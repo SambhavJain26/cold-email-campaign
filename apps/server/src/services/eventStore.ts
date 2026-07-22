@@ -4,7 +4,11 @@
 // `enrollments.current_state`.
 import type { Db, Tx } from '../db/client';
 import { insertEvents, listByEnrollments } from '../db/repos/eventsRepo';
-import { writeProjection, listIdsByState, patchScheduling } from '../db/repos/enrollmentsRepo';
+import {
+  writeProjection,
+  listIdsActivePastStep,
+  patchScheduling,
+} from '../db/repos/enrollmentsRepo';
 import { suppressLead } from '../db/repos/suppressionsRepo';
 import { getSettings } from '../db/repos/settingsRepo';
 import { acquireRebuildLockShared, lockEnrollment } from '../db/repos/locksRepo';
@@ -113,7 +117,9 @@ export class EventStore {
   ): Promise<number> {
     return this.db.transaction(async (tx) => {
       await acquireRebuildLockShared(tx);
-      const activeIds = await listIdsByState(tx, campaignId, 'ACTIVE');
+      // Only enrollments already past the last step can complete — exact
+      // SQL prefilter, keeps the per-tick sweep cheap.
+      const activeIds = await listIdsActivePastStep(tx, campaignId, shape.lastStepNo);
       const byEnrollment = await listByEnrollments(tx, activeIds);
       let completed = 0;
       for (const eid of activeIds) {

@@ -8,6 +8,7 @@
 import { Pool } from 'pg';
 import { createDb, type Db } from '../../src/db/client';
 import { EventStore } from '../../src/services/eventStore';
+import { buildEvent } from '../../src/domain/events';
 import { VirtualClock } from '../../src/clock/virtual';
 import { MockTransport } from '../../src/transport/mock/mockTransport';
 import { threadedReply, dsnBounce, oooReply } from '../../src/transport/mock/inbound';
@@ -35,6 +36,8 @@ export interface ScenarioConfig {
   seed?: number;
   tickMinutes?: number;
   pollMinutes?: number;
+  /** send_jitter_pct override (golden L3 uses 0 for exact-slot pacing). */
+  jitterPct?: number;
   /** Campaign ramp config; scenarios default to NO ramp (unlimited enroll). */
   ramp?: { ramp_days: number; ramp_daily_enroll_cap: number };
 }
@@ -43,7 +46,7 @@ export type LeadRef = string; // 'L0001' … — id 1…, email l0001@scenario.d
 
 export type ScriptedOutcome =
   | { outcome: 'hard_bounce'; dsn?: string }
-  | { outcome: 'soft_bounce_then_deliver'; retries?: number; dsn?: string }
+  | { outcome: 'soft_bounce_then_deliver'; retries?: number; dsn?: string; atStep?: number }
   | { outcome: 'smtp_transient'; times?: number };
 
 interface PendingInbound {
@@ -169,8 +172,8 @@ export class Scenario {
     // tunables tests mutate so runs stay order-independent.
     await this.pool.query(
       `UPDATE settings SET scheduler_tick_minutes = $1, poll_interval_minutes = $2,
-              optout_detection = 'auto' WHERE id = 1`,
-      [this.cfg.tickMinutes, this.cfg.pollMinutes],
+              optout_detection = 'auto', send_jitter_pct = $3 WHERE id = 1`,
+      [this.cfg.tickMinutes, this.cfg.pollMinutes, this.cfg.jitterPct ?? 20],
     );
   }
 
@@ -240,11 +243,14 @@ export class Scenario {
       });
       return;
     }
-    // soft_bounce_then_deliver: first `retries` sends soft-bounce, then clean.
-    let remaining = script.retries ?? 1;
+    // soft_bounce_then_deliver: `retries` consecutive accepted sends starting
+    // at the atStep-th (default: the first) soft-bounce, then delivery sticks.
+    const retries = script.retries ?? 1;
+    const firstBounced = script.atStep ?? 1;
+    let count = 0;
     this.watchSends(email, (entry) => {
-      if (remaining <= 0) return;
-      remaining -= 1;
+      count += 1;
+      if (count < firstBounced || count >= firstBounced + retries) return;
       this.pendingInbound.push({
         at: new Date(entry.at.getTime() + 5 * 60_000),
         mailboxId: entry.mailboxId,
@@ -258,13 +264,14 @@ export class Scenario {
     });
   }
 
-  /** A human reply `days` after the lead's FIRST accepted send. */
-  replyAfter(ref: LeadRef, opts: { days: number; text: string }): void {
+  /**
+   * A human reply `days` after the lead's Nth accepted send (`afterStep`,
+   * default 1 — soft-retry resends count as their own sends, so scripts that
+   * combine both must account for the extra attempt).
+   */
+  replyAfter(ref: LeadRef, opts: { days: number; text: string; afterStep?: number }): void {
     const email = leadEmail(ref);
-    let armed = true;
-    this.watchSends(email, (entry) => {
-      if (!armed) return;
-      armed = false;
+    this.afterNthSend(email, opts.afterStep ?? 1, (entry) => {
       const at = new Date(entry.at.getTime() + opts.days * 86_400_000);
       this.pendingInbound.push({
         at,
@@ -280,13 +287,10 @@ export class Scenario {
     });
   }
 
-  /** An OOO auto-reply `days` after the lead's first accepted send. */
-  oooAfter(ref: LeadRef, opts: { days: number }): void {
+  /** An OOO auto-reply `days` after the lead's Nth accepted send. */
+  oooAfter(ref: LeadRef, opts: { days: number; afterStep?: number }): void {
     const email = leadEmail(ref);
-    let armed = true;
-    this.watchSends(email, (entry) => {
-      if (!armed) return;
-      armed = false;
+    this.afterNthSend(email, opts.afterStep ?? 1, (entry) => {
       const at = new Date(entry.at.getTime() + opts.days * 86_400_000);
       this.pendingInbound.push({
         at,
@@ -294,6 +298,71 @@ export class Scenario {
         build: () => oooReply({ from: email, receivedAt: at, inReplyTo: entry.messageId }),
       });
     });
+  }
+
+  /**
+   * A link unsubscribe `days` after the lead's Nth accepted send (the compliance
+   * footer link — no inbound message involved; appended via the eventStore
+   * exactly like the future API route will).
+   */
+  linkUnsubAfter(ref: LeadRef, opts: { days: number; afterStep: number }): void {
+    const email = leadEmail(ref);
+    this.afterNthSend(email, opts.afterStep, (entry) => {
+      const at = new Date(entry.at.getTime() + opts.days * 86_400_000);
+      this.scheduleJob('link-unsub', at, async (now) => {
+        const r = await this.pool.query(
+          `SELECT id, lead_id FROM enrollments WHERE lead_id = $1 AND campaign_id = $2`,
+          [leadId(ref), this.campaignId],
+        );
+        if (r.rows.length !== 1) throw new Error(`linkUnsubAfter(${ref}): enrollment not found`);
+        await this.store.append([
+          buildEvent.unsubscribe({
+            leadId: leadId(ref),
+            enrollmentId: r.rows[0].id,
+            campaignId: this.campaignId,
+            occurredAt: now,
+            source: 'link',
+          }),
+        ]);
+      });
+    });
+  }
+
+  /** Operator action: tag a reply's sentiment (appends sentiment_tagged, decision M). */
+  async tagSentiment(ref: LeadRef, sentiment: 'positive' | 'neutral' | 'negative'): Promise<void> {
+    const r = await this.pool.query(
+      `SELECT e.id, e.enrollment_id FROM events e
+       WHERE e.lead_id = $1 AND e.type = 'human_reply' ORDER BY e.id DESC LIMIT 1`,
+      [leadId(ref)],
+    );
+    if (r.rows.length !== 1) throw new Error(`tagSentiment(${ref}): no human_reply found`);
+    await this.store.append([
+      buildEvent.sentimentTagged({
+        leadId: leadId(ref),
+        enrollmentId: r.rows[0].enrollment_id,
+        campaignId: this.campaignId,
+        occurredAt: this.clock.now(),
+        sentiment,
+        attributes: { reply_event_id: Number(r.rows[0].id), tagged_by: 'human' },
+      }),
+    ]);
+  }
+
+  /** Operator action: mark a meeting booked (milestone flag, not a state). */
+  async bookMeeting(ref: LeadRef): Promise<void> {
+    const r = await this.pool.query(
+      `SELECT id FROM enrollments WHERE lead_id = $1 AND campaign_id = $2`,
+      [leadId(ref), this.campaignId],
+    );
+    if (r.rows.length !== 1) throw new Error(`bookMeeting(${ref}): enrollment not found`);
+    await this.store.append([
+      buildEvent.meetingBooked({
+        leadId: leadId(ref),
+        enrollmentId: r.rows[0].id,
+        campaignId: this.campaignId,
+        occurredAt: this.clock.now(),
+      }),
+    ]);
   }
 
   /** Inline job queue — the test-side JobPort (pg-boss equivalent, docs/13 §4). */
@@ -386,6 +455,15 @@ export class Scenario {
     const list = this.sendWatchers.get(key) ?? [];
     list.push(fn);
     this.sendWatchers.set(key, list);
+  }
+
+  /** Fire once, on the lead's Nth ACCEPTED send. */
+  private afterNthSend(email: string, nth: number, fn: (entry: SentEntryLite) => void): void {
+    let count = 0;
+    this.watchSends(email, (entry) => {
+      count += 1;
+      if (count === nth) fn(entry);
+    });
   }
 
   /** Feed newly-accepted sends to registered watchers exactly once. */

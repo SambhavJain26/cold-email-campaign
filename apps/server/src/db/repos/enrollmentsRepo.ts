@@ -93,6 +93,27 @@ export async function listDue(db: DbLike, now: Date): Promise<DueEnrollment[]> {
   return rows.map((r) => ({ ...r, nextSendAt: r.nextSendAt! }));
 }
 
+/**
+ * Completion candidates: ACTIVE enrollments already past the sequence's last
+ * step (shouldComplete requires currentStepNo > lastStepNo, so this SQL
+ * prefilter is exact — it just avoids folding every ACTIVE enrollment).
+ */
+export async function listIdsActivePastStep(
+  db: DbLike,
+  campaignId: number | null,
+  lastStepNo: number,
+): Promise<number[]> {
+  const base = and(
+    eq(enrollments.currentState, 'ACTIVE'),
+    sql`${enrollments.currentStepNo} > ${lastStepNo}`,
+  );
+  const rows = await db
+    .select({ id: enrollments.id })
+    .from(enrollments)
+    .where(campaignId === null ? base : and(base, eq(enrollments.campaignId, campaignId)));
+  return rows.map((r) => r.id);
+}
+
 /** Campaigns that still have ACTIVE enrollments — the tick's completion sweep set. */
 export async function activeCampaignIds(db: DbLike): Promise<number[]> {
   const rows = await db

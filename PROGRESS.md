@@ -4,7 +4,7 @@
 
 **Legend:** `[ ]` not started · `[~]` in progress · `[x]` done · `[!]` blocked (note why in the log)
 
-**Current focus:** → **B3** (mock transport + scheduler + poller; B0–B2 complete)
+**Current focus:** → **B4** (render engine; B0–B3 complete, **M1 proven core** ✅)
 
 ---
 
@@ -13,7 +13,7 @@
 | | Milestone | Definition | Requires | Status |
 |--|-----------|-----------|----------|--------|
 | M0 | Docs complete | All docs/ written; decisions locked | — | ✅ 2026-07-22 |
-| M1 | **Proven core** | Golden cohort passes at all 3 levels offline | B0–B3 | ☐ |
+| M1 | **Proven core** | Golden cohort passes at all 3 levels offline | B0–B3 | ✅ 2026-07-22 |
 | M2 | **Operable workflow** | Real API serving F0–F3 screens | B4–B6, F0–F3 | ☐ |
 | M3 | **Full product (offline)** | Walkthrough-replay e2e green; ops hardened | F4–F8, B7 | ☐ |
 | M4 | **Live** | Canary checklist done; real cohort reconciles | B8 | ☐ |
@@ -35,8 +35,8 @@
 - **Gate:** ✅ 2026-07-22 — golden L2 green (every Part-10/§13 number through SQL); edge suite green; contract-shaped fixtures exported to apps/web/src/mocks/fixtures/golden/ (F0 unblocked)
 
 ### B3 — Mock transport + scheduler + poller ← core complete
-- [x] B3.1 transport migration · [x] B3.2 MockTransport · [x] B3.3 synthetic inbound · [x] B3.4 scenario runner · [x] B3.5 tz/windows · [x] B3.6 pacing+rotation · [x] B3.7 tick · [x] B3.8 sendOne+confirm-delivery · [x] B3.9 capacity+enroll · [x] B3.10 poll cycle+ledger · [x] B3.11 classifier · [x] B3.12 STOP detection · [x] B3.13 auto-pause · [x] B3.14 health machine+redistribution · [x] B3.15 alerts · [x] B3.16 pg-boss wiring · [ ] B3.17 **golden L3 (flagship)** · [ ] B3.18 edge suite · [ ] B3.19 transport-swap test
-- **Gate:** ☐ B3.17–19 green → **M1**
+- [x] B3.1 transport migration · [x] B3.2 MockTransport · [x] B3.3 synthetic inbound · [x] B3.4 scenario runner · [x] B3.5 tz/windows · [x] B3.6 pacing+rotation · [x] B3.7 tick · [x] B3.8 sendOne+confirm-delivery · [x] B3.9 capacity+enroll · [x] B3.10 poll cycle+ledger · [x] B3.11 classifier · [x] B3.12 STOP detection · [x] B3.13 auto-pause · [x] B3.14 health machine+redistribution · [x] B3.15 alerts · [x] B3.16 pg-boss wiring · [x] B3.17 **golden L3 (flagship)** · [x] B3.18 edge suite · [x] B3.19 transport-swap test
+- **Gate:** ✅ 2026-07-22 — B3.17–19 green → **M1** (golden suite 47 tests: L1 + L2 + L3 full-pipeline replay)
 
 ### B4 — Render engine
 - [ ] B4.1 migration · [ ] B4.2 parser · [ ] B4.3 merge tags · [ ] B4.4 spintax · [ ] B4.5 mode slots · [ ] B4.6 footer+guard · [ ] B4.7 checks+score · [ ] B4.8 variant selection · [ ] B4.9 MIME/threading · [ ] B4.10 manual compose · [ ] B4.11 test suite · [ ] B4.12 threading e2e
@@ -100,6 +100,7 @@
 
 | Date | Entry |
 |------|-------|
+| 2026-07-22 | **B3 COMPLETE — M1 PROVEN CORE.** B3.17 golden L3 flagship: the Part-10 cohort scripted as live scenario (golden/scenario.ts reuses constants' id layout) and driven through the REAL scheduler+poller+eventStore over MockTransport+VirtualClock for 47 virtual days (30 enroll-days × 30/day + 17-day tail; tick 9 min = exact 18-min pace slots at jitter 0; ~3.3k sends). Reproduces terminals 40/18/47/780, every L2 headline (8.3/3.2/4.6/2.0/1.0/17/2.0-per-100, 13b delivered 867/831/801/789 + repliers 30/25/10/7 + positives 15/9/1/3, 13c per-tier), PLUS pipeline invariants L1/L2 can't see: zero out-of-window sends, zero mailbox-day cap violations, pace floor ≥ minGap×0.8, threading integrity, never-rerouted follow-ups, classifier saw exactly 27 bounces + 72 replies + 0 unrelated, rebuild zero-drift after the live run. completeEligible gained an exact SQL prefilter (ACTIVE past last step) to keep per-tick sweeps cheap. B3.18 edges (never-burst 14h-downtime catch-up w/ single alert, ET-local-midnight cap accounting across UTC midnight, rotation balance ±1) + B3.19 transport-swap (TrivialTransport via composition override — downstream identical; compose gains jobPort override). 224 unit+integration, 47 golden. Next: B4.1. |
 | 2026-07-22 | B3 checkpoint 4 (B3.13–B3.16, built 15→13→14→16): 0006_ops migration (alerts + alert_severity) + DbAlertSink (webhook seam for B7.4); auto-pause engine — docs/05 §5 window queries on events alone (last-N sends correlated to bounces by enrollment+step), Part-11 example locked verbatim (55 sends: 3-in-10 absolute fires, 4-in-50 = 8%), pct rule volume-gated, alert carries both windows; resumeMailbox (50% cap) + 7-clean-days auto-clear proven; health machine rounded out — TransportAuthError on fetchNew → auth_failed + redistribution (transient fetch errors rethrow to job retry), imap_stale flip→auto-recover cycle tested, redistribution keeps mid-thread assignments; pg-boss 12 wired (tick cron, per-mailbox poll queues, delayed confirm-delivery as the JobPort impl) + boot/schedule/execute smoke on the real thing; composition root now builds the full worker graph (real MockTransport at MAIL_TRANSPORT=mock) and main.ts starts jobs for ROLE≠api. 248 tests; golden green. Next: B3.17 golden L3. |
 | 2026-07-22 | B3 checkpoint 3 (B3.10–B3.12): poller complete. Poll cycle with (mailbox,UID) + Message-ID idempotency (duplicate rows carry message_id NULL — im_msgid belongs to the original); ledger id PRE-allocated via identity nextval so human_reply.attributes.incoming_message_id and the row land in ONE tx (OVERRIDING SYSTEM VALUE insert); 4-bucket classifier (DSN→hard/soft w/ +4h same-step retry; auto-reply threaded but non-stopping; human via In-Reply-To→References walk; poison→unrelated+parse_error, never wedges); STOP matcher (unquote, 300-char window, bare-"stop" needs ≤40 words AND ≤4-word standalone clause — docs/07 §7 amended: its ≤40-words-only rule false-positived on its own example) + tag_only skip. Fixture corpus exercised bucket×provider; flows: reply-stops-sequence, auto-unsub+suppression, soft→retry→recover→delivered, soft×3→BOUNCED, late-reply-upgrades-COMPLETED, reply-after-UNSUB logged-not-changed. Lesson: settings row survives resetCoreTables — scenario init now restores mutated tunables. 224 tests; golden green. Next: B3.13 (checkpoint 4 order: B3.15 alerts infra first). |
 | 2026-07-22 | B3 checkpoint 2 (B3.5–B3.9): scheduler complete against MockTransport. tzmap (51 states, majority-zone splits) + Intl-based insideWindow/startOfLocalDay (no reset cron); pacing minGap±jitter + rotation (ratio → last_send_at → seeded rng); Scheduler.tick (session advisory lock (2,0), housekeeping incl. imap-stale flip + resume_cap 7-day clear + per-campaign completeEligible, budgets from sent-event counts, oldest-first due loop, catchup_backlog deduped per episode); sendOne (4a/4b/4c: tx append+sent_messages+patches, 5×transient→paused/smtp_failing, RCPT-5xx→hard_bounce, auth→auth_failed+redistribution); confirm-delivery keyed to sentAt so soft-retry attempts don't veto; capacity+enroll service (ramp caps, tier ordering, recycle hash guard in SQL — drizzle lesson: bare array in sql`` expands to a tuple, use sql.param). EventStore.append gains {patches, txWork} (terminal fold beats stale nextSendAt). Seams: SequenceProvider (static), Renderer (stub), JobPort (inline queue), AlertSink (capturing). 161 tests; golden L1/L2 green. Next: B3.10. |
