@@ -3,11 +3,13 @@
 // message never wedges the mailbox; job failure never advances last_poll_uid.
 import type { Db } from '../db/client';
 import type { Clock } from '../clock';
-import type { MailTransport, IncomingMessage } from '../transport/types';
+import { TransportAuthError, type MailTransport, type IncomingMessage } from '../transport/types';
 import type { AlertSink } from '../alerts/types';
 import type { EventStore } from '../services/eventStore';
+import { evaluateAutoPause } from '../services/autoPause';
 import { getSettings } from '../db/repos/settingsRepo';
 import { getMailbox, patchMailbox } from '../db/repos/mailboxesRepo';
+import { redistributeUnstarted } from '../db/repos/enrollmentsRepo';
 import {
   existsByUid,
   findByMessageId,
@@ -47,7 +49,31 @@ export class Poller {
 
     const now = clock.now();
     const settings = await getSettings(db);
-    const msgs = (await transport.fetchNew(mailboxId)).sort((a, b) => a.uid - b.uid);
+
+    let msgs: IncomingMessage[];
+    try {
+      msgs = (await transport.fetchNew(mailboxId)).sort((a, b) => a.uid - b.uid);
+    } catch (err) {
+      if (err instanceof TransportAuthError) {
+        // Permanent IMAP auth failure (docs/07 §5): pause sends, alert,
+        // redistribute unstarted enrollments (docs/06 §6).
+        await patchMailbox(db, mailboxId, {
+          status: 'auth_failed',
+          statusReason: err.message,
+          pausedAt: now,
+        });
+        await alerts.emit('mailbox_auth_failed', 'error', {
+          mailboxId,
+          error: err.message,
+          via: 'imap_poll',
+        });
+        await redistributeUnstarted(db, mailboxId);
+        return result;
+      }
+      // Transient failure: rethrow - job retry/backoff owns it; last_poll_uid
+      // did NOT advance, and staleness detection is the scheduler's job.
+      throw err;
+    }
 
     for (const m of msgs) {
       // Idempotency 1: (mailbox, UID) already in the ledger.
@@ -107,6 +133,13 @@ export class Poller {
       result.processed += 1;
       result.byClass[classified.classification] =
         (result.byClass[classified.classification] ?? 0) + 1;
+
+      // Post-commit hook (docs/06 §6): every hard_bounce append re-evaluates
+      // the sending mailbox's auto-pause windows.
+      const hardBounce = classified.events.find((e) => e.type === 'hard_bounce');
+      if (hardBounce && 'mailboxId' in hardBounce && hardBounce.mailboxId !== undefined) {
+        await evaluateAutoPause({ db, alerts }, hardBounce.mailboxId, now);
+      }
     }
 
     await patchMailbox(db, mailboxId, { lastSuccessfulPollAt: now });

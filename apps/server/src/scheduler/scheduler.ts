@@ -22,6 +22,7 @@ import {
 import { insertSentMessage, listThreadMessageIds } from '../db/repos/sentMessagesRepo';
 import { buildEvent } from '../domain/events';
 import { shapeOf, stepOf } from '../domain/sequence';
+import { evaluateAutoPause } from '../services/autoPause';
 import { resolveTimezone } from './tzmap';
 import { insideWindow, startOfLocalDay } from './window';
 import { jitterFactor, minGapMs, paceReady } from './pacing';
@@ -412,8 +413,8 @@ export class Scheduler {
     return 'auth_failed';
   }
 
-  /** Post-commit hook on hard_bounce appends - auto-pause evaluation lands at B3.13. */
-  protected afterHardBounce(_mailboxId: number, _now: Date): Promise<void> {
-    return Promise.resolve();
+  /** Post-commit hook on every hard_bounce append (docs/06 §6, B3.13). */
+  protected async afterHardBounce(mailboxId: number, now: Date): Promise<void> {
+    await evaluateAutoPause({ db: this.deps.db, alerts: this.deps.alerts }, mailboxId, now);
   }
 }

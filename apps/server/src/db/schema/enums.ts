@@ -51,6 +51,7 @@ export const incomingClassEnum = pgEnum('incoming_class', [
   'human_reply',
   'unrelated',
 ]);
+export const alertSeverityEnum = pgEnum('alert_severity', ['info', 'warning', 'error']);
 export const campaignStatusEnum = pgEnum('campaign_status', [
   'draft',
   'active',

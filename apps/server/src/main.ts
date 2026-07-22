@@ -1,5 +1,5 @@
-// Boot: config → logger → compose → HTTP listen → graceful shutdown.
-// ROLE branching (api|worker|all) becomes meaningful when pg-boss jobs land (B3).
+// Boot: config → logger → compose → workers (ROLE) → HTTP listen → graceful
+// shutdown.
 import { loadConfig } from './config/env';
 import { createLogger } from './config/logger';
 import { compose } from './composition';
@@ -12,8 +12,14 @@ async function main(): Promise<void> {
 
   const app = buildServer({ logger, pool: services.pool });
 
+  if (config.ROLE !== 'api') {
+    await services.jobs.start(); // pg-boss: tick cron, polls, confirm-delivery
+    logger.info('pg-boss workers started');
+  }
+
   const shutdown = async (signal: string): Promise<void> => {
     logger.info({ signal }, 'shutting down');
+    await services.jobs.stop();
     await app.close();
     await services.pool.end();
     process.exit(0);

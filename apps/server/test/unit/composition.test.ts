@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { compose } from '../../src/composition';
 import { parseEnv } from '../../src/config/env';
 import { VirtualClock } from '../../src/clock/virtual';
+import { MockTransport } from '../../src/transport/mock/mockTransport';
 
 function testConfig() {
   const r = parseEnv({
@@ -16,10 +17,15 @@ function testConfig() {
 }
 
 describe('compose', () => {
-  it('defaults to SystemClock and a stub transport that fails loudly', async () => {
+  it('defaults to SystemClock and the real MockTransport (MAIL_TRANSPORT=mock)', async () => {
     const services = compose(testConfig());
     expect(Math.abs(services.clock.now().getTime() - Date.now())).toBeLessThan(1000);
-    await expect(services.transport.fetchNew(1)).rejects.toThrow(/MockTransport arrives in B3/);
+    expect(services.transport).toBeInstanceOf(MockTransport);
+    await expect(services.transport.fetchNew(1)).resolves.toEqual([]);
+    // the full worker graph is composed too
+    expect(services.scheduler).toBeDefined();
+    expect(services.poller).toBeDefined();
+    expect(services.jobs).toBeDefined();
   });
 
   it('accepts overrides - the seam tests use for VirtualClock + scripted transports', () => {
