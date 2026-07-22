@@ -19,9 +19,7 @@ describe('compose', () => {
   it('defaults to SystemClock and a stub transport that fails loudly', async () => {
     const services = compose(testConfig());
     expect(Math.abs(services.clock.now().getTime() - Date.now())).toBeLessThan(1000);
-    await expect(
-      services.transport.fetchNew(1),
-    ).rejects.toThrow(/MockTransport arrives in B3/);
+    await expect(services.transport.fetchNew(1)).rejects.toThrow(/MockTransport arrives in B3/);
   });
 
   it('accepts overrides — the seam tests use for VirtualClock + scripted transports', () => {

@@ -15,7 +15,13 @@ export function registerErrorHandling(app: FastifyInstance): void {
     if (fastifyErr.validation) {
       return reply
         .status(400)
-        .send(toEnvelope('validation', fastifyErr.message ?? 'Validation failed', fastifyErr.validation));
+        .send(
+          toEnvelope(
+            'validation',
+            fastifyErr.message ?? 'Validation failed',
+            fastifyErr.validation,
+          ),
+        );
     }
     req.log.error({ err }, 'unhandled error');
     return reply.status(500).send(toEnvelope('internal', 'Internal server error'));
