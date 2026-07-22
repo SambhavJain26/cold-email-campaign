@@ -31,7 +31,7 @@
 - **Gate:** ✅ 2026-07-22 - B1.8/B1.9/B1.10 green; golden L1 at both levels (pure fold + live eventStore append + rebuild zero-drift); @golden is a separate required CI job
 
 ### B2 - Metrics engine
-- [ ] B2.1-9 metric functions · [ ] B2.10 sentiment CTE · [ ] B2.11-14 groupings · [ ] B2.15 outcomes+selfCheck · [ ] B2.16 golden L2 · [ ] B2.17 edge tests · [ ] B2.18 fixture export → web mocks
+- [x] B2.1-9 metric functions · [x] B2.10 sentiment CTE · [x] B2.11-14 groupings · [x] B2.15 outcomes+selfCheck · [x] B2.16 golden L2 · [x] B2.17 edge tests · [~] B2.18 fixture export → web mocks
 - **Gate:** ☐ golden L2 + edges green; fixtures exported (unblocks F0)
 
 ### B3 - Mock transport + scheduler + poller ← core complete
