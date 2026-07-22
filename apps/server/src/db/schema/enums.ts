@@ -37,6 +37,20 @@ export const personalizationModeEnum = pgEnum('personalization_mode', [
   'template_auto',
 ]);
 export const unsubscribeSourceEnum = pgEnum('unsubscribe_source', ['reply', 'link', 'manual']);
+export const mailboxStatusEnum = pgEnum('mailbox_status', [
+  'ok',
+  'paused',
+  'auto_paused',
+  'auth_failed',
+  'imap_stale',
+  'provider_blocked',
+]);
+export const incomingClassEnum = pgEnum('incoming_class', [
+  'bounce',
+  'auto_reply',
+  'human_reply',
+  'unrelated',
+]);
 export const campaignStatusEnum = pgEnum('campaign_status', [
   'draft',
   'active',

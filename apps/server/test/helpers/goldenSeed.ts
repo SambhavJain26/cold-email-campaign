@@ -5,7 +5,7 @@ import type { Db } from '../../src/db/client';
 import { EventStore } from '../../src/services/eventStore';
 import { GOLDEN, personalizationModeOf, tierOf } from '../fixtures/golden/constants';
 import { loadGoldenEvents } from '../fixtures/golden/load';
-import { resetCoreTables } from './db';
+import { resetCoreTables, seedMailboxes } from './db';
 
 const CHUNK = 1000;
 
@@ -16,6 +16,7 @@ const CHUNK = 1000;
  */
 export async function seedGoldenCohort(db: Db, pool: Pool): Promise<number> {
   await resetCoreTables(pool);
+  await seedMailboxes(pool, GOLDEN.mailboxes); // fixture events carry mailbox_id 1..4 (FK since 0004)
 
   const n = GOLDEN.totalLeads;
   const emails = Array.from({ length: n }, (_, i) => `golden-${i + 1}@fixture.dev`);

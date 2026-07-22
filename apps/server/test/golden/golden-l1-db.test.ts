@@ -9,7 +9,7 @@ import { rebuildProjections } from '../../src/services/rebuildProjections';
 import { stateCounts } from '../../src/db/repos/enrollmentsRepo';
 import { GOLDEN, personalizationModeOf, tierOf } from '../fixtures/golden/constants';
 import { loadGoldenEvents } from '../fixtures/golden/load';
-import { TEST_DATABASE_URL, resetCoreTables } from '../helpers/db';
+import { TEST_DATABASE_URL, resetCoreTables, seedMailboxes } from '../helpers/db';
 
 const CHUNK = 1000;
 
@@ -22,6 +22,7 @@ describe('@golden L1 - live append + rebuild equivalence', () => {
     ({ db, pool } = createDb(TEST_DATABASE_URL));
     store = new EventStore(db);
     await resetCoreTables(pool);
+    await seedMailboxes(pool, GOLDEN.mailboxes); // fixture events carry mailbox_id 1..4 (FK since 0004)
 
     // 885 leads + campaign + enrollments; RESTART IDENTITY makes ids 1..885
     // line up with the fixture's lead/enrollment ids.

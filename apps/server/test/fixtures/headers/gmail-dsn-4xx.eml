@@ -1,0 +1,30 @@
+From: Mail Delivery Subsystem <mailer-daemon@googlemail.com>
+To: arjun@ourdomain.com
+Subject: Delivery Status Notification (Delay)
+Message-ID: <68b1a2c3.050a0220.9f3e1@mx.google.com>
+Date: Tue, 13 Jan 2026 14:02:51 -0800
+Auto-Submitted: auto-replied
+Content-Type: multipart/report; report-type=delivery-status; boundary="000000000000ef34gh"
+
+--000000000000ef34gh
+Content-Type: text/plain; charset="UTF-8"
+
+** Mailbox full **
+
+Your message to maria.garcia@sunsethomes.com couldn't be delivered because
+the recipient's inbox is full.
+
+--000000000000ef34gh
+Content-Type: message/delivery-status
+
+Reporting-MTA: dns; googlemail.com
+Received-From-MTA: dns; ourdomain.com
+Arrival-Date: Tue, 13 Jan 2026 14:02:49 -0800
+
+Final-Recipient: rfc822; maria.garcia@sunsethomes.com
+Action: failed
+Status: 4.2.2
+Diagnostic-Code: smtp; 452-4.2.2 The email account that you tried to reach is
+ over quota. Please direct the recipient to clear space in their mailbox.
+
+--000000000000ef34gh--
