@@ -5,7 +5,7 @@ import { createDb, type Db } from '../../src/db/client';
 import type { Pool } from 'pg';
 import { EventStore } from '../../src/services/eventStore';
 import { buildEvent } from '../../src/domain/events';
-import { TEST_DATABASE_URL, resetCoreTables } from '../helpers/db';
+import { TEST_DATABASE_URL, resetCoreTables, seedMailboxes } from '../helpers/db';
 
 const at = (min: number) => new Date(Date.UTC(2026, 2, 2, 9, min));
 
@@ -28,6 +28,7 @@ describe('eventStore.append', () => {
 
   beforeEach(async () => {
     await resetCoreTables(pool);
+    await seedMailboxes(pool, 1);
     leadId = (await pool.query(`INSERT INTO leads (email) VALUES ('es@test.dev') RETURNING id`))
       .rows[0].id;
     campaignId = (await pool.query(`INSERT INTO campaigns (name) VALUES ('t') RETURNING id`))

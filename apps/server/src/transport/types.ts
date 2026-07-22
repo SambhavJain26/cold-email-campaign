@@ -21,6 +21,12 @@ export interface SendResult {
   accepted: boolean;
   transientError?: string; // 4xx/connection — retry, nothing appended
   permanentError?: string; // 5xx — hard_bounce (recipient) or mailbox failure
+  /**
+   * Which thing failed permanently (docs/06 §5 4c): 'recipient' = RCPT-time
+   * 5xx → append hard_bounce; 'mailbox' = auth/connection-level permanent
+   * → mailbox status auth_failed + redistribution.
+   */
+  errorScope?: 'recipient' | 'mailbox';
 }
 
 export interface IncomingMessage {

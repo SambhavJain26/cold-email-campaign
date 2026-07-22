@@ -23,6 +23,23 @@ export function getTestPool(): Pool {
  */
 export async function resetCoreTables(pool: Pool): Promise<void> {
   await pool.query(
-    'TRUNCATE events, enrollments, suppressions, campaigns, leads RESTART IDENTITY CASCADE',
+    `TRUNCATE events, enrollments, suppressions, campaigns, leads,
+             incoming_messages, sent_messages, mailbox_secrets, mailboxes
+     RESTART IDENTITY CASCADE`,
   );
+}
+
+/**
+ * Seed n mailboxes (ids 1..n after RESTART IDENTITY). Events referencing
+ * mailbox_id are FK-checked since 0004 — any test appending sent/bounce
+ * events needs these rows first.
+ */
+export async function seedMailboxes(pool: Pool, n: number, dailyCap = 30): Promise<void> {
+  for (let i = 1; i <= n; i++) {
+    await pool.query(
+      `INSERT INTO mailboxes (display_name, from_address, smtp_host, imap_host, daily_cap)
+       VALUES ($1, $2, 'smtp.test.dev', 'imap.test.dev', $3)`,
+      [`Test Mailbox ${i}`, `mb${i}@test.dev`, dailyCap],
+    );
+  }
 }

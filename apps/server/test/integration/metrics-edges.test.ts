@@ -6,7 +6,7 @@ import { createDb, type Db } from '../../src/db/client';
 import { EventStore } from '../../src/services/eventStore';
 import { MetricsEngine } from '../../src/services/metrics';
 import { buildEvent } from '../../src/domain/events';
-import { TEST_DATABASE_URL, resetCoreTables } from '../helpers/db';
+import { TEST_DATABASE_URL, resetCoreTables, seedMailboxes } from '../helpers/db';
 
 const at = (min: number) => new Date(Date.UTC(2026, 3, 1, 9, min));
 
@@ -19,6 +19,7 @@ describe('metrics edge cases', () => {
     ({ db, pool } = createDb(TEST_DATABASE_URL));
     metrics = new MetricsEngine(db);
     await resetCoreTables(pool);
+    await seedMailboxes(pool, 1);
 
     // 6 leads covering every edge
     for (let i = 1; i <= 6; i++) {
