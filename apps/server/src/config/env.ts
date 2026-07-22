@@ -41,7 +41,9 @@ export interface ParseEnvSuccess {
 }
 
 /** Pure parse - used by tests and loadConfig. Empty strings count as unset. */
-export function parseEnv(source: Record<string, string | undefined>): ParseEnvSuccess | ParseEnvFailure {
+export function parseEnv(
+  source: Record<string, string | undefined>,
+): ParseEnvSuccess | ParseEnvFailure {
   const cleaned = Object.fromEntries(
     Object.entries(source).filter(([, v]) => v !== undefined && v !== ''),
   );

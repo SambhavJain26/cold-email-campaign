@@ -15,7 +15,10 @@ describe('api skeleton', () => {
   beforeAll(async () => {
     pool = getTestPool();
     const silent = new Writable({ write: (_c, _e, cb) => cb() });
-    app = buildServer({ logger: createLogger({ LOG_LEVEL: 'error', NODE_ENV: 'test' }, silent), pool });
+    app = buildServer({
+      logger: createLogger({ LOG_LEVEL: 'error', NODE_ENV: 'test' }, silent),
+      pool,
+    });
     // test-only routes exercising the central error mapping
     app.get('/boom-app-error', () => {
       throw new AppError('conflict', 409, 'already exists', { id: 7 });
