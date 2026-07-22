@@ -16,6 +16,7 @@ import type {
   VerifyResult,
 } from '../../src/transport/types';
 import { runConfirmDelivery } from '../../src/scheduler/confirmDelivery';
+import { StaticSequenceProvider } from '../../src/scheduler/staticSequenceProvider';
 import { TEST_DATABASE_URL, resetCoreTables, seedMailboxes } from '../helpers/db';
 import type { SequenceDef } from '../../src/domain/sequence';
 
@@ -73,11 +74,14 @@ describe('transport-swap (B3.19)', () => {
   beforeAll(async () => {
     clock = new VirtualClock('2026-01-05T14:00:00Z'); // Mon 09:00 ET, inside window
     transport = new TrivialTransport();
+    const sequences = new StaticSequenceProvider();
+    sequences.register(1, twoStep);
     services = compose(testConfig(), {
       clock,
       transport, // ← the ONE line that changes at B8
       databaseUrl: TEST_DATABASE_URL,
       jobPort: { scheduleConfirmDelivery: () => Promise.resolve() }, // inline; confirm run manually below
+      sequences,
     });
     pool = services.pool;
     await resetCoreTables(pool);
@@ -89,7 +93,6 @@ describe('transport-swap (B3.19)', () => {
        VALUES (1, 1, 'ACTIVE', 'template_auto', $1, $1)`,
       [clock.now()],
     );
-    services.sequences.register(1, twoStep);
   });
 
   afterAll(async () => {

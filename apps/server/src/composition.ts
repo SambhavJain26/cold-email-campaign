@@ -14,9 +14,9 @@ import { EventStore } from './services/eventStore';
 import { Scheduler } from './scheduler/scheduler';
 import { Poller } from './poller/poller';
 import { Jobs } from './jobs';
-import { StaticSequenceProvider } from './scheduler/staticSequenceProvider';
+import { DbSequenceProvider } from './scheduler/dbSequenceProvider';
 import { StubRenderer } from './render/stub';
-import type { JobPort } from './scheduler/types';
+import type { JobPort, SequenceProvider } from './scheduler/types';
 import { DbAlertSink } from './alerts/emitter';
 import { systemRng, type Rng } from './util/rng';
 
@@ -31,7 +31,7 @@ export interface AppServices {
   poller: Poller;
   /** Started by main.ts when ROLE ∈ {worker, all}. */
   jobs: Jobs;
-  sequences: StaticSequenceProvider;
+  sequences: SequenceProvider;
 }
 
 export interface ComposeOverrides {
@@ -42,6 +42,8 @@ export interface ComposeOverrides {
   rng?: Rng;
   /** Tests inject an inline job queue instead of pg-boss. */
   jobPort?: JobPort;
+  /** Tests inject a StaticSequenceProvider instead of the DB-backed one. */
+  sequences?: SequenceProvider;
 }
 
 export function compose(config: Config, overrides: ComposeOverrides = {}): AppServices {
@@ -58,7 +60,7 @@ export function compose(config: Config, overrides: ComposeOverrides = {}): AppSe
 
   const store = new EventStore(db);
   const alerts = new DbAlertSink(db); // webhook wired at B7.4
-  const sequences = new StaticSequenceProvider(); // DB-backed provider at B4
+  const sequences = overrides.sequences ?? new DbSequenceProvider(db); // 0003 tables (B4.1)
   const renderer = new StubRenderer(); // real render engine at B4
   const rng = overrides.rng ?? systemRng;
 
