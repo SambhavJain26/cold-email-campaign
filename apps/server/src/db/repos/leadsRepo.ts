@@ -1,7 +1,7 @@
-import { eq, inArray, sql } from 'drizzle-orm';
+import { and, eq, ilike, inArray, isNull, or, sql, type SQL } from 'drizzle-orm';
 import type { LeadTier } from '@coldemail/shared';
 import type { DbLike } from '../client';
-import { leads } from '../schema';
+import { enrollments, leads } from '../schema';
 
 export type LeadRow = typeof leads.$inferSelect;
 
@@ -51,6 +51,73 @@ export async function insertImportedLeads(
     for (const r of returned) inserted.set(r.email, r.id);
   }
   return inserted;
+}
+
+/**
+ * The lead-list filter (docs/10 GET /leads) — shared by the list endpoint
+ * (B6.3) and bulk-tier-by-filter so "select all matching" is exact.
+ */
+export interface LeadFilter {
+  tier?: LeadTier | 'untiered';
+  state?: string;
+  /** Leads with an enrollment in this campaign. */
+  campaignId?: number;
+  /** Case-insensitive substring over email / first / last / company. */
+  q?: string;
+  suppressed?: boolean;
+}
+
+export function leadFilterWhere(filter: LeadFilter): SQL | undefined {
+  const conds: SQL[] = [];
+  if (filter.tier !== undefined) {
+    conds.push(filter.tier === 'untiered' ? isNull(leads.tier)! : eq(leads.tier, filter.tier)!);
+  }
+  if (filter.state !== undefined) conds.push(eq(leads.state, filter.state)!);
+  if (filter.suppressed !== undefined) conds.push(eq(leads.isSuppressed, filter.suppressed)!);
+  if (filter.q !== undefined && filter.q !== '') {
+    const like = `%${filter.q}%`;
+    conds.push(
+      or(
+        ilike(leads.email, like),
+        ilike(leads.firstName, like),
+        ilike(leads.lastName, like),
+        ilike(leads.company, like),
+      )!,
+    );
+  }
+  if (filter.campaignId !== undefined) {
+    conds.push(
+      sql`EXISTS (SELECT 1 FROM ${enrollments} e
+                  WHERE e.lead_id = ${leads.id} AND e.campaign_id = ${filter.campaignId})`,
+    );
+  }
+  return conds.length === 0 ? undefined : and(...conds);
+}
+
+export async function updateTierByIds(
+  db: DbLike,
+  ids: readonly number[],
+  tier: LeadTier | null,
+): Promise<number> {
+  if (ids.length === 0) return 0;
+  const rows = await db
+    .update(leads)
+    .set({ tier })
+    .where(inArray(leads.id, [...ids]))
+    .returning({ id: leads.id });
+  return rows.length;
+}
+
+export async function updateTierByFilter(
+  db: DbLike,
+  filter: LeadFilter,
+  tier: LeadTier | null,
+): Promise<number> {
+  const where = leadFilterWhere(filter);
+  // An empty filter would retier EVERY lead — refuse; that can't be intended.
+  if (where === undefined) throw new Error('bulk-tier filter matched no constraints');
+  const rows = await db.update(leads).set({ tier }).where(where).returning({ id: leads.id });
+  return rows.length;
 }
 
 /** Which of these normalized emails already exist in leads (ingest dup check). */
