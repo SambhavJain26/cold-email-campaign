@@ -16,7 +16,7 @@ import { Poller } from './poller/poller';
 import { Jobs } from './jobs';
 import { DbSequenceProvider } from './scheduler/dbSequenceProvider';
 import { RenderEngine } from './render/engine';
-import type { JobPort, SequenceProvider } from './scheduler/types';
+import type { JobPort, Renderer, SequenceProvider } from './scheduler/types';
 import { DbAlertSink } from './alerts/emitter';
 import { systemRng, type Rng } from './util/rng';
 
@@ -32,6 +32,8 @@ export interface AppServices {
   /** Started by main.ts when ROLE ∈ {worker, all}. */
   jobs: Jobs;
   sequences: SequenceProvider;
+  /** The one engine instance - manualCompose (B4.10) and B6 previews share it. */
+  renderer: Renderer;
 }
 
 export interface ComposeOverrides {
@@ -92,5 +94,17 @@ export function compose(config: Config, overrides: ComposeOverrides = {}): AppSe
     alerts,
   });
 
-  return { config, clock, transport, db, pool, store, scheduler, poller, jobs, sequences };
+  return {
+    config,
+    clock,
+    transport,
+    db,
+    pool,
+    store,
+    scheduler,
+    poller,
+    jobs,
+    sequences,
+    renderer,
+  };
 }
