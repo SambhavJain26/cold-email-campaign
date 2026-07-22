@@ -3,6 +3,7 @@
 // typed queries via db/repos. drizzle-kit diffs against this barrel.
 export * from './enums';
 export * from './core';
+export * from './ingest';
 export * from './sequences';
 export * from './settings';
 export * from './transport';
