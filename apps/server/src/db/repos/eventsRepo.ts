@@ -61,6 +61,39 @@ export async function countSentSince(db: DbLike, mailboxId: number, since: Date)
   return rows[0]?.n ?? 0;
 }
 
+/** Lifetime sends from a mailbox — gates the pct auto-pause rule (docs/05 §5). */
+export async function lifetimeSentCount(db: DbLike, mailboxId: number): Promise<number> {
+  const rows = await db
+    .select({ n: sql<number>`count(*)::int` })
+    .from(events)
+    .where(and(eq(events.type, 'sent'), eq(events.mailboxId, mailboxId)));
+  return rows[0]?.n ?? 0;
+}
+
+/**
+ * Auto-pause window (docs/05 §5, spec Part 11): among the mailbox's last N
+ * SEND events, how many bounced hard? A bounce belongs to the send it bounced
+ * — correlated by (enrollment, step) — so the window is over sends, not time.
+ */
+export async function hardBouncesInLastNSends(
+  db: DbLike,
+  mailboxId: number,
+  n: number,
+): Promise<number> {
+  const rows = await db.execute(sql`
+    WITH last_sends AS (
+      SELECT enrollment_id, step_no FROM events
+      WHERE mailbox_id = ${mailboxId} AND type = 'sent'
+      ORDER BY id DESC LIMIT ${n}
+    )
+    SELECT count(*)::int AS n FROM last_sends s
+    WHERE EXISTS (
+      SELECT 1 FROM events b
+      WHERE b.type = 'hard_bounce'
+        AND b.enrollment_id = s.enrollment_id AND b.step_no = s.step_no)`);
+  return (rows.rows[0] as { n: number }).n;
+}
+
 /** Any bounce for (enrollment, step) at/after `since` — confirm-delivery's veto (decision N). */
 export async function hasBounceSince(
   db: DbLike,

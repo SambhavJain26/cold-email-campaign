@@ -61,6 +61,19 @@ export interface VerifyResult {
   error?: string;
 }
 
+/**
+ * Thrown by fetchNew on a PERMANENT auth/credential failure (docs/07 §5):
+ * the poller flips the mailbox to auth_failed + redistributes. Transient
+ * fetch errors are plain Errors — job retry/backoff handles those.
+ */
+export class TransportAuthError extends Error {
+  readonly permanent = true;
+  constructor(message: string) {
+    super(message);
+    this.name = 'TransportAuthError';
+  }
+}
+
 export interface MailTransport {
   /** Sending side — used by the scheduler (docs/06 §5). */
   send(msg: OutboundMessage): Promise<SendResult>;

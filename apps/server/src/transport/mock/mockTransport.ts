@@ -33,6 +33,7 @@ export class MockTransport implements MailTransport {
   private inbound = new Map<number, IncomingMessage[]>(); // mailboxId -> queue
   private nextUid = new Map<number, number>(); // mailboxId -> next IMAP UID
   private verifyScript = new Map<string, VerifyResult>(); // fromAddress -> result
+  private fetchErrors = new Map<number, Error[]>(); // mailboxId -> FIFO of scripted fetch failures
 
   constructor(private readonly clock: Clock) {}
 
@@ -66,6 +67,13 @@ export class MockTransport implements MailTransport {
     this.verifyScript.set(fromAddress.toLowerCase(), result);
   }
 
+  /** Script the next fetchNew for a mailbox to throw (IMAP failure paths, docs/07 §5). */
+  failNextFetch(mailboxId: number, error: Error): void {
+    const q = this.fetchErrors.get(mailboxId) ?? [];
+    q.push(error);
+    this.fetchErrors.set(mailboxId, q);
+  }
+
   /** Accepted sends to one recipient, oldest first. */
   sentTo(recipient: string): SentEntry[] {
     const key = recipient.toLowerCase();
@@ -87,6 +95,8 @@ export class MockTransport implements MailTransport {
   }
 
   fetchNew(mailboxId: number): Promise<IncomingMessage[]> {
+    const err = this.fetchErrors.get(mailboxId)?.shift();
+    if (err) return Promise.reject(err);
     const q = this.inbound.get(mailboxId) ?? [];
     this.inbound.set(mailboxId, []);
     return Promise.resolve(q);
