@@ -11,7 +11,7 @@ Status meaning: 🔒 locked (change requires editing this file first) · 🔧 de
 | ID | Decision | Status |
 |----|----------|--------|
 | A | Single-operator monolith, one VPS, one datastore. Not multi-tenant. | 🔒 |
-| B | **TypeScript on Node.js 22 LTS** end-to-end (API, workers, dashboard). | 🔒 |
+| B | **TypeScript on Node.js ≥22 (LTS)** end-to-end (API, workers, dashboard). Dev/CI run Node 24 (current LTS); `engines: ">=22"`. | 🔒 |
 | C | **PostgreSQL 16 only.** pg-boss for jobs/cron. No Redis, no broker. | 🔒 |
 | D | **React SPA** (Vite) talking to a JSON API. | 🔒 |
 | E | Sentiment AI pre-suggestion: optional adapter on the Anthropic API. **Auto-enabled iff `ANTHROPIC_API_KEY` is set**, otherwise silently off. Suggestion is stored on the incoming message, never auto-applied - the human always confirms. | 🔒 |

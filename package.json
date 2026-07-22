@@ -1,0 +1,19 @@
+{
+  "name": "cold-email-campaign",
+  "private": true,
+  "version": "0.0.0",
+  "description": "Single-operator cold email campaign tool - event-sourced core, SMTP/IMAP transport, React dashboard",
+  "engines": {
+    "node": ">=22"
+  },
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "scripts": {
+    "typecheck": "npm run typecheck --workspaces --if-present"
+  },
+  "devDependencies": {
+    "typescript": "^5.7.0"
+  }
+}
