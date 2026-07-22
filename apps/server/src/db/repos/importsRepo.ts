@@ -1,4 +1,4 @@
-import { and, asc, eq, inArray } from 'drizzle-orm';
+import { and, asc, eq, inArray, sql } from 'drizzle-orm';
 import type { DbLike } from '../client';
 import { importRows, imports, type ImportCounts } from '../schema';
 
@@ -58,8 +58,22 @@ export async function listRowsByFlags(
     .orderBy(asc(importRows.rowNo));
 }
 
-export async function setRowLeadId(db: DbLike, rowId: number, leadId: number): Promise<void> {
-  await db.update(importRows).set({ leadId }).where(eq(importRows.id, rowId));
+/** Batch lead_id backfill - one round trip per 10k rows, not one per row. */
+export async function backfillLeadIds(
+  db: DbLike,
+  pairs: ReadonlyArray<{ rowId: number; leadId: number }>,
+): Promise<void> {
+  const CHUNK = 10_000;
+  for (let i = 0; i < pairs.length; i += CHUNK) {
+    const slice = pairs.slice(i, i + CHUNK);
+    await db.execute(sql`
+      UPDATE import_rows AS ir SET lead_id = m.lead_id
+      FROM unnest(
+        ${sql.param(slice.map((p) => p.rowId))}::bigint[],
+        ${sql.param(slice.map((p) => p.leadId))}::bigint[]
+      ) AS m(row_id, lead_id)
+      WHERE ir.id = m.row_id`);
+  }
 }
 
 export async function markCommitted(

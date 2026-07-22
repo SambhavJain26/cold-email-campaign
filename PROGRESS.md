@@ -4,7 +4,7 @@
 
 **Legend:** `[ ]` not started · `[~]` in progress · `[x]` done · `[!]` blocked (note why in the log)
 
-**Current focus:** → **B5** (ingest; B0-B4 complete, **M1 proven core** ✅)
+**Current focus:** → **B6** (API layer; B0-B5 complete, **M1 proven core** ✅)
 
 ---
 
@@ -43,8 +43,8 @@
 - **Gate:** ✅ 2026-07-23 - B4.11-12 green; golden L3 green across the renderer swap (real templates now rendering)
 
 ### B5 - Ingest
-- [x] B5.1 migration · [x] B5.2 CSV parse · [x] B5.3 hygiene+preview · [x] B5.4 commit · [x] B5.5 suppression-at-ingest · [x] B5.6 bulk-tier · [x] B5.7 recycle+hash guard · [ ] B5.8 1000→885 fixture test · [ ] B5.9 edge suite
-- **Gate:** ☐ B5.8-9 green
+- [x] B5.1 migration · [x] B5.2 CSV parse · [x] B5.3 hygiene+preview · [x] B5.4 commit · [x] B5.5 suppression-at-ingest · [x] B5.6 bulk-tier · [x] B5.7 recycle+hash guard · [x] B5.8 1000→885 fixture test · [x] B5.9 edge suite
+- **Gate:** ✅ 2026-07-23 - B5.8-9 green (fixture split exact on first run; full §7 edge coverage across the B5 suites)
 
 ### B6 - API layer
 - [ ] B6.1 auth · [ ] B6.2 mailboxes · [ ] B6.3 leads · [ ] B6.4 imports · [ ] B6.5 sequences · [ ] B6.6 campaigns/capacity/recycle · [ ] B6.7 unibox · [ ] B6.8 manual-sends · [ ] B6.9 analytics · [ ] B6.10 settings/compliance · [ ] B6.11 alerts · [ ] B6.12 system · [ ] B6.13 shared schemas = contract · [ ] B6.14 API test suite
@@ -100,6 +100,7 @@
 
 | Date | Entry |
 |------|-------|
+| 2026-07-23 | **B5 COMPLETE - gate closed.** B5.8: deterministic fixture generator (seeded shuffle; dup originals pinned to the file head so "first occurrence kept" is well-defined) → committed real_estate_leads.csv; generator ⇔ file determinism lock; preview reproduces the walkthrough split EXACTLY on first run (1,000 → 60 role + 40 invalid + 15 dup → 885 committable, 82 nameless, 0 suppressed); drop_flagged inserts 885 untiered, import_all inserts 945. B5.9 remaining edges: suppressed re-import dropped under BOTH modes, nurture excluded from auto-enroll (the rest of §7 was locked in the CP2/CP3 suites). Perf: import_rows.lead_id backfill batched via UPDATE…FROM unnest (was one round-trip per row - untenable at the 50k cap). Gate: 235 unit + 131 integration + 47 golden green; 0005 down/up drilled; rebuild dry-run clean. Next: B6.1 (auth). |
 | 2026-07-23 | B5 checkpoint 3 (B5.6-B5.7): services/tiering.ts bulkTier (exactly one of leadIds/filter; empty filter refused - would retier every lead) over leadsRepo.leadFilterWhere (tier/untiered, state, q ilike over email+names+company, campaign EXISTS, suppressed - shared with B6.3's list endpoint); enrolled_tier snapshots proven immune to later edits. Recycle: coldStorage view (COMPLETED + not suppressed, earliest_recycle_at = terminal_at + cold_storage_rest_days), recycle() into a DRAFT target - rest-day gate, nurture excluded from bulk enrollment (deliberate-act rule extended from docs/09 §4), already-enrolled skip, content-hash guard BLOCKS the whole action via RecycleSequenceConflictError listing offending stepNos (sent_messages probe), enrollLeads tail shared with enroll(), recycled_from_campaign_id tagged. **listDue now joins campaigns status='active'** - closes the hole where a draft recycle target would start sending immediately (paused campaigns also go silent; scenario campaigns unaffected). 126 integration green incl. 9 new. Next: B5.8. |
 | 2026-07-23 | B5 checkpoint 2 (B5.2-B5.5): ingest/ module - parse.ts (csv-parse streaming, BOM, `,`/`;`/tab sniffed off the header line, alias map keyed by POST-snake_case form - 'E-Mail'→'e_mail'; unmapped headers → custom_fields; 10MB/50k caps, row cap mid-stream; missing email header = CsvContractError); hygiene.ts pure (34-entry role list, syntactic-only email check per spec - no MX; first-match-wins flag order locked by tests: invalid > role > dup > suppressed > missing_name; invalid rows don't reserve their email for dup purposes); service.ts preview (persists import_rows + counts - counts.ok is the IMPORTABLE-CLEAN display number per docs/03's {"ok":885,…,"missing_first_name":82} example, row flags stay disjoint; 20 samples/flag) + commit (drop_flagged vs import_all - invalid/suppressed NEVER; suppressed-after-preview re-checked at commit; between-preview-and-commit lead creation = onConflictDoNothing skip; lead_id backfill; double-commit refused). leads insert: normalized email, source 'csv_import', tier NULL (decision R). 235 unit + ingest-service integration green. Next: B5.6. |
 | 2026-07-23 | B5 checkpoint 1 (B5.1): 0005_ingest migration - import_row_flag enum, imports (counts jsonb per flag), import_rows (raw jsonb + email_normalized + flag + lead_id backfill column, ir_import_flag index, cascade on import delete) + leads.import_id FK deferred from 0001. Filename-order backfill after 0006 (same as 0003/0004). Drizzle mirror (schema/ingest.ts), importsRepo (chunked insertImportRows - 5k rows/batch under the 65k bind-param cap; sampleRowsByFlag/listRowsByFlags in file order), resetCoreTables truncates the new tables. 110 integration green. Next: B5.2. |

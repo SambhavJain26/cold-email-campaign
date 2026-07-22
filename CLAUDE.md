@@ -9,11 +9,13 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Current state: implementation underway
 
-M0 (docs), B0-B4 (foundation → event log → metrics → mock transport/scheduler/poller → render engine) are complete - **M1 proven core** ✅. **Check [PROGRESS.md](PROGRESS.md) for the current task pointer before starting work.** Dev loop assumes: Node ≥22, Docker running (`docker compose up -d` → Postgres 16 on port **5433**), `.env` copied from `.env.example` (generated keys).
+M0 (docs), B0-B5 (foundation → event log → metrics → mock transport/scheduler/poller → render engine → ingest) are complete - **M1 proven core** ✅. **Check [PROGRESS.md](PROGRESS.md) for the current task pointer before starting work.** Dev loop assumes: Node ≥22, Docker running (`docker compose up -d` → Postgres 16 on port **5433**), `.env` copied from `.env.example` (generated keys).
 
 Seams to know about: `SequenceProvider` (DB-backed `DbSequenceProvider` in prod composition; tests inject `StaticSequenceProvider` via the `sequences` compose override), `Renderer` (`render/engine.ts` - pure/sync; the CALLER loads `RenderContext`: mode, custom_fields, auto_observations, compliance row, threadSubject), `JobPort` (scenario inline queue in tests; pg-boss in prod). The scenario runner (`apps/server/test/helpers/scenario.ts`) is the integration-test entry point: real scheduler+poller+eventStore over MockTransport+VirtualClock.
 
 B4 facts that bite: the renderer ECHOES `variant.contentHash` (hash computed at variant-SAVE time via `render/hash.ts` - decision Q), so fixture hashes like `'sha-stepN'` stay stable across template edits. Empty `compliance_settings.physical_address` refuses ALL sends (`compliance_missing_address` alert) - `resetCoreTables` seeds a test address; blank it explicitly to test the guard. Soft-retries pin the ORIGINAL variant (round-robin would change the resent text). In-thread follow-ups re-render the step-1 subject for `Re:` from the first sent event's `attributes.variant_id`. Fatal pre-send checks → `render_failed` outcome: nothing appended, enrollment stays due.
+
+B5 facts that bite: `listDue` only serves enrollments of `campaigns.status='active'` - a draft recycle target stays silent until activated; test campaigns must be inserted `'active'`. `imports.counts.ok` is the IMPORTABLE-CLEAN display number (ok-flag + missing_first_name) per docs/03's example - row flags stay disjoint. `invalid`/`suppressed` rows are never imported under either commit mode, and suppression is re-checked at commit time. Ingest alias-map keys are the POST-snake_case header form ('e-mail' → 'e_mail'). Recycle's hash guard blocks the WHOLE action (`RecycleSequenceConflictError` lists offending steps); nurture is excluded from all bulk enrollment paths.
 
 ## Where to look first
 
