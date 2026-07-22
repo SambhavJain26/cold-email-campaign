@@ -20,6 +20,9 @@ export default defineConfig({
           globalSetup: ['./apps/server/test/helpers/global-setup.ts'],
           // DB-backed tests share one database — keep them serial.
           fileParallelism: false,
+          // Multi-day VirtualClock scenarios run hundreds of real DB ticks;
+          // the 5s default flakes on slower runs (B4 added per-tick queries).
+          testTimeout: 30_000,
         },
       },
       {
