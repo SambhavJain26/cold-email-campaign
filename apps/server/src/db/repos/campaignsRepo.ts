@@ -35,3 +35,15 @@ export function rampOf(c: CampaignRow): RampConfig {
 export function autoObservationsOf(c: CampaignRow): Record<string, string> | null {
   return tierEffortOf(c).auto_observations ?? null;
 }
+
+/** Tag a recycle target with its source (the "Recycled - Pass 2" label, docs/09 §6). */
+export async function setRecycledFrom(
+  db: DbLike,
+  campaignId: number,
+  sourceCampaignId: number,
+): Promise<void> {
+  await db
+    .update(campaigns)
+    .set({ recycledFromCampaignId: sourceCampaignId })
+    .where(eq(campaigns.id, campaignId));
+}

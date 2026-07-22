@@ -1,7 +1,7 @@
 import { and, asc, eq, gte, isNotNull, isNull, lt, lte, or, sql } from 'drizzle-orm';
 import { isTerminal, type LeadTier, type PersonalizationMode } from '@coldemail/shared';
 import type { DbLike } from '../client';
-import { enrollments, leads } from '../schema';
+import { campaigns, enrollments, leads } from '../schema';
 import type { EnrollmentSnapshot } from '../../domain/reducer';
 
 export type EnrollmentRow = typeof enrollments.$inferSelect;
@@ -62,10 +62,12 @@ export interface DueEnrollment {
 }
 
 /**
- * Due work, oldest-first (docs/06 §1 C): ACTIVE, next_send_at <= now, not
- * snoozed. Oldest-first ordering + budgets IS the catch-up mechanism.
- * Suppressed leads are excluded - send-time is one of suppression's four
- * enforcement layers.
+ * Due work, oldest-first (docs/06 §1 C): ACTIVE enrollment in an ACTIVE
+ * campaign, next_send_at <= now, not snoozed. Oldest-first ordering + budgets
+ * IS the catch-up mechanism. Suppressed leads are excluded - send-time is one
+ * of suppression's four enforcement layers. The campaign-status join keeps
+ * draft/paused campaigns silent - recycle (docs/09 §6) enrolls into a DRAFT
+ * campaign that must not send until activated.
  */
 export async function listDue(db: DbLike, now: Date): Promise<DueEnrollment[]> {
   const rows = await db
@@ -85,9 +87,11 @@ export async function listDue(db: DbLike, now: Date): Promise<DueEnrollment[]> {
     })
     .from(enrollments)
     .innerJoin(leads, eq(leads.id, enrollments.leadId))
+    .innerJoin(campaigns, eq(campaigns.id, enrollments.campaignId))
     .where(
       and(
         eq(enrollments.currentState, 'ACTIVE'),
+        eq(campaigns.status, 'active'),
         lte(enrollments.nextSendAt, now),
         or(isNull(enrollments.snoozedUntil), lte(enrollments.snoozedUntil, now)),
         eq(leads.isSuppressed, false),
@@ -177,6 +181,57 @@ export async function countEnrolledSince(
     .from(enrollments)
     .where(and(eq(enrollments.campaignId, campaignId), gte(enrollments.enrolledAt, since)));
   return rows[0]?.n ?? 0;
+}
+
+/** Cold storage source rows (docs/09 §6): COMPLETED in the source campaign, lead not suppressed. */
+export interface ColdStorageRow {
+  leadId: number;
+  email: string;
+  tier: LeadTier | null;
+  completedAt: Date;
+}
+
+export async function coldStorageRows(
+  db: DbLike,
+  sourceCampaignId: number,
+): Promise<ColdStorageRow[]> {
+  const rows = await db
+    .select({
+      leadId: enrollments.leadId,
+      email: leads.email,
+      tier: leads.tier,
+      completedAt: enrollments.terminalAt,
+    })
+    .from(enrollments)
+    .innerJoin(leads, eq(leads.id, enrollments.leadId))
+    .where(
+      and(
+        eq(enrollments.campaignId, sourceCampaignId),
+        eq(enrollments.currentState, 'COMPLETED'),
+        eq(leads.isSuppressed, false),
+      ),
+    )
+    .orderBy(asc(enrollments.terminalAt), asc(enrollments.leadId));
+  return rows.map((r) => ({ ...r, completedAt: r.completedAt! }));
+}
+
+/** Which of these leads already have an enrollment in the campaign. */
+export async function enrolledLeadIdsIn(
+  db: DbLike,
+  campaignId: number,
+  leadIds: readonly number[],
+): Promise<Set<number>> {
+  if (leadIds.length === 0) return new Set();
+  const rows = await db
+    .select({ leadId: enrollments.leadId })
+    .from(enrollments)
+    .where(
+      and(
+        eq(enrollments.campaignId, campaignId),
+        sql`${enrollments.leadId} = ANY(${sql.param([...leadIds])}::bigint[])`,
+      ),
+    );
+  return new Set(rows.map((r) => r.leadId));
 }
 
 export interface NewEnrollment {

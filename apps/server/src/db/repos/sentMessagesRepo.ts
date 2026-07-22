@@ -47,6 +47,28 @@ export async function latestSentToLead(
   return rows[0];
 }
 
+/**
+ * Recycle hash guard probe (decision Q, docs/09 §6): which of the candidate
+ * hashes have ANY of these leads already received?
+ */
+export async function hashesReceivedByLeads(
+  db: DbLike,
+  leadIds: readonly number[],
+  candidateHashes: readonly string[],
+): Promise<Set<string>> {
+  if (leadIds.length === 0 || candidateHashes.length === 0) return new Set();
+  const rows = await db
+    .selectDistinct({ contentHash: sentMessages.contentHash })
+    .from(sentMessages)
+    .where(
+      and(
+        inArray(sentMessages.leadId, [...leadIds]),
+        inArray(sentMessages.contentHash, [...candidateHashes]),
+      ),
+    );
+  return new Set(rows.map((r) => r.contentHash));
+}
+
 /** All prior message-ids of an enrollment's thread, oldest first (References chain). */
 export async function listThreadMessageIds(
   db: DbLike,
