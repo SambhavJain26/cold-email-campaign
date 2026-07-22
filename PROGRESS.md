@@ -27,7 +27,7 @@
 - **Gate:** ✅ 2026-07-22 — CI green (typecheck, lint, format, migration drill, 25 tests on Postgres service); VirtualClock gate test passes; live boot smoke verified
 
 ### B1 — Event log + state machine
-- [x] B1.1 core migration · [x] B1.2 seeds · [x] B1.3 event constructors · [~] B1.4 reducer · [ ] B1.5 eventStore.append · [ ] B1.6 rebuild-projections · [ ] B1.7 golden fixture · [ ] B1.8 transition-matrix tests · [ ] B1.9 golden L1 + rebuild equivalence · [x] B1.10 append-only enforcement test
+- [x] B1.1 core migration · [x] B1.2 seeds · [x] B1.3 event constructors · [x] B1.4 reducer · [ ] B1.5 eventStore.append · [ ] B1.6 rebuild-projections · [ ] B1.7 golden fixture · [x] B1.8 transition-matrix tests · [ ] B1.9 golden L1 + rebuild equivalence · [x] B1.10 append-only enforcement test
 - **Gate:** ☐ B1.8–B1.10 green
 
 ### B2 — Metrics engine
@@ -100,6 +100,7 @@
 
 | Date | Entry |
 |------|-------|
+| 2026-07-22 | B1 checkpoint 1 (B1.1–B1.4, B1.8, B1.10): 0001_core + 0002_seed migrations (append-only trigger + app_rw grants proven by tests; suppressions moved up from 0005; operator seed → B6 boot); Drizzle mirrors; shared domain vocabulary; zod event constructors; pure reducer + derived completion. Doc fix: docs/04 matrix — REPLIED + bounce upgrades to BOUNCED per spec precedence (footnote had it backwards). 73 tests. |
 | 2026-07-22 | **B0 COMPLETE.** B0.8–B0.10: pino logging with proven redaction; Fastify skeleton (/health with db ping, error-envelope contract, graceful boot/shutdown — live smoke passed); GitHub Actions CI green (one formatting fix after format:check landed). 25 tests. Next: B1.1 (0001_core migration). |
 | 2026-07-22 | B0.5–B0.7: zod env loader (fail-loud); Clock seam (VirtualClock stepTo tick-stepping; 49-day fast-forward gate test); MailTransport interface + throwing stub; composition root with MAIL_TRANSPORT flag + test-override seam. 18 tests green. |
 | 2026-07-22 | B0.3–B0.4: Postgres 16 via compose (port 5433, initdb creates test DB). Custom up/down SQL migration runner + CLI (drizzle-kit can't do downs — docs/03 §6 updated); drizzle-orm client stub; vitest split into unit/integration projects with test-DB globalSetup; apply→down→apply drill green on dev + test DBs. |

@@ -19,7 +19,9 @@ const enrolled_ = base.extend({
   enrollmentId: id,
   campaignId: id,
   mailboxId: id.optional(),
-  attributes: z.object({ tier: z.enum(LEAD_TIERS).nullable().default(null) }).default({ tier: null }),
+  attributes: z
+    .object({ tier: z.enum(LEAD_TIERS).nullable().default(null) })
+    .default({ tier: null }),
 });
 const sent_ = base.extend({
   type: z.literal('sent'),

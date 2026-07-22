@@ -84,12 +84,12 @@ function toTerminal(s: EnrollmentSnapshot, t: TerminalState, at: Date): Enrollme
 |---|---|---|---|---|---|---|---|---|---|
 | NEW | ACTIVE | – | – | – | – | – | – | – | – |
 | ACTIVE | ∅ | step+1 | ACTIVE (retry++) | BOUNCED | BOUNCED | REPLIED | UNSUBSCRIBED | flag | proj |
-| REPLIED | ∅ | ∅¹ | ∅ | ∅² | ∅² | REPLIED (best sentiment) | **UNSUBSCRIBED** | flag | proj |
+| REPLIED | ∅ | ∅¹ | ∅ | **BOUNCED**² | **BOUNCED**² | REPLIED (best sentiment) | **UNSUBSCRIBED** | flag | proj |
 | BOUNCED | ∅ | ∅ | ∅ | ∅ | BOUNCED | ∅³ | **UNSUBSCRIBED** | flag | proj |
 | UNSUBSCRIBED | ∅ | ∅ | ∅ | ∅ | ∅ | ∅³ | UNSUBSCRIBED | flag | proj |
 | COMPLETED | ∅ | ∅ | ∅ | BOUNCED⁴ | BOUNCED⁴ | REPLIED⁴ | UNSUBSCRIBED⁴ | flag | proj |
 
-∅ = no change. ¹ scheduler must never send to terminal states — but if a race lands a `sent` after a reply, state is unharmed. ² lower priority than REPLIED → ignored. ³ replies from bounced/unsubscribed leads still log the event (facts are facts) but can't downgrade the state. ⁴ higher priority than COMPLETED → late events upgrade it (e.g. a reply arriving after sequence end still counts — this is intended and matches the precedence rule).
+∅ = no change. ¹ scheduler must never send to terminal states — but if a race lands a `sent` after a reply, state is unharmed. ² BOUNCED (3) outranks REPLIED (2), so a post-reply bounce upgrades — per the spec's "highest-priority terminal state it triggered". Rare (sequences stop on reply) but possible when the last sent message bounces late. ³ replies from bounced/unsubscribed leads still log the event (facts are facts) but can't downgrade the state — REPLIED (2) < BOUNCED (3)/UNSUBSCRIBED (4). ⁴ higher priority than COMPLETED → late events upgrade it (e.g. a reply arriving after sequence end still counts — this is intended and matches the precedence rule).
 
 ## 3. Suppression side effects (transactional, not in the reducer)
 
