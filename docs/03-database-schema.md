@@ -178,6 +178,7 @@ CREATE TABLE step_variants (
   body_template    text NOT NULL,              -- footer NOT stored here (appended at render)
   active           bool NOT NULL DEFAULT true,
   content_hash     text NOT NULL,              -- sha256(subject||'\0'||body), recomputed on save (decision Q)
+  attributes       jsonb NOT NULL DEFAULT '{}', -- {"bespoke":true} = Mode-1 one-off variant (docs/08 §3)
   UNIQUE (step_id, label)
 );
 ```

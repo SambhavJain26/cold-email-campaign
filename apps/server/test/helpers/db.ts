@@ -24,7 +24,8 @@ export function getTestPool(): Pool {
 export async function resetCoreTables(pool: Pool): Promise<void> {
   await pool.query(
     `TRUNCATE events, enrollments, suppressions, campaigns, leads,
-             incoming_messages, sent_messages, mailbox_secrets, mailboxes
+             incoming_messages, sent_messages, mailbox_secrets, mailboxes,
+             step_variants, sequence_steps, sequences
      RESTART IDENTITY CASCADE`,
   );
 }
