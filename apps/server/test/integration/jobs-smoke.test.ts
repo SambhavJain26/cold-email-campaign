@@ -12,7 +12,7 @@ import { Scheduler } from '../../src/scheduler/scheduler';
 import { Poller } from '../../src/poller/poller';
 import { Jobs } from '../../src/jobs';
 import { StaticSequenceProvider } from '../../src/scheduler/staticSequenceProvider';
-import { StubRenderer } from '../../src/render/stub';
+import { RenderEngine } from '../../src/render/engine';
 import { CapturingAlerts } from '../../src/alerts/types';
 import { systemRng } from '../../src/util/rng';
 import { TEST_DATABASE_URL, resetCoreTables, seedMailboxes } from '../helpers/db';
@@ -46,7 +46,7 @@ describe('pg-boss wiring smoke (B3.16)', () => {
       clock,
       rng: systemRng,
       sequences,
-      renderer: new StubRenderer(),
+      renderer: new RenderEngine(),
       jobs: { scheduleConfirmDelivery: () => Promise.resolve() },
       alerts,
     });

@@ -3,37 +3,9 @@
 // (Hooks are wired to the real tick/poll in B3.7/B3.10.)
 import { afterEach, describe, expect, it } from 'vitest';
 import { scenario, leadEmail, type Scenario } from '../helpers/scenario';
-import type { SequenceDef } from '../../src/domain/sequence';
+import { testSequence } from '../helpers/sequences';
 
-const fourStep: SequenceDef = {
-  id: 1,
-  steps: [
-    {
-      stepNo: 1,
-      waitDays: 0,
-      inThread: false,
-      variants: [{ id: 1, label: 'A', contentHash: 'h1' }],
-    },
-    {
-      stepNo: 2,
-      waitDays: 3,
-      inThread: true,
-      variants: [{ id: 2, label: 'A', contentHash: 'h2' }],
-    },
-    {
-      stepNo: 3,
-      waitDays: 4,
-      inThread: true,
-      variants: [{ id: 3, label: 'A', contentHash: 'h3' }],
-    },
-    {
-      stepNo: 4,
-      waitDays: 5,
-      inThread: true,
-      variants: [{ id: 4, label: 'A', contentHash: 'h4' }],
-    },
-  ],
-};
+const fourStep = testSequence(1, [0, 3, 4, 5]);
 
 describe('scenario runner skeleton', () => {
   let s: Scenario;

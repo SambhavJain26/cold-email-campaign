@@ -13,19 +13,10 @@ import { CapturingAlerts } from '../../src/alerts/types';
 import { TEST_DATABASE_URL, resetCoreTables, seedMailboxes } from '../helpers/db';
 import { loadHeaderFixture } from '../helpers/emlFixtures';
 import { scenario, leadEmail, type Scenario } from '../helpers/scenario';
-import type { SequenceDef } from '../../src/domain/sequence';
+import { testSequence } from '../helpers/sequences';
 
-const step = (stepNo: number, waitDays: number, hash: string): SequenceDef['steps'][number] => ({
-  stepNo,
-  waitDays,
-  inThread: stepNo > 1,
-  variants: [{ id: stepNo, label: 'A', contentHash: hash }],
-});
-const twoStep: SequenceDef = { id: 1, steps: [step(1, 0, 'h1'), step(2, 3, 'h2')] };
-const fourStep: SequenceDef = {
-  id: 1,
-  steps: [step(1, 0, 'h1'), step(2, 3, 'h2'), step(3, 4, 'h3'), step(4, 5, 'h4')],
-};
+const twoStep = testSequence(1, [0, 3]);
+const fourStep = testSequence(1, [0, 3, 4, 5]);
 
 describe('classifier over the fixture corpus (B3.11)', () => {
   let db: Db;

@@ -53,10 +53,12 @@ export interface DueEnrollment {
   currentStepNo: number;
   assignedMailboxId: number | null;
   nextSendAt: Date;
+  personalizationMode: PersonalizationMode;
   leadEmail: string;
   leadFirstName: string | null;
   leadCompany: string | null;
   leadState: string | null;
+  leadCustomFields: Record<string, string>;
 }
 
 /**
@@ -74,10 +76,12 @@ export async function listDue(db: DbLike, now: Date): Promise<DueEnrollment[]> {
       currentStepNo: enrollments.currentStepNo,
       assignedMailboxId: enrollments.assignedMailboxId,
       nextSendAt: enrollments.nextSendAt,
+      personalizationMode: enrollments.personalizationMode,
       leadEmail: leads.email,
       leadFirstName: leads.firstName,
       leadCompany: leads.company,
       leadState: leads.state,
+      leadCustomFields: leads.customFields,
     })
     .from(enrollments)
     .innerJoin(leads, eq(leads.id, enrollments.leadId))
@@ -90,7 +94,11 @@ export async function listDue(db: DbLike, now: Date): Promise<DueEnrollment[]> {
       ),
     )
     .orderBy(asc(enrollments.nextSendAt), asc(enrollments.id));
-  return rows.map((r) => ({ ...r, nextSendAt: r.nextSendAt! }));
+  return rows.map((r) => ({
+    ...r,
+    nextSendAt: r.nextSendAt!,
+    leadCustomFields: (r.leadCustomFields ?? {}) as Record<string, string>,
+  }));
 }
 
 /**

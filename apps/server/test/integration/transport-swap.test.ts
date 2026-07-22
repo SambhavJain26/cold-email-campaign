@@ -18,7 +18,7 @@ import type {
 import { runConfirmDelivery } from '../../src/scheduler/confirmDelivery';
 import { StaticSequenceProvider } from '../../src/scheduler/staticSequenceProvider';
 import { TEST_DATABASE_URL, resetCoreTables, seedMailboxes } from '../helpers/db';
-import type { SequenceDef } from '../../src/domain/sequence';
+import { testSequence } from '../helpers/sequences';
 
 /** A deliberately boring second transport: accepts everything, no inbound. */
 class TrivialTransport implements MailTransport {
@@ -35,23 +35,7 @@ class TrivialTransport implements MailTransport {
   }
 }
 
-const twoStep: SequenceDef = {
-  id: 1,
-  steps: [
-    {
-      stepNo: 1,
-      waitDays: 0,
-      inThread: false,
-      variants: [{ id: 1, label: 'A', contentHash: 'h1' }],
-    },
-    {
-      stepNo: 2,
-      waitDays: 3,
-      inThread: true,
-      variants: [{ id: 2, label: 'A', contentHash: 'h2' }],
-    },
-  ],
-};
+const twoStep = testSequence(1, [0, 3]);
 
 function testConfig() {
   const r = parseEnv({

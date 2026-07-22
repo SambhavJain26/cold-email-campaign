@@ -9,6 +9,8 @@ export interface TierEffortConfig {
   A: PersonalizationMode;
   B: PersonalizationMode;
   C: PersonalizationMode;
+  /** Market-keyed {{custom_observation}} segment rule (docs/08 §3), 'default' key incl. */
+  auto_observations?: Record<string, string>;
 }
 
 export interface RampConfig {
@@ -27,4 +29,9 @@ export function tierEffortOf(c: CampaignRow): TierEffortConfig {
 
 export function rampOf(c: CampaignRow): RampConfig {
   return c.rampConfig as RampConfig;
+}
+
+/** The campaign's auto_observations table, or null when unset (docs/08 §3). */
+export function autoObservationsOf(c: CampaignRow): Record<string, string> | null {
+  return tierEffortOf(c).auto_observations ?? null;
 }

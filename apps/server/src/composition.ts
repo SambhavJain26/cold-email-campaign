@@ -15,7 +15,7 @@ import { Scheduler } from './scheduler/scheduler';
 import { Poller } from './poller/poller';
 import { Jobs } from './jobs';
 import { DbSequenceProvider } from './scheduler/dbSequenceProvider';
-import { StubRenderer } from './render/stub';
+import { RenderEngine } from './render/engine';
 import type { JobPort, SequenceProvider } from './scheduler/types';
 import { DbAlertSink } from './alerts/emitter';
 import { systemRng, type Rng } from './util/rng';
@@ -61,7 +61,7 @@ export function compose(config: Config, overrides: ComposeOverrides = {}): AppSe
   const store = new EventStore(db);
   const alerts = new DbAlertSink(db); // webhook wired at B7.4
   const sequences = overrides.sequences ?? new DbSequenceProvider(db); // 0003 tables (B4.1)
-  const renderer = new StubRenderer(); // real render engine at B4
+  const renderer = new RenderEngine(); // docs/08 - the only producer of outbound bodies
   const rng = overrides.rng ?? systemRng;
 
   // Late-bound JobPort: scheduler → jobs → scheduler is a cycle on paper;

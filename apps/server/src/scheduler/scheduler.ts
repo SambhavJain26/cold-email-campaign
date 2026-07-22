@@ -8,25 +8,41 @@ import type { MailTransport, OutboundMessage } from '../transport/types';
 import type { Rng } from '../util/rng';
 import type { AlertSink } from '../alerts/types';
 import type { EventStore } from '../services/eventStore';
-import type { JobPort, Renderer, SequenceProvider } from './types';
+import type { JobPort, LeadLite, RenderContext, Renderer, SequenceProvider } from './types';
 import type { SendWindow } from '../db/schema/transport';
-import { getSettings, type SettingsRow } from '../db/repos/settingsRepo';
+import { getComplianceSettings, getSettings, type SettingsRow } from '../db/repos/settingsRepo';
 import { listMailboxesByStatus, patchMailbox } from '../db/repos/mailboxesRepo';
-import { countSentSince, hasSoftBounceAfter, lastSentEvent } from '../db/repos/eventsRepo';
+import {
+  countSentForStep,
+  countSentSince,
+  firstSentEvent,
+  hasSoftBounceAfter,
+  lastSentEvent,
+  type SentEventLite,
+} from '../db/repos/eventsRepo';
 import {
   activeCampaignIds,
   listDue,
   redistributeUnstarted,
   type DueEnrollment,
 } from '../db/repos/enrollmentsRepo';
-import { insertSentMessage, listThreadMessageIds } from '../db/repos/sentMessagesRepo';
+import { insertSentMessage } from '../db/repos/sentMessagesRepo';
+import { autoObservationsOf, getCampaign } from '../db/repos/campaignsRepo';
+import { getVariantById } from '../db/repos/sequencesRepo';
 import { buildEvent } from '../domain/events';
-import { shapeOf, stepOf } from '../domain/sequence';
+import {
+  shapeOf,
+  stepOf,
+  type SequenceDef,
+  type SequenceStepDef,
+  type VariantDef,
+} from '../domain/sequence';
 import { evaluateAutoPause } from '../services/autoPause';
 import { resolveTimezone } from './tzmap';
 import { insideWindow, startOfLocalDay } from './window';
 import { jitterFactor, minGapMs, paceReady } from './pacing';
 import { pickMailbox, type RotationCandidate } from './rotation';
+import { buildMessageId, buildThreadHeaders } from './mime';
 
 const SCHEDULER_LOCK = [2, 0] as const; // advisory keyspace: (2,0) = tick
 
@@ -43,7 +59,8 @@ export interface SchedulerDeps {
   alerts: AlertSink;
 }
 
-export type SendOutcomeKind = 'sent' | 'transient' | 'hard_bounce' | 'auth_failed' | 'no_step';
+export type SendOutcomeKind =
+  'sent' | 'transient' | 'hard_bounce' | 'auth_failed' | 'no_step' | 'render_failed';
 
 export interface TickResult {
   ran: boolean;
@@ -62,6 +79,16 @@ export class Scheduler {
   private transientFailures = new Map<number, number>();
   /** catchup_backlog is emitted once per downtime episode (docs/06 §1). */
   private catchupAlerted = false;
+  /** compliance_missing_address is emitted once per episode (docs/08 §4). */
+  private complianceAlerted = false;
+  /** render_failed alerted once per variant per process run. */
+  private renderFailAlerted = new Set<number>();
+  /** Per-tick caches: compliance row, per-campaign auto_observations, round-robin counters. */
+  private tickCtx: {
+    compliance: { physicalAddress: string; optoutText: string };
+    autoObs: Map<number, Record<string, string> | null>;
+    roundRobin: Map<string, number>;
+  } | null = null;
 
   constructor(private readonly deps: SchedulerDeps) {}
 
@@ -86,12 +113,40 @@ export class Scheduler {
   }
 
   private async tickBody(now: Date): Promise<TickResult> {
-    const { db, rng, alerts } = this.deps;
+    const { db } = this.deps;
     const settings = await getSettings(db);
+    const compliance = await getComplianceSettings(db);
+    this.tickCtx = { compliance, autoObs: new Map(), roundRobin: new Map() };
+    try {
+      return await this.tickInner(now, settings, compliance);
+    } finally {
+      this.tickCtx = null;
+    }
+  }
+
+  private async tickInner(
+    now: Date,
+    settings: SettingsRow,
+    compliance: { physicalAddress: string; optoutText: string },
+  ): Promise<TickResult> {
+    const { db, rng, alerts } = this.deps;
 
     // A. housekeeping
     await this.refreshMailboxHealth(now, settings);
     const completed = await this.completeFinished(now, settings);
+
+    // CAN-SPAM global guard (docs/08 §4): empty physical address → refuse ALL
+    // sends, alert once per episode. Housekeeping/completion still ran.
+    if (compliance.physicalAddress.trim() === '') {
+      if (!this.complianceAlerted) {
+        await alerts.emit('compliance_missing_address', 'error', {
+          reason: 'compliance_settings.physical_address is empty - sends refused globally',
+        });
+        this.complianceAlerted = true;
+      }
+      return { ran: true, sent: 0, completed, overdueLeft: 0 };
+    }
+    this.complianceAlerted = false;
 
     // B. per-mailbox budgets. Cap-reset midnight is the operator's zone
     // (settings.default_timezone) - mailboxes carry no tz of their own.
@@ -159,6 +214,7 @@ export class Scheduler {
           budgets.delete(mb.id);
           break;
         case 'no_step':
+        case 'render_failed': // nothing sent; enrollment stays due until the template is fixed
           break;
       }
     }
@@ -256,6 +312,7 @@ export class Scheduler {
     mb: { id: number; fromAddress: string },
     now: Date,
     settings: SettingsRow,
+    opts: { variantOverride?: VariantDef; literal?: boolean } = {},
   ): Promise<SendOutcomeKind> {
     const { db, store, transport, renderer, sequences, jobs, alerts } = this.deps;
 
@@ -264,42 +321,65 @@ export class Scheduler {
     // Soft-bounce retry resends the SAME step (docs/07 §2.1): the reducer
     // already advanced current_step_no at the original send.
     let stepNo = e.currentStepNo;
+    let retryOf: SentEventLite | null = null;
     const last = await lastSentEvent(db, e.id);
     if (last && (await hasSoftBounceAfter(db, e.id, last.stepNo, last.occurredAt))) {
       stepNo = last.stepNo;
+      retryOf = last;
     }
 
     const step = stepOf(seq, stepNo);
     if (!step) return 'no_step'; // past the end - completion housekeeping owns this
 
-    // Variant selection: stable per-lead spread; B4.8 replaces with true round-robin.
-    const variant = step.variants[e.leadId % step.variants.length]!;
+    // Variant selection (B4.8): manual override > retry pins the ORIGINAL
+    // variant (the retry must resend the same text) > round-robin.
+    let variant = opts.variantOverride ?? (retryOf ? this.variantOf(seq, retryOf) : null);
+    let literal = opts.literal ?? false;
+    if (variant === null && retryOf?.variantId != null) {
+      // Original variant left the active set (rotation/bespoke) - DB lookup.
+      const row = await getVariantById(db, retryOf.variantId);
+      if (row) {
+        variant = {
+          id: row.id,
+          label: row.label,
+          contentHash: row.contentHash,
+          subjectTemplate: row.subjectTemplate,
+          bodyTemplate: row.bodyTemplate,
+        };
+        literal = row.attributes.bespoke === true;
+      }
+    }
+    if (variant === null) {
+      if (step.variants.length === 0) {
+        await this.alertRenderFailed(-step.stepNo, e, ['no_active_variants']);
+        return 'render_failed';
+      }
+      variant = await this.pickVariant(e.campaignId, step);
+    }
+
     const rendered = renderer.render({
       variant,
       step,
-      lead: {
-        id: e.leadId,
-        email: e.leadEmail,
-        firstName: e.leadFirstName,
-        company: e.leadCompany,
-        state: e.leadState,
-      },
+      lead: this.leadLiteOf(e),
       enrollmentId: e.id,
+      ctx: await this.renderContextFor(e, seq, step, { literal }),
     });
 
-    // Threading (docs/07 §4): In-Reply-To = previous step's Message-ID;
-    // References = all prior ids in order. Same-step retries re-anchor to the
-    // PREVIOUS step, not the bounced attempt.
-    const messageId = `<ce-${e.id}-${stepNo}-${now.getTime()}@${mb.fromAddress.split('@')[1]}>`;
-    let inReplyTo: string | undefined;
-    let references: string[] | undefined;
-    if (step.inThread) {
-      const thread = (await listThreadMessageIds(db, e.id)).filter((m) => m.stepNo < stepNo);
-      if (thread.length > 0) {
-        inReplyTo = thread.at(-1)!.messageId;
-        references = thread.map((m) => m.messageId);
-      }
+    // Fatal pre-send checks block the send (docs/08 §5); the enrollment stays
+    // due so a fixed template resumes it naturally.
+    if (rendered.checks.fatal.length > 0) {
+      await this.alertRenderFailed(
+        variant.id,
+        e,
+        rendered.checks.fatal.map((f) => f.id),
+      );
+      return 'render_failed';
     }
+    this.renderFailAlerted.delete(variant.id);
+
+    // Threading (docs/07 §4) via buildMime (docs/08 §6).
+    const messageId = buildMessageId(e.id, stepNo, now, mb.fromAddress);
+    const { inReplyTo, references } = await buildThreadHeaders(db, e.id, stepNo, step.inThread);
 
     const msg: OutboundMessage = {
       mailboxId: mb.id,
@@ -416,5 +496,124 @@ export class Scheduler {
   /** Post-commit hook on every hard_bounce append (docs/06 §6, B3.13). */
   protected async afterHardBounce(mailboxId: number, now: Date): Promise<void> {
     await evaluateAutoPause({ db: this.deps.db, alerts: this.deps.alerts }, mailboxId, now);
+  }
+
+  // ── render wiring (B4.8) ───────────────────────────────────────────────────
+
+  private leadLiteOf(e: DueEnrollment): LeadLite {
+    return {
+      id: e.leadId,
+      email: e.leadEmail,
+      firstName: e.leadFirstName,
+      company: e.leadCompany,
+      state: e.leadState,
+    };
+  }
+
+  /** The caller-loaded RenderContext (docs/08: the engine itself is pure). */
+  private async renderContextFor(
+    e: DueEnrollment,
+    seq: SequenceDef,
+    step: SequenceStepDef,
+    opts: { literal: boolean },
+  ): Promise<RenderContext> {
+    const compliance = this.tickCtx?.compliance ?? (await getComplianceSettings(this.deps.db));
+    const base: RenderContext = {
+      mode: e.personalizationMode,
+      customFields: e.leadCustomFields,
+      autoObservations: await this.autoObsFor(e.campaignId),
+      compliance,
+      literal: opts.literal,
+    };
+    if (step.inThread && step.stepNo > 1) {
+      base.threadSubject = await this.threadSubjectFor(e, seq, base);
+    }
+    return base;
+  }
+
+  private async autoObsFor(campaignId: number): Promise<Record<string, string> | null> {
+    const cache = this.tickCtx?.autoObs;
+    const cached = cache?.get(campaignId);
+    if (cached !== undefined) return cached;
+    const campaign = await getCampaign(this.deps.db, campaignId);
+    const table = campaign ? autoObservationsOf(campaign) : null;
+    cache?.set(campaignId, table);
+    return table;
+  }
+
+  /** The variant a past send used, if it is still in the active def. */
+  private variantOf(seq: SequenceDef, sent: SentEventLite): VariantDef | null {
+    if (sent.variantId === null) return null;
+    const step = stepOf(seq, sent.stepNo);
+    return step?.variants.find((v) => v.id === sent.variantId) ?? null;
+  }
+
+  /**
+   * Round-robin among active variants (docs/06 pickVariant, B4.8): stateless -
+   * the counter is the campaign-step's sent count, so it survives restarts and
+   * rebuilds; the per-tick cache keeps it one query per (campaign, step) per tick.
+   */
+  private async pickVariant(campaignId: number, step: SequenceStepDef): Promise<VariantDef> {
+    const key = `${campaignId}:${step.stepNo}`;
+    const cache = this.tickCtx?.roundRobin;
+    let count = cache?.get(key);
+    if (count === undefined) {
+      count = await countSentForStep(this.deps.db, campaignId, step.stepNo);
+    }
+    cache?.set(key, count + 1);
+    return step.variants[count % step.variants.length]!;
+  }
+
+  /**
+   * The rendered step-1 subject for `Re:` threading (docs/08 §6): re-rendered
+   * deterministically (same seed → same spintax picks). Bespoke step-1 renders
+   * literal. Undefined on any lookup failure - the engine then Re:-prefixes
+   * the step's own subject instead of crashing the send.
+   */
+  private async threadSubjectFor(
+    e: DueEnrollment,
+    seq: SequenceDef,
+    base: RenderContext,
+  ): Promise<string | undefined> {
+    const { db, renderer } = this.deps;
+    const first = await firstSentEvent(db, e.id);
+    if (!first) return undefined;
+    let variant = this.variantOf(seq, first);
+    let literal = false;
+    if (!variant && first.variantId !== null) {
+      const row = await getVariantById(db, first.variantId);
+      if (row) {
+        variant = {
+          id: row.id,
+          label: row.label,
+          contentHash: row.contentHash,
+          subjectTemplate: row.subjectTemplate,
+          bodyTemplate: row.bodyTemplate,
+        };
+        literal = row.attributes.bespoke === true;
+      }
+    }
+    if (!variant) return undefined;
+    return renderer.render({
+      variant,
+      step: { stepNo: first.stepNo, inThread: false },
+      lead: this.leadLiteOf(e),
+      enrollmentId: e.id,
+      ctx: { ...base, threadSubject: undefined, literal },
+    }).subject;
+  }
+
+  private async alertRenderFailed(
+    variantKey: number,
+    e: DueEnrollment,
+    fatalIds: string[],
+  ): Promise<void> {
+    if (this.renderFailAlerted.has(variantKey)) return;
+    this.renderFailAlerted.add(variantKey);
+    await this.deps.alerts.emit('render_failed', 'error', {
+      enrollmentId: e.id,
+      campaignId: e.campaignId,
+      fatal: fatalIds,
+    });
   }
 }

@@ -11,6 +11,11 @@ export async function getLeadByEmail(db: DbLike, email: string): Promise<LeadRow
   return rows[0];
 }
 
+export async function getLeadById(db: DbLike, id: number): Promise<LeadRow | undefined> {
+  const rows = await db.select().from(leads).where(eq(leads.id, id));
+  return rows[0];
+}
+
 export interface EligibleLead {
   id: number;
   tier: LeadTier | null;

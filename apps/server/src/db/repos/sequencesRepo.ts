@@ -1,4 +1,4 @@
-import { asc, eq, inArray } from 'drizzle-orm';
+import { and, asc, eq, inArray } from 'drizzle-orm';
 import type { DbLike } from '../client';
 import { campaigns, sequences, sequenceSteps, stepVariants } from '../schema';
 import type { SequenceDef } from '../../domain/sequence';
@@ -59,9 +59,28 @@ export async function loadSequenceDef(db: DbLike, sequenceId: number): Promise<S
       inThread: s.inThread,
       variants: variants
         .filter((v) => v.stepId === s.id && v.active)
-        .map((v) => ({ id: v.id, label: v.label, contentHash: v.contentHash })),
+        .map((v) => ({
+          id: v.id,
+          label: v.label,
+          contentHash: v.contentHash,
+          subjectTemplate: v.subjectTemplate,
+          bodyTemplate: v.bodyTemplate,
+        })),
     })),
   };
+}
+
+/** The sequence_steps row id for (sequence, step_no) - bespoke variants attach here. */
+export async function getStepId(
+  db: DbLike,
+  sequenceId: number,
+  stepNo: number,
+): Promise<number | null> {
+  const rows = await db
+    .select({ id: sequenceSteps.id })
+    .from(sequenceSteps)
+    .where(and(eq(sequenceSteps.sequenceId, sequenceId), eq(sequenceSteps.stepNo, stepNo)));
+  return rows[0]?.id ?? null;
 }
 
 /** Full variant row by id - ignores `active` (bespoke/rotated-out lookups). */
