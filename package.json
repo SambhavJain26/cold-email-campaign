@@ -12,6 +12,9 @@
   ],
   "scripts": {
     "typecheck": "npm run typecheck --workspaces --if-present",
+    "db:migrate": "npm run db:migrate -w @coldemail/server",
+    "db:rollback": "npm run db:rollback -w @coldemail/server",
+    "db:status": "npm run db:status -w @coldemail/server",
     "lint": "eslint .",
     "format": "prettier --write .",
     "format:check": "prettier --check .",

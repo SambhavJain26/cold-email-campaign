@@ -6,13 +6,21 @@
   "description": "API + workers: Fastify, Drizzle, pg-boss - event-sourced core",
   "scripts": {
     "dev": "tsx watch src/main.ts",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "db:migrate": "tsx src/db/cli.ts up",
+    "db:rollback": "tsx src/db/cli.ts down",
+    "db:status": "tsx src/db/cli.ts status"
   },
   "dependencies": {
-    "@coldemail/shared": "*"
+    "@coldemail/shared": "*",
+    "dotenv": "^17.4.2",
+    "drizzle-orm": "^0.45.2",
+    "pg": "^8.22.0"
   },
   "devDependencies": {
     "@types/node": "^26.1.1",
+    "@types/pg": "^8.20.0",
+    "drizzle-kit": "^0.31.10",
     "tsx": "^4.19.0"
   }
 }
