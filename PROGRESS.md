@@ -27,7 +27,7 @@
 - **Gate:** ✅ 2026-07-22 — CI green (typecheck, lint, format, migration drill, 25 tests on Postgres service); VirtualClock gate test passes; live boot smoke verified
 
 ### B1 — Event log + state machine
-- [x] B1.1 core migration · [x] B1.2 seeds · [~] B1.3 event constructors · [ ] B1.4 reducer · [ ] B1.5 eventStore.append · [ ] B1.6 rebuild-projections · [ ] B1.7 golden fixture · [ ] B1.8 transition-matrix tests · [ ] B1.9 golden L1 + rebuild equivalence · [x] B1.10 append-only enforcement test
+- [x] B1.1 core migration · [x] B1.2 seeds · [x] B1.3 event constructors · [~] B1.4 reducer · [ ] B1.5 eventStore.append · [ ] B1.6 rebuild-projections · [ ] B1.7 golden fixture · [ ] B1.8 transition-matrix tests · [ ] B1.9 golden L1 + rebuild equivalence · [x] B1.10 append-only enforcement test
 - **Gate:** ☐ B1.8–B1.10 green
 
 ### B2 — Metrics engine
