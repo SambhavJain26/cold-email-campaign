@@ -7,9 +7,9 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - **Keep this file current.** When you learn something new — a better approach, a good practice, a lesson from a mistake — add it here. When something here is outdated or no longer used, remove it. Write and edit this file tersely: facts only, no filler.
 - **Commit and push after every completed task.** Branch off `main` if not already on it; push to `origin main`.
 
-## Current state: documentation-complete, pre-implementation
+## Current state: implementation underway
 
-This repo currently contains **only design and build documentation — no code has been written yet.** Milestone M0 (docs) is done; the next action is task **B0.1** (scaffold the monorepo). Do not assume `package.json`, build tooling, or a test runner exist until B0 lands. When you add them, follow the stack and layout already specified in the docs rather than choosing your own.
+M0 (docs) and B0 (foundation/scaffolding) are complete. **Check [PROGRESS.md](PROGRESS.md) for the current task pointer before starting work.** Dev loop assumes: Node ≥22, Docker running (`docker compose up -d` → Postgres 16 on port **5433**), `.env` copied from `.env.example` (generated keys).
 
 ## Where to look first
 
@@ -61,17 +61,14 @@ npm-workspaces monorepo: `apps/server` (TypeScript/Node ≥22 — dev on 24, Fas
 
 `domain/` is pure — it imports nothing from db/api/transport and never reads the wall clock. `db/repos/` is the only place SQL/Drizzle lives. `scheduler/`, `poller/`, `render/`, `ingest/`, `services/` depend on `domain` + `db/repos` + the *interfaces* `transport/types` and `clock` — never concrete transports. Only `composition.ts` imports concrete implementations. These boundaries are enforced by ESLint import rules; don't route around them.
 
-## Commands
+## Commands (verified)
 
-**None exist yet** — tooling arrives in B0. The docs specify what they will be; once B0.10 lands, expect (subject to what B0 actually sets up):
-
-- `docker compose up -d` — start Postgres (dev)
-- `npm run db:migrate` / `npm run db:rollback` — Drizzle migrations (applied on boot in prod)
-- `npm test` — Vitest unit + integration (needs the Postgres test DB)
-- The `@golden` suite is a separate required CI job; the walkthrough-replay Playwright e2e (`apps/web/e2e/walkthrough.spec.ts`) is the flagship UI test.
-- `npm run rebuild-projections -- --dry-run` — projection drift check / correctness audit
-
-When you scaffold these, add the real, verified invocations here and to [docs/00-INDEX.md](docs/00-INDEX.md).
+- `docker compose up -d` — dev Postgres 16 (`coldemail-postgres`, port 5433, dbs `coldemail` + `coldemail_test`)
+- `npm run db:migrate` / `db:rollback` / `db:status` — in-repo SQL migration runner (paired `.up.sql`/`.down.sql` in `apps/server/src/db/migrations/`; drizzle-kit is diff-generation assist only)
+- `npm test` — all Vitest projects; the `integration` project needs the Postgres container. `npx vitest run --project unit` = fast, no DB
+- `npm run typecheck` / `lint` / `format` — lint enforces the module boundaries (`eslint.config.mjs`; blocks are a partition — see Tooling lessons)
+- `npm run dev -w @coldemail/server` — tsx watch boot (needs `.env`)
+- CI (`.github/workflows/ci.yml`): typecheck + lint + format:check + migration drill + tests on a Postgres service. The `@golden` suite becomes a separate required job at B1; `rebuild-projections` CLI arrives in B1.
 
 ## Conventions worth knowing before you write domain code
 

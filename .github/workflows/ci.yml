@@ -1,0 +1,52 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  ci:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: coldemail
+          POSTGRES_PASSWORD: coldemail_dev
+          POSTGRES_DB: coldemail
+        ports: ['5433:5432']
+        options: >-
+          --health-cmd "pg_isready -U coldemail -d coldemail"
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 10
+    env:
+      DATABASE_URL: postgres://coldemail:coldemail_dev@localhost:5433/coldemail
+      TEST_DATABASE_URL: postgres://coldemail:coldemail_dev@localhost:5433/coldemail_test
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+
+      - run: npm ci
+
+      - name: Create test database (service containers skip initdb mounts)
+        run: PGPASSWORD=coldemail_dev psql -h localhost -p 5433 -U coldemail -d coldemail -c 'CREATE DATABASE coldemail_test'
+
+      - run: npm run typecheck
+      - run: npm run lint
+      - run: npm run format:check
+
+      - name: Migration drill (apply -> rollback -> apply)
+        run: |
+          npm run db:migrate
+          npm run db:rollback
+          npm run db:migrate
+
+      - run: npm test
+
+  # The @golden suite becomes a separate required job at B1 (docs/13 §6).
