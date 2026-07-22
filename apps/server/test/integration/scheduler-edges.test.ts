@@ -4,19 +4,9 @@
 import { afterEach, describe, expect, it } from 'vitest';
 import { scenario, leadEmail, type Scenario } from '../helpers/scenario';
 import { localParts } from '../../src/scheduler/window';
-import type { SequenceDef } from '../../src/domain/sequence';
+import { testSequence } from '../helpers/sequences';
 
-const oneStep: SequenceDef = {
-  id: 1,
-  steps: [
-    {
-      stepNo: 1,
-      waitDays: 0,
-      inThread: false,
-      variants: [{ id: 1, label: 'A', contentHash: 'h1' }],
-    },
-  ],
-};
+const oneStep = testSequence(1, [0]);
 
 describe('scheduler edges (B3.18)', () => {
   let s: Scenario;

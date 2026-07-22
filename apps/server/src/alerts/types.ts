@@ -13,7 +13,9 @@ export type AlertKind =
   | 'selfcheck_drift'
   | 'catchup_backlog'
   | 'suppression_removed'
-  | 'job_failed';
+  | 'job_failed'
+  | 'compliance_missing_address' // docs/08 §4 global send guard (B4.8)
+  | 'render_failed'; // fatal pre-send check blocked a send (B4.8)
 
 export interface AlertSink {
   emit(kind: AlertKind, severity: AlertSeverity, payload: Record<string, unknown>): Promise<void>;

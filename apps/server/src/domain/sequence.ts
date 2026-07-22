@@ -9,6 +9,8 @@ export interface VariantDef {
   label: string; // 'A','B',…
   /** sha256(subject_template + '\0' + body_template) — decision Q. */
   contentHash: string;
+  subjectTemplate: string; // docs/08 §2 grammar; rendered by render/engine
+  bodyTemplate: string; // footer NOT included (appended at render, docs/08 §4)
 }
 
 export interface SequenceStepDef {

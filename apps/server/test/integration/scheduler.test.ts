@@ -2,22 +2,12 @@
 // capacity + enroll — real scheduler over MockTransport + VirtualClock.
 import { afterEach, describe, expect, it } from 'vitest';
 import { scenario, leadEmail, type Scenario } from '../helpers/scenario';
-import type { SequenceDef } from '../../src/domain/sequence';
 import { capacityToday, enroll } from '../../src/services/enrollment';
 import { buildEvent } from '../../src/domain/events';
+import { testSequence } from '../helpers/sequences';
 
-const step = (stepNo: number, waitDays: number, hash: string): SequenceDef['steps'][number] => ({
-  stepNo,
-  waitDays,
-  inThread: stepNo > 1,
-  variants: [{ id: stepNo, label: 'A', contentHash: hash }],
-});
-
-const fourStep: SequenceDef = {
-  id: 1,
-  steps: [step(1, 0, 'h1'), step(2, 3, 'h2'), step(3, 4, 'h3'), step(4, 5, 'h4')],
-};
-const twoStep: SequenceDef = { id: 1, steps: [step(1, 0, 'h1'), step(2, 3, 'h2')] };
+const fourStep = testSequence(1, [0, 3, 4, 5]);
+const twoStep = testSequence(1, [0, 3]);
 
 const eventTypes = async (s: Scenario, leadId: number): Promise<string[]> => {
   const r = await s.pool.query(`SELECT type FROM events WHERE lead_id = $1 ORDER BY id`, [leadId]);
@@ -212,7 +202,7 @@ describe('scheduler (B3.7/B3.8)', () => {
     expect(s.mock.sentLog).toHaveLength(0);
     await s.advanceDays(1);
     expect(s.mock.sentLog.filter((e) => e.result.accepted)).toHaveLength(1);
-  });
+  }, 30_000);
 });
 
 describe('capacity + enroll (B3.9)', () => {

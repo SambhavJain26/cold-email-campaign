@@ -19,7 +19,7 @@ import type { EnrollmentState, LeadTier } from '@coldemail/shared';
 import { Scheduler } from '../../src/scheduler/scheduler';
 import { Poller } from '../../src/poller/poller';
 import { StaticSequenceProvider } from '../../src/scheduler/staticSequenceProvider';
-import { StubRenderer } from '../../src/render/stub';
+import { RenderEngine } from '../../src/render/engine';
 import { runConfirmDelivery } from '../../src/scheduler/confirmDelivery';
 import type { JobPort } from '../../src/scheduler/types';
 import { CapturingAlerts } from '../../src/alerts/types';
@@ -132,7 +132,7 @@ export class Scenario {
       clock: this.clock,
       rng: this.rng,
       sequences: this.sequences,
-      renderer: new StubRenderer(),
+      renderer: new RenderEngine(),
       jobs: this.jobPort,
       alerts: this.alerts,
     });

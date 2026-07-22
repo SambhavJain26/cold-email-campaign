@@ -7,14 +7,30 @@ import type { Scenario, LeadRef } from '../../helpers/scenario';
 import { GOLDEN, linkUnsubStep, replierStep, sentimentOf } from './constants';
 
 /** The walkthrough's 4-step sequence (waits 0/3/4/5), one variant per step,
- *  content hashes matching the fixture's (`sha-stepN`). */
+ *  content hashes matching the fixture's (`sha-stepN`) — the renderer ECHOES
+ *  the hash (decision Q: computed at save time), so real templates here don't
+ *  disturb events.jsonl parity. Templates are fatal-free for the golden leads
+ *  (no first_name/company/state → every tag falls back; no URLs in step 1;
+ *  no {{custom_observation}} — the harness seeds no segment rules). */
+const goldenBody = (stepNo: number): string =>
+  `Hi {{first_name|there}},\n\nStep ${stepNo} of the walkthrough sequence — checking in on ` +
+  'your listings pipeline and whether a quick chat makes sense this week.\n\nBest,\nSam';
+
 export const GOLDEN_SEQUENCE: SequenceDef = {
   id: 1,
   steps: [0, 3, 4, 5].map((waitDays, idx) => ({
     stepNo: idx + 1,
     waitDays,
     inThread: idx > 0,
-    variants: [{ id: idx + 1, label: 'A', contentHash: `sha-step${idx + 1}` }],
+    variants: [
+      {
+        id: idx + 1,
+        label: 'A',
+        contentHash: `sha-step${idx + 1}`,
+        subjectTemplate: 'Quick question about {{company|your listings}}',
+        bodyTemplate: goldenBody(idx + 1),
+      },
+    ],
   })),
 };
 

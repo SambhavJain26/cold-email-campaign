@@ -36,6 +36,13 @@ describe('seeded settings', () => {
     const { rows } = await pool.query('SELECT * FROM compliance_settings');
     expect(rows).toHaveLength(1);
     expect(rows[0].optout_text).toMatch(/Reply STOP/i);
-    expect(rows[0].physical_address).toBe(''); // must be filled before sends (docs/08 §4)
+    // The SEED default is empty — must be filled before sends (docs/08 §4).
+    // The row itself is overwritten by resetCoreTables (test harness seeds an
+    // address so DB suites can send), so assert the DDL default instead.
+    const def = await pool.query(
+      `SELECT column_default FROM information_schema.columns
+       WHERE table_name = 'compliance_settings' AND column_name = 'physical_address'`,
+    );
+    expect(def.rows[0].column_default).toBe("''::text");
   });
 });

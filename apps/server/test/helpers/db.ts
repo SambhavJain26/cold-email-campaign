@@ -28,6 +28,13 @@ export async function resetCoreTables(pool: Pool): Promise<void> {
              step_variants, sequence_steps, sequences
      RESTART IDENTITY CASCADE`,
   );
+  // compliance_settings survives TRUNCATE (single seeded row) and its seed
+  // default physical_address is '' — which trips the B4 global send guard
+  // (docs/08 §4). Restore a test address so every DB suite can send; suites
+  // testing the guard itself blank it explicitly.
+  await pool.query(
+    `UPDATE compliance_settings SET physical_address = '100 Test Street, Austin TX 78701' WHERE id = 1`,
+  );
 }
 
 /**

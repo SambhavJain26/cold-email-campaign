@@ -13,19 +13,9 @@ import { redistributeUnstarted } from '../../src/db/repos/enrollmentsRepo';
 import { TransportAuthError } from '../../src/transport/types';
 import { TEST_DATABASE_URL, resetCoreTables, seedMailboxes } from '../helpers/db';
 import { scenario, type Scenario } from '../helpers/scenario';
-import type { SequenceDef } from '../../src/domain/sequence';
+import { testSequence } from '../helpers/sequences';
 
-const oneStep: SequenceDef = {
-  id: 1,
-  steps: [
-    {
-      stepNo: 1,
-      waitDays: 0,
-      inThread: false,
-      variants: [{ id: 1, label: 'A', contentHash: 'h1' }],
-    },
-  ],
-};
+const oneStep = testSequence(1, [0]);
 
 describe('alert emitter (B3.15)', () => {
   let db: Db;

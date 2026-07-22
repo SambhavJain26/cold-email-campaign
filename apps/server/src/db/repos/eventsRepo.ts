@@ -116,19 +116,100 @@ export async function hasBounceSince(
   return rows.length > 0;
 }
 
+export interface SentEventLite {
+  stepNo: number;
+  occurredAt: Date;
+  messageId: string;
+  /** attributes.variant_id — which variant produced the send (B4.8). */
+  variantId: number | null;
+}
+
+function toSentEventLite(r: {
+  stepNo: number | null;
+  occurredAt: Date;
+  messageId: string | null;
+  attributes: unknown;
+}): SentEventLite {
+  const variantId = (r.attributes as { variant_id?: number } | null)?.variant_id;
+  return {
+    stepNo: r.stepNo!,
+    occurredAt: r.occurredAt,
+    messageId: r.messageId!,
+    variantId: typeof variantId === 'number' ? variantId : null,
+  };
+}
+
 /** Latest sent event of an enrollment — soft-retry detection + threading anchor. */
 export async function lastSentEvent(
   db: DbLike,
   enrollmentId: number,
-): Promise<{ stepNo: number; occurredAt: Date; messageId: string } | null> {
+): Promise<SentEventLite | null> {
   const rows = await db
-    .select({ stepNo: events.stepNo, occurredAt: events.occurredAt, messageId: events.messageId })
+    .select({
+      stepNo: events.stepNo,
+      occurredAt: events.occurredAt,
+      messageId: events.messageId,
+      attributes: events.attributes,
+    })
     .from(events)
     .where(and(eq(events.enrollmentId, enrollmentId), eq(events.type, 'sent')))
     .orderBy(desc(events.id))
     .limit(1);
-  const r = rows[0];
-  return r ? { stepNo: r.stepNo!, occurredAt: r.occurredAt, messageId: r.messageId! } : null;
+  return rows[0] ? toSentEventLite(rows[0]) : null;
+}
+
+/** First sent event of an enrollment (= step 1) — the thread's subject anchor (docs/08 §6). */
+export async function firstSentEvent(
+  db: DbLike,
+  enrollmentId: number,
+): Promise<SentEventLite | null> {
+  const rows = await db
+    .select({
+      stepNo: events.stepNo,
+      occurredAt: events.occurredAt,
+      messageId: events.messageId,
+      attributes: events.attributes,
+    })
+    .from(events)
+    .where(and(eq(events.enrollmentId, enrollmentId), eq(events.type, 'sent')))
+    .orderBy(asc(events.id))
+    .limit(1);
+  return rows[0] ? toSentEventLite(rows[0]) : null;
+}
+
+/** Recycle guard probe (decision Q): has this lead ever received this template hash? */
+export async function leadReceivedContentHash(
+  db: DbLike,
+  leadId: number,
+  contentHash: string,
+): Promise<boolean> {
+  const rows = await db
+    .select({ id: events.id })
+    .from(events)
+    .where(
+      and(
+        eq(events.type, 'sent'),
+        eq(events.leadId, leadId),
+        sql`${events.attributes}->>'content_hash' = ${contentHash}`,
+      ),
+    )
+    .limit(1);
+  return rows.length > 0;
+}
+
+/** Sends for a campaign step — the stateless round-robin counter (B4.8). */
+export async function countSentForStep(
+  db: DbLike,
+  campaignId: number,
+  stepNo: number,
+): Promise<number> {
+  const rows = await db
+    .select({ n: sql<number>`count(*)::int` })
+    .from(events)
+    .where(
+      and(eq(events.type, 'sent'), eq(events.campaignId, campaignId), eq(events.stepNo, stepNo)),
+    );
+  return rows[0]?.n ?? 0;
 }
 
 /** Soft bounce for (enrollment, step) after an instant — is this send a retry? */
