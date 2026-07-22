@@ -40,6 +40,8 @@ export interface ComposeOverrides {
   transport?: MailTransport;
   databaseUrl?: string;
   rng?: Rng;
+  /** Tests inject an inline job queue instead of pg-boss. */
+  jobPort?: JobPort;
 }
 
 export function compose(config: Config, overrides: ComposeOverrides = {}): AppServices {
@@ -62,7 +64,7 @@ export function compose(config: Config, overrides: ComposeOverrides = {}): AppSe
 
   // Late-bound JobPort: scheduler → jobs → scheduler is a cycle on paper;
   // in practice jobs only calls back into tick/poll handlers.
-  const jobPort: JobPort = {
+  const jobPort: JobPort = overrides.jobPort ?? {
     scheduleConfirmDelivery: (job) => jobs.scheduleConfirmDelivery(job),
   };
 

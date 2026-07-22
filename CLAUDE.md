@@ -9,7 +9,9 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Current state: implementation underway
 
-M0 (docs) and B0 (foundation/scaffolding) are complete. **Check [PROGRESS.md](PROGRESS.md) for the current task pointer before starting work.** Dev loop assumes: Node ≥22, Docker running (`docker compose up -d` → Postgres 16 on port **5433**), `.env` copied from `.env.example` (generated keys).
+M0 (docs), B0-B3 (foundation → event log → metrics → mock transport/scheduler/poller) are complete - **M1 proven core** ✅. **Check [PROGRESS.md](PROGRESS.md) for the current task pointer before starting work.** Dev loop assumes: Node ≥22, Docker running (`docker compose up -d` → Postgres 16 on port **5433**), `.env` copied from `.env.example` (generated keys).
+
+B3 seams to know about: `SequenceProvider` (static in-memory now; B4 swaps in DB-backed), `Renderer` (`render/stub.ts` now; B4 replaces - golden L3 must stay green across the swap), `JobPort` (scenario inline queue in tests; pg-boss in prod). The scenario runner (`apps/server/test/helpers/scenario.ts`) is the integration-test entry point: real scheduler+poller+eventStore over MockTransport+VirtualClock.
 
 ## Where to look first
 
@@ -83,4 +85,8 @@ npm-workspaces monorepo: `apps/server` (TypeScript/Node ≥22 - dev on 24, Fasti
 ## Tooling lessons
 
 - **ESLint flat config does not merge rule options across matching blocks - last match wins per rule.** The boundary rules in `eslint.config.mjs` therefore *partition* `apps/server/src` (domain / db / transport+clock+composition / rest); keep the partition exhaustive when adding blocks, and verify new rules actually fire with a temp violation file.
+- **Drizzle `sql` templates expand a bare interpolated array into a tuple** (`($1,$2,…)`) - which can't cast to `text[]`. Use `sql.param([...])` to keep it one array placeholder.
+- **`resetCoreTables` truncates core tables but NOT the seeded `settings` row** - a test that mutates settings leaks into later runs. The scenario runner's `init()` restores the tunables it owns; do the same in any new DB-backed suite that edits settings.
+- **The test DB is shared and serial** - never run two DB-backed vitest invocations concurrently (a parallel run's truncates corrupt a long-running golden replay mid-flight).
+- Migrations may land out of filename order across stages (0004 before 0003, 0006 before 0005): the runner applies pending-by-filename, so this is fine - but a later-numbered migration must never depend on an earlier-numbered one that hasn't landed yet.
 - The Bash tool's working directory persists between calls on this machine - use absolute paths or re-`cd` to the repo root.
