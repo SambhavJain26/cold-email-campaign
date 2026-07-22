@@ -4,13 +4,13 @@
 // `import_all` only additionally admits `role_based`.
 import type { DbLike } from '../db/client';
 import {
+  backfillLeadIds,
   createImport,
   getImport,
   insertImportRows,
   listRowsByFlags,
   markCommitted,
   sampleRowsByFlag,
-  setRowLeadId,
   type ImportRowFlag,
 } from '../db/repos/importsRepo';
 import { existingEmails, insertImportedLeads, type NewImportedLead } from '../db/repos/leadsRepo';
@@ -148,17 +148,14 @@ export async function commitImport(
     db,
     toInsert.map((t) => t.lead),
   );
-  let inserted = 0;
-  for (const t of toInsert) {
+  const pairs = toInsert.flatMap((t) => {
     const leadId = insertedByEmail.get(t.lead.email);
-    if (leadId !== undefined) {
-      await setRowLeadId(db, t.rowId, leadId);
-      inserted += 1;
-    }
-  }
+    return leadId === undefined ? [] : [{ rowId: t.rowId, leadId }];
+  });
+  await backfillLeadIds(db, pairs);
 
   await markCommitted(db, input.importId, input.mode);
-  return { inserted, skipped: rows.length - inserted };
+  return { inserted: pairs.length, skipped: rows.length - pairs.length };
 }
 
 /** Re-export the parse contract for API-layer use (B6.4). */
