@@ -65,10 +65,11 @@ npm-workspaces monorepo: `apps/server` (TypeScript/Node ≥22 - dev on 24, Fasti
 
 - `docker compose up -d` - dev Postgres 16 (`coldemail-postgres`, port 5433, dbs `coldemail` + `coldemail_test`)
 - `npm run db:migrate` / `db:rollback` / `db:status` - in-repo SQL migration runner (paired `.up.sql`/`.down.sql` in `apps/server/src/db/migrations/`; drizzle-kit is diff-generation assist only)
-- `npm test` - all Vitest projects; the `integration` project needs the Postgres container. `npx vitest run --project unit` = fast, no DB
+- `npm test` - all Vitest projects (unit / integration / golden); DB-backed projects need the Postgres container. `npx vitest run --project unit` = fast, no DB. `npm run test:golden` = the locked 885-lead regression (never skip)
+- `npm run rebuild-projections -- --dry-run` - projection drift check (exit 1 on drift). Golden fixture: regenerate via `npx tsx test/fixtures/golden/write.ts` in `apps/server` - but only deliberately; a determinism test locks generator ⇔ committed `events.jsonl`
 - `npm run typecheck` / `lint` / `format` - lint enforces the module boundaries (`eslint.config.mjs`; blocks are a partition - see Tooling lessons)
 - `npm run dev -w @coldemail/server` - tsx watch boot (needs `.env`)
-- CI (`.github/workflows/ci.yml`): typecheck + lint + format:check + migration drill + tests on a Postgres service. The `@golden` suite becomes a separate required job at B1; `rebuild-projections` CLI arrives in B1.
+- CI (`.github/workflows/ci.yml`): `ci` job (typecheck + lint + format:check + migration drill + unit/integration) and `golden` job (the locked regression), both on Postgres services.
 
 ## Conventions worth knowing before you write domain code
 

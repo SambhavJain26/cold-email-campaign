@@ -18,9 +18,19 @@ export default defineConfig({
           name: 'integration',
           include: ['apps/server/test/integration/**/*.test.ts'],
           globalSetup: ['./apps/server/test/helpers/global-setup.ts'],
-          // DB-backed tests share one database - keep them serial for now
-          // (per-schema isolation arrives with real tables in B1).
+          // DB-backed tests share one database - keep them serial.
           fileParallelism: false,
+        },
+      },
+      {
+        test: {
+          // The locked regression (docs/13 §3). NEVER skip - red here means
+          // the math stopped closing. Separate required CI job.
+          name: 'golden',
+          include: ['apps/server/test/golden/**/*.test.ts'],
+          globalSetup: ['./apps/server/test/helpers/global-setup.ts'],
+          fileParallelism: false,
+          testTimeout: 120_000,
         },
       },
     ],
