@@ -2,9 +2,9 @@
 // enter the system. Appends event(s) and updates the affected projections in
 // ONE Postgres transaction. Nothing else writes `events` or
 // `enrollments.current_state`.
-import type { Db } from '../db/client';
+import type { Db, Tx } from '../db/client';
 import { insertEvents, listByEnrollments } from '../db/repos/eventsRepo';
-import { writeProjection, listIdsByState } from '../db/repos/enrollmentsRepo';
+import { writeProjection, listIdsByState, patchScheduling } from '../db/repos/enrollmentsRepo';
 import { suppressLead } from '../db/repos/suppressionsRepo';
 import { getSettings } from '../db/repos/settingsRepo';
 import { acquireRebuildLockShared, lockEnrollment } from '../db/repos/locksRepo';
@@ -16,6 +16,24 @@ import {
   type SequenceShape,
 } from '../domain/reducer';
 
+/**
+ * Scheduling columns the reducer cannot derive (they need the sequence
+ * definition / wall time): set atomically with the append (docs/02 §3).
+ * nextSendAt is ignored when the fold lands on a terminal state - the
+ * projection writer clears it and nothing may resurrect a dead enrollment.
+ */
+export interface SchedulingPatch {
+  enrollmentId: number;
+  nextSendAt?: Date | null;
+  assignedMailboxId?: number;
+}
+
+export interface AppendOptions {
+  patches?: readonly SchedulingPatch[];
+  /** Extra same-transaction work (sent_messages row, incoming_messages row, …). */
+  txWork?: (tx: Tx, eventIds: number[]) => Promise<void>;
+}
+
 export class EventStore {
   constructor(private readonly db: Db) {}
 
@@ -25,7 +43,7 @@ export class EventStore {
    * recomputed by folding its FULL event history - projection == fold(log)
    * by construction, which is what makes rebuild a no-op check.
    */
-  async append(evs: readonly DomainEvent[]): Promise<number[]> {
+  async append(evs: readonly DomainEvent[], opts: AppendOptions = {}): Promise<number[]> {
     if (evs.length === 0) return [];
     return this.db.transaction(async (tx) => {
       // Rebuild takes this exclusively; appends share it.
@@ -51,9 +69,18 @@ export class EventStore {
       }
 
       const byEnrollment = await listByEnrollments(tx, enrollmentIds);
+      const terminalIds = new Set<number>();
       for (const eid of enrollmentIds) {
         const snapshot = foldEvents(byEnrollment.get(eid) ?? [], shape);
         await writeProjection(tx, eid, snapshot);
+        if (snapshot.state !== 'NEW' && snapshot.state !== 'ACTIVE') terminalIds.add(eid);
+      }
+
+      // Scheduling patches (docs/02 §3): same tx, after the fold so a
+      // terminal outcome always wins over a stale nextSendAt.
+      for (const p of opts.patches ?? []) {
+        const patch = terminalIds.has(p.enrollmentId) ? { ...p, nextSendAt: undefined } : p;
+        await patchScheduling(tx, p.enrollmentId, patch);
       }
 
       // Suppression side effects (docs/04 §3) - same transaction, so an
@@ -65,6 +92,8 @@ export class EventStore {
           await suppressLead(tx, e.leadId, 'unsubscribed', e.occurredAt);
         }
       }
+
+      if (opts.txWork) await opts.txWork(tx, ids);
 
       return ids;
     });

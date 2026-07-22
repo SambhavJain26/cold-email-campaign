@@ -8,7 +8,6 @@
 import { Pool } from 'pg';
 import { createDb, type Db } from '../../src/db/client';
 import { EventStore } from '../../src/services/eventStore';
-import { buildEvent } from '../../src/domain/events';
 import { VirtualClock } from '../../src/clock/virtual';
 import { MockTransport } from '../../src/transport/mock/mockTransport';
 import { threadedReply, dsnBounce, oooReply } from '../../src/transport/mock/inbound';
@@ -16,6 +15,13 @@ import { seededRng, type Rng } from '../../src/util/rng';
 import type { SequenceDef } from '../../src/domain/sequence';
 import type { SendWindow } from '../../src/db/schema/transport';
 import type { EnrollmentState, LeadTier } from '@coldemail/shared';
+import { Scheduler } from '../../src/scheduler/scheduler';
+import { StaticSequenceProvider } from '../../src/scheduler/staticSequenceProvider';
+import { StubRenderer } from '../../src/render/stub';
+import { runConfirmDelivery } from '../../src/scheduler/confirmDelivery';
+import type { JobPort } from '../../src/scheduler/types';
+import { CapturingAlerts } from '../../src/alerts/types';
+import { enroll as enrollService } from '../../src/services/enrollment';
 import { TEST_DATABASE_URL, resetCoreTables } from './db';
 
 export interface ScenarioConfig {
@@ -28,6 +34,8 @@ export interface ScenarioConfig {
   seed?: number;
   tickMinutes?: number;
   pollMinutes?: number;
+  /** Campaign ramp config; scenarios default to NO ramp (unlimited enroll). */
+  ramp?: { ramp_days: number; ramp_daily_enroll_cap: number };
 }
 
 export type LeadRef = string; // 'L0001' … - id 1…, email l0001@scenario.dev
@@ -72,6 +80,11 @@ export class Scenario {
   readonly rng: Rng;
   readonly campaignId = 1;
   readonly hooks: ScenarioHooks = {};
+  readonly alerts = new CapturingAlerts();
+  readonly sequences = new StaticSequenceProvider();
+  readonly scheduler: Scheduler;
+  /** JobPort backed by the inline queue - pg-boss's stand-in (docs/13 §4). */
+  readonly jobPort: JobPort;
 
   private readonly cfg: Required<
     Pick<ScenarioConfig, 'mailboxes' | 'dailyCap' | 'tickMinutes' | 'pollMinutes'>
@@ -95,6 +108,33 @@ export class Scenario {
     ({ db: this.db, pool: this.pool } = createDb(TEST_DATABASE_URL));
     this.store = new EventStore(this.db);
     this.rng = seededRng(cfg.seed ?? 42);
+    this.sequences.register(this.campaignId, cfg.sequence);
+    this.jobPort = {
+      scheduleConfirmDelivery: (job) => {
+        this.scheduleJob('confirm-delivery', job.runAt, () =>
+          runConfirmDelivery({ db: this.db, store: this.store, clock: this.clock }, job).then(
+            () => undefined,
+          ),
+        );
+        return Promise.resolve();
+      },
+    };
+    this.scheduler = new Scheduler({
+      db: this.db,
+      pool: this.pool,
+      store: this.store,
+      transport: this.mock,
+      clock: this.clock,
+      rng: this.rng,
+      sequences: this.sequences,
+      renderer: new StubRenderer(),
+      jobs: this.jobPort,
+      alerts: this.alerts,
+    });
+    // Default hooks: the REAL scheduler tick (B3.7). Poll is wired at B3.10.
+    this.hooks.tick = async () => {
+      await this.scheduler.tick();
+    };
   }
 
   /** Reset DB, seed mailboxes + campaign + settings. Call once, first. */
@@ -108,8 +148,10 @@ export class Scenario {
         [`mb${i}`, `mb${i}@scenario.dev`, this.cfg.dailyCap, JSON.stringify(window)],
       );
     }
+    const ramp = this.cfg.ramp ?? { ramp_days: 0, ramp_daily_enroll_cap: 0 }; // no ramp by default
     await this.pool.query(
-      `INSERT INTO campaigns (name, status) VALUES ('Scenario Campaign', 'active')`,
+      `INSERT INTO campaigns (name, status, ramp_config) VALUES ('Scenario Campaign', 'active', $1)`,
+      [JSON.stringify(ramp)],
     );
     await this.pool.query(
       `UPDATE settings SET scheduler_tick_minutes = $1, poll_interval_minutes = $2 WHERE id = 1`,
@@ -148,43 +190,15 @@ export class Scenario {
     );
   }
 
-  /**
-   * Enroll leads into the campaign. Placeholder implementation until the real
-   * enroll service lands (B3.9): eligible leads in tier order A→B→C→untiered,
-   * oldest first; enrolled event + next_send_at = now.
-   */
-  async enroll(opts: { count: number; tier?: LeadTier }): Promise<number[]> {
-    const now = this.clock.now();
-    const rows = await this.pool.query(
-      `SELECT l.id, l.tier FROM leads l
-       WHERE NOT l.is_suppressed
-         AND l.tier IS DISTINCT FROM 'nurture'
-         AND ($2::lead_tier IS NULL OR l.tier = $2)
-         AND NOT EXISTS (SELECT 1 FROM enrollments e WHERE e.lead_id = l.id AND e.campaign_id = $3)
-       ORDER BY CASE l.tier WHEN 'A' THEN 1 WHEN 'B' THEN 2 WHEN 'C' THEN 3 ELSE 4 END, l.id
-       LIMIT $1`,
-      [opts.count, opts.tier ?? null, this.campaignId],
+  /** Enroll leads via the REAL enrollment service (B3.9, docs/06 §7). */
+  async enroll(opts: { count: number; tier?: LeadTier; force?: boolean }): Promise<number[]> {
+    const result = await enrollService(
+      { db: this.db, store: this.store, clock: this.clock, sequences: this.sequences },
+      this.campaignId,
+      opts.count,
+      { tier: opts.tier, force: opts.force ?? true }, // scenarios default past the capacity gate
     );
-    const ids: number[] = [];
-    for (const r of rows.rows as { id: number; tier: LeadTier | null }[]) {
-      const enr = await this.pool.query(
-        `INSERT INTO enrollments (lead_id, campaign_id, current_state, enrolled_tier, personalization_mode, enrolled_at, next_send_at)
-         VALUES ($1, $2, 'NEW', $3, 'template_auto', $4, $4) RETURNING id`,
-        [r.id, this.campaignId, r.tier, now],
-      );
-      const enrollmentId = enr.rows[0].id as number;
-      await this.store.append([
-        buildEvent.enrolled({
-          leadId: r.id,
-          enrollmentId,
-          campaignId: this.campaignId,
-          occurredAt: now,
-        }),
-      ]);
-      // append's fold sets NEW→ACTIVE but never touches next_send_at; keep it.
-      ids.push(r.id);
-    }
-    return ids;
+    return result.leadIds;
   }
 
   /** Script what happens when we send to a lead (docs/13 §4). */

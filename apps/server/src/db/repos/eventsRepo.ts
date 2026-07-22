@@ -1,6 +1,6 @@
 // Events repo: the only place SQL touches the events table.
 // Append-only - there is deliberately no update/delete here.
-import { asc, eq, inArray } from 'drizzle-orm';
+import { and, asc, desc, eq, gte, inArray, sql } from 'drizzle-orm';
 import type { DbLike } from '../client';
 import { events } from '../schema';
 import { parseDomainEvent, type DomainEvent } from '../../domain/events';
@@ -48,6 +48,76 @@ export async function insertEvents(db: DbLike, evs: readonly DomainEvent[]): Pro
   if (evs.length === 0) return [];
   const rows = await db.insert(events).values(evs.map(toRow)).returning({ id: events.id });
   return rows.map((r) => r.id);
+}
+
+/** Sends from a mailbox since an instant - the cap counter (docs/06 §1 B). */
+export async function countSentSince(db: DbLike, mailboxId: number, since: Date): Promise<number> {
+  const rows = await db
+    .select({ n: sql<number>`count(*)::int` })
+    .from(events)
+    .where(
+      and(eq(events.type, 'sent'), eq(events.mailboxId, mailboxId), gte(events.occurredAt, since)),
+    );
+  return rows[0]?.n ?? 0;
+}
+
+/** Any bounce for (enrollment, step) at/after `since` - confirm-delivery's veto (decision N). */
+export async function hasBounceSince(
+  db: DbLike,
+  enrollmentId: number,
+  stepNo: number,
+  since: Date,
+): Promise<boolean> {
+  const rows = await db
+    .select({ id: events.id })
+    .from(events)
+    .where(
+      and(
+        eq(events.enrollmentId, enrollmentId),
+        eq(events.stepNo, stepNo),
+        inArray(events.type, ['soft_bounce', 'hard_bounce']),
+        gte(events.occurredAt, since),
+      ),
+    )
+    .limit(1);
+  return rows.length > 0;
+}
+
+/** Latest sent event of an enrollment - soft-retry detection + threading anchor. */
+export async function lastSentEvent(
+  db: DbLike,
+  enrollmentId: number,
+): Promise<{ stepNo: number; occurredAt: Date; messageId: string } | null> {
+  const rows = await db
+    .select({ stepNo: events.stepNo, occurredAt: events.occurredAt, messageId: events.messageId })
+    .from(events)
+    .where(and(eq(events.enrollmentId, enrollmentId), eq(events.type, 'sent')))
+    .orderBy(desc(events.id))
+    .limit(1);
+  const r = rows[0];
+  return r ? { stepNo: r.stepNo!, occurredAt: r.occurredAt, messageId: r.messageId! } : null;
+}
+
+/** Soft bounce for (enrollment, step) after an instant - is this send a retry? */
+export async function hasSoftBounceAfter(
+  db: DbLike,
+  enrollmentId: number,
+  stepNo: number,
+  after: Date,
+): Promise<boolean> {
+  const rows = await db
+    .select({ id: events.id })
+    .from(events)
+    .where(
+      and(
+        eq(events.enrollmentId, enrollmentId),
+        eq(events.stepNo, stepNo),
+        eq(events.type, 'soft_bounce'),
+        gte(events.occurredAt, after),
+      ),
+    )
+    .limit(1);
+  return rows.length > 0;
 }
 
 export async function listByEnrollment(db: DbLike, enrollmentId: number): Promise<DomainEvent[]> {
