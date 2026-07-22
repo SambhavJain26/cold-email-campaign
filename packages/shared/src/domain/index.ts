@@ -63,3 +63,19 @@ export type PersonalizationMode = (typeof PERSONALIZATION_MODES)[number];
 
 export const CAMPAIGN_STATUSES = ['draft', 'active', 'paused', 'completed', 'archived'] as const;
 export type CampaignStatus = (typeof CAMPAIGN_STATUSES)[number];
+
+export const MAILBOX_STATUSES = [
+  'ok',
+  'paused',
+  'auto_paused',
+  'auth_failed',
+  'imap_stale',
+  'provider_blocked',
+] as const;
+export type MailboxStatus = (typeof MAILBOX_STATUSES)[number];
+
+export const INCOMING_CLASSES = ['bounce', 'auto_reply', 'human_reply', 'unrelated'] as const;
+export type IncomingClass = (typeof INCOMING_CLASSES)[number];
+
+export const ALERT_SEVERITIES = ['info', 'warning', 'error'] as const;
+export type AlertSeverity = (typeof ALERT_SEVERITIES)[number];
