@@ -55,7 +55,7 @@ The build is **contract-first and two-track**. [docs/10-api-contract.md](docs/10
 
 ## Planned tech stack (see [docs/02-architecture.md](docs/02-architecture.md))
 
-npm-workspaces monorepo: `apps/server` (TypeScript/Node 22, Fastify, Drizzle ORM, pg-boss jobs), `apps/web` (React 18 + Vite + Tailwind + shadcn/ui + TanStack Query), `packages/shared` (Zod DTO schemas — the runtime form of the API contract). PostgreSQL 16 only — **no Redis, no broker**; background work (scheduler tick, IMAP polls, confirm-delivery, self-check) runs as pg-boss jobs in the same Node process (`ROLE=all|api|worker`).
+npm-workspaces monorepo: `apps/server` (TypeScript/Node ≥22 — dev on 24, Fastify, Drizzle ORM, pg-boss jobs), `apps/web` (React 18 + Vite + Tailwind + shadcn/ui + TanStack Query), `packages/shared` (Zod DTO schemas — the runtime form of the API contract). PostgreSQL 16 only — **no Redis, no broker**; background work (scheduler tick, IMAP polls, confirm-delivery, self-check) runs as pg-boss jobs in the same Node process (`ROLE=all|api|worker`).
 
 ### Module boundaries to respect (`apps/server/src/`)
 

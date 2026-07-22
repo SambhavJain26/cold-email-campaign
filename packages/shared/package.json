@@ -1,0 +1,16 @@
+{
+  "name": "@coldemail/shared",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "description": "Zod DTO schemas + shared domain vocabulary — the executable form of docs/10-api-contract.md",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "zod": "^4.0.0"
+  }
+}
