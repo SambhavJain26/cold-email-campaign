@@ -4,7 +4,7 @@
 
 **Legend:** `[ ]` not started · `[~]` in progress · `[x]` done · `[!]` blocked (note why in the log)
 
-**Current focus:** → **B0** (in progress - B0.1-B0.2 done; next B0.3)
+**Current focus:** → **B1** (event log + state machine; B0 complete)
 
 ---
 
@@ -24,7 +24,7 @@
 
 ### B0 - Foundation
 - [x] B0.1 monorepo scaffold · [x] B0.2 tooling · [x] B0.3 compose+env · [x] B0.4 drizzle+test-db · [x] B0.5 config loader · [x] B0.6 Clock · [x] B0.7 MailTransport iface+stub · [x] B0.8 logging · [x] B0.9 fastify skeleton · [x] B0.10 CI
-- **Gate:** ☐ clone→up→migrate→test green in CI
+- **Gate:** ✅ 2026-07-22 - CI green (typecheck, lint, format, migration drill, 25 tests on Postgres service); VirtualClock gate test passes; live boot smoke verified
 
 ### B1 - Event log + state machine
 - [ ] B1.1 core migration · [ ] B1.2 seeds · [ ] B1.3 event constructors · [ ] B1.4 reducer · [ ] B1.5 eventStore.append · [ ] B1.6 rebuild-projections · [ ] B1.7 golden fixture · [ ] B1.8 transition-matrix tests · [ ] B1.9 golden L1 + rebuild equivalence · [ ] B1.10 append-only enforcement test
@@ -100,6 +100,7 @@
 
 | Date | Entry |
 |------|-------|
+| 2026-07-22 | **B0 COMPLETE.** B0.8-B0.10: pino logging with proven redaction; Fastify skeleton (/health with db ping, error-envelope contract, graceful boot/shutdown - live smoke passed); GitHub Actions CI green (one formatting fix after format:check landed). 25 tests. Next: B1.1 (0001_core migration). |
 | 2026-07-22 | B0.5-B0.7: zod env loader (fail-loud); Clock seam (VirtualClock stepTo tick-stepping; 49-day fast-forward gate test); MailTransport interface + throwing stub; composition root with MAIL_TRANSPORT flag + test-override seam. 18 tests green. |
 | 2026-07-22 | B0.3-B0.4: Postgres 16 via compose (port 5433, initdb creates test DB). Custom up/down SQL migration runner + CLI (drizzle-kit can't do downs - docs/03 §6 updated); drizzle-orm client stub; vitest split into unit/integration projects with test-DB globalSetup; apply→down→apply drill green on dev + test DBs. |
 | 2026-07-22 | B0.2: ESLint 10 flat config with module-boundary rules (partitioned blocks - flat config is last-match-wins per rule; both partitions verified firing with temp violation files), Prettier, Vitest 4 + smoke test. format/lint/typecheck/test all green. |

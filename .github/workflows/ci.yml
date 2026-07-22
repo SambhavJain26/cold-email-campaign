@@ -25,9 +25,9 @@ jobs:
       DATABASE_URL: postgres://coldemail:coldemail_dev@localhost:5433/coldemail
       TEST_DATABASE_URL: postgres://coldemail:coldemail_dev@localhost:5433/coldemail_test
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v5
         with:
           node-version-file: .nvmrc
           cache: npm
