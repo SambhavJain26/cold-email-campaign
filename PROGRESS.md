@@ -23,7 +23,7 @@
 ## Backend track
 
 ### B0 — Foundation
-- [x] B0.1 monorepo scaffold · [x] B0.2 tooling · [x] B0.3 compose+env · [x] B0.4 drizzle+test-db · [ ] B0.5 config loader · [ ] B0.6 Clock · [ ] B0.7 MailTransport iface+stub · [ ] B0.8 logging · [ ] B0.9 fastify skeleton · [ ] B0.10 CI
+- [x] B0.1 monorepo scaffold · [x] B0.2 tooling · [x] B0.3 compose+env · [x] B0.4 drizzle+test-db · [x] B0.5 config loader · [ ] B0.6 Clock · [ ] B0.7 MailTransport iface+stub · [ ] B0.8 logging · [ ] B0.9 fastify skeleton · [ ] B0.10 CI
 - **Gate:** ☐ clone→up→migrate→test green in CI
 
 ### B1 — Event log + state machine
