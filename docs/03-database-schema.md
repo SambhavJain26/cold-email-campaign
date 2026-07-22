@@ -352,6 +352,6 @@ GRANT  INSERT, SELECT ON events TO app_rw;
 
 ## 6. Migration policy
 
-- drizzle-kit generates SQL migrations into `apps/server/src/db/migrations/`; committed to git; applied on boot (`migrate` before server start) and by `npm run db:migrate`.
+- Migrations are **hand-authored paired SQL files** (`NNNN_name.up.sql` / `NNNN_name.down.sql`) in `apps/server/src/db/migrations/`, executed by the in-repo runner (`src/db/migrate.ts`, tracked in `schema_migrations`), committed to git, applied on boot (prod) and by `npm run db:migrate` / `db:rollback` / `db:status`. drizzle-kit is generation-assist only (diff SQL from schema defs into gitignored `drizzle-kit-out/`, hand-copied in) — it cannot execute or roll back migrations. *(Changed at B0.4: drizzle-kit has no down-migration support, and this doc requires tested downs; hand-written DDL also fits the trigger/grant-heavy schema.)*
 - Numbered plan: `0001_core` (enums + events + leads + campaigns + enrollments + trigger/roles) → `0002_seed` → `0003_sequences` → `0004_transport_tables` (mailboxes, secrets, sent_messages, incoming_messages) → `0005_ingest` (imports, suppressions) → `0006_ops` (alerts, operator). Later stages add columns only via new migrations — never edit an applied migration.
 - Rollback: every migration ships a `down`; tested in CI (apply → down → apply).
