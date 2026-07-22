@@ -2,12 +2,12 @@
 // enter the system. Appends event(s) and updates the affected projections in
 // ONE Postgres transaction. Nothing else writes `events` or
 // `enrollments.current_state`.
-import { sql } from 'drizzle-orm';
 import type { Db } from '../db/client';
 import { insertEvents, listByEnrollments } from '../db/repos/eventsRepo';
 import { writeProjection, listIdsByState } from '../db/repos/enrollmentsRepo';
 import { suppressLead } from '../db/repos/suppressionsRepo';
 import { getSettings } from '../db/repos/settingsRepo';
+import { acquireRebuildLockShared, lockEnrollment } from '../db/repos/locksRepo';
 import type { DomainEvent } from '../domain/events';
 import {
   completeSnapshot,
@@ -15,9 +15,6 @@ import {
   shouldComplete,
   type SequenceShape,
 } from '../domain/reducer';
-
-/** Shared advisory-lock keyspace: (0,0) = projection-wide (rebuild holds it exclusively). */
-const REBUILD_LOCK = [0, 0] as const;
 
 export class EventStore {
   constructor(private readonly db: Db) {}
@@ -32,9 +29,7 @@ export class EventStore {
     if (evs.length === 0) return [];
     return this.db.transaction(async (tx) => {
       // Rebuild takes this exclusively; appends share it.
-      await tx.execute(
-        sql`SELECT pg_advisory_xact_lock_shared(${REBUILD_LOCK[0]}, ${REBUILD_LOCK[1]})`,
-      );
+      await acquireRebuildLockShared(tx);
 
       const settings = await getSettings(tx);
       const shape: SequenceShape = {
@@ -52,7 +47,7 @@ export class EventStore {
         ),
       ].sort((a, b) => a - b); // stable order avoids deadlocks between concurrent appends
       for (const eid of enrollmentIds) {
-        await tx.execute(sql`SELECT pg_advisory_xact_lock(1, ${eid})`);
+        await lockEnrollment(tx, eid);
       }
 
       const byEnrollment = await listByEnrollments(tx, enrollmentIds);
@@ -88,9 +83,7 @@ export class EventStore {
     campaignId: number | null = null,
   ): Promise<number> {
     return this.db.transaction(async (tx) => {
-      await tx.execute(
-        sql`SELECT pg_advisory_xact_lock_shared(${REBUILD_LOCK[0]}, ${REBUILD_LOCK[1]})`,
-      );
+      await acquireRebuildLockShared(tx);
       const activeIds = await listIdsByState(tx, campaignId, 'ACTIVE');
       const byEnrollment = await listByEnrollments(tx, activeIds);
       let completed = 0;

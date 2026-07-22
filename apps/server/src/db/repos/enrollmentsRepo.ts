@@ -36,6 +36,12 @@ export async function getById(db: DbLike, id: number): Promise<EnrollmentRow | u
   return rows[0];
 }
 
+export async function listAll(db: DbLike, campaignId: number | null): Promise<EnrollmentRow[]> {
+  return campaignId === null
+    ? db.select().from(enrollments)
+    : db.select().from(enrollments).where(eq(enrollments.campaignId, campaignId));
+}
+
 export async function listIdsByState(
   db: DbLike,
   campaignId: number | null,

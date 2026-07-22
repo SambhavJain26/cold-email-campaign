@@ -18,7 +18,8 @@
     "lint": "eslint .",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
-    "test": "vitest run"
+    "test": "vitest run",
+    "rebuild-projections": "npm run rebuild-projections -w @coldemail/server --"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
