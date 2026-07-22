@@ -23,7 +23,7 @@
 ## Backend track
 
 ### B0 — Foundation
-- [x] B0.1 monorepo scaffold · [x] B0.2 tooling · [x] B0.3 compose+env · [x] B0.4 drizzle+test-db · [x] B0.5 config loader · [x] B0.6 Clock · [ ] B0.7 MailTransport iface+stub · [ ] B0.8 logging · [ ] B0.9 fastify skeleton · [ ] B0.10 CI
+- [x] B0.1 monorepo scaffold · [x] B0.2 tooling · [x] B0.3 compose+env · [x] B0.4 drizzle+test-db · [x] B0.5 config loader · [x] B0.6 Clock · [x] B0.7 MailTransport iface+stub · [ ] B0.8 logging · [ ] B0.9 fastify skeleton · [ ] B0.10 CI
 - **Gate:** ☐ clone→up→migrate→test green in CI
 
 ### B1 — Event log + state machine
@@ -100,6 +100,7 @@
 
 | Date | Entry |
 |------|-------|
+| 2026-07-22 | B0.5–B0.7: zod env loader (fail-loud); Clock seam (VirtualClock stepTo tick-stepping; 49-day fast-forward gate test); MailTransport interface + throwing stub; composition root with MAIL_TRANSPORT flag + test-override seam. 18 tests green. |
 | 2026-07-22 | B0.3–B0.4: Postgres 16 via compose (port 5433, initdb creates test DB). Custom up/down SQL migration runner + CLI (drizzle-kit can't do downs — docs/03 §6 updated); drizzle-orm client stub; vitest split into unit/integration projects with test-DB globalSetup; apply→down→apply drill green on dev + test DBs. |
 | 2026-07-22 | B0.2: ESLint 10 flat config with module-boundary rules (partitioned blocks — flat config is last-match-wins per rule; both partitions verified firing with temp violation files), Prettier, Vitest 4 + smoke test. format/lint/typecheck/test all green. |
 | 2026-07-22 | B0.1: npm-workspaces monorepo scaffolded (`apps/server`, `apps/web` placeholder, `packages/shared`); base tsconfig (strict, ESM, bundler resolution); dir tree per docs/02 §1; typecheck + tsx smoke-run green. Node updated: machine runs 24 (current LTS), decision B now `>=22`. |

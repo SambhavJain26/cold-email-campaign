@@ -38,6 +38,15 @@ export default tseslint.config(
   },
   js.configs.recommended,
   ...tseslint.configs.recommended,
+  {
+    rules: {
+      // _-prefix = intentionally unused (interface conformance, catch slots)
+      '@typescript-eslint/no-unused-vars': [
+        'error',
+        { argsIgnorePattern: '^_', varsIgnorePattern: '^_', caughtErrorsIgnorePattern: '^_' },
+      ],
+    },
+  },
 
   // 1. domain/ is pure: nothing outside domain/, no infra packages.
   {
