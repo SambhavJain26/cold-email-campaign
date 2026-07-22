@@ -1,0 +1,23 @@
+# Dev infrastructure. Prod profile (app + caddy + backup) arrives in B7 - see docs/16.
+# Host port 5433 (not 5432) to avoid colliding with other Postgres stacks on this machine.
+services:
+  db:
+    image: postgres:16
+    container_name: coldemail-postgres
+    environment:
+      POSTGRES_USER: coldemail
+      POSTGRES_PASSWORD: coldemail_dev
+      POSTGRES_DB: coldemail
+    ports:
+      - '5433:5432'
+    volumes:
+      - coldemail_pgdata:/var/lib/postgresql/data
+      - ./docker/initdb:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U coldemail -d coldemail']
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+volumes:
+  coldemail_pgdata:
