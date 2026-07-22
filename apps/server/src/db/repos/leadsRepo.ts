@@ -1,7 +1,15 @@
-import { sql } from 'drizzle-orm';
+import { eq, sql } from 'drizzle-orm';
 import type { LeadTier } from '@coldemail/shared';
 import type { DbLike } from '../client';
 import { leads } from '../schema';
+
+export type LeadRow = typeof leads.$inferSelect;
+
+/** Lookup by normalized email (decision L: trim + lowercase, stored normalized). */
+export async function getLeadByEmail(db: DbLike, email: string): Promise<LeadRow | undefined> {
+  const rows = await db.select().from(leads).where(eq(leads.email, email.trim().toLowerCase()));
+  return rows[0];
+}
 
 export interface EligibleLead {
   id: number;
