@@ -10,7 +10,8 @@
     "db:migrate": "tsx src/db/cli.ts up",
     "db:rollback": "tsx src/db/cli.ts down",
     "db:status": "tsx src/db/cli.ts status",
-    "rebuild-projections": "tsx src/services/rebuildCli.ts"
+    "rebuild-projections": "tsx src/services/rebuildCli.ts",
+    "golden:export": "tsx test/fixtures/golden/export-api-fixtures.ts"
   },
   "dependencies": {
     "@coldemail/shared": "*",

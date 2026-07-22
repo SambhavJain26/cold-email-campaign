@@ -1,0 +1,50 @@
+[
+  {
+    "tier": "A",
+    "contacted": 255,
+    "reply_rate": {
+      "numerator": 33,
+      "denominator": 255,
+      "value": 12.9
+    },
+    "positive_rate": {
+      "numerator": 17,
+      "denominator": 255,
+      "value": 6.7
+    },
+    "meetings": 13,
+    "mode": "human_written"
+  },
+  {
+    "tier": "B",
+    "contacted": 447,
+    "reply_rate": {
+      "numerator": 31,
+      "denominator": 447,
+      "value": 6.9
+    },
+    "positive_rate": {
+      "numerator": 8,
+      "denominator": 447,
+      "value": 1.8
+    },
+    "meetings": 3,
+    "mode": "template_researched"
+  },
+  {
+    "tier": "C",
+    "contacted": 165,
+    "reply_rate": {
+      "numerator": 8,
+      "denominator": 165,
+      "value": 4.8
+    },
+    "positive_rate": {
+      "numerator": 3,
+      "denominator": 165,
+      "value": 1.8
+    },
+    "meetings": 1,
+    "mode": "template_auto"
+  }
+]

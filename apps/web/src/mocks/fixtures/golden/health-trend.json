@@ -1,0 +1,338 @@
+[
+  {
+    "day": "2026-01-05",
+    "sent": 30,
+    "delivered": 30,
+    "replies": 0,
+    "hard_bounces": 0,
+    "unsubscribes": 0
+  },
+  {
+    "day": "2026-01-06",
+    "sent": 30,
+    "delivered": 30,
+    "replies": 24,
+    "hard_bounces": 0,
+    "unsubscribes": 0
+  },
+  {
+    "day": "2026-01-07",
+    "sent": 30,
+    "delivered": 30,
+    "replies": 0,
+    "hard_bounces": 0,
+    "unsubscribes": 3
+  },
+  {
+    "day": "2026-01-08",
+    "sent": 36,
+    "delivered": 36,
+    "replies": 0,
+    "hard_bounces": 0,
+    "unsubscribes": 0
+  },
+  {
+    "day": "2026-01-09",
+    "sent": 57,
+    "delivered": 57,
+    "replies": 6,
+    "hard_bounces": 0,
+    "unsubscribes": 4
+  },
+  {
+    "day": "2026-01-10",
+    "sent": 60,
+    "delivered": 60,
+    "replies": 3,
+    "hard_bounces": 0,
+    "unsubscribes": 3
+  },
+  {
+    "day": "2026-01-11",
+    "sent": 60,
+    "delivered": 60,
+    "replies": 0,
+    "hard_bounces": 0,
+    "unsubscribes": 0
+  },
+  {
+    "day": "2026-01-12",
+    "sent": 60,
+    "delivered": 60,
+    "replies": 0,
+    "hard_bounces": 0,
+    "unsubscribes": 0
+  },
+  {
+    "day": "2026-01-13",
+    "sent": 84,
+    "delivered": 79,
+    "replies": 0,
+    "hard_bounces": 5,
+    "unsubscribes": 0
+  },
+  {
+    "day": "2026-01-14",
+    "sent": 90,
+    "delivered": 90,
+    "replies": 2,
+    "hard_bounces": 0,
+    "unsubscribes": 0
+  },
+  {
+    "day": "2026-01-15",
+    "sent": 90,
+    "delivered": 90,
+    "replies": 4,
+    "hard_bounces": 0,
+    "unsubscribes": 3
+  },
+  {
+    "day": "2026-01-16",
+    "sent": 83,
+    "delivered": 83,
+    "replies": 0,
+    "hard_bounces": 0,
+    "unsubscribes": 0
+  },
+  {
+    "day": "2026-01-17",
+    "sent": 83,
+    "delivered": 83,
+    "replies": 7,
+    "hard_bounces": 0,
+    "unsubscribes": 0
+  },
+  {
+    "day": "2026-01-18",
+    "sent": 123,
+    "delivered": 105,
+    "replies": 7,
+    "hard_bounces": 0,
+    "unsubscribes": 10
+  },
+  {
+    "day": "2026-01-19",
+    "sent": 120,
+    "delivered": 129,
+    "replies": 0,
+    "hard_bounces": 0,
+    "unsubscribes": 0
+  },
+  {
+    "day": "2026-01-20",
+    "sent": 106,
+    "delivered": 106,
+    "replies": 0,
+    "hard_bounces": 0,
+    "unsubscribes": 0
+  },
+  {
+    "day": "2026-01-21",
+    "sent": 101,
+    "delivered": 101,
+    "replies": 1,
+    "hard_bounces": 0,
+    "unsubscribes": 0
+  },
+  {
+    "day": "2026-01-22",
+    "sent": 120,
+    "delivered": 120,
+    "replies": 9,
+    "hard_bounces": 0,
+    "unsubscribes": 10
+  },
+  {
+    "day": "2026-01-23",
+    "sent": 120,
+    "delivered": 120,
+    "replies": 0,
+    "hard_bounces": 0,
+    "unsubscribes": 0
+  },
+  {
+    "day": "2026-01-24",
+    "sent": 120,
+    "delivered": 120,
+    "replies": 0,
+    "hard_bounces": 0,
+    "unsubscribes": 0
+  },
+  {
+    "day": "2026-01-25",
+    "sent": 105,
+    "delivered": 105,
+    "replies": 0,
+    "hard_bounces": 0,
+    "unsubscribes": 0
+  },
+  {
+    "day": "2026-01-26",
+    "sent": 91,
+    "delivered": 91,
+    "replies": 0,
+    "hard_bounces": 0,
+    "unsubscribes": 0
+  },
+  {
+    "day": "2026-01-27",
+    "sent": 120,
+    "delivered": 120,
+    "replies": 1,
+    "hard_bounces": 0,
+    "unsubscribes": 1
+  },
+  {
+    "day": "2026-01-28",
+    "sent": 120,
+    "delivered": 112,
+    "replies": 0,
+    "hard_bounces": 8,
+    "unsubscribes": 0
+  },
+  {
+    "day": "2026-01-29",
+    "sent": 120,
+    "delivered": 120,
+    "replies": 0,
+    "hard_bounces": 0,
+    "unsubscribes": 0
+  },
+  {
+    "day": "2026-01-30",
+    "sent": 120,
+    "delivered": 120,
+    "replies": 0,
+    "hard_bounces": 0,
+    "unsubscribes": 0
+  },
+  {
+    "day": "2026-01-31",
+    "sent": 112,
+    "delivered": 112,
+    "replies": 0,
+    "hard_bounces": 0,
+    "unsubscribes": 0
+  },
+  {
+    "day": "2026-02-01",
+    "sent": 120,
+    "delivered": 120,
+    "replies": 2,
+    "hard_bounces": 0,
+    "unsubscribes": 0
+  },
+  {
+    "day": "2026-02-02",
+    "sent": 120,
+    "delivered": 120,
+    "replies": 0,
+    "hard_bounces": 0,
+    "unsubscribes": 0
+  },
+  {
+    "day": "2026-02-03",
+    "sent": 105,
+    "delivered": 100,
+    "replies": 0,
+    "hard_bounces": 5,
+    "unsubscribes": 0
+  },
+  {
+    "day": "2026-02-04",
+    "sent": 80,
+    "delivered": 80,
+    "replies": 0,
+    "hard_bounces": 0,
+    "unsubscribes": 0
+  },
+  {
+    "day": "2026-02-05",
+    "sent": 90,
+    "delivered": 90,
+    "replies": 0,
+    "hard_bounces": 0,
+    "unsubscribes": 0
+  },
+  {
+    "day": "2026-02-06",
+    "sent": 70,
+    "delivered": 70,
+    "replies": 0,
+    "hard_bounces": 0,
+    "unsubscribes": 1
+  },
+  {
+    "day": "2026-02-07",
+    "sent": 60,
+    "delivered": 60,
+    "replies": 0,
+    "hard_bounces": 0,
+    "unsubscribes": 0
+  },
+  {
+    "day": "2026-02-08",
+    "sent": 60,
+    "delivered": 60,
+    "replies": 0,
+    "hard_bounces": 0,
+    "unsubscribes": 0
+  },
+  {
+    "day": "2026-02-09",
+    "sent": 50,
+    "delivered": 50,
+    "replies": 0,
+    "hard_bounces": 0,
+    "unsubscribes": 0
+  },
+  {
+    "day": "2026-02-10",
+    "sent": 39,
+    "delivered": 39,
+    "replies": 3,
+    "hard_bounces": 0,
+    "unsubscribes": 0
+  },
+  {
+    "day": "2026-02-11",
+    "sent": 30,
+    "delivered": 30,
+    "replies": 3,
+    "hard_bounces": 0,
+    "unsubscribes": 5
+  },
+  {
+    "day": "2026-02-12",
+    "sent": 30,
+    "delivered": 30,
+    "replies": 0,
+    "hard_bounces": 0,
+    "unsubscribes": 0
+  },
+  {
+    "day": "2026-02-13",
+    "sent": 30,
+    "delivered": 30,
+    "replies": 0,
+    "hard_bounces": 0,
+    "unsubscribes": 0
+  },
+  {
+    "day": "2026-02-14",
+    "sent": 30,
+    "delivered": 30,
+    "replies": 0,
+    "hard_bounces": 0,
+    "unsubscribes": 0
+  },
+  {
+    "day": "2026-02-15",
+    "sent": 10,
+    "delivered": 10,
+    "replies": 0,
+    "hard_bounces": 0,
+    "unsubscribes": 0
+  }
+]
