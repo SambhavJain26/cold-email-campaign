@@ -170,6 +170,22 @@ export async function insertEnrollments(
   return inserted.map((r) => r.id);
 }
 
+/**
+ * Bounce matching (docs/07 §2.1): the lead's most recent ACTIVE enrollment,
+ * else the most recent one - a DSN can trail the terminal transition.
+ */
+export async function latestForLead(
+  db: DbLike,
+  leadId: number,
+): Promise<EnrollmentRow | undefined> {
+  const rows = await db
+    .select()
+    .from(enrollments)
+    .where(eq(enrollments.leadId, leadId))
+    .orderBy(sql`${enrollments.enrolledAt} DESC`, sql`${enrollments.id} DESC`);
+  return rows.find((r) => r.currentState === 'ACTIVE') ?? rows[0];
+}
+
 export async function getById(db: DbLike, id: number): Promise<EnrollmentRow | undefined> {
   const rows = await db.select().from(enrollments).where(eq(enrollments.id, id));
   return rows[0];

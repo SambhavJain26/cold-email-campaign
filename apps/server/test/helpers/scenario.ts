@@ -16,6 +16,7 @@ import type { SequenceDef } from '../../src/domain/sequence';
 import type { SendWindow } from '../../src/db/schema/transport';
 import type { EnrollmentState, LeadTier } from '@coldemail/shared';
 import { Scheduler } from '../../src/scheduler/scheduler';
+import { Poller } from '../../src/poller/poller';
 import { StaticSequenceProvider } from '../../src/scheduler/staticSequenceProvider';
 import { StubRenderer } from '../../src/render/stub';
 import { runConfirmDelivery } from '../../src/scheduler/confirmDelivery';
@@ -83,6 +84,7 @@ export class Scenario {
   readonly alerts = new CapturingAlerts();
   readonly sequences = new StaticSequenceProvider();
   readonly scheduler: Scheduler;
+  readonly poller: Poller;
   /** JobPort backed by the inline queue - pg-boss's stand-in (docs/13 §4). */
   readonly jobPort: JobPort;
 
@@ -131,9 +133,19 @@ export class Scenario {
       jobs: this.jobPort,
       alerts: this.alerts,
     });
-    // Default hooks: the REAL scheduler tick (B3.7). Poll is wired at B3.10.
+    this.poller = new Poller({
+      db: this.db,
+      store: this.store,
+      transport: this.mock,
+      clock: this.clock,
+      alerts: this.alerts,
+    });
+    // Default hooks: the REAL scheduler tick (B3.7) + REAL poll cycle (B3.10).
     this.hooks.tick = async () => {
       await this.scheduler.tick();
+    };
+    this.hooks.poll = async (mailboxId) => {
+      await this.poller.poll(mailboxId);
     };
   }
 
@@ -153,8 +165,11 @@ export class Scenario {
       `INSERT INTO campaigns (name, status, ramp_config) VALUES ('Scenario Campaign', 'active', $1)`,
       [JSON.stringify(ramp)],
     );
+    // Settings survive resetCoreTables (single seeded row) - restore the
+    // tunables tests mutate so runs stay order-independent.
     await this.pool.query(
-      `UPDATE settings SET scheduler_tick_minutes = $1, poll_interval_minutes = $2 WHERE id = 1`,
+      `UPDATE settings SET scheduler_tick_minutes = $1, poll_interval_minutes = $2,
+              optout_detection = 'auto' WHERE id = 1`,
       [this.cfg.tickMinutes, this.cfg.pollMinutes],
     );
   }

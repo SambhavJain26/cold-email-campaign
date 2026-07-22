@@ -81,6 +81,7 @@ describe('scenario runner skeleton', () => {
 
   it('scripted hard_bounce reacts to an accepted send with a queued DSN', async () => {
     s = await scenario({ mailboxes: 1, sequence: fourStep });
+    s.hooks.poll = undefined; // inspect the raw inbound queue ourselves
     await s.importLeads(2);
     s.onSend('L0001', { outcome: 'hard_bounce', dsn: '5.1.1' });
 
@@ -103,6 +104,7 @@ describe('scenario runner skeleton', () => {
 
   it('replyAfter arms on the FIRST accepted send and threads to its Message-ID', async () => {
     s = await scenario({ mailboxes: 1, sequence: fourStep });
+    s.hooks.poll = undefined; // inspect the raw inbound queue ourselves
     await s.importLeads(1);
     s.replyAfter('L0001', { days: 1, text: 'Sounds interesting.' });
 

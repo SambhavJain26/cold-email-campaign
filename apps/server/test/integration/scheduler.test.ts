@@ -76,7 +76,7 @@ describe('scheduler (B3.7/B3.8)', () => {
   }, 30_000);
 
   it('threading: follow-up carries In-Reply-To/References to the step-1 Message-ID', async () => {
-    s = await scenario({ mailboxes: 1, sequence: twoStep });
+    s = await scenario({ mailboxes: 1, sequence: twoStep, tickMinutes: 30 });
     await s.importLeads(1);
     await s.enroll({ count: 1 });
 
@@ -90,7 +90,7 @@ describe('scheduler (B3.7/B3.8)', () => {
     expect(second!.msg.headers.references).toEqual([first!.msg.headers.messageId]);
     // follow-up went out the SAME mailbox
     expect(second!.msg.mailboxId).toBe(first!.msg.mailboxId);
-  });
+  }, 30_000);
 
   it('window enforcement: PT lead waits for 08:00 Pacific; default-tz lead sends immediately', async () => {
     s = await scenario({ mailboxes: 1, sequence: fourStep });
