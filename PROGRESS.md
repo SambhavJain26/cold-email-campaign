@@ -4,7 +4,7 @@
 
 **Legend:** `[ ]` not started · `[~]` in progress · `[x]` done · `[!]` blocked (note why in the log)
 
-**Current focus:** → **B0** (in progress - B0.1 done)
+**Current focus:** → **B0** (in progress - B0.1-B0.2 done; next B0.3)
 
 ---
 
@@ -23,7 +23,7 @@
 ## Backend track
 
 ### B0 - Foundation
-- [x] B0.1 monorepo scaffold · [~] B0.2 tooling · [ ] B0.3 compose+env · [ ] B0.4 drizzle+test-db · [ ] B0.5 config loader · [ ] B0.6 Clock · [ ] B0.7 MailTransport iface+stub · [ ] B0.8 logging · [ ] B0.9 fastify skeleton · [ ] B0.10 CI
+- [x] B0.1 monorepo scaffold · [x] B0.2 tooling · [ ] B0.3 compose+env · [ ] B0.4 drizzle+test-db · [ ] B0.5 config loader · [ ] B0.6 Clock · [ ] B0.7 MailTransport iface+stub · [ ] B0.8 logging · [ ] B0.9 fastify skeleton · [ ] B0.10 CI
 - **Gate:** ☐ clone→up→migrate→test green in CI
 
 ### B1 - Event log + state machine
@@ -100,5 +100,6 @@
 
 | Date | Entry |
 |------|-------|
+| 2026-07-22 | B0.2: ESLint 10 flat config with module-boundary rules (partitioned blocks - flat config is last-match-wins per rule; both partitions verified firing with temp violation files), Prettier, Vitest 4 + smoke test. format/lint/typecheck/test all green. |
 | 2026-07-22 | B0.1: npm-workspaces monorepo scaffolded (`apps/server`, `apps/web` placeholder, `packages/shared`); base tsconfig (strict, ESM, bundler resolution); dir tree per docs/02 §1; typecheck + tsx smoke-run green. Node updated: machine runs 24 (current LTS), decision B now `>=22`. |
 | 2026-07-22 | M0: full low-level documentation set written (docs/00-16 + this tracker). Decisions A-F confirmed (F kept automatic with escape hatch); new decisions G-Z locked - see [docs/01-decisions.md](docs/01-decisions.md). Notable resolutions: `sentiment_tagged` event added to preserve append-only (M); `delivered` via confirm-delivery job (N); `incoming_messages` ledger (O); content-hash recycle guard (Q); untiered-on-import (R). Next: B0.1. |

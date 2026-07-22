@@ -81,3 +81,8 @@ When you scaffold these, add the real, verified invocations here and to [docs/00
 - **Recycling never re-sends an identical message:** every `sent` event stores a `content_hash` of the template; enrollment is blocked if a lead would receive a hash they already got - decision Q.
 - **Reply threading is header-based** (`In-Reply-To`/`References` → the stored `Message-ID`), never subject-line matching. Follow-ups are fixed to the enrollment's originally-assigned mailbox and are never rerouted - rerouting breaks threading.
 - Imported leads start **untiered (`tier = NULL`)**, not defaulted - decision R.
+
+## Tooling lessons
+
+- **ESLint flat config does not merge rule options across matching blocks - last match wins per rule.** The boundary rules in `eslint.config.mjs` therefore *partition* `apps/server/src` (domain / db / transport+clock+composition / rest); keep the partition exhaustive when adding blocks, and verify new rules actually fire with a temp violation file.
+- The Bash tool's working directory persists between calls on this machine - use absolute paths or re-`cd` to the repo root.
