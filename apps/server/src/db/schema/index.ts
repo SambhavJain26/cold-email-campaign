@@ -1,3 +1,5 @@
 // Drizzle table definitions mirror docs/03-database-schema.md 1:1.
-// Populated from B1 (0001_core) onward; drizzle-kit diffs against this file.
-export {};
+// The .sql migration files are the DDL source of truth; these exist for
+// typed queries via db/repos. drizzle-kit diffs against this barrel.
+export * from './enums';
+export * from './core';

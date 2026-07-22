@@ -1,3 +1,4 @@
+import './pg-types';
 import { drizzle } from 'drizzle-orm/node-postgres';
 import { Pool } from 'pg';
 
