@@ -4,7 +4,7 @@
 
 **Legend:** `[ ]` not started · `[~]` in progress · `[x]` done · `[!]` blocked (note why in the log)
 
-**Current focus:** → **B2** (metrics engine; B0–B1 complete)
+**Current focus:** → **B3** (mock transport + scheduler + poller; B0–B2 complete)
 
 ---
 
@@ -31,8 +31,8 @@
 - **Gate:** ✅ 2026-07-22 — B1.8/B1.9/B1.10 green; golden L1 at both levels (pure fold + live eventStore append + rebuild zero-drift); @golden is a separate required CI job
 
 ### B2 — Metrics engine
-- [x] B2.1–9 metric functions · [x] B2.10 sentiment CTE · [x] B2.11–14 groupings · [x] B2.15 outcomes+selfCheck · [x] B2.16 golden L2 · [x] B2.17 edge tests · [~] B2.18 fixture export → web mocks
-- **Gate:** ☐ golden L2 + edges green; fixtures exported (unblocks F0)
+- [x] B2.1–9 metric functions · [x] B2.10 sentiment CTE · [x] B2.11–14 groupings · [x] B2.15 outcomes+selfCheck · [x] B2.16 golden L2 · [x] B2.17 edge tests · [x] B2.18 fixture export → web mocks
+- **Gate:** ✅ 2026-07-22 — golden L2 green (every Part-10/§13 number through SQL); edge suite green; contract-shaped fixtures exported to apps/web/src/mocks/fixtures/golden/ (F0 unblocked)
 
 ### B3 — Mock transport + scheduler + poller ← core complete
 - [ ] B3.1 transport migration · [ ] B3.2 MockTransport · [ ] B3.3 synthetic inbound · [ ] B3.4 scenario runner · [ ] B3.5 tz/windows · [ ] B3.6 pacing+rotation · [ ] B3.7 tick · [ ] B3.8 sendOne+confirm-delivery · [ ] B3.9 capacity+enroll · [ ] B3.10 poll cycle+ledger · [ ] B3.11 classifier · [ ] B3.12 STOP detection · [ ] B3.13 auto-pause · [ ] B3.14 health machine+redistribution · [ ] B3.15 alerts · [ ] B3.16 pg-boss wiring · [ ] B3.17 **golden L3 (flagship)** · [ ] B3.18 edge suite · [ ] B3.19 transport-swap test
@@ -100,6 +100,7 @@
 
 | Date | Entry |
 |------|-------|
+| 2026-07-22 | **B2 COMPLETE.** MetricsEngine + metricsRepo (campaign+asOf scoping, sentiment CTE, groupings, selfCheck); watch rules pure; golden L2 exact (8.3/3.2/4.6/2.0/1.0/17/2.0-per-100 + 13b/13c tables); denominator reconciliation: campaign bounce rates ÷ leads sent-to (Part 10's 18/885); B2.18 fixtures exported for MSW. 125 tests. Next: B3.1. |
 | 2026-07-22 | **B1 COMPLETE.** Checkpoint 2 (B1.5–B1.7, B1.9): eventStore.append chokepoint (fold-full-history projections, advisory locks, atomic suppression side effects); rebuild-projections + CLI (drift detect/repair proven); golden fixture — 7,691 events, 885 leads, deterministic generator with self-asserting composition (fold reproduced Part 10's 40/18/47/780 on first run); golden L1 green at pure-fold AND live-DB levels; @golden CI job added. Fixture reconciliations documented in test/fixtures/golden/constants.ts (tier totals, delivered-per-step derived honestly; walkthrough 13b/13c screen numbers were illustrative). 97 tests. |
 | 2026-07-22 | B1 checkpoint 1 (B1.1–B1.4, B1.8, B1.10): 0001_core + 0002_seed migrations (append-only trigger + app_rw grants proven by tests; suppressions moved up from 0005; operator seed → B6 boot); Drizzle mirrors; shared domain vocabulary; zod event constructors; pure reducer + derived completion. Doc fix: docs/04 matrix — REPLIED + bounce upgrades to BOUNCED per spec precedence (footnote had it backwards). 73 tests. |
 | 2026-07-22 | **B0 COMPLETE.** B0.8–B0.10: pino logging with proven redaction; Fastify skeleton (/health with db ping, error-envelope contract, graceful boot/shutdown — live smoke passed); GitHub Actions CI green (one formatting fix after format:check landed). 25 tests. Next: B1.1 (0001_core migration). |

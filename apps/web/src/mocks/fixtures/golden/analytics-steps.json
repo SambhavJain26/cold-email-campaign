@@ -1,0 +1,42 @@
+[
+  {
+    "step_no": 1,
+    "delivered": 867,
+    "positive_replies": 15,
+    "positive_rate": {
+      "numerator": 15,
+      "denominator": 867,
+      "value": 1.7
+    }
+  },
+  {
+    "step_no": 2,
+    "delivered": 831,
+    "positive_replies": 9,
+    "positive_rate": {
+      "numerator": 9,
+      "denominator": 831,
+      "value": 1.1
+    }
+  },
+  {
+    "step_no": 3,
+    "delivered": 801,
+    "positive_replies": 1,
+    "positive_rate": {
+      "numerator": 1,
+      "denominator": 801,
+      "value": 0.1
+    }
+  },
+  {
+    "step_no": 4,
+    "delivered": 789,
+    "positive_replies": 3,
+    "positive_rate": {
+      "numerator": 3,
+      "denominator": 789,
+      "value": 0.4
+    }
+  }
+]

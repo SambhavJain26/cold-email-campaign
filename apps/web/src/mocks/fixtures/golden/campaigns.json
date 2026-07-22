@@ -1,0 +1,16 @@
+{
+  "items": [
+    {
+      "id": 1,
+      "name": "Golden Pass 1",
+      "status": "completed",
+      "sequence_id": null,
+      "enrolled_count": 885,
+      "contacted_count": 867,
+      "recycled_from_campaign_id": null
+    }
+  ],
+  "total": 1,
+  "page": 1,
+  "per_page": 50
+}

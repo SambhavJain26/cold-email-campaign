@@ -1,0 +1,45 @@
+{
+  "progress": {
+    "contacted": 867,
+    "total": 885,
+    "pct": 98
+  },
+  "reply_rate": {
+    "numerator": 72,
+    "denominator": 867,
+    "value": 8.3
+  },
+  "positive_rate": {
+    "numerator": 28,
+    "denominator": 867,
+    "value": 3.2
+  },
+  "meetings": {
+    "count": 17,
+    "per_100": 2
+  },
+  "hard_bounce_rate": {
+    "numerator": 18,
+    "denominator": 885,
+    "value": 2
+  },
+  "soft_bounce_rate": {
+    "numerator": 9,
+    "denominator": 885,
+    "value": 1
+  },
+  "unsubscribe_rate": {
+    "numerator": 40,
+    "denominator": 867,
+    "value": 4.6
+  },
+  "capacity": {
+    "total_daily_capacity": 120,
+    "followups_due_today": 0,
+    "sent_so_far_today": 0,
+    "room_for_new": 120,
+    "ramp_cap_remaining": null,
+    "suggested": 0
+  },
+  "watch_flags": []
+}

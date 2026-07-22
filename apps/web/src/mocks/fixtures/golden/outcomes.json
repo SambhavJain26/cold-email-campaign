@@ -1,0 +1,12 @@
+{
+  "UNSUBSCRIBED": 40,
+  "BOUNCED": 18,
+  "REPLIED": {
+    "positive": 28,
+    "neutral": 19
+  },
+  "COMPLETED": 780,
+  "ACTIVE": 0,
+  "NEW": 0,
+  "total": 885
+}
