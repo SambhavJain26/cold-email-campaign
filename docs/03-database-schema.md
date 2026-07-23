@@ -217,6 +217,7 @@ CREATE TABLE incoming_messages (
   suggested_sentiment    sentiment,                  -- AI suggestion (decision E); null if off
   dsn_status             text,                       -- '5.1.1' etc when classification=bounce
   snippet                text,                       -- first 300 chars unquoted text, for Unibox list
+  body_text              text,                       -- full unquoted reply text (0007) — Unibox detail view
   UNIQUE (mailbox_id, imap_uid)
 );
 CREATE INDEX im_class ON incoming_messages (classification, processed_at DESC);
@@ -316,7 +317,8 @@ CREATE TABLE operator (
   id int PRIMARY KEY CHECK (id = 1),
   email text NOT NULL,
   password_hash text NOT NULL,          -- argon2id
-  created_at timestamptz NOT NULL DEFAULT now()
+  created_at timestamptz NOT NULL DEFAULT now(),
+  updated_at timestamptz NOT NULL DEFAULT now() -- bumped on password change
 );
 CREATE TABLE alerts (
   id bigint GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
@@ -329,7 +331,7 @@ CREATE TABLE alerts (
 CREATE INDEX alerts_unacked ON alerts (created_at DESC) WHERE acknowledged_at IS NULL;
 ```
 
-Seeds (migration `0002_seed`): `settings` row, `compliance_settings` row, `operator` row (email from env, hash of `OPERATOR_INITIAL_PASSWORD`).
+Seeds (migration `0002_seed`): `settings` row, `compliance_settings` row. The `operator` row is NOT seeded in SQL — it needs an argon2id hash of `OPERATOR_INITIAL_PASSWORD`, so `ensureOperator` creates it at first boot (B6.1); the table itself lands in `0007_operator`.
 
 **Cold Storage is a query, not a table** (plan §4.2): enrollments `COMPLETED` joined to non-suppressed leads, with `terminal_at + rest_days` computing earliest-recycle.
 
@@ -354,5 +356,5 @@ GRANT  INSERT, SELECT ON events TO app_rw;
 ## 6. Migration policy
 
 - Migrations are **hand-authored paired SQL files** (`NNNN_name.up.sql` / `NNNN_name.down.sql`) in `apps/server/src/db/migrations/`, executed by the in-repo runner (`src/db/migrate.ts`, tracked in `schema_migrations`), committed to git, applied on boot (prod) and by `npm run db:migrate` / `db:rollback` / `db:status`. drizzle-kit is generation-assist only (diff SQL from schema defs into gitignored `drizzle-kit-out/`, hand-copied in) — it cannot execute or roll back migrations. *(Changed at B0.4: drizzle-kit has no down-migration support, and this doc requires tested downs; hand-written DDL also fits the trigger/grant-heavy schema.)*
-- Numbered plan: `0001_core` (enums + events + leads + campaigns + enrollments + trigger/roles) → `0002_seed` → `0003_sequences` → `0004_transport_tables` (mailboxes, secrets, sent_messages, incoming_messages) → `0005_ingest` (imports, suppressions) → `0006_ops` (alerts, operator). Later stages add columns only via new migrations — never edit an applied migration.
+- Numbered plan: `0001_core` (enums + events + leads + campaigns + enrollments + trigger/roles) → `0002_seed` → `0003_sequences` → `0004_transport_tables` (mailboxes, secrets, sent_messages, incoming_messages) → `0005_ingest` (imports, suppressions) → `0006_ops` (alerts) → `0007_operator` (operator + incoming_messages.body_text). Later stages add columns only via new migrations — never edit an applied migration.
 - Rollback: every migration ships a `down`; tested in CI (apply → down → apply).

@@ -1,0 +1,4 @@
+// The executable API contract (decision H) — one file per docs/10 section,
+// landing in lockstep with its B6 route group.
+export * from './common';
+export * from './auth';

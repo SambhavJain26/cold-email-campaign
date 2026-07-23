@@ -49,6 +49,9 @@ jobs:
 
       - run: npx vitest run --project unit --project integration
 
+      # docs/13 §6 ordering: API tests after unit+integration (shared serial test DB).
+      - run: npx vitest run --project api
+
   # The locked regression (docs/13 §3). Required. Red here = the math stopped closing.
   golden:
     runs-on: ubuntu-latest

@@ -8,3 +8,4 @@ export * from './sequences';
 export * from './settings';
 export * from './transport';
 export * from './ops';
+export * from './operator';

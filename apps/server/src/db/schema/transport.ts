@@ -97,6 +97,7 @@ export const incomingMessages = pgTable(
     suggestedSentiment: sentimentEnum('suggested_sentiment'),
     dsnStatus: text('dsn_status'),
     snippet: text('snippet'),
+    bodyText: text('body_text'), // full unquoted reply text (0007) — unibox detail view
   },
   (t) => [
     unique().on(t.mailboxId, t.imapUid),

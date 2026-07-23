@@ -27,6 +27,16 @@ export default defineConfig({
       },
       {
         test: {
+          // B6.14: every endpoint over the seeded golden DB via fastify.inject.
+          name: 'api',
+          include: ['apps/server/test/api/**/*.test.ts'],
+          globalSetup: ['./apps/server/test/helpers/global-setup.ts'],
+          fileParallelism: false,
+          testTimeout: 30_000,
+        },
+      },
+      {
+        test: {
           // The locked regression (docs/13 §3). NEVER skip — red here means
           // the math stopped closing. Separate required CI job.
           name: 'golden',

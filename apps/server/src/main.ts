@@ -4,13 +4,17 @@ import { loadConfig } from './config/env';
 import { createLogger } from './config/logger';
 import { compose } from './composition';
 import { buildServer } from './api/server';
+import { ensureOperator } from './services/operatorAuth';
 
 async function main(): Promise<void> {
   const config = loadConfig();
   const logger = createLogger(config);
   const services = compose(config);
 
-  const app = buildServer({ logger, pool: services.pool });
+  // First-boot operator seed (decision I) — idempotent, before the API serves.
+  await ensureOperator(services.db, config);
+
+  const app = buildServer({ logger, services });
 
   if (config.ROLE !== 'api') {
     await services.jobs.start(); // pg-boss: tick cron, polls, confirm-delivery
