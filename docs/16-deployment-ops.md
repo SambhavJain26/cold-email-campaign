@@ -20,6 +20,7 @@ Single always-on VPS (finalized decision). Docker Compose primary; systemd alter
 | `NODE_ENV` | | `production` | |
 | `LOG_LEVEL` | | `info` | pino |
 | `BACKUP_DIR` | | `/var/backups/coldemail` | pg_dump target |
+| `SIMULATED_CLOCK` | | `false` | test-only (docs/13 §5): VirtualClock + inline jobs + `POST /system/advance-clock`; boot refuses it with `smtp_imap` or `NODE_ENV=production` |
 
 Everything operator-tunable at runtime lives in the `settings` row, not env (02 §5).
 

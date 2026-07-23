@@ -64,7 +64,7 @@ Shapes below in TS notation. `Metric = { numerator: number, denominator: number 
 | | |
 |---|---|
 | GET `/unibox?bucket=human\|auto_reply&sentiment=&mailbox_id=&unhandled=&page=` | → `UniboxItem[] = {incoming_message_id, received_at, lead: {id, name, company}, campaign_id, step_no, snippet, effective_sentiment, suggested_sentiment, auto_unsubscribed: boolean, meeting_booked: boolean, enrollment_id}` - bucket `human` default; `auto_reply` is the OOO tab |
-| GET `/unibox/:incoming_message_id` | → full item + body text + thread (prior sent messages) |
+| GET `/unibox/:incoming_message_id` | → `UniboxItem & {body_text, thread: {message_id, step_no, sent_at}[]}` - full reply text from `incoming_messages.body_text` (0007) |
 | POST `/unibox/:incoming_message_id/sentiment` | `{sentiment}` → item - appends `sentiment_tagged` (decision M) |
 | POST `/enrollments/:id/meeting-booked` | → `{ok}` - appends `meeting_booked` (state unchanged) |
 | POST `/enrollments/:id/snooze` | `{until}` → `{ok}` |
@@ -82,9 +82,9 @@ Shapes below in TS notation. `Metric = { numerator: number, denominator: number 
 | GET `/analytics/overview?campaign_id=` | → `{progress: {contacted, total, pct}, reply_rate: Metric, positive_rate: Metric, meetings: {count, per_100}, hard_bounce_rate: Metric, soft_bounce_rate: Metric, unsubscribe_rate: Metric, capacity: Capacity, watch_flags: string[]}` |
 | GET `/analytics/variants?sequence_id=&step_no=1` | → per-variant `{variant_id, label, subject_template, sent, reply_rate, positive_rate, meetings}` (13a) |
 | POST `/step-variants/:id/deactivate` | → `{ok}` ("route all to B") |
-| GET `/analytics/steps?sequence_id=` | → per-step `{step_no, delivered, positive_replies, positive_rate}` (13b) |
+| GET `/analytics/steps?sequence_id=` | → `{items: {step_no, delivered, positive_replies, positive_rate}[]}` (13b) - also accepts `?campaign_id=` (aggregates across a sequence's campaigns; the executable form since B6.13 - the golden campaign has no DB sequence) |
 | GET `/analytics/tiers?campaign_id=` | → per-tier `{tier, contacted, reply_rate, positive_rate, meetings, mode}` + `{promotable: {tier_c_engaged: number}}` (13c) |
-| GET `/analytics/health-trend?days=30` | → daily series + sparkline aggregates + watch-rule statuses (13d) |
+| GET `/analytics/health-trend?days=30&campaign_id?=` | → `{items: DailySeries[], totals, watch_flags: {rule, message}[]}` (13d - executable form per B6.13) |
 
 ## Settings, compliance, alerts, system
 | | |

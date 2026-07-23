@@ -162,6 +162,37 @@ export async function getUniboxRow(db: DbLike, id: number): Promise<UniboxRow | 
   return rows[0] ? toUniboxRow(rows[0]) : null;
 }
 
+/** B6.12 reply-detection debug list - straight off the ledger (decision O). */
+export async function listIncoming(
+  db: DbLike,
+  opts: {
+    classification?: IncomingMessageRow['classification'];
+    mailboxId?: number;
+    page: number;
+    perPage: number;
+  },
+): Promise<{ items: IncomingMessageRow[]; total: number }> {
+  const conds = [
+    ...(opts.classification !== undefined
+      ? [eq(incomingMessages.classification, opts.classification)]
+      : []),
+    ...(opts.mailboxId !== undefined ? [eq(incomingMessages.mailboxId, opts.mailboxId)] : []),
+  ];
+  const where = conds.length > 0 ? and(...conds) : undefined;
+  const items = await db
+    .select()
+    .from(incomingMessages)
+    .where(where)
+    .orderBy(sql`${incomingMessages.processedAt} DESC`, sql`${incomingMessages.id} DESC`)
+    .limit(opts.perPage)
+    .offset((opts.page - 1) * opts.perPage);
+  const totals = await db
+    .select({ n: sql<number>`count(*)::int` })
+    .from(incomingMessages)
+    .where(where);
+  return { items, total: totals[0]?.n ?? 0 };
+}
+
 /** Idempotency check 1 (docs/07 §1): same (mailbox, UID) already processed. */
 export async function existsByUid(db: DbLike, mailboxId: number, uid: number): Promise<boolean> {
   const rows = await db

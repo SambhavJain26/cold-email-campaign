@@ -38,8 +38,8 @@
     "followups_due_today": 0,
     "sent_so_far_today": 0,
     "room_for_new": 120,
-    "ramp_cap_remaining": null,
-    "suggested": 0
+    "ramp_cap_remaining": 20,
+    "suggested": 20
   },
   "watch_flags": []
 }

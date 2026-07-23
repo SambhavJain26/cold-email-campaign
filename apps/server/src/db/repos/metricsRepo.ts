@@ -233,6 +233,23 @@ export async function dailySeries(
   );
 }
 
+/**
+ * 13c promotable count: Tier-C enrollments that replied - the "[Promote N
+ * engaged Tier-C → Tier B]" number (docs/12 §12).
+ */
+export async function tierCEngagedCount(db: DbLike, scope: MetricScope): Promise<number> {
+  const row = await one<{ n: number }>(
+    db,
+    sql`SELECT count(*)::int AS n FROM enrollments e
+        WHERE e.enrolled_tier = 'C'
+          ${scope.campaignId != null ? sql`AND e.campaign_id = ${scope.campaignId}` : sql``}
+          AND EXISTS (SELECT 1 FROM events hr
+                       WHERE hr.type = 'human_reply' AND hr.enrollment_id = e.id
+                       ${scope.asOf != null ? sql`AND hr.occurred_at <= ${scope.asOf}` : sql``})`,
+  );
+  return row.n;
+}
+
 export interface MailboxVolumeRow {
   mailbox_id: number;
   day: string;

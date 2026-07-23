@@ -19,6 +19,10 @@ import { RenderEngine } from './render/engine';
 import type { JobPort, Renderer, SequenceProvider } from './scheduler/types';
 import { DbAlertSink } from './alerts/emitter';
 import { systemRng, type Rng } from './util/rng';
+import { MetricsEngine } from './services/metrics';
+import { InlineJobQueue, SimulationDriver } from './services/simulation';
+import { isSteppable } from './clock';
+import { VirtualClock } from './clock/virtual';
 
 export interface AppServices {
   config: Config;
@@ -34,6 +38,10 @@ export interface AppServices {
   sequences: SequenceProvider;
   /** The one engine instance - manualCompose (B4.10) and B6 previews share it. */
   renderer: Renderer;
+  /** B6.9 analytics routes read through this. */
+  metrics: MetricsEngine;
+  /** Present ONLY when config.SIMULATED_CLOCK (B6.12 advance-clock). */
+  simulation?: SimulationDriver;
 }
 
 export interface ComposeOverrides {
@@ -49,7 +57,8 @@ export interface ComposeOverrides {
 }
 
 export function compose(config: Config, overrides: ComposeOverrides = {}): AppServices {
-  const clock = overrides.clock ?? new SystemClock();
+  const clock =
+    overrides.clock ?? (config.SIMULATED_CLOCK ? new VirtualClock() : new SystemClock());
 
   const transport =
     overrides.transport ??
@@ -66,11 +75,17 @@ export function compose(config: Config, overrides: ComposeOverrides = {}): AppSe
   const renderer = new RenderEngine(); // docs/08 - the only producer of outbound bodies
   const rng = overrides.rng ?? systemRng;
 
+  // SIMULATED_CLOCK: pg-boss cron fires on wall time - meaningless against
+  // virtual time - so confirm-delivery goes through an inline queue the
+  // SimulationDriver drains during advance-clock (docs/13 §5).
+  const inlineQueue = config.SIMULATED_CLOCK && !overrides.jobPort ? new InlineJobQueue() : null;
+
   // Late-bound JobPort: scheduler → jobs → scheduler is a cycle on paper;
   // in practice jobs only calls back into tick/poll handlers.
-  const jobPort: JobPort = overrides.jobPort ?? {
-    scheduleConfirmDelivery: (job) => jobs.scheduleConfirmDelivery(job),
-  };
+  const jobPort: JobPort = overrides.jobPort ??
+    inlineQueue ?? {
+      scheduleConfirmDelivery: (job) => jobs.scheduleConfirmDelivery(job),
+    };
 
   const scheduler = new Scheduler({
     db,
@@ -94,6 +109,18 @@ export function compose(config: Config, overrides: ComposeOverrides = {}): AppSe
     alerts,
   });
 
+  const simulation =
+    config.SIMULATED_CLOCK && inlineQueue !== null && isSteppable(clock)
+      ? new SimulationDriver({
+          db,
+          clock,
+          scheduler,
+          poller,
+          queue: inlineQueue,
+          confirmDelivery: { db, store, clock },
+        })
+      : undefined;
+
   return {
     config,
     clock,
@@ -106,5 +133,7 @@ export function compose(config: Config, overrides: ComposeOverrides = {}): AppSe
     jobs,
     sequences,
     renderer,
+    metrics: new MetricsEngine(db),
+    ...(simulation && { simulation }),
   };
 }

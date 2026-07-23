@@ -16,7 +16,11 @@ async function main(): Promise<void> {
 
   const app = buildServer({ logger, services });
 
-  if (config.ROLE !== 'api') {
+  if (config.SIMULATED_CLOCK) {
+    // Virtual time: pg-boss cron never fires; POST /system/advance-clock
+    // drives the scheduler/poller instead (docs/13 §5 - mock builds only).
+    logger.warn('SIMULATED_CLOCK active - pg-boss workers NOT started');
+  } else if (config.ROLE !== 'api') {
     await services.jobs.start(); // pg-boss: tick cron, polls, confirm-delivery
     logger.info('pg-boss workers started');
   }

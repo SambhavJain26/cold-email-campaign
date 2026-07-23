@@ -37,7 +37,10 @@ export interface Capacity {
   suggested: number;
 }
 
-export async function capacityToday(deps: EnrollmentDeps, campaignId: number): Promise<Capacity> {
+export async function capacityToday(
+  deps: Pick<EnrollmentDeps, 'db' | 'clock'>,
+  campaignId: number,
+): Promise<Capacity> {
   const { db, clock } = deps;
   const now = clock.now();
   const settings = await getSettings(db);

@@ -123,6 +123,15 @@ export async function outcomeCounts(
   return res.rows as Array<{ state: string; sentiment: string | null; n: number }>;
 }
 
+/** Every campaign sending a sequence (B6.9 steps aggregation across passes). */
+export async function campaignIdsForSequence(db: DbLike, sequenceId: number): Promise<number[]> {
+  const rows = await db
+    .select({ id: campaigns.id })
+    .from(campaigns)
+    .where(eq(campaigns.sequenceId, sequenceId));
+  return rows.map((r) => r.id);
+}
+
 /** Tag a recycle target with its source (the "Recycled - Pass 2" label, docs/09 §6). */
 export async function setRecycledFrom(
   db: DbLike,
