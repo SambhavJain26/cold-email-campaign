@@ -8,26 +8,47 @@ const hexKey32 = z
   .string()
   .regex(/^[0-9a-f]{64}$/i, 'must be 32 bytes as 64 hex chars (see .env.example for generator)');
 
-export const envSchema = z.object({
-  // required
-  DATABASE_URL: z.url(),
-  SECRET_KEY: hexKey32,
-  SESSION_KEY: hexKey32,
-  OPERATOR_EMAIL: z.email(),
-  OPERATOR_INITIAL_PASSWORD: z.string().min(8),
-  // wiring
-  MAIL_TRANSPORT: z.enum(['mock', 'smtp_imap']).default('mock'),
-  ROLE: z.enum(['all', 'api', 'worker']).default('all'),
-  PORT: z.coerce.number().int().min(1).max(65535).default(3000),
-  HOST: z.string().default('127.0.0.1'),
-  NODE_ENV: z.enum(['development', 'test', 'production']).default('production'),
-  LOG_LEVEL: z.enum(['fatal', 'error', 'warn', 'info', 'debug', 'trace']).default('info'),
-  BACKUP_DIR: z.string().default('/var/backups/coldemail'),
-  // optional
-  ANTHROPIC_API_KEY: z.string().min(1).optional(),
-  ALERT_WEBHOOK_URL: z.url().optional(),
-  TEST_DATABASE_URL: z.url().optional(),
-});
+export const envSchema = z
+  .object({
+    // required
+    DATABASE_URL: z.url(),
+    SECRET_KEY: hexKey32,
+    SESSION_KEY: hexKey32,
+    OPERATOR_EMAIL: z.email(),
+    OPERATOR_INITIAL_PASSWORD: z.string().min(8),
+    // wiring
+    MAIL_TRANSPORT: z.enum(['mock', 'smtp_imap']).default('mock'),
+    ROLE: z.enum(['all', 'api', 'worker']).default('all'),
+    PORT: z.coerce.number().int().min(1).max(65535).default(3000),
+    HOST: z.string().default('127.0.0.1'),
+    NODE_ENV: z.enum(['development', 'test', 'production']).default('production'),
+    LOG_LEVEL: z.enum(['fatal', 'error', 'warn', 'info', 'debug', 'trace']).default('info'),
+    BACKUP_DIR: z.string().default('/var/backups/coldemail'),
+    /** Test-only (B6.12): VirtualClock + inline jobs + POST /system/advance-clock. */
+    SIMULATED_CLOCK: z.stringbool().default(false),
+    // optional
+    ANTHROPIC_API_KEY: z.string().min(1).optional(),
+    ALERT_WEBHOOK_URL: z.url().optional(),
+    TEST_DATABASE_URL: z.url().optional(),
+  })
+  .superRefine((cfg, ctx) => {
+    // A simulated clock against real SMTP/IMAP would burst-send the backlog —
+    // refuse loudly (docs/13 §5: mock builds only).
+    if (cfg.SIMULATED_CLOCK && cfg.MAIL_TRANSPORT === 'smtp_imap') {
+      ctx.addIssue({
+        code: 'custom',
+        path: ['SIMULATED_CLOCK'],
+        message: 'SIMULATED_CLOCK requires MAIL_TRANSPORT=mock',
+      });
+    }
+    if (cfg.SIMULATED_CLOCK && cfg.NODE_ENV === 'production') {
+      ctx.addIssue({
+        code: 'custom',
+        path: ['SIMULATED_CLOCK'],
+        message: 'SIMULATED_CLOCK is refused in production',
+      });
+    }
+  });
 
 export type Config = z.infer<typeof envSchema>;
 

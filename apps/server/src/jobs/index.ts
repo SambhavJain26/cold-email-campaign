@@ -111,6 +111,17 @@ export class Jobs implements JobPort {
     );
   }
 
+  /**
+   * GET /system/status: the confirm-delivery backlog — the only queue where
+   * "pending" is operationally meaningful. 0 when pg-boss isn't running
+   * (ROLE=api, SIMULATED_CLOCK, tests).
+   */
+  async pendingCount(): Promise<number> {
+    if (!this.boss) return 0;
+    const stats = await this.boss.getQueueStats(CONFIRM_QUEUE);
+    return stats.reduce((a, s) => a + s.queuedCount + s.deferredCount + s.activeCount, 0);
+  }
+
   async stop(): Promise<void> {
     if (this.boss) {
       await this.boss.stop({ graceful: false });

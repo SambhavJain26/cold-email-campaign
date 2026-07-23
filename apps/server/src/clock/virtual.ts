@@ -1,22 +1,9 @@
-import type { Clock } from './index';
+import { durationMs, type Duration, type SteppableClock } from './index';
 
-export interface Duration {
-  days?: number;
-  hours?: number;
-  minutes?: number;
-  seconds?: number;
-  ms?: number;
-}
-
-export function durationMs(d: Duration): number {
-  return (
-    (d.days ?? 0) * 86_400_000 +
-    (d.hours ?? 0) * 3_600_000 +
-    (d.minutes ?? 0) * 60_000 +
-    (d.seconds ?? 0) * 1_000 +
-    (d.ms ?? 0)
-  );
-}
+// Re-exported for existing importers; the definitions live in the barrel so
+// interface-only consumers (SimulationDriver) never touch this file.
+export { durationMs };
+export type { Duration };
 
 /**
  * Test clock: time moves only when told to. Drives multi-day scenario tests
@@ -25,7 +12,7 @@ export function durationMs(d: Duration): number {
  * callback at each step — exactly how scheduler ticks + poll cycles fire
  * "along the way" of a time jump.
  */
-export class VirtualClock implements Clock {
+export class VirtualClock implements SteppableClock {
   private current: Date;
 
   constructor(start: Date | string = '2026-01-05T08:00:00Z') {

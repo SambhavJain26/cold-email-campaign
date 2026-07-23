@@ -90,11 +90,19 @@ export class Scheduler {
     roundRobin: Map<string, number>;
   } | null = null;
 
+  /** Last completed tick (in-memory — single process, GET /system/status). */
+  private _lastTickAt: Date | null = null;
+
+  get lastTickAt(): Date | null {
+    return this._lastTickAt;
+  }
+
   constructor(private readonly deps: SchedulerDeps) {}
 
   async tick(): Promise<TickResult> {
     const { pool, clock } = this.deps;
     const now = clock.now();
+    this._lastTickAt = now;
 
     const client = await pool.connect();
     const locked = (

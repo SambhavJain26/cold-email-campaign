@@ -61,8 +61,11 @@ export interface ApiHarness {
   close(): Promise<void>;
 }
 
-export async function createApiHarness(overrides: ComposeOverrides = {}): Promise<ApiHarness> {
-  const config = testConfig();
+export async function createApiHarness(
+  overrides: ComposeOverrides = {},
+  env: Record<string, string> = {},
+): Promise<ApiHarness> {
+  const config = testConfig(env);
   const clock = (overrides.clock as VirtualClock | undefined) ?? new VirtualClock();
   const services = compose(config, {
     databaseUrl: TEST_DATABASE_URL,

@@ -2,7 +2,6 @@
   "items": [
     {
       "mailbox_id": 1,
-      "seven_day_avg": 7.9,
       "series": [
         {
           "date": "2026-01-05",
@@ -176,7 +175,6 @@
     },
     {
       "mailbox_id": 2,
-      "seven_day_avg": 7.9,
       "series": [
         {
           "date": "2026-01-05",
@@ -350,7 +348,6 @@
     },
     {
       "mailbox_id": 3,
-      "seven_day_avg": 7.9,
       "series": [
         {
           "date": "2026-01-05",
@@ -524,7 +521,6 @@
     },
     {
       "mailbox_id": 4,
-      "seven_day_avg": 7.7,
       "series": [
         {
           "date": "2026-01-05",

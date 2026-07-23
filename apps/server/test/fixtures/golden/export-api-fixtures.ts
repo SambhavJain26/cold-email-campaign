@@ -7,7 +7,12 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { createDb } from '../../../src/db/client';
 import { MetricsEngine } from '../../../src/services/metrics';
-import { mailboxImbalance } from '../../../src/services/metrics/watchRules';
+import {
+  mailboxImbalance,
+  replyRateDrop,
+  unsubClimbing,
+} from '../../../src/services/metrics/watchRules';
+import { capacityToday } from '../../../src/services/enrollment';
 import { GOLDEN } from './constants';
 import { seedGoldenCohort } from '../../helpers/goldenSeed';
 import { TEST_DATABASE_URL } from '../../helpers/db';
@@ -53,9 +58,13 @@ async function main(): Promise<void> {
       total: states.reduce((a, r) => a + r.n, 0),
     };
 
-    // GET /analytics/overview (capacity is scheduler territory — static
-    // completed-campaign values until B3/B6 wire the real calculator)
-    const [progress, reply, positive, meetings, hard, soft, unsub] = await Promise.all([
+    // GET /analytics/overview — capacity via the REAL calculator (B6), fixed
+    // "now" = endOfCampaign so the API reproduces this over the seeded DB.
+    // NOTE the seeded campaign's created_at is wall time (seed time), which is
+    // always AFTER endOfCampaign — the ramp window therefore always reads
+    // "in ramp" here; deterministic as long as that stays true.
+    const clock = { now: () => new Date(GOLDEN.endOfCampaign) };
+    const [progress, reply, positive, meetings, hard, soft, unsub, cap] = await Promise.all([
       m.progress(scope),
       m.replyRate(scope),
       m.positiveReplyRate(scope),
@@ -63,7 +72,21 @@ async function main(): Promise<void> {
       m.hardBounceRate(scope),
       m.softBounceRate(scope),
       m.unsubscribeRate(scope),
+      capacityToday({ db, clock }, GOLDEN.campaignId),
     ]);
+    // watch flags exactly as GET /analytics/overview computes them: a 30-day
+    // window ending "now"
+    const watchFrom = new Date(new Date(GOLDEN.endOfCampaign).getTime() - 30 * 86_400_000);
+    const watchTo = new Date(GOLDEN.endOfCampaign);
+    const watchSeries = await m.dailySeries(scope, watchFrom, watchTo);
+    const watchVolume = await m.mailboxVolume(watchFrom, watchTo);
+    const watchFlags = [
+      replyRateDrop(watchSeries),
+      unsubClimbing(watchSeries),
+      mailboxImbalance(watchVolume).flag,
+    ]
+      .filter((f) => f !== null)
+      .map((f) => f.rule);
     const overview = {
       progress: {
         contacted: progress.numerator,
@@ -77,14 +100,14 @@ async function main(): Promise<void> {
       soft_bounce_rate: soft,
       unsubscribe_rate: unsub,
       capacity: {
-        total_daily_capacity: 120,
-        followups_due_today: 0,
-        sent_so_far_today: 0,
-        room_for_new: 120,
-        ramp_cap_remaining: null,
-        suggested: 0,
+        total_daily_capacity: cap.total,
+        followups_due_today: cap.followupsDue,
+        sent_so_far_today: cap.sentSoFar,
+        room_for_new: cap.roomForNew,
+        ramp_cap_remaining: cap.rampCap,
+        suggested: cap.suggested,
       },
-      watch_flags: [],
+      watch_flags: watchFlags,
     };
 
     // GET /analytics/steps + /analytics/tiers
@@ -114,26 +137,45 @@ async function main(): Promise<void> {
         volumeByMailbox.set(r.mailbox_id, []).get(r.mailbox_id)!
       ).push({ date: r.day, sends: r.sends });
     }
+    // contract-verbatim: {mailbox_id, series}[] — seven_day_avg lives on the
+    // Mailbox DTO, not here (reconciled at B6.13)
+    void sevenDayAvg;
     const volume = {
       items: [...volumeByMailbox.entries()].map(([mailbox_id, s]) => ({
         mailbox_id,
-        seven_day_avg: sevenDayAvg[mailbox_id] ?? 0,
         series: s,
       })),
       imbalance: flag !== null,
     };
 
-    // GET /campaigns (list entry for the golden campaign)
+    // GET /campaigns (list entry for the golden campaign) — full Campaign DTO
+    const campaignRow = (
+      await pool.query(
+        `SELECT name, status, sequence_id, tier_effort_config, ramp_config,
+                recycled_from_campaign_id
+         FROM campaigns WHERE id = $1`,
+        [GOLDEN.campaignId],
+      )
+    ).rows[0] as {
+      name: string;
+      status: string;
+      sequence_id: number | null;
+      tier_effort_config: unknown;
+      ramp_config: unknown;
+      recycled_from_campaign_id: number | null;
+    };
     const campaigns = {
       items: [
         {
           id: GOLDEN.campaignId,
-          name: 'Golden Pass 1',
-          status: 'completed',
-          sequence_id: null,
+          name: campaignRow.name,
+          status: campaignRow.status,
+          sequence_id: campaignRow.sequence_id,
+          tier_effort_config: campaignRow.tier_effort_config,
+          ramp_config: campaignRow.ramp_config,
+          recycled_from_campaign_id: campaignRow.recycled_from_campaign_id,
           enrolled_count: outcomes.total,
           contacted_count: progress.numerator,
-          recycled_from_campaign_id: null,
         },
       ],
       total: 1,
