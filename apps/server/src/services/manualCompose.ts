@@ -8,15 +8,37 @@
 import type { Db } from '../db/client';
 import type { Clock } from '../clock';
 import type { Scheduler, SendOutcomeKind } from '../scheduler/scheduler';
-import type { Renderer } from '../scheduler/types';
+import type { Renderer, SequenceProvider } from '../scheduler/types';
+import type { RenderChecks } from '../render/types';
 import type { DueEnrollment } from '../db/repos/enrollmentsRepo';
-import { getById } from '../db/repos/enrollmentsRepo';
+import { findByLeadAndCampaign, getById, insertEnrollments } from '../db/repos/enrollmentsRepo';
 import { getLeadById } from '../db/repos/leadsRepo';
 import { getComplianceSettings, getSettings } from '../db/repos/settingsRepo';
 import { listMailboxesByStatus } from '../db/repos/mailboxesRepo';
 import { leadReceivedContentHash } from '../db/repos/eventsRepo';
 import { getStepId, insertBespokeVariant, sequenceIdForCampaign } from '../db/repos/sequencesRepo';
+import { latestSentMessageId } from '../db/repos/sentMessagesRepo';
+import { getCampaign } from '../db/repos/campaignsRepo';
 import { contentHashOf } from '../render/hash';
+import { buildEvent } from '../domain/events';
+import type { EventStore } from './eventStore';
+
+/** No sendable mailbox (all at cap/unhealthy, or the override is) → 409 mailbox_unhealthy. */
+export class MailboxUnhealthyError extends Error {
+  readonly code = 'mailbox_unhealthy';
+  constructor(message: string) {
+    super(message);
+    this.name = 'MailboxUnhealthyError';
+  }
+}
+
+/** Fatal pre-send checks → 422 (docs/10 manual-sends row). */
+export class FatalChecksError extends Error {
+  constructor(readonly checks: RenderChecks) {
+    super(`manual compose blocked by pre-send checks: ${checks.fatal.map((f) => f.id).join(', ')}`);
+    this.name = 'FatalChecksError';
+  }
+}
 
 export interface ManualComposeDeps {
   db: Db;
@@ -29,12 +51,17 @@ export interface ManualComposeInput {
   enrollmentId: number;
   subject: string;
   bodyText: string;
+  /** Operator override (docs/10 `mailbox_id?`). Never reroutes a threaded follow-up. */
+  mailboxId?: number;
 }
 
 export interface ManualComposeResult {
   outcome: SendOutcomeKind;
   variantId: number;
   contentHash: string;
+  checks: RenderChecks;
+  /** The sent message's Message-ID; null when the outcome wasn't 'sent'. */
+  messageId: string | null;
 }
 
 export async function manualCompose(
@@ -94,8 +121,7 @@ export async function manualCompose(
     },
   });
   if (preview.checks.fatal.length > 0) {
-    const ids = preview.checks.fatal.map((f) => f.id).join(', ');
-    throw new Error(`manual compose blocked by pre-send checks: ${ids}`);
+    throw new FatalChecksError(preview.checks);
   }
 
   // Persist the one-off variant on the real sequence step row.
@@ -112,14 +138,32 @@ export async function manualCompose(
     contentHash,
   });
 
-  // Follow-ups stay on the assigned mailbox (threading); first sends take the
-  // first healthy one. Manual sends are operator actions - no cap accounting.
+  // Follow-ups stay on the assigned mailbox (threading - never rerouted);
+  // first sends take the override, else the first healthy one. Manual sends
+  // are operator actions - no cap accounting.
   const okBoxes = await listMailboxesByStatus(db, ['ok']);
-  const mailbox =
-    enrollment.assignedMailboxId !== null
-      ? okBoxes.find((m) => m.id === enrollment.assignedMailboxId)
-      : okBoxes[0];
-  if (!mailbox) throw new Error('no healthy mailbox available for the manual send');
+  let mailbox;
+  if (enrollment.assignedMailboxId !== null) {
+    if (input.mailboxId !== undefined && input.mailboxId !== enrollment.assignedMailboxId) {
+      throw new Error(
+        `enrollment ${enrollment.id} is threaded on mailbox ${enrollment.assignedMailboxId} - rerouting would break threading`,
+      );
+    }
+    mailbox = okBoxes.find((m) => m.id === enrollment.assignedMailboxId);
+    if (!mailbox) {
+      throw new MailboxUnhealthyError(
+        `assigned mailbox ${enrollment.assignedMailboxId} is not healthy`,
+      );
+    }
+  } else if (input.mailboxId !== undefined) {
+    mailbox = okBoxes.find((m) => m.id === input.mailboxId);
+    if (!mailbox) {
+      throw new MailboxUnhealthyError(`mailbox ${input.mailboxId} is not healthy`);
+    }
+  } else {
+    mailbox = okBoxes[0];
+    if (!mailbox) throw new MailboxUnhealthyError('no healthy mailbox available');
+  }
 
   const due: DueEnrollment = {
     id: enrollment.id,
@@ -154,5 +198,72 @@ export async function manualCompose(
     },
   );
 
-  return { outcome, variantId, contentHash };
+  const messageId =
+    outcome === 'sent' ? await latestSentMessageId(db, enrollment.id, contentHash) : null;
+  return { outcome, variantId, contentHash, checks: preview.checks, messageId };
+}
+
+export interface ManualSendDeps extends ManualComposeDeps {
+  store: EventStore;
+  sequences: SequenceProvider;
+}
+
+export interface ManualSendInput {
+  leadId: number;
+  campaignId: number;
+  mailboxId?: number;
+  subject: string;
+  bodyText: string;
+}
+
+/**
+ * B6.8 POST /manual-sends: enroll-if-needed, then the manualCompose path.
+ * A fresh enrollment is created human_written (Mode 1 by definition) with an
+ * `enrolled` event - the docs/10 traceability row (`enrolled`?) + `sent`.
+ */
+export async function manualSend(
+  deps: ManualSendDeps,
+  input: ManualSendInput,
+): Promise<ManualComposeResult & { enrollmentId: number }> {
+  const { db, clock, store } = deps;
+  const now = clock.now();
+
+  const campaign = await getCampaign(db, input.campaignId);
+  if (!campaign) throw new Error(`campaign ${input.campaignId} not found`);
+  const lead = await getLeadById(db, input.leadId);
+  if (!lead) throw new Error(`lead ${input.leadId} not found`);
+
+  let enrollment = await findByLeadAndCampaign(db, input.leadId, input.campaignId);
+  if (!enrollment) {
+    if (lead.isSuppressed) throw new Error(`lead ${lead.email} is suppressed`);
+    const [enrollmentId] = await insertEnrollments(db, [
+      {
+        leadId: lead.id,
+        campaignId: input.campaignId,
+        enrolledTier: lead.tier,
+        personalizationMode: 'human_written',
+        enrolledAt: now,
+      },
+    ]);
+    await store.append(
+      [
+        buildEvent.enrolled({
+          leadId: lead.id,
+          enrollmentId: enrollmentId!,
+          campaignId: input.campaignId,
+          occurredAt: now,
+        }),
+      ],
+      { patches: [{ enrollmentId: enrollmentId!, nextSendAt: now }] },
+    );
+    enrollment = await getById(db, enrollmentId!);
+  }
+
+  const result = await manualCompose(deps, {
+    enrollmentId: enrollment!.id,
+    subject: input.subject,
+    bodyText: input.bodyText,
+    mailboxId: input.mailboxId,
+  });
+  return { ...result, enrollmentId: enrollment!.id };
 }

@@ -69,6 +69,42 @@ export async function hashesReceivedByLeads(
   return new Set(rows.map((r) => r.contentHash));
 }
 
+/** The newest message-id an enrollment sent with this content hash (manual-send response). */
+export async function latestSentMessageId(
+  db: DbLike,
+  enrollmentId: number,
+  contentHash: string,
+): Promise<string | null> {
+  const rows = await db
+    .select({ messageId: sentMessages.messageId })
+    .from(sentMessages)
+    .where(
+      and(eq(sentMessages.enrollmentId, enrollmentId), eq(sentMessages.contentHash, contentHash)),
+    )
+    .orderBy(desc(sentMessages.sentAt))
+    .limit(1);
+  return rows[0]?.messageId ?? null;
+}
+
+/** Which of these leads already received ANY of the candidate hashes (per-lead recycle guard). */
+export async function leadsWithHashConflict(
+  db: DbLike,
+  leadIds: readonly number[],
+  candidateHashes: readonly string[],
+): Promise<Set<number>> {
+  if (leadIds.length === 0 || candidateHashes.length === 0) return new Set();
+  const rows = await db
+    .selectDistinct({ leadId: sentMessages.leadId })
+    .from(sentMessages)
+    .where(
+      and(
+        inArray(sentMessages.leadId, [...leadIds]),
+        inArray(sentMessages.contentHash, [...candidateHashes]),
+      ),
+    );
+  return new Set(rows.map((r) => r.leadId));
+}
+
 /** All prior message-ids of an enrollment's thread, oldest first (References chain). */
 export async function listThreadMessageIds(
   db: DbLike,

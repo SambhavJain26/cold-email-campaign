@@ -254,6 +254,19 @@ export async function insertEnrollments(
   return inserted.map((r) => r.id);
 }
 
+/** The one enrollment for (lead, campaign) - UNIQUE(lead_id, campaign_id). */
+export async function findByLeadAndCampaign(
+  db: DbLike,
+  leadId: number,
+  campaignId: number,
+): Promise<EnrollmentRow | undefined> {
+  const rows = await db
+    .select()
+    .from(enrollments)
+    .where(and(eq(enrollments.leadId, leadId), eq(enrollments.campaignId, campaignId)));
+  return rows[0];
+}
+
 /**
  * Bounce matching (docs/07 §2.1): the lead's most recent ACTIVE enrollment,
  * else the most recent one - a DSN can trail the terminal transition.
