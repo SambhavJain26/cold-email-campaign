@@ -1,4 +1,6 @@
 import type { FastifyError, FastifyInstance } from 'fastify';
+import { CsvContractError, ImportTooLargeError } from '../../ingest/parse';
+import { SequenceEditConflictError } from '../../db/repos/sequencesRepo';
 import { AppError, toEnvelope } from '../errors';
 import { RequestValidationError } from './zodCompilers';
 
@@ -22,6 +24,18 @@ export function registerErrorHandling(app: FastifyInstance): void {
           err.issues.map((i) => ({ path: i.path.map(String).join('.'), message: i.message })),
         ),
       );
+    }
+    // typed service errors → their contract codes (docs/10 error table)
+    if (err instanceof ImportTooLargeError) {
+      return reply.status(413).send(toEnvelope('import_too_large', err.message));
+    }
+    if (err instanceof CsvContractError) {
+      return reply.status(400).send(toEnvelope('validation', err.message));
+    }
+    if (err instanceof SequenceEditConflictError) {
+      return reply
+        .status(422)
+        .send(toEnvelope('sequence_invalid', err.message, { conflicts: err.details }));
     }
     const fastifyErr = err as Partial<FastifyError>;
     if (fastifyErr.validation) {

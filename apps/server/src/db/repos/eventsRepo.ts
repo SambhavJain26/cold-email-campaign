@@ -5,7 +5,7 @@ import type { DbLike } from '../client';
 import { events } from '../schema';
 import { parseDomainEvent, type DomainEvent } from '../../domain/events';
 
-type EventRow = typeof events.$inferSelect;
+export type EventRow = typeof events.$inferSelect;
 
 /** DomainEvent → insert row (snake_case columns handled by drizzle defs). */
 function toRow(e: DomainEvent): typeof events.$inferInsert {
@@ -232,6 +232,11 @@ export async function hasSoftBounceAfter(
     )
     .limit(1);
   return rows.length > 0;
+}
+
+/** B6.3 lead-detail timeline: RAW rows (all columns), oldest first. */
+export async function listRowsByLead(db: DbLike, leadId: number): Promise<EventRow[]> {
+  return db.select().from(events).where(eq(events.leadId, leadId)).orderBy(asc(events.id));
 }
 
 export async function listByEnrollment(db: DbLike, enrollmentId: number): Promise<DomainEvent[]> {

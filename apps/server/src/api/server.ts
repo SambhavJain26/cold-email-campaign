@@ -11,6 +11,9 @@ import { authRoutes } from './auth';
 import { mailboxesRoutes } from './mailboxes';
 import { settingsRoutes } from './settings';
 import { alertsRoutes } from './alerts';
+import { leadsRoutes } from './leads';
+import { importsRoutes } from './imports';
+import { sequencesRoutes } from './sequences';
 
 const pkg = createRequire(import.meta.url)('../../package.json') as { version: string };
 
@@ -51,6 +54,9 @@ export function buildServer({ logger, services }: ServerDeps): FastifyInstance {
       await mailboxesRoutes(api, services);
       await settingsRoutes(api, services);
       await alertsRoutes(api, services);
+      await leadsRoutes(api, services);
+      await importsRoutes(api, services);
+      await sequencesRoutes(api, services);
     },
     { prefix: '/api/v1' },
   );

@@ -21,6 +21,27 @@ export async function suppressedAmong(db: DbLike, emails: readonly string[]): Pr
   return found;
 }
 
+/**
+ * Decision U: suppression removal - deliberately loud, typed-confirm at the
+ * API layer, audit alert emitted by the route. Deletes the suppression row
+ * and clears the lead projection flags. Events are NEVER touched (the
+ * historical unsubscribe/hard_bounce stays in the log). Returns false if the
+ * email wasn't suppressed.
+ */
+export async function removeSuppression(db: DbLike, email: string, at: Date): Promise<boolean> {
+  const normalized = email.trim().toLowerCase();
+  const deleted = await db
+    .delete(suppressions)
+    .where(eq(suppressions.email, normalized))
+    .returning({ email: suppressions.email });
+  if (deleted.length === 0) return false;
+  await db
+    .update(leads)
+    .set({ isSuppressed: false, suppressionReason: null, suppressedAt: null, updatedAt: at })
+    .where(eq(leads.email, normalized));
+  return true;
+}
+
 export async function suppressLead(
   db: DbLike,
   leadId: number,

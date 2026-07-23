@@ -76,6 +76,22 @@ export async function backfillLeadIds(
   }
 }
 
+/** B6.4 GET /imports - history, newest first. */
+export async function listImports(
+  db: DbLike,
+  page: number,
+  perPage: number,
+): Promise<{ items: ImportRow[]; total: number }> {
+  const items = await db
+    .select()
+    .from(imports)
+    .orderBy(sql`${imports.createdAt} DESC`, sql`${imports.id} DESC`)
+    .limit(perPage)
+    .offset((page - 1) * perPage);
+  const totals = await db.select({ n: sql<number>`count(*)::int` }).from(imports);
+  return { items, total: totals[0]?.n ?? 0 };
+}
+
 export async function markCommitted(
   db: DbLike,
   importId: number,
