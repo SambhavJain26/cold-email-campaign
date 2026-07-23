@@ -12,7 +12,7 @@ export function usePutSettings() {
   return useMutation({
     mutationFn: (body: PutSettingsBody) =>
       apiFetch('/settings', settingsResponseSchema, { method: 'PUT', body }),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['settings'] }),
+    onSuccess: () => void qc.invalidateQueries({ queryKey: ['settings'] }),
   });
 }
 
@@ -21,6 +21,6 @@ export function usePutCompliance() {
   return useMutation({
     mutationFn: (body: ComplianceDto) =>
       apiFetch('/compliance', complianceSchema, { method: 'PUT', body }),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['compliance'] }),
+    onSuccess: () => void qc.invalidateQueries({ queryKey: ['compliance'] }),
   });
 }
