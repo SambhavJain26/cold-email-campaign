@@ -1,0 +1,84 @@
+import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { campaignSchema, enrollResponseSchema, okResponseSchema } from '@coldemail/shared';
+import { apiFetch } from '../client';
+
+type EnrollBody = { count: number } | { lead_ids: number[]; force?: boolean };
+
+export function useCreateCampaign() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (body: {
+      name: string;
+      sequence_id: number;
+      tier_effort_config?: unknown;
+      ramp_config?: unknown;
+    }) => apiFetch('/campaigns', campaignSchema, { method: 'POST', body }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['campaigns'] }),
+  });
+}
+
+export function usePatchCampaign() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({
+      id,
+      body,
+    }: {
+      id: number;
+      body: { name?: string; status?: 'active' | 'paused' | 'archived' };
+    }) => apiFetch(`/campaigns/${id}`, campaignSchema, { method: 'PATCH', body }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['campaigns'] }),
+  });
+}
+
+export function useEnroll() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ campaignId, body }: { campaignId: number; body: EnrollBody }) =>
+      apiFetch(`/campaigns/${campaignId}/enroll`, enrollResponseSchema, {
+        method: 'POST',
+        body,
+      }),
+    onSuccess: (_data, { campaignId }) => {
+      qc.invalidateQueries({ queryKey: ['campaigns'] });
+      qc.invalidateQueries({ queryKey: ['overview', campaignId] });
+      qc.invalidateQueries({ queryKey: ['leads'] });
+    },
+  });
+}
+
+export function useRecycle() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({
+      targetCampaignId,
+      sourceCampaignId,
+    }: {
+      targetCampaignId: number;
+      sourceCampaignId: number;
+    }) =>
+      apiFetch(`/campaigns/${targetCampaignId}/recycle`, enrollResponseSchema, {
+        method: 'POST',
+        body: { source_campaign_id: sourceCampaignId },
+      }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['campaigns'] });
+      qc.invalidateQueries({ queryKey: ['cold-storage'] });
+      qc.invalidateQueries({ queryKey: ['leads'] });
+    },
+  });
+}
+
+export function useDeactivateVariant() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (variantId: number) =>
+      apiFetch(`/step-variants/${variantId}/deactivate`, okResponseSchema, {
+        method: 'POST',
+      }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['analytics'] });
+      qc.invalidateQueries({ queryKey: ['sequences'] });
+    },
+  });
+}

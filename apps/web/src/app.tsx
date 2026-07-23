@@ -1,8 +1,20 @@
+import { QueryClientProvider } from '@tanstack/react-query';
+import { RouterProvider } from 'react-router-dom';
+import { Toaster } from '@/components/ui/sonner';
+import { setOnUnauthorized } from '@/api/client';
+import { queryClient } from '@/api/queryClient';
+import { router } from '@/router';
+
+// 401 anywhere → /login (docs/11 §2), preserving nothing - session is gone.
+setOnUnauthorized(() => {
+  void router.navigate('/login', { replace: true });
+});
+
 export default function App() {
-  // Placeholder root - replaced by RouterProvider + QueryClientProvider in F0.3/F0.5.
   return (
-    <div className="flex min-h-screen items-center justify-center bg-background text-foreground">
-      <p className="text-sm text-muted-foreground">Cold Email Campaign - F0 scaffold</p>
-    </div>
+    <QueryClientProvider client={queryClient}>
+      <RouterProvider router={router} />
+      <Toaster position="top-right" richColors />
+    </QueryClientProvider>
   );
 }
