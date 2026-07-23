@@ -14,7 +14,7 @@ Single always-on VPS (finalized decision). Docker Compose primary; systemd alter
 | `OPERATOR_EMAIL` / `OPERATOR_INITIAL_PASSWORD` | ✅ first boot | - | seeds `operator` row (password changeable in UI) |
 | `MAIL_TRANSPORT` | ✅ | `mock` | `mock` \| `smtp_imap` - **the one switch that goes live (B8)** |
 | `ROLE` | | `all` | `all` \| `api` \| `worker` (decision Y) |
-| `PORT` / `HOST` | | `3000` / `127.0.0.1` | app listens localhost-only; Caddy fronts it |
+| `PORT` / `HOST` | | `3001` / `127.0.0.1` | app listens localhost-only; Caddy fronts it |
 | `ANTHROPIC_API_KEY` | | unset | unset = sentiment suggestion silently off (decision E) |
 | `ALERT_WEBHOOK_URL` | | unset | generic JSON POST per alert (decision V) |
 | `NODE_ENV` | | `production` | |
