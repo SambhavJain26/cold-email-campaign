@@ -1,6 +1,7 @@
 import js from '@eslint/js';
 import tseslint from 'typescript-eslint';
 import prettier from 'eslint-config-prettier';
+import reactHooks from 'eslint-plugin-react-hooks';
 
 // ── Module-boundary building blocks (docs/02 §1) ─────────────────────────────
 // NOTE: flat config does NOT merge a rule's options across matching blocks -
@@ -33,7 +34,7 @@ export default tseslint.config(
       '**/node_modules/**',
       '**/dist/**',
       '**/coverage/**',
-      'apps/web/**', // placeholder until F0 - gets its own config then
+      'apps/web/public/mockServiceWorker.js', // MSW-generated
     ],
   },
   js.configs.recommended,
@@ -114,6 +115,33 @@ export default tseslint.config(
       'no-restricted-imports': [
         'error',
         { patterns: [banDrizzle, banConcreteTransports, banConcreteClocks] },
+      ],
+    },
+  },
+
+  // ── apps/web (docs/11 §1) ──────────────────────────────────────────────────
+  // features/ may import components/*, api/*, lib - never each other; all server
+  // data flows through api/queries hooks (no raw fetch in features).
+  {
+    files: ['apps/web/src/**/*.{ts,tsx}'],
+    plugins: { 'react-hooks': reactHooks },
+    rules: {
+      ...reactHooks.configs.recommended.rules,
+    },
+  },
+  {
+    files: ['apps/web/src/features/**/*.{ts,tsx}'],
+    rules: {
+      'no-restricted-imports': [
+        'error',
+        {
+          patterns: [
+            {
+              group: ['@/features/*/*', '../../features/**'],
+              message: 'features may not import each other (docs/11 s1).',
+            },
+          ],
+        },
       ],
     },
   },
