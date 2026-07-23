@@ -1,8 +1,21 @@
+import path from 'node:path';
 import { defineConfig } from 'vitest/config';
 
 export default defineConfig({
   test: {
     projects: [
+      {
+        // F0.6: web component tests - jsdom + Testing Library.
+        resolve: {
+          alias: { '@': path.resolve(import.meta.dirname, 'apps/web/src') },
+        },
+        test: {
+          name: 'web',
+          include: ['apps/web/src/**/*.test.{ts,tsx}'],
+          environment: 'jsdom',
+          setupFiles: ['./apps/web/src/test/setup.ts'],
+        },
+      },
       {
         test: {
           name: 'unit',
