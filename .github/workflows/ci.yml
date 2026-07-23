@@ -52,6 +52,25 @@ jobs:
       # docs/13 §6 ordering: API tests after unit+integration (shared serial test DB).
       - run: npx vitest run --project api
 
+  # F0.7: web track — component tests (jsdom) + mock-mode Playwright e2e.
+  # No Postgres: MSW serves the golden fixtures (docs/11 §4).
+  web:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+      - run: npm ci
+      - run: npm run build -w @coldemail/web
+      - run: npx vitest run --project web
+      - run: npx playwright install chromium --with-deps
+        working-directory: apps/web
+      - run: npm run e2e -w @coldemail/web
+        env:
+          CI: 'true'
+
   # The locked regression (docs/13 §3). Required. Red here = the math stopped closing.
   golden:
     runs-on: ubuntu-latest
