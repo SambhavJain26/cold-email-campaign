@@ -7,7 +7,10 @@ import { fileURLToPath } from 'node:url';
 const root = path.dirname(fileURLToPath(import.meta.url));
 
 // docs/11 §4: VITE_API_MODE=mock (default) serves MSW over golden fixtures;
-// 'real' proxies /api to the Fastify server on localhost:3000.
+// 'real' proxies /api to the Fastify server. Default matches the server's PORT
+// default (docs/16); override with VITE_API_TARGET when running it elsewhere.
+const apiTarget = process.env.VITE_API_TARGET ?? 'http://localhost:3000';
+
 export default defineConfig({
   plugins: [react(), tailwindcss()],
   resolve: {
@@ -16,7 +19,7 @@ export default defineConfig({
   server: {
     port: 5173,
     proxy: {
-      '/api': { target: 'http://localhost:3000', changeOrigin: false },
+      '/api': { target: apiTarget, changeOrigin: false },
     },
   },
 });
