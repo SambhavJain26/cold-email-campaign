@@ -2,22 +2,24 @@
 import { Writable } from 'node:stream';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import type { FastifyInstance } from 'fastify';
-import type { Pool } from 'pg';
 import { buildServer } from '../../src/api/server';
 import { AppError } from '../../src/api/errors';
 import { createLogger } from '../../src/config/logger';
-import { getTestPool } from '../helpers/db';
+import { compose, type AppServices } from '../../src/composition';
+import { testConfig } from '../api/helpers/app';
+import { TEST_DATABASE_URL } from '../helpers/db';
 
 describe('api skeleton', () => {
   let app: FastifyInstance;
-  let pool: Pool;
+  let services: AppServices;
 
   beforeAll(async () => {
-    pool = getTestPool();
+    const config = testConfig();
+    services = compose(config, { databaseUrl: TEST_DATABASE_URL });
     const silent = new Writable({ write: (_c, _e, cb) => cb() });
     app = buildServer({
       logger: createLogger({ LOG_LEVEL: 'error', NODE_ENV: 'test' }, silent),
-      pool,
+      services,
     });
     // test-only routes exercising the central error mapping
     app.get('/boom-app-error', () => {
@@ -31,7 +33,7 @@ describe('api skeleton', () => {
 
   afterAll(async () => {
     await app.close();
-    await pool.end();
+    await services.pool.end();
   });
 
   it('GET /health reports ok with db reachable and a version', async () => {

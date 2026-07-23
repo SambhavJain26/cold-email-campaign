@@ -25,7 +25,8 @@ export async function resetCoreTables(pool: Pool): Promise<void> {
   await pool.query(
     `TRUNCATE events, enrollments, suppressions, campaigns, leads,
              incoming_messages, sent_messages, mailbox_secrets, mailboxes,
-             step_variants, sequence_steps, sequences, import_rows, imports
+             step_variants, sequence_steps, sequences, import_rows, imports,
+             operator
      RESTART IDENTITY CASCADE`,
   );
   // compliance_settings survives TRUNCATE (single seeded row) and its seed
