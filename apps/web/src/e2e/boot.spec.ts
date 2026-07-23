@@ -40,7 +40,9 @@ test('wrong password shows the envelope error and stays on /login', async ({ pag
   await page.getByLabel('Password').fill('wrong');
   await page.getByRole('button', { name: 'Sign in' }).click();
 
-  await expect(page.getByText('authentication required')).toBeVisible();
+  // Envelope message shows twice by design: inline alert + the F1.4 mutation toast.
+  await expect(page.getByRole('alert').getByText('authentication required')).toBeVisible();
+  await expect(page.getByLabel(/Notifications/).getByText('authentication required')).toBeVisible();
   await expect(page).toHaveURL(/\/login$/);
 });
 
