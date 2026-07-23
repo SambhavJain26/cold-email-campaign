@@ -222,7 +222,16 @@ function buildUnibox(leads: LeadDto[]): UniboxItemDto[] {
   for (let n = 0; n < 10; n++) {
     const lead = leads[n]!;
     const tagged = n < 5;
-    const sentiment = n % 3 === 0 ? 'positive' : n % 3 === 1 ? 'neutral' : 'negative';
+    const autoUnsubscribed = n === 9;
+    // The STOP card must read like one: a keyword-matched opt-out is negative
+    // and auto-suppressed (decision F), never a warm "send times" reply.
+    const sentiment = autoUnsubscribed
+      ? 'negative'
+      : n % 3 === 0
+        ? 'positive'
+        : n % 3 === 1
+          ? 'neutral'
+          : 'negative';
     items.push({
       incoming_message_id: 100 + n,
       received_at: `2026-02-${String(10 + n).padStart(2, '0')}T14:0${n % 10}:00.000Z`,
@@ -233,15 +242,17 @@ function buildUnibox(leads: LeadDto[]): UniboxItemDto[] {
       },
       campaign_id: 1,
       step_no: 1 + (n % 4),
-      snippet:
-        sentiment === 'positive'
+      snippet: autoUnsubscribed
+        ? 'STOP. Take me off this list.'
+        : sentiment === 'positive'
           ? 'Sure — send over some times next week.'
           : sentiment === 'neutral'
             ? 'Who is this? How did you get my email?'
             : 'Not interested, please stop emailing me.',
-      effective_sentiment: tagged ? sentiment : null,
-      suggested_sentiment: tagged ? null : sentiment,
-      auto_unsubscribed: n === 9,
+      // An auto-suppressed STOP is a settled fact, not a suggestion.
+      effective_sentiment: tagged || autoUnsubscribed ? sentiment : null,
+      suggested_sentiment: tagged || autoUnsubscribed ? null : sentiment,
+      auto_unsubscribed: autoUnsubscribed,
       meeting_booked: n === 0,
       enrollment_id: lead.id,
     });

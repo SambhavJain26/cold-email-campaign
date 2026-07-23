@@ -93,6 +93,8 @@ export const renderChecksSchema = z
   })
   .strict();
 
+export type RenderChecks = z.infer<typeof renderChecksSchema>;
+
 export const previewResponseSchema = z
   .object({
     subject: z.string(),
