@@ -22,6 +22,7 @@ import { StateBadge } from '@/components/shared/state-badge';
 import { TierBadge } from '@/components/shared/tier-badge';
 import { useLead } from '@/api/queries/leads';
 import { usePatchLead, useRemoveSuppression } from '@/api/mutations/leads';
+import { ManualComposer } from './manual-composer';
 import { Timeline } from './timeline';
 
 const UNTIERED = '__untiered__';
@@ -161,6 +162,7 @@ function EditCard({ lead }: { lead: LeadDto & { notes: string | null } }) {
   const [tier, setTier] = useState<string>(lead.tier ?? UNTIERED);
   const [notes, setNotes] = useState(lead.notes ?? '');
   const [observation, setObservation] = useState(lead.custom_fields.custom_observation ?? '');
+  const [composerOpen, setComposerOpen] = useState(false);
 
   const dirty =
     (lead.tier ?? UNTIERED) !== tier ||
@@ -225,10 +227,17 @@ function EditCard({ lead }: { lead: LeadDto & { notes: string | null } }) {
           <Button size="sm" disabled={!dirty || patch.isPending} onClick={save}>
             Save
           </Button>
-          <Button size="sm" variant="outline" disabled title="Arrives with the Unibox stage (F6)">
+          <Button
+            size="sm"
+            variant="outline"
+            disabled={lead.is_suppressed}
+            title={lead.is_suppressed ? 'Suppressed leads can never be sent to' : ''}
+            onClick={() => setComposerOpen(true)}
+          >
             <PenLine className="size-4" /> Manual compose
           </Button>
         </div>
+        <ManualComposer lead={lead} open={composerOpen} onOpenChange={setComposerOpen} />
       </CardContent>
     </Card>
   );

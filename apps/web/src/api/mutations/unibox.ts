@@ -1,9 +1,10 @@
-import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { useMutation, useQueryClient, type QueryClient } from '@tanstack/react-query';
 import {
   manualSendResponseSchema,
   okResponseSchema,
   type ManualSendBody,
   type Sentiment,
+  type UniboxItemDto,
 } from '@coldemail/shared';
 import { apiFetch } from '../client';
 
@@ -18,7 +19,46 @@ function useInvalidateUniboxMetrics() {
   };
 }
 
+type CachedList = { items: UniboxItemDto[] };
+
+function isList(value: unknown): value is CachedList {
+  return typeof value === 'object' && value !== null && Array.isArray((value as CachedList).items);
+}
+
+function isItem(value: unknown): value is UniboxItemDto {
+  return (
+    typeof value === 'object' &&
+    value !== null &&
+    typeof (value as UniboxItemDto).incoming_message_id === 'number'
+  );
+}
+
+/** Patch every cached unibox list AND detail entry the predicate matches, so an
+ *  optimistic tag shows instantly on the feed and inside an open thread view. */
+function patchUniboxCaches(
+  qc: QueryClient,
+  matches: (item: UniboxItemDto) => boolean,
+  patch: (item: UniboxItemDto) => UniboxItemDto,
+): [readonly unknown[], unknown][] {
+  const snapshot = qc.getQueriesData({ queryKey: ['unibox'] });
+  qc.setQueriesData({ queryKey: ['unibox'] }, (old: unknown) => {
+    if (isList(old)) {
+      return { ...old, items: old.items.map((item) => (matches(item) ? patch(item) : item)) };
+    }
+    if (isItem(old) && matches(old)) return { ...old, ...patch(old) };
+    return old;
+  });
+  return snapshot;
+}
+
+function restore(qc: QueryClient, snapshot: [readonly unknown[], unknown][] | undefined): void {
+  for (const [key, data] of snapshot ?? []) qc.setQueryData(key, data);
+}
+
+/** F6.2 - one-click tagging, optimistic (decision T: the actions the operator
+ *  repeats dozens of times must feel instant; the server is the truth on settle). */
 export function useTagSentiment() {
+  const qc = useQueryClient();
   const invalidate = useInvalidateUniboxMetrics();
   return useMutation({
     mutationFn: ({
@@ -32,18 +72,39 @@ export function useTagSentiment() {
         method: 'POST',
         body: { sentiment },
       }),
-    onSuccess: invalidate,
+    onMutate: async ({ incomingMessageId, sentiment }) => {
+      await qc.cancelQueries({ queryKey: ['unibox'] });
+      const snapshot = patchUniboxCaches(
+        qc,
+        (item) => item.incoming_message_id === incomingMessageId,
+        (item) => ({ ...item, effective_sentiment: sentiment, suggested_sentiment: null }),
+      );
+      return { snapshot };
+    },
+    onError: (_error, _variables, context) => restore(qc, context?.snapshot),
+    onSettled: invalidate,
   });
 }
 
 export function useMeetingBooked() {
+  const qc = useQueryClient();
   const invalidate = useInvalidateUniboxMetrics();
   return useMutation({
     mutationFn: (enrollmentId: number) =>
       apiFetch(`/enrollments/${enrollmentId}/meeting-booked`, okResponseSchema, {
         method: 'POST',
       }),
-    onSuccess: invalidate,
+    onMutate: async (enrollmentId) => {
+      await qc.cancelQueries({ queryKey: ['unibox'] });
+      const snapshot = patchUniboxCaches(
+        qc,
+        (item) => item.enrollment_id === enrollmentId,
+        (item) => ({ ...item, meeting_booked: true }),
+      );
+      return { snapshot };
+    },
+    onError: (_error, _variables, context) => restore(qc, context?.snapshot),
+    onSettled: invalidate,
   });
 }
 
@@ -55,7 +116,9 @@ export function useSnooze() {
         method: 'POST',
         body: { until },
       }),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['unibox'] }),
+    // Fire-and-forget: awaiting the refetch here would swallow per-call callbacks
+    // if it unmounts the caller (the F2 lesson).
+    onSuccess: () => void qc.invalidateQueries({ queryKey: ['unibox'] }),
   });
 }
 

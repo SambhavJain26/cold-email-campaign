@@ -30,7 +30,9 @@ export function SentimentTag({
     >
       <span aria-hidden>{GLYPH[sentiment]}</span>
       {sentiment}
-      {suggested && <span className="text-[10px] text-muted-foreground">(AI-assisted)</span>}
+      {suggested && (
+        <span className="text-[10px] normal-case text-muted-foreground">(AI-assisted)</span>
+      )}
     </span>
   );
 }
