@@ -1,0 +1,155 @@
+// B6.3 — leads list/detail/patch, bulk-tier, suppression removal (decision U).
+import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { suppressLead } from '../../src/db/repos/suppressionsRepo';
+import { getLeadById } from '../../src/db/repos/leadsRepo';
+import { createApiHarness, type ApiHarness } from './helpers/app';
+import { eventWatermark, expectNoNewEvents } from './helpers/events';
+
+describe('B6.3 leads', () => {
+  let h: ApiHarness;
+
+  beforeAll(async () => {
+    h = await createApiHarness();
+    // three leads: tiered A, untiered, untiered-with-enrollment
+    await h.pool.query(`
+      INSERT INTO leads (email, first_name, last_name, company, state, tier, custom_fields)
+      VALUES
+        ('amy@acme.dev',   'Amy',  'Ash',   'Acme Realty', 'TX', 'A', '{"custom_observation":"saw your Dallas listings"}'),
+        ('bob@bravo.dev',  'Bob',  'Best',  'Bravo Homes', 'CO', NULL, '{}'),
+        ('cara@cedar.dev', 'Cara', 'Cole',  'Cedar Group', 'TX', NULL, '{}')`);
+    await h.pool.query(`INSERT INTO campaigns (name, status) VALUES ('Camp 1', 'active')`);
+    await h.pool.query(`
+      INSERT INTO enrollments (campaign_id, lead_id, current_state, current_step_no, personalization_mode, enrolled_at)
+      VALUES (1, 3, 'ACTIVE', 2, 'template_auto', now())`);
+    await h.pool.query(`
+      INSERT INTO events (type, occurred_at, lead_id, enrollment_id, campaign_id, step_no, attributes)
+      VALUES ('enrolled', now(), 3, 1, 1, NULL, '{}'),
+             ('sent',     now(), 3, 1, 1, 1,    '{"content_hash":"sha-x"}')`);
+  });
+  afterAll(async () => {
+    await h.close();
+  });
+
+  it('lists with filters, pagination envelope, and untiered_count meta', async () => {
+    const all = (await h.inject({ method: 'GET', url: '/api/v1/leads' })).json();
+    expect(all.total).toBe(3);
+    expect(all.untiered_count).toBe(2);
+    expect(all.items[0]).toMatchObject({ email: 'amy@acme.dev', tier: 'A' });
+    expect(all.items[2].latest_enrollment).toEqual({
+      campaign_id: 1,
+      current_state: 'ACTIVE',
+      current_step_no: 2,
+    });
+
+    const tierA = (await h.inject({ method: 'GET', url: '/api/v1/leads?tier=A' })).json();
+    expect(tierA.total).toBe(1);
+    const untiered = (await h.inject({ method: 'GET', url: '/api/v1/leads?tier=untiered' })).json();
+    expect(untiered.total).toBe(2);
+    const tx = (await h.inject({ method: 'GET', url: '/api/v1/leads?state=TX' })).json();
+    expect(tx.total).toBe(2);
+    const q = (await h.inject({ method: 'GET', url: '/api/v1/leads?q=bravo' })).json();
+    expect(q.total).toBe(1);
+    const inCamp = (await h.inject({ method: 'GET', url: '/api/v1/leads?campaign_id=1' })).json();
+    expect(inCamp.total).toBe(1);
+    expect(inCamp.items[0].email).toBe('cara@cedar.dev');
+  });
+
+  it('detail returns notes + full event timeline', async () => {
+    const res = await h.inject({ method: 'GET', url: '/api/v1/leads/3' });
+    expect(res.statusCode).toBe(200);
+    const lead = res.json();
+    expect(lead.timeline.map((e: { type: string }) => e.type)).toEqual(['enrolled', 'sent']);
+    expect(lead.timeline[1].attributes.content_hash).toBe('sha-x');
+    expect((await h.inject({ method: 'GET', url: '/api/v1/leads/99' })).statusCode).toBe(404);
+  });
+
+  it('PATCH edits tier / notes / custom_fields (custom_observation home)', async () => {
+    const wm = await eventWatermark(h.pool);
+    const res = await h.inject({
+      method: 'PATCH',
+      url: '/api/v1/leads/2',
+      payload: {
+        tier: 'B',
+        notes: 'warm intro via Slack',
+        custom_fields: { custom_observation: 'your Boulder open house' },
+      },
+    });
+    expect(res.statusCode).toBe(200);
+    expect(res.json().tier).toBe('B');
+    expect(res.json().custom_fields.custom_observation).toBe('your Boulder open house');
+    const row = await getLeadById(h.services.db, 2);
+    expect(row!.notes).toBe('warm intro via Slack');
+    await expectNoNewEvents(h.pool, wm);
+  });
+
+  it('bulk-tier by ids and by filter; exactly-one-of enforced', async () => {
+    const wm = await eventWatermark(h.pool);
+    const byIds = await h.inject({
+      method: 'POST',
+      url: '/api/v1/leads/bulk-tier',
+      payload: { lead_ids: [2], tier: null },
+    });
+    expect(byIds.json()).toEqual({ updated: 1 });
+
+    const byFilter = await h.inject({
+      method: 'POST',
+      url: '/api/v1/leads/bulk-tier',
+      payload: { filter: { state: 'TX', tier: 'untiered' }, tier: 'C' },
+    });
+    expect(byFilter.json()).toEqual({ updated: 1 }); // cara (amy is tier A)
+
+    const both = await h.inject({
+      method: 'POST',
+      url: '/api/v1/leads/bulk-tier',
+      payload: { lead_ids: [1], filter: { state: 'TX' }, tier: 'A' },
+    });
+    expect(both.statusCode).toBe(400);
+    const neither = await h.inject({
+      method: 'POST',
+      url: '/api/v1/leads/bulk-tier',
+      payload: { tier: 'A' },
+    });
+    expect(neither.statusCode).toBe(400);
+    await expectNoNewEvents(h.pool, wm); // bulk-tier: none (traceability)
+  });
+
+  it('DELETE /suppressions/:email — typed confirm, audit alert, projection cleared', async () => {
+    await suppressLead(h.services.db, 2, 'manual', h.clock.now());
+    expect((await getLeadById(h.services.db, 2))!.isSuppressed).toBe(true);
+
+    const wrong = await h.inject({
+      method: 'DELETE',
+      url: '/api/v1/suppressions/bob@bravo.dev',
+      payload: { confirm: 'nope@bravo.dev' },
+    });
+    expect(wrong.statusCode).toBe(400);
+
+    const wm = await eventWatermark(h.pool);
+    const ok = await h.inject({
+      method: 'DELETE',
+      url: '/api/v1/suppressions/bob@bravo.dev',
+      payload: { confirm: 'bob@bravo.dev' },
+    });
+    expect(ok.statusCode).toBe(200);
+    const lead = await getLeadById(h.services.db, 2);
+    expect(lead!.isSuppressed).toBe(false);
+    expect(lead!.suppressionReason).toBeNull();
+    await expectNoNewEvents(h.pool, wm); // removal is alert-audited, not event-logged
+
+    const alerts = (await h.inject({ method: 'GET', url: '/api/v1/alerts?unacked=true' })).json();
+    expect(
+      alerts.items.some(
+        (a: { kind: string; payload: { email?: string } }) =>
+          a.kind === 'suppression_removed' && a.payload.email === 'bob@bravo.dev',
+      ),
+    ).toBe(true);
+
+    // no longer suppressed → 404 on repeat
+    const again = await h.inject({
+      method: 'DELETE',
+      url: '/api/v1/suppressions/bob@bravo.dev',
+      payload: { confirm: 'bob@bravo.dev' },
+    });
+    expect(again.statusCode).toBe(404);
+  });
+});

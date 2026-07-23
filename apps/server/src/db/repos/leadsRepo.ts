@@ -94,6 +94,122 @@ export function leadFilterWhere(filter: LeadFilter): SQL | undefined {
   return conds.length === 0 ? undefined : and(...conds);
 }
 
+export interface LeadListItem {
+  lead: LeadRow;
+  latestEnrollment: { campaignId: number; currentState: string; currentStepNo: number } | null;
+}
+
+/**
+ * B6.3 GET /leads: filtered page + total + the untiered banner count.
+ * "Latest enrollment" = the newest enrollments row per lead (highest id).
+ */
+export async function listLeads(
+  db: DbLike,
+  filter: LeadFilter,
+  page: number,
+  perPage: number,
+): Promise<{ items: LeadListItem[]; total: number }> {
+  const where = leadFilterWhere(filter);
+  const rows = await db
+    .select()
+    .from(leads)
+    .where(where)
+    .orderBy(leads.id)
+    .limit(perPage)
+    .offset((page - 1) * perPage);
+  const totals = await db
+    .select({ n: sql<number>`count(*)::int` })
+    .from(leads)
+    .where(where);
+
+  const latestByLead = new Map<
+    number,
+    { campaignId: number; currentState: string; currentStepNo: number }
+  >();
+  if (rows.length > 0) {
+    const enr = await db
+      .select({
+        leadId: enrollments.leadId,
+        campaignId: enrollments.campaignId,
+        currentState: enrollments.currentState,
+        currentStepNo: enrollments.currentStepNo,
+        id: enrollments.id,
+      })
+      .from(enrollments)
+      .where(
+        inArray(
+          enrollments.leadId,
+          rows.map((r) => r.id),
+        ),
+      )
+      .orderBy(enrollments.leadId, enrollments.id);
+    for (const e of enr) {
+      // ordered by id asc — the last write per lead wins = newest enrollment
+      latestByLead.set(e.leadId, {
+        campaignId: e.campaignId,
+        currentState: e.currentState,
+        currentStepNo: e.currentStepNo,
+      });
+    }
+  }
+
+  return {
+    items: rows.map((lead) => ({ lead, latestEnrollment: latestByLead.get(lead.id) ?? null })),
+    total: totals[0]?.n ?? 0,
+  };
+}
+
+/** Single-lead version of the listLeads join (detail + patch responses). */
+export async function latestEnrollmentLite(
+  db: DbLike,
+  leadId: number,
+): Promise<LeadListItem['latestEnrollment']> {
+  const rows = await db
+    .select({
+      campaignId: enrollments.campaignId,
+      currentState: enrollments.currentState,
+      currentStepNo: enrollments.currentStepNo,
+    })
+    .from(enrollments)
+    .where(eq(enrollments.leadId, leadId))
+    .orderBy(sql`${enrollments.id} DESC`)
+    .limit(1);
+  return rows[0] ?? null;
+}
+
+/** The untiered banner number (decision R): importable leads awaiting a tier. */
+export async function untieredCount(db: DbLike): Promise<number> {
+  const rows = await db
+    .select({ n: sql<number>`count(*)::int` })
+    .from(leads)
+    .where(and(isNull(leads.tier), eq(leads.isSuppressed, false)));
+  return rows[0]?.n ?? 0;
+}
+
+/** B6.3 PATCH /leads/:id — tier, notes, custom_fields (custom_observation lives there). */
+export async function patchLead(
+  db: DbLike,
+  id: number,
+  patch: {
+    tier?: LeadTier | null;
+    notes?: string | null;
+    customFields?: Record<string, string>;
+  },
+  at: Date,
+): Promise<LeadRow | undefined> {
+  const rows = await db
+    .update(leads)
+    .set({
+      ...(patch.tier !== undefined && { tier: patch.tier }),
+      ...(patch.notes !== undefined && { notes: patch.notes }),
+      ...(patch.customFields !== undefined && { customFields: patch.customFields }),
+      updatedAt: at,
+    })
+    .where(eq(leads.id, id))
+    .returning();
+  return rows[0];
+}
+
 export async function updateTierByIds(
   db: DbLike,
   ids: readonly number[],

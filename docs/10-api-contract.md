@@ -44,9 +44,11 @@ Shapes below in TS notation. `Metric = { numerator: number, denominator: number 
 ## Sequences
 | | |
 |---|---|
-| GET `/sequences` · POST `/sequences` · PATCH `/sequences/:id` | `Sequence = {id, name, stop_on_reply, stop_on_hard_bounce, stop_on_unsubscribe, steps: Step[]}`; `Step = {id, step_no, wait_days, in_thread, variants: Variant[]}`; `Variant = {id, label, subject_template, body_template, active}` — steps/variants are nested writes (replace-set semantics per save) |
+| GET `/sequences` · POST `/sequences` · PATCH `/sequences/:id` | `Sequence = {id, name, stop_on_reply, stop_on_hard_bounce, stop_on_unsubscribe, steps: Step[]}`; `Step = {id, step_no, wait_days, in_thread, variants: Variant[]}`; `Variant = {id, label, subject_template, body_template, active}` — steps/variants are nested writes (replace-set semantics per save¹) |
 | POST `/sequences/:id/preview` | `{lead_id, step_no, variant_id}` → `{subject, body, checks: {fatal[], warnings[], score, variations}}` — the Preview & Pre-send panel verbatim |
 | POST `/sequences/validate-template` | `{template}` → `{tokens, errors, variations}` — live builder validation |
+
+¹ Replace-set is literal only while the sequence has **zero sends**. Once sends exist (2026-07-23 operator decision): variants missing from a save are **retired** (`active=false`, rows kept — deleting would orphan variant analytics and punch holes in the content-hash recycle guard), and steps can be edited/added but not deleted or renumbered (violations → 422 `sequence_invalid`). Bespoke (Mode-1) variant rows are never touched by saves. Existing rows are matched by `id`; rows without `id` are inserted.
 
 ## Campaigns
 | | |

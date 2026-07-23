@@ -1,5 +1,5 @@
-import { and, asc, eq, inArray } from 'drizzle-orm';
-import type { DbLike } from '../client';
+import { and, asc, eq, inArray, sql } from 'drizzle-orm';
+import type { Db, DbLike } from '../client';
 import { campaigns, sequences, sequenceSteps, stepVariants } from '../schema';
 import type { SequenceDef } from '../../domain/sequence';
 
@@ -94,6 +94,9 @@ export async function getVariantById(
 
 export interface CreateSequenceInput {
   name: string;
+  stopOnReply?: boolean;
+  stopOnHardBounce?: boolean;
+  stopOnUnsubscribe?: boolean;
   steps: Array<{
     stepNo: number;
     waitDays: number;
@@ -111,9 +114,17 @@ export interface CreateSequenceInput {
 
 /** Insert a whole sequence tree; returns the new sequence id. (Tests + B6.5.) */
 export async function createSequence(db: DbLike, input: CreateSequenceInput): Promise<number> {
-  const [seq] = await db.insert(sequences).values({ name: input.name }).returning({
-    id: sequences.id,
-  });
+  const [seq] = await db
+    .insert(sequences)
+    .values({
+      name: input.name,
+      ...(input.stopOnReply !== undefined && { stopOnReply: input.stopOnReply }),
+      ...(input.stopOnHardBounce !== undefined && { stopOnHardBounce: input.stopOnHardBounce }),
+      ...(input.stopOnUnsubscribe !== undefined && { stopOnUnsubscribe: input.stopOnUnsubscribe }),
+    })
+    .returning({
+      id: sequences.id,
+    });
   const sequenceId = seq!.id;
   for (const step of input.steps) {
     const [stepRow] = await db
@@ -137,6 +148,269 @@ export async function createSequence(db: DbLike, input: CreateSequenceInput): Pr
     }
   }
   return sequenceId;
+}
+
+// ── B6.5 nested read/write ───────────────────────────────────────────────────
+
+export interface NestedSequence {
+  sequence: SequenceRow;
+  steps: Array<{
+    step: typeof sequenceSteps.$inferSelect;
+    /** Builder view: bespoke (Mode-1) variants are excluded — they're send
+     *  artifacts, not editable copy. Retired (active=false) variants stay. */
+    variants: StepVariantRow[];
+  }>;
+}
+
+export async function getSequenceNested(
+  db: DbLike,
+  sequenceId: number,
+): Promise<NestedSequence | null> {
+  const seqRows = await db.select().from(sequences).where(eq(sequences.id, sequenceId));
+  const sequence = seqRows[0];
+  if (!sequence) return null;
+  const steps = await db
+    .select()
+    .from(sequenceSteps)
+    .where(eq(sequenceSteps.sequenceId, sequenceId))
+    .orderBy(asc(sequenceSteps.stepNo));
+  const variants =
+    steps.length === 0
+      ? []
+      : await db
+          .select()
+          .from(stepVariants)
+          .where(
+            inArray(
+              stepVariants.stepId,
+              steps.map((s) => s.id),
+            ),
+          )
+          .orderBy(asc(stepVariants.label));
+  return {
+    sequence,
+    steps: steps.map((step) => ({
+      step,
+      variants: variants.filter((v) => v.stepId === step.id && v.attributes.bespoke !== true),
+    })),
+  };
+}
+
+export async function listSequencesNested(db: DbLike): Promise<NestedSequence[]> {
+  const seqRows = await db
+    .select()
+    .from(sequences)
+    .where(eq(sequences.archived, false))
+    .orderBy(asc(sequences.id));
+  const out: NestedSequence[] = [];
+  for (const s of seqRows) {
+    out.push((await getSequenceNested(db, s.id))!);
+  }
+  return out;
+}
+
+/** Any real send through this sequence? Gates the edit policy below. */
+export async function sequenceHasSends(db: DbLike, sequenceId: number): Promise<boolean> {
+  const rows = await db.execute(sql`
+    SELECT 1 FROM sent_messages sm
+    JOIN enrollments e ON e.id = sm.enrollment_id
+    JOIN campaigns c ON c.id = e.campaign_id
+    WHERE c.sequence_id = ${sequenceId}
+    LIMIT 1`);
+  return rows.rows.length > 0;
+}
+
+/** A save violated the after-sends edit policy → 422 sequence_invalid. */
+export class SequenceEditConflictError extends Error {
+  constructor(readonly details: string[]) {
+    super(`sequence edit conflicts with send history: ${details.join('; ')}`);
+    this.name = 'SequenceEditConflictError';
+  }
+}
+
+export interface SequenceSaveInput {
+  name: string;
+  stopOnReply: boolean;
+  stopOnHardBounce: boolean;
+  stopOnUnsubscribe: boolean;
+  steps: Array<{
+    id?: number;
+    stepNo: number;
+    waitDays: number;
+    inThread: boolean;
+    variants: Array<{
+      id?: number;
+      label: string;
+      subjectTemplate: string;
+      bodyTemplate: string;
+      /** Recomputed by the caller via render/hash on every save (decision Q). */
+      contentHash: string;
+      active: boolean;
+    }>;
+  }>;
+}
+
+/**
+ * PATCH /sequences/:id — replace-set semantics per save (docs/10), with the
+ * 2026-07-23 edit policy: literal replace only while the sequence has ZERO
+ * sends; once sends exist, steps can be edited/added but not deleted or
+ * renumbered, and variants missing from the save are RETIRED (active=false,
+ * rows kept) instead of deleted — deleting would orphan variant analytics and
+ * punch holes in the content-hash recycle guard. Bespoke (Mode-1) rows are
+ * never touched by saves.
+ */
+export async function updateSequenceReplaceSet(
+  db: Db,
+  sequenceId: number,
+  input: SequenceSaveInput,
+  opts: { retireOnly: boolean },
+): Promise<void> {
+  await db.transaction(async (tx) => {
+    await tx
+      .update(sequences)
+      .set({
+        name: input.name,
+        stopOnReply: input.stopOnReply,
+        stopOnHardBounce: input.stopOnHardBounce,
+        stopOnUnsubscribe: input.stopOnUnsubscribe,
+      })
+      .where(eq(sequences.id, sequenceId));
+
+    const existingSteps = await tx
+      .select()
+      .from(sequenceSteps)
+      .where(eq(sequenceSteps.sequenceId, sequenceId));
+    const existingVariants =
+      existingSteps.length === 0
+        ? []
+        : await tx
+            .select()
+            .from(stepVariants)
+            .where(
+              inArray(
+                stepVariants.stepId,
+                existingSteps.map((s) => s.id),
+              ),
+            );
+
+    const stepById = new Map(existingSteps.map((s) => [s.id, s]));
+    const inputStepIds = new Set(input.steps.flatMap((s) => (s.id === undefined ? [] : [s.id])));
+    const conflicts: string[] = [];
+
+    for (const s of input.steps) {
+      if (s.id !== undefined && !stepById.has(s.id)) {
+        conflicts.push(`step id ${s.id} does not belong to sequence ${sequenceId}`);
+      }
+      if (opts.retireOnly && s.id !== undefined && stepById.get(s.id)!.stepNo !== s.stepNo) {
+        conflicts.push(`step ${stepById.get(s.id)!.stepNo} cannot be renumbered after sends`);
+      }
+    }
+    if (opts.retireOnly) {
+      for (const s of existingSteps) {
+        if (!inputStepIds.has(s.id)) {
+          conflicts.push(`step ${s.stepNo} cannot be deleted after sends`);
+        }
+      }
+    }
+    if (conflicts.length > 0) throw new SequenceEditConflictError(conflicts);
+
+    // literal mode: drop steps missing from the save (cascade takes variants)
+    if (!opts.retireOnly) {
+      const missing = existingSteps.filter((s) => !inputStepIds.has(s.id));
+      if (missing.length > 0) {
+        await tx.delete(sequenceSteps).where(
+          inArray(
+            sequenceSteps.id,
+            missing.map((s) => s.id),
+          ),
+        );
+      }
+    }
+
+    for (const s of input.steps) {
+      let stepId = s.id;
+      if (stepId === undefined) {
+        const [row] = await tx
+          .insert(sequenceSteps)
+          .values({ sequenceId, stepNo: s.stepNo, waitDays: s.waitDays, inThread: s.inThread })
+          .returning({ id: sequenceSteps.id });
+        stepId = row!.id;
+      } else {
+        await tx
+          .update(sequenceSteps)
+          .set({ stepNo: s.stepNo, waitDays: s.waitDays, inThread: s.inThread })
+          .where(eq(sequenceSteps.id, stepId));
+      }
+
+      const existingHere = existingVariants.filter(
+        (v) => v.stepId === stepId && v.attributes.bespoke !== true,
+      );
+      const inputVariantIds = new Set(
+        s.variants.flatMap((v) => (v.id === undefined ? [] : [v.id])),
+      );
+
+      for (const v of s.variants) {
+        if (v.id === undefined) {
+          await tx.insert(stepVariants).values({
+            stepId,
+            label: v.label,
+            subjectTemplate: v.subjectTemplate,
+            bodyTemplate: v.bodyTemplate,
+            contentHash: v.contentHash,
+            active: v.active,
+          });
+        } else {
+          if (!existingHere.some((e) => e.id === v.id)) {
+            throw new SequenceEditConflictError([
+              `variant id ${v.id} does not belong to step ${s.stepNo}`,
+            ]);
+          }
+          await tx
+            .update(stepVariants)
+            .set({
+              label: v.label,
+              subjectTemplate: v.subjectTemplate,
+              bodyTemplate: v.bodyTemplate,
+              contentHash: v.contentHash,
+              active: v.active,
+            })
+            .where(eq(stepVariants.id, v.id));
+        }
+      }
+
+      const dropped = existingHere.filter((e) => !inputVariantIds.has(e.id));
+      if (dropped.length > 0) {
+        if (opts.retireOnly) {
+          await tx
+            .update(stepVariants)
+            .set({ active: false })
+            .where(
+              inArray(
+                stepVariants.id,
+                dropped.map((d) => d.id),
+              ),
+            );
+        } else {
+          await tx.delete(stepVariants).where(
+            inArray(
+              stepVariants.id,
+              dropped.map((d) => d.id),
+            ),
+          );
+        }
+      }
+    }
+  });
+}
+
+/** POST /step-variants/:id/deactivate ("route all to B") + retire path. */
+export async function deactivateVariant(db: DbLike, variantId: number): Promise<boolean> {
+  const rows = await db
+    .update(stepVariants)
+    .set({ active: false })
+    .where(eq(stepVariants.id, variantId))
+    .returning({ id: stepVariants.id });
+  return rows.length > 0;
 }
 
 /**
