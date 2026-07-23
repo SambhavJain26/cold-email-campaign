@@ -28,6 +28,8 @@ export const overviewResponseSchema = z
   })
   .strict();
 
+export type OverviewResponse = z.infer<typeof overviewResponseSchema>;
+
 export const variantsQuerySchema = z.object({
   sequence_id: z.coerce.number().int().positive(),
   step_no: z.coerce.number().int().min(1).default(1),

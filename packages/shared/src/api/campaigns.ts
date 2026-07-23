@@ -64,6 +64,8 @@ export const capacityResponseSchema = z
   })
   .strict();
 
+export type CapacityResponse = z.infer<typeof capacityResponseSchema>;
+
 export const enrollBodySchema = z.union([
   z.object({ count: z.number().int().min(1) }).strict(),
   z
@@ -92,6 +94,8 @@ export const outcomesResponseSchema = z
     total: z.number().int(),
   })
   .strict();
+
+export type OutcomesResponse = z.infer<typeof outcomesResponseSchema>;
 
 export const recycleBodySchema = z
   .object({ source_campaign_id: z.number().int().positive() })

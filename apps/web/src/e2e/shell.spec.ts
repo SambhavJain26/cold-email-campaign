@@ -56,8 +56,11 @@ test('alerts bell: failure fixtures show a badge; ack decrements it', async ({ p
   await expect(badge).toHaveText('3');
 
   await page.getByRole('button', { name: 'Alerts' }).click();
-  await expect(page.getByText('Mailbox 3 authentication failed')).toBeVisible();
-  await expect(page.getByText(/never bursts/)).toBeVisible(); // catch-up copy
+  // Scope to the popover: F5's catch-up BANNER carries the same never-burst copy
+  // on this screen, so an unscoped match trips strict mode.
+  const popover = page.getByRole('dialog');
+  await expect(popover.getByText('Mailbox 3 authentication failed')).toBeVisible();
+  await expect(popover.getByText(/never bursts/)).toBeVisible(); // catch-up copy
 
   await page.getByRole('button', { name: 'Ack' }).first().click();
   await expect(badge).toHaveText('2');

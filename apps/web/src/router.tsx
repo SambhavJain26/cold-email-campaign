@@ -11,6 +11,7 @@ import MailboxesPage from '@/features/mailboxes/page';
 import SequencesPage from '@/features/sequences/page';
 import SequenceBuilderPage from '@/features/sequences/builder-page';
 import CampaignsPage from '@/features/campaigns/page';
+import CampaignDetailPage from '@/features/campaigns/detail-page';
 import UniboxPage from '@/features/unibox/page';
 import AnalyticsPage from '@/features/analytics/page';
 import ColdStoragePage from '@/features/coldstorage/page';
@@ -33,7 +34,7 @@ export const router = createBrowserRouter([
           { path: '/sequences', element: <SequencesPage /> },
           { path: '/sequences/:id', element: <SequenceBuilderPage /> },
           { path: '/campaigns', element: <CampaignsPage /> },
-          { path: '/campaigns/:id', element: <CampaignsPage /> },
+          { path: '/campaigns/:id', element: <CampaignDetailPage /> },
           { path: '/unibox', element: <UniboxPage /> },
           { path: '/analytics', element: <AnalyticsPage /> },
           { path: '/cold-storage', element: <ColdStoragePage /> },
