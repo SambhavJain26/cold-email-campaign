@@ -1,0 +1,231 @@
+import { useState } from 'react';
+import { AlertTriangle, CheckCircle2, Lock, XCircle } from 'lucide-react';
+import { Link } from 'react-router-dom';
+import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { useLeads } from '@/api/queries/leads';
+import { usePreviewSequence } from '@/api/mutations/sequences';
+import { useDebounced } from '@/lib/use-debounced';
+import type { DraftVariant } from './draft';
+
+export interface PreviewTarget {
+  stepNo: number;
+  variant: DraftVariant;
+}
+
+const FOOTER_SEPARATOR = '\n\n---\n';
+
+/** The engine appends the CAN-SPAM footer after all expansion (docs/08 §4) - split it
+ *  back out so the panel can show it as the locked block the operator cannot edit. */
+export function splitFooter(body: string): { body: string; footer: string | null } {
+  const index = body.lastIndexOf(FOOTER_SEPARATOR);
+  if (index === -1) return { body, footer: null };
+  return { body: body.slice(0, index), footer: body.slice(index + FOOTER_SEPARATOR.length) };
+}
+
+/** F4.4 - Preview & pre-send panel (docs/12 §5): lead picker → POST preview →
+ *  rendered output with the locked footer block + the checklist verbatim. */
+export function PreviewPanel({
+  sequenceId,
+  target,
+  dirty,
+}: {
+  sequenceId: number | null;
+  target: PreviewTarget | null;
+  dirty: boolean;
+}) {
+  const [search, setSearch] = useState('');
+  const [leadId, setLeadId] = useState<number | null>(null);
+  const debouncedSearch = useDebounced(search, 300);
+  const leads = useLeads({ per_page: 8, q: debouncedSearch === '' ? undefined : debouncedSearch });
+  const preview = usePreviewSequence(sequenceId ?? 0);
+
+  const selectedLead = leads.data?.items.find((lead) => lead.id === leadId);
+  const canPreview =
+    sequenceId !== null && target !== null && target.variant.id !== undefined && leadId !== null;
+
+  const rendered = preview.data ? splitFooter(preview.data.body) : null;
+  const checks = preview.data?.checks;
+
+  return (
+    <aside
+      className="space-y-3 rounded-lg border border-border p-4"
+      aria-label="Preview and pre-send checks"
+      data-testid="preview-panel"
+    >
+      <div className="flex items-center justify-between">
+        <h2 className="text-sm font-semibold">Preview &amp; pre-send</h2>
+        {target && (
+          <span className="text-xs text-muted-foreground">
+            Step {target.stepNo} · variant {target.variant.label}
+          </span>
+        )}
+      </div>
+
+      {sequenceId === null ? (
+        <p className="text-xs text-muted-foreground">
+          Save the sequence first - the preview renders through the real engine, so it needs saved
+          templates.
+        </p>
+      ) : (
+        <>
+          <div className="space-y-1.5">
+            <Label htmlFor="preview-lead" className="text-xs">
+              Lead
+            </Label>
+            <Input
+              id="preview-lead"
+              className="h-8"
+              placeholder="Search leads by email, name, company"
+              value={search}
+              onChange={(event) => setSearch(event.target.value)}
+            />
+            <div className="max-h-40 overflow-y-auto rounded-md border border-border">
+              {(leads.data?.items ?? []).map((lead) => (
+                <button
+                  key={lead.id}
+                  type="button"
+                  onClick={() => setLeadId(lead.id)}
+                  className={`flex w-full flex-col items-start px-2 py-1 text-left text-xs hover:bg-accent ${
+                    lead.id === leadId ? 'bg-accent' : ''
+                  }`}
+                >
+                  <span className="font-medium">{lead.email}</span>
+                  <span className="text-muted-foreground">
+                    {[lead.first_name, lead.company].filter(Boolean).join(' · ') || '-'}
+                  </span>
+                </button>
+              ))}
+              {leads.data?.items.length === 0 && (
+                <p className="px-2 py-2 text-xs text-muted-foreground">No leads match.</p>
+              )}
+            </div>
+          </div>
+
+          {dirty && (
+            <p className="text-[11px] text-warning">
+              Unsaved edits are not previewed - the render runs against the saved templates.
+            </p>
+          )}
+
+          <Button
+            size="sm"
+            className="w-full"
+            disabled={!canPreview || preview.isPending}
+            onClick={() => {
+              if (!canPreview || target === null || leadId === null) return;
+              preview.mutate({
+                lead_id: leadId,
+                step_no: target.stepNo,
+                variant_id: target.variant.id!,
+              });
+            }}
+          >
+            {preview.isPending ? 'Rendering…' : 'Render preview'}
+          </Button>
+          {!canPreview && (
+            <p className="text-[11px] text-muted-foreground">
+              {target === null
+                ? 'Pick a variant with the Preview button on a step card.'
+                : target.variant.id === undefined
+                  ? 'This variant is new - save the sequence before previewing it.'
+                  : 'Pick a lead to render against.'}
+            </p>
+          )}
+
+          {preview.data && (
+            <div className="space-y-3" data-testid="preview-result">
+              {selectedLead && (
+                <p className="text-[11px] text-muted-foreground">
+                  Rendered for {selectedLead.email}
+                </p>
+              )}
+              <div className="space-y-1">
+                <p className="text-[11px] text-muted-foreground">Subject</p>
+                <p
+                  className="rounded-md border border-border px-2 py-1 text-xs"
+                  data-testid="preview-subject"
+                >
+                  {preview.data.subject}
+                </p>
+              </div>
+              <div className="space-y-1">
+                <p className="text-[11px] text-muted-foreground">Body</p>
+                <pre
+                  className="rounded-md border border-border px-2 py-1 font-mono text-xs whitespace-pre-wrap"
+                  data-testid="preview-body"
+                >
+                  {rendered?.body}
+                </pre>
+                {rendered?.footer !== null && rendered !== null && (
+                  <div
+                    className="rounded-md border border-dashed border-border bg-muted/40 px-2 py-1"
+                    data-testid="preview-footer"
+                  >
+                    <p className="flex items-center gap-1 text-[11px] text-muted-foreground">
+                      <Lock className="size-3" aria-hidden /> Appended to every send -{' '}
+                      <Link to="/settings" className="underline">
+                        edit in Compliance settings
+                      </Link>
+                    </p>
+                    <pre className="font-mono text-xs whitespace-pre-wrap">{rendered.footer}</pre>
+                  </div>
+                )}
+              </div>
+
+              {checks && (
+                <div className="space-y-1" data-testid="preview-checks">
+                  <div className="flex items-center gap-2">
+                    <Badge
+                      variant={
+                        checks.fatal.length > 0
+                          ? 'destructive'
+                          : checks.warnings.length > 0
+                            ? 'secondary'
+                            : 'default'
+                      }
+                      className="tabular-nums"
+                      data-testid="preview-score"
+                    >
+                      score {checks.score.toFixed(1)} / 10
+                    </Badge>
+                    <span className="text-[11px] text-muted-foreground tabular-nums">
+                      {checks.variations} variations
+                    </span>
+                  </div>
+                  {checks.fatal.map((item) => (
+                    <p
+                      key={item.id}
+                      role="alert"
+                      className="flex items-start gap-1 text-[11px] text-destructive"
+                    >
+                      <XCircle className="mt-px size-3 shrink-0" aria-hidden /> {item.message}
+                    </p>
+                  ))}
+                  {checks.warnings.map((item) => (
+                    <p key={item.id} className="flex items-start gap-1 text-[11px] text-warning">
+                      <AlertTriangle className="mt-px size-3 shrink-0" aria-hidden /> {item.message}
+                    </p>
+                  ))}
+                  {checks.fatal.length === 0 && checks.warnings.length === 0 && (
+                    <p className="flex items-center gap-1 text-[11px] text-success">
+                      <CheckCircle2 className="size-3" aria-hidden /> All pre-send checks pass.
+                    </p>
+                  )}
+                  {checks.fatal.length > 0 && (
+                    <p className="text-[11px] text-destructive">
+                      Fatal checks block the send - this variant will not go out until they are
+                      fixed.
+                    </p>
+                  )}
+                </div>
+              )}
+            </div>
+          )}
+        </>
+      )}
+    </aside>
+  );
+}

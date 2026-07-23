@@ -1,10 +1,5 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query';
-import {
-  previewResponseSchema,
-  sequenceSchema,
-  validateTemplateResponseSchema,
-  type SequenceWriteBody,
-} from '@coldemail/shared';
+import { previewResponseSchema, sequenceSchema, type SequenceWriteBody } from '@coldemail/shared';
 import { apiFetch } from '../client';
 
 export function useCreateSequence() {
@@ -32,17 +27,6 @@ export function usePreviewSequence(sequenceId: number) {
       apiFetch(`/sequences/${sequenceId}/preview`, previewResponseSchema, {
         method: 'POST',
         body,
-      }),
-  });
-}
-
-/** POST-shaped read: live validation chips in the builder (debounced by the caller). */
-export function useValidateTemplate() {
-  return useMutation({
-    mutationFn: (template: string) =>
-      apiFetch('/sequences/validate-template', validateTemplateResponseSchema, {
-        method: 'POST',
-        body: { template },
       }),
   });
 }

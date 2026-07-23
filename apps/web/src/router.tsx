@@ -9,6 +9,7 @@ import LeadsPage from '@/features/leads/page';
 import LeadDetailPage from '@/features/leads/detail-page';
 import MailboxesPage from '@/features/mailboxes/page';
 import SequencesPage from '@/features/sequences/page';
+import SequenceBuilderPage from '@/features/sequences/builder-page';
 import CampaignsPage from '@/features/campaigns/page';
 import UniboxPage from '@/features/unibox/page';
 import AnalyticsPage from '@/features/analytics/page';
@@ -30,7 +31,7 @@ export const router = createBrowserRouter([
           { path: '/leads/:id', element: <LeadDetailPage /> },
           { path: '/mailboxes', element: <MailboxesPage /> },
           { path: '/sequences', element: <SequencesPage /> },
-          { path: '/sequences/:id', element: <SequencesPage /> },
+          { path: '/sequences/:id', element: <SequenceBuilderPage /> },
           { path: '/campaigns', element: <CampaignsPage /> },
           { path: '/campaigns/:id', element: <CampaignsPage /> },
           { path: '/unibox', element: <UniboxPage /> },
