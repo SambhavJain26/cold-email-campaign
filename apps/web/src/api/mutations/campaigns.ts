@@ -13,7 +13,7 @@ export function useCreateCampaign() {
       tier_effort_config?: unknown;
       ramp_config?: unknown;
     }) => apiFetch('/campaigns', campaignSchema, { method: 'POST', body }),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['campaigns'] }),
+    onSuccess: () => void qc.invalidateQueries({ queryKey: ['campaigns'] }),
   });
 }
 
@@ -27,7 +27,7 @@ export function usePatchCampaign() {
       id: number;
       body: { name?: string; status?: 'active' | 'paused' | 'archived' };
     }) => apiFetch(`/campaigns/${id}`, campaignSchema, { method: 'PATCH', body }),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['campaigns'] }),
+    onSuccess: () => void qc.invalidateQueries({ queryKey: ['campaigns'] }),
   });
 }
 

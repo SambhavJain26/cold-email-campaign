@@ -13,7 +13,7 @@ export function usePatchLead() {
   return useMutation({
     mutationFn: ({ id, body }: { id: number; body: PatchLeadBody }) =>
       apiFetch(`/leads/${id}`, leadSchema, { method: 'PATCH', body }),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['leads'] }),
+    onSuccess: () => void qc.invalidateQueries({ queryKey: ['leads'] }),
   });
 }
 
@@ -22,7 +22,7 @@ export function useBulkTier() {
   return useMutation({
     mutationFn: (body: BulkTierBody) =>
       apiFetch('/leads/bulk-tier', bulkTierResponseSchema, { method: 'POST', body }),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['leads'] }),
+    onSuccess: () => void qc.invalidateQueries({ queryKey: ['leads'] }),
   });
 }
 

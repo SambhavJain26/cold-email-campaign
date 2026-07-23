@@ -8,9 +8,13 @@ import {
 } from '@coldemail/shared';
 import { apiFetch } from '../client';
 
+// Fire-and-forget: returning the invalidation promise from a mutation-level
+// onSuccess makes React Query AWAIT the refetch before per-call callbacks -
+// if the refetch unmounts the calling component (e.g. a failure panel that
+// disappears on success), its mutate() callbacks are silently skipped.
 function useInvalidateMailboxes() {
   const qc = useQueryClient();
-  return () => qc.invalidateQueries({ queryKey: ['mailboxes'] });
+  return () => void qc.invalidateQueries({ queryKey: ['mailboxes'] });
 }
 
 export function useCreateMailbox() {

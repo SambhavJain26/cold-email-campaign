@@ -7,6 +7,6 @@ export function useAckAlert() {
   return useMutation({
     mutationFn: (alertId: number) =>
       apiFetch(`/alerts/${alertId}/ack`, okResponseSchema, { method: 'POST' }),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['alerts'] }),
+    onSuccess: () => void qc.invalidateQueries({ queryKey: ['alerts'] }),
   });
 }

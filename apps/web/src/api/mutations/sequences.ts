@@ -12,7 +12,7 @@ export function useCreateSequence() {
   return useMutation({
     mutationFn: (body: SequenceWriteBody) =>
       apiFetch('/sequences', sequenceSchema, { method: 'POST', body }),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['sequences'] }),
+    onSuccess: () => void qc.invalidateQueries({ queryKey: ['sequences'] }),
   });
 }
 
@@ -21,7 +21,7 @@ export function useUpdateSequence() {
   return useMutation({
     mutationFn: ({ id, body }: { id: number; body: SequenceWriteBody }) =>
       apiFetch(`/sequences/${id}`, sequenceSchema, { method: 'PATCH', body }),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['sequences'] }),
+    onSuccess: () => void qc.invalidateQueries({ queryKey: ['sequences'] }),
   });
 }
 

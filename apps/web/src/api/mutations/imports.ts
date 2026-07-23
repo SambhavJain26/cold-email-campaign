@@ -15,7 +15,7 @@ export function useUploadImport() {
       form.append('file', file);
       return apiFetch('/imports', importPreviewResponseSchema, { method: 'POST', body: form });
     },
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['imports'] }),
+    onSuccess: () => void qc.invalidateQueries({ queryKey: ['imports'] }),
   });
 }
 
