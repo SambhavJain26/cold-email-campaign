@@ -15,7 +15,7 @@ describe('parseEnv', () => {
     if (!r.success) throw new Error(r.issues.join('; '));
     expect(r.config.MAIL_TRANSPORT).toBe('mock');
     expect(r.config.ROLE).toBe('all');
-    expect(r.config.PORT).toBe(3000);
+    expect(r.config.PORT).toBe(3001);
     expect(r.config.HOST).toBe('127.0.0.1');
     expect(r.config.NODE_ENV).toBe('production');
   });
