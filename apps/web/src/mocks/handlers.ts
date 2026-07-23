@@ -146,6 +146,82 @@ function scanTemplate(template: string) {
 
 const mockChecks = { fatal: [], warnings: [], score: 10, variations: 4 };
 
+/** Parse errors block the save the way B6.5 does: 422 sequence_invalid with the
+ *  per step/variant/field errors the builder maps onto its tabs (docs/12 §5). */
+function sequenceTemplateErrors(
+  body: import('@coldemail/shared').SequenceWriteBody,
+): Array<{ step_no: number; label: string; field: string; message: string }> {
+  return body.steps.flatMap((step) =>
+    step.variants.flatMap((variant) =>
+      (
+        [
+          ['subject_template', variant.subject_template],
+          ['body_template', variant.body_template],
+        ] as const
+      ).flatMap(([field, source]) =>
+        scanTemplate(source).errors.map((error) => ({
+          step_no: step.step_no,
+          label: variant.label,
+          field,
+          message: error.message,
+        })),
+      ),
+    ),
+  );
+}
+
+const SPAM_PHRASES = ['free', 'act now', 'limited time', 'guarantee', 'risk free', 'click here'];
+
+/** Mirrors the load-bearing half of docs/08 §5 so the builder's checklist behaves
+ *  offline the way the real engine does — notably URLs are FATAL in step 1. */
+function mockRenderChecks(
+  stepNo: number,
+  subject: string,
+  body: string,
+  compliance: { physical_address: string; optout_text: string },
+) {
+  const fatal: Array<{ id: string; message: string }> = [];
+  const warnings: Array<{ id: string; message: string }> = [];
+  const content = `${subject}\n${body}`;
+
+  for (const source of [subject, body]) {
+    for (const error of scanTemplate(source).errors) {
+      fatal.push({ id: 'template_parse', message: `${error.message} (offset ${error.offset})` });
+    }
+  }
+  if (/(https?:\/\/|www\.)/i.test(content)) {
+    if (stepNo === 1) fatal.push({ id: 'url_in_step1', message: 'step 1 must not contain URLs' });
+    else warnings.push({ id: 'url', message: 'follow-up contains a URL' });
+  }
+  if (compliance.physical_address.trim() === '' || compliance.optout_text.trim() === '') {
+    fatal.push({
+      id: 'footer',
+      message: 'compliance footer needs a physical address and opt-out text',
+    });
+  }
+  if (/<\/?[a-z][^>]*>/i.test(content)) {
+    fatal.push({ id: 'html', message: 'HTML tags / image markup are not allowed' });
+  }
+  if (subject.length > 60) {
+    warnings.push({
+      id: 'subject_length',
+      message: `subject may reach ${subject.length} chars (max 60)`,
+    });
+  }
+  const words = body.split(/\s+/).filter((w) => w !== '').length;
+  if (words < 40 || words > 180) {
+    warnings.push({ id: 'body_length', message: `body is ${words} words (want 40–180)` });
+  }
+  const lower = content.toLowerCase();
+  for (const phrase of SPAM_PHRASES) {
+    if (lower.includes(phrase)) {
+      warnings.push({ id: `spam:${phrase}`, message: `spam trigger: "${phrase}"` });
+    }
+  }
+  const score = Math.max(0, Math.min(10, 10 - 2 * fatal.length - 0.4 * warnings.length));
+  return { fatal, warnings, score: Math.round(score * 10) / 10 };
+}
+
 export const handlers: RequestHandler[] = [
   // ── auth ──────────────────────────────────────────────────────────────────
   http.post(`${BASE}/auth/login`, async ({ request }) => {
@@ -406,6 +482,11 @@ export const handlers: RequestHandler[] = [
     authed(async ({ request }) => {
       const body = await parseBody(request, sequenceWriteBodySchema);
       if (body instanceof Response) return body;
+      const templateErrors = sequenceTemplateErrors(body);
+      if (templateErrors.length > 0)
+        return err('sequence_invalid', 'template errors block the save', 422, {
+          errors: templateErrors,
+        });
       const sequence: SequenceDto = {
         id: db.nextId++,
         name: body.name,
@@ -437,6 +518,11 @@ export const handlers: RequestHandler[] = [
       if (index === -1) return notFound('sequence');
       const body = await parseBody(request, sequenceWriteBodySchema);
       if (body instanceof Response) return body;
+      const templateErrors = sequenceTemplateErrors(body);
+      if (templateErrors.length > 0)
+        return err('sequence_invalid', 'template errors block the save', 422, {
+          errors: templateErrors,
+        });
       const existing = db.sequences[index]!;
       const sequence: SequenceDto = {
         id: existing.id,
@@ -476,14 +562,26 @@ export const handlers: RequestHandler[] = [
         .find((v) => v.id === body.variant_id);
       if (!variant) return notFound('variant');
       const first = lead.first_name ?? 'there';
+      const expand = (template: string) =>
+        template
+          .replace(/\{\{RANDOM\|([^}]*)\}\}/g, (_m, options: string) => options.split('|')[0] ?? '')
+          .replace(/\{\{first_name[^}]*\}\}/g, first)
+          .replace(/\{\{company[^}]*\}\}/g, lead.company ?? 'your team')
+          .replace(/\{\{[^}]*\}\}/g, lead.city ?? 'your market');
+      const subject = expand(variant.subject_template);
+      const bodyPreFooter = expand(variant.body_template);
+      // The real engine appends the footer after all expansion (docs/08 §4) —
+      // separator included so the panel can split it back out.
+      const footer = `\n\n---\n${db.compliance.physical_address}\n${db.compliance.optout_text}`;
       return HttpResponse.json({
-        subject: variant.subject_template.replace(/\{\{[^}]*\}\}/g, lead.company ?? first),
-        body:
-          variant.body_template
-            .replace(/\{\{first_name[^}]*\}\}/g, first)
-            .replace(/\{\{[^}]*\}\}/g, lead.city ?? 'your market') +
-          `\n\n—\n${db.compliance.physical_address}\n${db.compliance.optout_text}`,
-        checks: mockChecks,
+        subject,
+        body: bodyPreFooter + footer,
+        checks: {
+          ...mockRenderChecks(body.step_no, subject, bodyPreFooter, db.compliance),
+          variations:
+            scanTemplate(variant.subject_template).variations *
+            scanTemplate(variant.body_template).variations,
+        },
       });
     }),
   ),
