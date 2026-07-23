@@ -15,8 +15,8 @@ import {
   insertEnrollments,
 } from '../db/repos/enrollmentsRepo';
 import { getCampaign, rampOf, setRecycledFrom, tierEffortOf } from '../db/repos/campaignsRepo';
-import { selectEligibleLeads, type EligibleLead } from '../db/repos/leadsRepo';
-import { hashesReceivedByLeads } from '../db/repos/sentMessagesRepo';
+import { leadsByIds, selectEligibleLeads, type EligibleLead } from '../db/repos/leadsRepo';
+import { hashesReceivedByLeads, leadsWithHashConflict } from '../db/repos/sentMessagesRepo';
 import { allContentHashes, type SequenceDef } from '../domain/sequence';
 import { startOfLocalDay } from '../scheduler/window';
 import { buildEvent } from '../domain/events';
@@ -72,10 +72,31 @@ export async function capacityToday(deps: EnrollmentDeps, campaignId: number): P
   };
 }
 
+/** count > suggested without force (docs/10: 409 capacity_exceeded). */
+export class CapacityExceededError extends Error {
+  readonly code = 'capacity_exceeded';
+  constructor(
+    readonly requested: number,
+    readonly suggested: number,
+  ) {
+    super(
+      `enroll count ${requested} exceeds suggested capacity ${suggested} (use force to override)`,
+    );
+    this.name = 'CapacityExceededError';
+  }
+}
+
+export interface SkippedBucket {
+  reason: string;
+  count: number;
+}
+
 export interface EnrollResult {
   enrolled: number;
   leadIds: number[];
   enrollmentIds: number[];
+  /** docs/10 enroll response: why candidates were passed over. */
+  skipped: SkippedBucket[];
 }
 
 /**
@@ -97,9 +118,7 @@ export async function enroll(
   if (!opts.force) {
     const cap = await capacityToday(deps, campaignId);
     if (count > cap.suggested) {
-      throw new Error(
-        `enroll count ${count} exceeds suggested capacity ${cap.suggested} (use force to override)`,
-      );
+      throw new CapacityExceededError(count, cap.suggested);
     }
   }
 
@@ -114,7 +133,63 @@ export async function enroll(
     count,
     opts.tier,
   );
-  return enrollLeads(deps, campaignId, eligible, now);
+  const result = await enrollLeads(deps, campaignId, eligible, now);
+  if (eligible.length < count) {
+    result.skipped.push({ reason: 'insufficient_eligible', count: count - eligible.length });
+  }
+  return result;
+}
+
+/**
+ * Explicit-ids enrollment (docs/10 `{lead_ids, force?}`): the deliberate-act
+ * path — nurture leads ARE allowed here (docs/09 §4; bulk paths exclude
+ * them). Every ineligible id is reported in `skipped` by reason instead of
+ * silently dropped.
+ */
+export async function enrollByIds(
+  deps: EnrollmentDeps,
+  campaignId: number,
+  leadIds: number[],
+  opts: { force?: boolean } = {},
+): Promise<EnrollResult> {
+  const { db, clock, sequences } = deps;
+  const now = clock.now();
+
+  if (!opts.force) {
+    const cap = await capacityToday(deps, campaignId);
+    if (leadIds.length > cap.suggested) {
+      throw new CapacityExceededError(leadIds.length, cap.suggested);
+    }
+  }
+
+  const campaign = await getCampaign(db, campaignId);
+  if (!campaign) throw new Error(`campaign ${campaignId} not found`);
+  const seq = await sequences.sequenceFor(campaignId);
+
+  const unique = [...new Set(leadIds)];
+  const rows = await leadsByIds(db, unique);
+  const byId = new Map(rows.map((r) => [r.id, r]));
+  const already = await enrolledLeadIdsIn(db, campaignId, unique);
+  const conflicted = await leadsWithHashConflict(db, unique, allContentHashes(seq));
+
+  const skippedCounts = new Map<string, number>();
+  const skip = (reason: string) => skippedCounts.set(reason, (skippedCounts.get(reason) ?? 0) + 1);
+
+  const eligible: EligibleLead[] = [];
+  for (const id of unique) {
+    const lead = byId.get(id);
+    if (!lead) skip('not_found');
+    else if (lead.isSuppressed) skip('suppressed');
+    else if (already.has(id)) skip('already_enrolled');
+    else if (conflicted.has(id)) skip('content_hash_conflict');
+    else eligible.push({ id: lead.id, tier: lead.tier });
+  }
+
+  const result = await enrollLeads(deps, campaignId, eligible, now);
+  result.skipped.push(
+    ...[...skippedCounts.entries()].map(([reason, count]) => ({ reason, count })),
+  );
+  return result;
 }
 
 /** Shared tail of enroll + recycle: enrollment rows + `enrolled` events + next_send_at=now. */
@@ -125,7 +200,7 @@ async function enrollLeads(
   now: Date,
 ): Promise<EnrollResult> {
   const { db, store } = deps;
-  if (eligible.length === 0) return { enrolled: 0, leadIds: [], enrollmentIds: [] };
+  if (eligible.length === 0) return { enrolled: 0, leadIds: [], enrollmentIds: [], skipped: [] };
 
   const campaign = await getCampaign(db, campaignId);
   const effort = tierEffortOf(campaign!);
@@ -155,7 +230,12 @@ async function enrollLeads(
     { patches: enrollmentIds.map((id) => ({ enrollmentId: id, nextSendAt: now })) },
   );
 
-  return { enrolled: eligible.length, leadIds: eligible.map((l) => l.id), enrollmentIds };
+  return {
+    enrolled: eligible.length,
+    leadIds: eligible.map((l) => l.id),
+    enrollmentIds,
+    skipped: [],
+  };
 }
 
 // ── Cold storage & recycling (B5.7, docs/09 §6, walkthrough Stage 9) ────────
@@ -227,7 +307,7 @@ export async function recycle(
     rested.map((s) => s.leadId),
   );
   const candidates = rested.filter((s) => !already.has(s.leadId));
-  if (candidates.length === 0) return { enrolled: 0, leadIds: [], enrollmentIds: [] };
+  if (candidates.length === 0) return { enrolled: 0, leadIds: [], enrollmentIds: [], skipped: [] };
 
   await assertNoHashConflict(
     db,

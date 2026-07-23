@@ -14,6 +14,8 @@ import { alertsRoutes } from './alerts';
 import { leadsRoutes } from './leads';
 import { importsRoutes } from './imports';
 import { sequencesRoutes } from './sequences';
+import { campaignsRoutes } from './campaigns';
+import { uniboxRoutes } from './unibox';
 
 const pkg = createRequire(import.meta.url)('../../package.json') as { version: string };
 
@@ -57,6 +59,8 @@ export function buildServer({ logger, services }: ServerDeps): FastifyInstance {
       await leadsRoutes(api, services);
       await importsRoutes(api, services);
       await sequencesRoutes(api, services);
+      await campaignsRoutes(api, services);
+      await uniboxRoutes(api, services);
     },
     { prefix: '/api/v1' },
   );

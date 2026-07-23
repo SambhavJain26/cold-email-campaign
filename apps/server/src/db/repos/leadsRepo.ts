@@ -16,6 +16,14 @@ export async function getLeadById(db: DbLike, id: number): Promise<LeadRow | und
   return rows[0];
 }
 
+export async function leadsByIds(db: DbLike, ids: readonly number[]): Promise<LeadRow[]> {
+  if (ids.length === 0) return [];
+  return db
+    .select()
+    .from(leads)
+    .where(inArray(leads.id, [...ids]));
+}
+
 export interface NewImportedLead {
   email: string; // normalized (decision L)
   firstName?: string | null;

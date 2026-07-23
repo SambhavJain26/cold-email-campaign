@@ -1,6 +1,8 @@
 import type { FastifyError, FastifyInstance } from 'fastify';
 import { CsvContractError, ImportTooLargeError } from '../../ingest/parse';
 import { SequenceEditConflictError } from '../../db/repos/sequencesRepo';
+import { CapacityExceededError, RecycleSequenceConflictError } from '../../services/enrollment';
+import { FatalChecksError, MailboxUnhealthyError } from '../../services/manualCompose';
 import { AppError, toEnvelope } from '../errors';
 import { RequestValidationError } from './zodCompilers';
 
@@ -36,6 +38,22 @@ export function registerErrorHandling(app: FastifyInstance): void {
       return reply
         .status(422)
         .send(toEnvelope('sequence_invalid', err.message, { conflicts: err.details }));
+    }
+    if (err instanceof CapacityExceededError) {
+      return reply
+        .status(409)
+        .send(toEnvelope('capacity_exceeded', err.message, { suggested: err.suggested }));
+    }
+    if (err instanceof RecycleSequenceConflictError) {
+      return reply
+        .status(409)
+        .send(toEnvelope('recycle_sequence_conflict', err.message, { step_nos: err.stepNos }));
+    }
+    if (err instanceof MailboxUnhealthyError) {
+      return reply.status(409).send(toEnvelope('mailbox_unhealthy', err.message));
+    }
+    if (err instanceof FatalChecksError) {
+      return reply.status(422).send(toEnvelope('validation', err.message, err.checks));
     }
     const fastifyErr = err as Partial<FastifyError>;
     if (fastifyErr.validation) {
