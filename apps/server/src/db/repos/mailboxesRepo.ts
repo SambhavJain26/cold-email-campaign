@@ -1,6 +1,6 @@
 import { eq, inArray } from 'drizzle-orm';
 import type { DbLike } from '../client';
-import { mailboxes } from '../schema';
+import { mailboxes, mailboxSecrets } from '../schema';
 
 export type MailboxRow = typeof mailboxes.$inferSelect;
 export type MailboxStatus = MailboxRow['status'];
@@ -12,6 +12,7 @@ export interface NewMailbox {
   smtpPort?: number;
   imapHost: string;
   imapPort?: number;
+  authType?: string;
   dailyCap?: number;
   sendWindow?: MailboxRow['sendWindow'];
   status?: MailboxStatus;
@@ -42,7 +43,7 @@ export async function listMailboxesByStatus(
     .orderBy(mailboxes.id);
 }
 
-/** Partial column update — status transitions, pacing anchor, poll bookkeeping. */
+/** Partial column update — status transitions, pacing anchor, poll bookkeeping, B6.2 edits. */
 export async function patchMailbox(
   db: DbLike,
   id: number,
@@ -58,8 +59,36 @@ export async function patchMailbox(
       | 'lastPollUid'
       | 'dailyCap'
       | 'sendWindow'
+      | 'displayName'
+      | 'fromAddress'
+      | 'smtpHost'
+      | 'smtpPort'
+      | 'imapHost'
+      | 'imapPort'
+      | 'authType'
     >
   >,
 ): Promise<void> {
   await db.update(mailboxes).set(patch).where(eq(mailboxes.id, id));
+}
+
+/** Seal-then-store is the caller's job (secrets/seal.ts) — this repo only moves bytes. */
+export async function upsertMailboxSecret(
+  db: DbLike,
+  mailboxId: number,
+  sealed: Buffer,
+  at: Date,
+): Promise<void> {
+  await db
+    .insert(mailboxSecrets)
+    .values({ mailboxId, sealed, updatedAt: at })
+    .onConflictDoUpdate({ target: mailboxSecrets.mailboxId, set: { sealed, updatedAt: at } });
+}
+
+export async function getMailboxSecret(db: DbLike, mailboxId: number): Promise<Buffer | null> {
+  const rows = await db
+    .select({ sealed: mailboxSecrets.sealed })
+    .from(mailboxSecrets)
+    .where(eq(mailboxSecrets.mailboxId, mailboxId));
+  return rows[0]?.sealed ?? null;
 }

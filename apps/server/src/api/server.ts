@@ -8,6 +8,9 @@ import { registerSession } from './plugins/session';
 import { registerCsrfHeader } from './plugins/csrfHeader';
 import { registerRequireAuth } from './plugins/requireAuth';
 import { authRoutes } from './auth';
+import { mailboxesRoutes } from './mailboxes';
+import { settingsRoutes } from './settings';
+import { alertsRoutes } from './alerts';
 
 const pkg = createRequire(import.meta.url)('../../package.json') as { version: string };
 
@@ -45,6 +48,9 @@ export function buildServer({ logger, services }: ServerDeps): FastifyInstance {
       registerCsrfHeader(api);
       registerRequireAuth(api);
       await authRoutes(api, services);
+      await mailboxesRoutes(api, services);
+      await settingsRoutes(api, services);
+      await alertsRoutes(api, services);
     },
     { prefix: '/api/v1' },
   );

@@ -21,12 +21,14 @@
     "dotenv": "^17.4.2",
     "drizzle-orm": "^0.45.2",
     "fastify": "^5.10.0",
+    "libsodium-wrappers": "^0.8.4",
     "pg": "^8.22.0",
     "pg-boss": "^12.26.2",
     "pino": "^10.3.1",
     "zod": "^4.4.3"
   },
   "devDependencies": {
+    "@types/libsodium-wrappers": "^0.7.14",
     "@types/node": "^26.1.1",
     "@types/pg": "^8.20.0",
     "drizzle-kit": "^0.31.10",
