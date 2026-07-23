@@ -71,11 +71,13 @@ const CITY_STATE: Array<[string, string]> = [
  *  (the bounced never got delivered - and give F3's untiered banner data). */
 function buildLeads(): LeadDto[] {
   const leads: LeadDto[] = [];
+  let tieredRank = 0; // rank among NON-bounced so tier totals hit A 255 / B 447 / C 165
   for (let i = 1; i <= 885; i++) {
     const state =
       i <= 47 ? 'REPLIED' : i <= 87 ? 'UNSUBSCRIBED' : i <= 105 ? 'BOUNCED' : 'COMPLETED';
     const bounced = state === 'BOUNCED';
-    const tier = bounced ? null : i <= 255 ? 'A' : i <= 702 ? 'B' : 'C';
+    if (!bounced) tieredRank += 1;
+    const tier = bounced ? null : tieredRank <= 255 ? 'A' : tieredRank <= 702 ? 'B' : 'C';
     const first = FIRST[i % FIRST.length]!;
     const last = LAST[i % LAST.length]!;
     const [city, st] = CITY_STATE[i % CITY_STATE.length]!;

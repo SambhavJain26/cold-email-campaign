@@ -154,7 +154,7 @@ export const handlers: RequestHandler[] = [
     if (body.password === 'wrong') return unauthorized(); // testable failure path
     db.authenticated = true;
     persistSession(true);
-    return HttpResponse.json({ email: db.operatorEmail });
+    return HttpResponse.json({ ok: true }); // contract: identity comes from /auth/me
   }),
   http.post(`${BASE}/auth/logout`, () => {
     db.authenticated = false;

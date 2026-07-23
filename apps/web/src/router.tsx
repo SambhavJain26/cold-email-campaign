@@ -6,6 +6,7 @@ import { RequireAuth } from '@/components/layout/require-auth';
 import LoginPage from '@/features/auth/login-page';
 import OverviewPage from '@/features/overview/page';
 import LeadsPage from '@/features/leads/page';
+import LeadDetailPage from '@/features/leads/detail-page';
 import MailboxesPage from '@/features/mailboxes/page';
 import SequencesPage from '@/features/sequences/page';
 import CampaignsPage from '@/features/campaigns/page';
@@ -26,7 +27,7 @@ export const router = createBrowserRouter([
           { path: '/', element: <Navigate to="/overview" replace /> },
           { path: '/overview', element: <OverviewPage /> },
           { path: '/leads', element: <LeadsPage /> },
-          { path: '/leads/:id', element: <LeadsPage /> },
+          { path: '/leads/:id', element: <LeadDetailPage /> },
           { path: '/mailboxes', element: <MailboxesPage /> },
           { path: '/sequences', element: <SequencesPage /> },
           { path: '/sequences/:id', element: <SequencesPage /> },
