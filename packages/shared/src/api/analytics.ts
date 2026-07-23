@@ -47,6 +47,8 @@ export const variantAnalyticsRowSchema = z
   })
   .strict();
 
+export type VariantAnalyticsRow = z.infer<typeof variantAnalyticsRowSchema>;
+
 export const variantsResponseSchema = z
   .object({ items: z.array(variantAnalyticsRowSchema) })
   .strict();
@@ -70,6 +72,8 @@ export const stepAnalyticsRowSchema = z
   })
   .strict();
 
+export type StepAnalyticsRow = z.infer<typeof stepAnalyticsRowSchema>;
+
 export const stepsResponseSchema = z.object({ items: z.array(stepAnalyticsRowSchema) }).strict();
 
 export const tiersQuerySchema = z.object({
@@ -86,6 +90,8 @@ export const tierAnalyticsRowSchema = z
     mode: z.enum(PERSONALIZATION_MODES),
   })
   .strict();
+
+export type TierAnalyticsRow = z.infer<typeof tierAnalyticsRowSchema>;
 
 export const tiersResponseSchema = z
   .object({
@@ -111,6 +117,9 @@ export const dailySeriesRowSchema = z
   .strict();
 
 export const watchFlagSchema = z.object({ rule: z.string(), message: z.string() }).strict();
+
+export type DailySeriesRow = z.infer<typeof dailySeriesRowSchema>;
+export type WatchFlag = z.infer<typeof watchFlagSchema>;
 
 /** "daily series + sparkline aggregates + watch-rule statuses" (13d), executable form. */
 export const healthTrendResponseSchema = z

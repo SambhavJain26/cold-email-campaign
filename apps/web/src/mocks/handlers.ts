@@ -686,6 +686,17 @@ export const handlers: RequestHandler[] = [
       if (body instanceof Response) return body;
       if (target.status !== 'draft')
         return err('conflict', 'recycle target must be a draft campaign', 409);
+      // Decision Q: the cohort already received sequence 1's templates, so
+      // recycling them into it would re-send identical content — the hash guard
+      // blocks the WHOLE action and names the offending steps.
+      if (target.sequence_id === 1) {
+        return err(
+          'recycle_sequence_conflict',
+          'target sequence would re-send content these leads already received',
+          409,
+          { step_nos: [1, 2, 3, 4] },
+        );
+      }
       target.recycled_from_campaign_id = body.source_campaign_id;
       target.enrolled_count += 120;
       return HttpResponse.json({
