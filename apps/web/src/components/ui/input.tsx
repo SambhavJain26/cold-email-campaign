@@ -2,9 +2,16 @@ import * as React from 'react';
 
 import { cn } from '@/lib/utils';
 
-function Input({ className, type, ...props }: React.ComponentProps<'input'>) {
+// React-18 note: the shadcn registry template is React-19-style (ref via
+// props); on React 18 that silently drops refs — react-hook-form's register()
+// needs the DOM node, so this wrapper is converted to forwardRef.
+const Input = React.forwardRef<HTMLInputElement, React.ComponentProps<'input'>>(function Input(
+  { className, type, ...props },
+  ref,
+) {
   return (
     <input
+      ref={ref}
       type={type}
       data-slot="input"
       className={cn(
@@ -16,6 +23,6 @@ function Input({ className, type, ...props }: React.ComponentProps<'input'>) {
       {...props}
     />
   );
-}
+});
 
 export { Input };
