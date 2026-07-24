@@ -26,14 +26,14 @@ Everything operator-tunable at runtime lives in the `settings` row, not env (02 
 
 ## 2. Production Docker Compose (profile `prod`)
 
-Services: **db** (postgres:16, volume `pgdata`, healthcheck) · **app** (multi-stage node:22 image; runs `db:migrate` then boot; `depends_on: db healthy`; `restart: unless-stopped`; serves built SPA statically from Fastify) · **caddy** (:80/:443, auto-TLS, reverse-proxy to app; basic-auth *not* used - app auth is the gate; Caddy adds TLS + rate-limit headroom) · **backup** (alpine+pg_dump cron sidecar: nightly 02:30 `pg_dump -Fc` to `BACKUP_DIR`, prune > 14 days; weekly copy kept 8 weeks).
+Services: **db** (postgres:16, volume `pgdata`, healthcheck) · **app** (multi-stage node:22 image; runs `db:migrate` then boot; `depends_on: db healthy`; `restart: unless-stopped`; serves built SPA statically from Fastify) · **caddy** (:80/:443, auto-TLS, reverse-proxy to app; basic-auth *not* used - app auth is the gate; Caddy adds TLS + rate-limit headroom) · **backup** (alpine+pg_dump cron sidecar running [`scripts/backup.sh`](../scripts/backup.sh): nightly 02:30 `pg_dump -Fc` to `BACKUP_DIR`, prune > 14 days; weekly copy kept 8 weeks).
 
 Systemd alternative (documented in runbook): OS Postgres + `coldemail.service` (Node, `EnvironmentFile=/etc/coldemail.env`) + `coldemail-backup.timer`.
 
 ## 3. Runbook (operations, in order of likely need)
 
 - **Deploy/update:** `git pull && docker compose --profile prod build app && docker compose --profile prod up -d` - migrations run on boot; scheduler catch-up handles the downtime window (never-burst; expect a `catchup_backlog` alert if > a few hours).
-- **Backup now:** `docker compose exec backup /backup.sh`. **Restore drill (quarterly + B7.2 test):** restore latest dump into a scratch DB, run `rebuild-projections --dry-run`, expect 0 diffs, run `selfCheck` - data proven intact, not just present.
+- **Backup now:** `docker compose exec backup /backup.sh` (or `BACKUP_DIR=./backups sh scripts/backup.sh`). **Restore drill (quarterly + the automated B7.2 gate in CI):** `DATABASE_URL=… BACKUP_DIR=… sh scripts/restore-drill.sh` - dumps, restores into a scratch DB, runs `rebuild-projections` then `--dry-run` (expect 0 diffs = the fold is deterministic), then `self-check` (expect 0 invariant violations). Data proven intact, not just present. Uses `pg_dump`/`pg_restore`/`psql` from PATH.
 - **Rotate `SECRET_KEY`:** run `npm run rotate-secrets -- --new-key <hex>` (decrypts+re-seals all `mailbox_secrets` in one tx), then update env, restart.
 - **Password reset (locked out):** `npm run operator:set-password` on the VPS.
 - **Disaster recovery:** restore dump → boot → `rebuild-projections` → reconcile via self-check. The event log *is* the recovery source (plan §9).

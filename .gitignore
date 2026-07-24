@@ -9,6 +9,10 @@ coverage/
 .vite/
 drizzle-kit-out/
 
+# local backup dumps (B7.2 backup.sh / restore-drill.sh)
+backups/
+*.dump
+
 # playwright
 test-results/
 playwright-report/
