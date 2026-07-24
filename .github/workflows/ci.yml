@@ -52,6 +52,19 @@ jobs:
       # docs/13 §6 ordering: API tests after unit+integration (shared serial test DB).
       - run: npx vitest run --project api
 
+      # B7.2 restore drill: seed the golden cohort into a fresh DB, then replay
+      # the disaster-recovery runbook — dump → restore → rebuild → dry-run (0
+      # diffs) → self-check (0 violations). Proves backups are restorable, not
+      # just present (docs/16 §3).
+      - name: Restore drill (B7.2)
+        run: |
+          PGPASSWORD=coldemail_dev psql -h localhost -p 5433 -U coldemail -d coldemail -c 'CREATE DATABASE coldemail_drill'
+          npx tsx apps/server/test/ops/seed-golden.ts postgres://coldemail:coldemail_dev@localhost:5433/coldemail_drill
+          DATABASE_URL=postgres://coldemail:coldemail_dev@localhost:5433/coldemail_drill \
+            BACKUP_DIR="$RUNNER_TEMP/coldemail-backups" \
+            SCRATCH_DB=coldemail_drill_scratch \
+            bash scripts/restore-drill.sh
+
   # F0.7: web track — component tests (jsdom) + mock-mode Playwright e2e.
   # No Postgres: MSW serves the golden fixtures (docs/11 §4).
   web:

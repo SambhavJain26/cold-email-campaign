@@ -12,6 +12,7 @@
     "db:status": "tsx src/db/cli.ts status",
     "rebuild-projections": "tsx src/services/rebuildCli.ts",
     "rotate-secrets": "tsx src/services/rotateSecretsCli.ts",
+    "self-check": "tsx src/services/selfCheckCli.ts",
     "golden:export": "tsx test/fixtures/golden/export-api-fixtures.ts"
   },
   "dependencies": {
