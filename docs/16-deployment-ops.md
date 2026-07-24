@@ -34,6 +34,8 @@ Services: **db** (postgres:16, volume `pgdata`, healthcheck) · **app** (multi-s
 
 Systemd alternative ([`deploy/systemd/`](../deploy/systemd)): OS Postgres + OS Caddy + `coldemail.service` (Node, `EnvironmentFile=/etc/coldemail.env`, `ExecStartPre` runs migrations, app binds `127.0.0.1`) + `coldemail-backup.service`/`.timer` (nightly 02:30).
 
+**Resilience wiring (B7.6):** (a) **boot-migration ordering** — migrations complete before the server listens, in both models (the app entrypoint / the systemd `ExecStartPre`), so the schema is never behind the code. (b) **Healthchecks** — `db` uses `pg_isready`; `app` uses a Docker `HEALTHCHECK` hitting `/health` (a `node`/`fetch` one-liner — no curl in the slim image) and **caddy waits for `app: service_healthy`**, so TLS only fronts a ready app. (c) **Log rotation** — every compose service uses the `json-file` driver capped at 10 MB × 5 files (≤ 50 MB/service), so container logs can't fill the disk; on systemd, journald rotates. Backup dumps are pruned by `backup.sh` (§4).
+
 ## 3. Runbook (operations, in order of likely need)
 
 - **First deploy:** `cp .env.prod.example .env.prod`, generate `SECRET_KEY`/`SESSION_KEY`, set `POSTGRES_PASSWORD`/`OPERATOR_*`/`DOMAIN`, then `docker compose -f docker-compose.prod.yml --env-file .env.prod up -d --build`.

@@ -7,10 +7,19 @@
 # volumes.
 name: coldemail
 
+# Container stdout/stderr log rotation (B7.6): cap each service at 50 MB total
+# so logs can never fill the VPS disk. Applied to every service below.
+x-logging: &default-logging
+  driver: json-file
+  options:
+    max-size: '10m'
+    max-file: '5'
+
 services:
   db:
     image: postgres:16
     restart: unless-stopped
+    logging: *default-logging
     environment:
       POSTGRES_USER: ${POSTGRES_USER:-coldemail}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env.prod}
@@ -28,9 +37,23 @@ services:
       context: .
       target: app
     restart: unless-stopped
+    logging: *default-logging
     depends_on:
       db:
         condition: service_healthy
+    # Readiness = /health returns ok (DB reachable). caddy waits on this.
+    healthcheck:
+      test:
+        [
+          'CMD',
+          'node',
+          '-e',
+          "fetch('http://127.0.0.1:3001/health').then(r=>r.json()).then(b=>process.exit(b.ok?0:1)).catch(()=>process.exit(1))",
+        ]
+      interval: 30s
+      timeout: 5s
+      retries: 5
+      start_period: 40s
     environment:
       DATABASE_URL: postgres://${POSTGRES_USER:-coldemail}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB:-coldemail}
       SECRET_KEY: ${SECRET_KEY:?set SECRET_KEY in .env.prod}
@@ -57,8 +80,10 @@ services:
       context: .
       target: caddy
     restart: unless-stopped
+    logging: *default-logging
     depends_on:
-      - app
+      app:
+        condition: service_healthy
     environment:
       DOMAIN: ${DOMAIN:-localhost}
       TLS_EMAIL: ${TLS_EMAIL:-}
@@ -74,6 +99,7 @@ services:
       context: .
       dockerfile: docker/backup/Dockerfile
     restart: unless-stopped
+    logging: *default-logging
     depends_on:
       db:
         condition: service_healthy
