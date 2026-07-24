@@ -116,8 +116,13 @@ export function compose(config: Config, overrides: ComposeOverrides = {}): AppSe
     backupDir: config.BACKUP_DIR,
   });
 
+  // SIMULATED_CLOCK forbids smtp_imap (env superRefine), so transport is the
+  // MockTransport here - expose its scripting surface to the driver.
   const simulation =
-    config.SIMULATED_CLOCK && inlineQueue !== null && isSteppable(clock)
+    config.SIMULATED_CLOCK &&
+    inlineQueue !== null &&
+    isSteppable(clock) &&
+    transport instanceof MockTransport
       ? new SimulationDriver({
           db,
           clock,
@@ -125,6 +130,7 @@ export function compose(config: Config, overrides: ComposeOverrides = {}): AppSe
           poller,
           queue: inlineQueue,
           confirmDelivery: { db, store, clock },
+          scripting: transport,
         })
       : undefined;
 

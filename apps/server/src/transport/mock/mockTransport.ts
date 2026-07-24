@@ -8,9 +8,12 @@ import type {
   MailboxVerifyConfig,
   MailTransport,
   OutboundMessage,
+  ScriptableTransport,
   SendResult,
+  SynthesizeInboundInput,
   VerifyResult,
 } from '../types';
+import { dsnBounce, oooReply, threadedReply, unrelatedSpam } from './inbound';
 
 /** Scripted result of the NEXT send to a recipient (docs/06 §5 branches). */
 export type SendOutcome =
@@ -25,7 +28,7 @@ export interface SentEntry {
   result: SendResult;
 }
 
-export class MockTransport implements MailTransport {
+export class MockTransport implements MailTransport, ScriptableTransport {
   /** Every send attempt, in order - accepted or not. */
   readonly sentLog: SentEntry[] = [];
 
@@ -65,6 +68,65 @@ export class MockTransport implements MailTransport {
 
   onVerify(fromAddress: string, result: VerifyResult): void {
     this.verifyScript.set(fromAddress.toLowerCase(), result);
+  }
+
+  /**
+   * SIMULATED_CLOCK scripting (docs/13 §5): build a synthetic inbound message
+   * with real header shapes and queue it. reply/ooo thread onto our last
+   * accepted send to `to` (returns null if there is none yet); bounce/spam
+   * stand alone. The synthetic-inbound builders are the same ones the scenario
+   * runner uses, so the poller/classifier runs its exact production paths.
+   */
+  synthesizeInbound(input: SynthesizeInboundInput): { uid: number } | null {
+    const now = this.clock.now();
+    if (input.kind === 'bounce') {
+      const recipient = input.to ?? input.from;
+      if (!recipient) return null;
+      return {
+        uid: this.queueInbound(
+          input.mailboxId,
+          dsnBounce({ recipient, status: input.dsnStatus ?? '5.1.1', receivedAt: now }),
+        ),
+      };
+    }
+    if (input.kind === 'spam') {
+      return {
+        uid: this.queueInbound(
+          input.mailboxId,
+          unrelatedSpam({
+            from: input.from ?? 'stranger@spam.example.net',
+            receivedAt: now,
+            subject: input.subject,
+            bodyText: input.bodyText,
+          }),
+        ),
+      };
+    }
+    // reply / ooo need a threading anchor - our last accepted send to `to`.
+    if (!input.to) return null;
+    const anchor = this.lastSentTo(input.to);
+    if (!anchor) return null;
+    const inReplyTo = anchor.msg.headers.messageId;
+    const from = input.from ?? input.to;
+    const msg =
+      input.kind === 'ooo'
+        ? oooReply({
+            from,
+            inReplyTo,
+            references: [inReplyTo],
+            receivedAt: now,
+            subject: input.subject,
+            bodyText: input.bodyText,
+          })
+        : threadedReply({
+            from,
+            inReplyTo,
+            references: [inReplyTo],
+            receivedAt: now,
+            subject: input.subject,
+            bodyText: input.bodyText ?? 'Sounds interesting - tell me more.',
+          });
+    return { uid: this.queueInbound(input.mailboxId, msg) };
   }
 
   /** Script the next fetchNew for a mailbox to throw (IMAP failure paths, docs/07 §5). */

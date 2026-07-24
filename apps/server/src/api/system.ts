@@ -11,13 +11,45 @@ import {
   rebuildResponseSchema,
   systemStatusResponseSchema,
 } from '@coldemail/shared';
+import { z } from 'zod';
 import type { AppServices } from '../composition';
 import { listIncoming, type IncomingMessageRow } from '../db/repos/incomingMessagesRepo';
 import { listMailboxes } from '../db/repos/mailboxesRepo';
 import { getSettings } from '../db/repos/settingsRepo';
 import { rebuildProjections } from '../services/rebuildProjections';
 import { loadCampaignShapes } from '../services/campaignShapes';
+import { AppError } from './errors';
 import type { ZodTypeProvider } from './plugins/zodCompilers';
+
+// Test-only schemas (SIMULATED_CLOCK routes below) - not part of the contract.
+const okResponseSchema = z.object({ ok: z.literal(true) }).strict();
+const scriptInboundBodySchema = z
+  .object({
+    mailbox_id: z.number().int().positive(),
+    kind: z.enum(['reply', 'ooo', 'bounce', 'spam']),
+    to: z.string().optional(),
+    from: z.string().optional(),
+    subject: z.string().optional(),
+    body_text: z.string().optional(),
+    dsn_status: z.string().optional(),
+  })
+  .strict();
+const scriptInboundResponseSchema = z.object({ ok: z.literal(true), uid: z.number() }).strict();
+const scriptSendOutcomeBodySchema = z
+  .object({
+    recipient: z.string(),
+    kind: z.enum(['accept', 'transient', 'permanent_recipient', 'permanent_mailbox']),
+    error: z.string().optional(),
+  })
+  .strict();
+const scriptVerifyBodySchema = z
+  .object({
+    from_address: z.string(),
+    smtp_ok: z.boolean(),
+    imap_ok: z.boolean(),
+    error: z.string().optional(),
+  })
+  .strict();
 
 function toDebugRow(row: IncomingMessageRow) {
   return {
@@ -114,6 +146,53 @@ export async function systemRoutes(app: FastifyInstance, services: AppServices):
           minutes: req.body.minutes,
         });
         return { ok: true, now: now.toISOString(), ticks } as const;
+      },
+    );
+
+    // Script the mock transport the way the in-process scenario runner does
+    // (docs/13 §5). Inline schemas - these are test hooks, not the contract.
+    r.post(
+      '/system/script-inbound',
+      { schema: { body: scriptInboundBodySchema, response: { 200: scriptInboundResponseSchema } } },
+      async (req) => {
+        const b = req.body;
+        const res = simulation.scriptInbound({
+          mailboxId: b.mailbox_id,
+          kind: b.kind,
+          ...(b.to !== undefined && { to: b.to }),
+          ...(b.from !== undefined && { from: b.from }),
+          ...(b.subject !== undefined && { subject: b.subject }),
+          ...(b.body_text !== undefined && { bodyText: b.body_text }),
+          ...(b.dsn_status !== undefined && { dsnStatus: b.dsn_status }),
+        });
+        if (!res)
+          throw new AppError('conflict', 409, 'no accepted send to thread this inbound onto');
+        return { ok: true, uid: res.uid } as const;
+      },
+    );
+
+    r.post(
+      '/system/script-send-outcome',
+      { schema: { body: scriptSendOutcomeBodySchema, response: { 200: okResponseSchema } } },
+      async (req) => {
+        simulation.scriptSendOutcome(req.body.recipient, {
+          kind: req.body.kind,
+          ...(req.body.error !== undefined && { error: req.body.error }),
+        });
+        return { ok: true } as const;
+      },
+    );
+
+    r.post(
+      '/system/script-verify',
+      { schema: { body: scriptVerifyBodySchema, response: { 200: okResponseSchema } } },
+      async (req) => {
+        simulation.scriptVerify(req.body.from_address, {
+          smtpOk: req.body.smtp_ok,
+          imapOk: req.body.imap_ok,
+          ...(req.body.error !== undefined && { error: req.body.error }),
+        });
+        return { ok: true } as const;
       },
     );
   }

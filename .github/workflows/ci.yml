@@ -111,3 +111,37 @@ jobs:
       - run: npm ci
       - run: PGPASSWORD=coldemail_dev psql -h localhost -p 5433 -U coldemail -d coldemail -c 'CREATE DATABASE coldemail_test'
       - run: npm run test:golden
+
+  # The real-backend walkthrough replay (docs/13 §5) - the M3 closer. Drives the
+  # web UI against the real Fastify server in SIMULATED_CLOCK mode over
+  # MockTransport + advance-clock. The Playwright config boots both servers.
+  e2e-real:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: coldemail
+          POSTGRES_PASSWORD: coldemail_dev
+          POSTGRES_DB: coldemail
+        ports: ['5433:5432']
+        options: >-
+          --health-cmd "pg_isready -U coldemail -d coldemail"
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 10
+    env:
+      TEST_DATABASE_URL: postgres://coldemail:coldemail_dev@localhost:5433/coldemail_test
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+      - run: npm ci
+      - run: PGPASSWORD=coldemail_dev psql -h localhost -p 5433 -U coldemail -d coldemail -c 'CREATE DATABASE coldemail_test'
+      - run: npx playwright install chromium --with-deps
+        working-directory: apps/web
+      - run: npm run e2e:real -w @coldemail/web
+        env:
+          CI: 'true'
