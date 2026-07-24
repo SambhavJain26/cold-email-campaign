@@ -4,7 +4,7 @@
 
 **Legend:** `[ ]` not started · `[~]` in progress · `[x]` done · `[!]` blocked (note why in the log)
 
-**Current focus:** → **B8.3+ (blocked on real infrastructure).** **M3 ✅ closed.** **B8.1–B8.2 ✅** — the live `SmtpImapTransport` is built and proven against a real SMTP+IMAP server (GreenMail container), and `MAIL_TRANSPORT=smtp_imap` swaps in with the whole offline suite still green. Everything left in B8 (canary mailbox, real Gmail/Outlook DSN+OOO pattern tuning, ramp-up, real-cohort reconciliation) needs a VPS, a domain and real mailboxes — it is *operations*, not code.
+**Current focus:** → **B8.3+ (blocked on real infrastructure). No code work is outstanding.** **M3 ✅ closed.** **B8.1–B8.2 ✅** — the live `SmtpImapTransport` is built and proven against a real SMTP+IMAP server (GreenMail container), and `MAIL_TRANSPORT=smtp_imap` swaps in with the whole offline suite still green. **Post-M3 sweep ✅ (2026-07-25)** — every stage audited against docs/14/15 + the decision register; the four specified-but-unbuilt items found are closed (see the sweep entry in the log). Everything left in B8 (canary mailbox, real Gmail/Outlook DSN+OOO pattern tuning, ramp-up, real-cohort reconciliation) needs a VPS, a domain and real mailboxes — it is *operations*, not code; the pre-canary prerequisites are docs/16 §6a.
 
 ---
 
@@ -57,6 +57,14 @@
 ### B8 — Live transport
 - [x] B8.1 SmtpImapTransport · [x] B8.2 flag-swap test · [ ] B8.3 canary mailbox · [ ] B8.4 real DSN/OOO pattern validation · [ ] B8.5 ramp caps + all mailboxes · [ ] B8.6 real cohort reconciliation
 - **Gate:** ☐ canary checklist (docs/16 §5) → **M4 LIVE**. B8.1–B8.2 done and proven against a REAL SMTP+IMAP server in Docker (GreenMail); **B8.3–B8.6 are blocked on the operator having a VPS, a domain and real mailboxes** — they cannot be built, only performed.
+
+### Post-M3 sweep *(not a docs/14 stage — gaps found by auditing the finished stages)*
+- [x] decision E — AI sentiment pre-suggestion (`SentimentSuggester` + Anthropic adapter; had no task ID anywhere)
+- [x] `provider_blocked` transition + redistribution (docs/06 §6 state was unreachable)
+- [x] mailbox poll registration at runtime (a UI-added mailbox was never polled until restart)
+- [x] `operator:set-password` CLI (documented in the runbook, did not exist)
+- [x] minors: `transport.close()` on shutdown · `ROLE=worker` no longer listens · dead `page-stub.tsx` · docs/16 §6 ticked with evidence · **new docs/16 §6a pre-canary prerequisites**
+- **Gate:** ✅ 2026-07-25 — every suite green (unit 285, integration 158, api 72, **golden 47**, mail 22, web 47, e2e-mock 50, e2e-real 1)
 
 ---
 
