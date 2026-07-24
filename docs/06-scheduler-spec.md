@@ -109,6 +109,8 @@ on pause: status='auto_paused', alert with both window numbers (walkthrough Stag
 
 (Queries in docs/05 §5. The exact Part-11 example - 55 sends, 3-in-10 fires, 4-in-50 = 8% - is a locked test.)
 
+**`provider_blocked` trigger (implemented):** a run of `TRANSIENT_FAILURE_LIMIT` (5) consecutive transient send failures on one mailbox that ALL look like throttling (`scheduler/providerBlock.ts` - 421, 4.7.x, "rate", "throttl", "too many", "try again later", …) → `provider_blocked` + alert + redistribution. A single non-throttle failure in that run breaks the streak and the mailbox pauses as `smtp_failing` instead - the safer default, since only a real provider block warrants redistributing work away.
+
 **Redistribution on `auth_failed` / `provider_blocked`:** enrollments assigned to the dead mailbox that have **not yet received step 1** (no `sent` events) get `assigned_mailbox_id = NULL` → next tick's rotation reassigns them. Enrollments mid-thread keep their assignment and simply wait (walkthrough Stage 7's explicit distinction).
 
 **Resume:** operator action `POST /mailboxes/:id/resume { capPct }` sets `resume_cap = daily_cap × capPct / 100`, status `ok`. `resume_cap` clears back to null (full cap) automatically after 7 consecutive days with 0 hard bounces (checked in tick housekeeping).

@@ -27,6 +27,11 @@ const banConcreteClocks = {
   message:
     'Only composition.ts (and tests) use concrete clocks -- depend on the Clock interface (docs/02 s1).',
 };
+const banConcreteSuggester = {
+  group: ['**/sentiment/anthropic*'],
+  message:
+    'Only composition.ts wires the Anthropic adapter -- depend on sentiment/types (decision E).',
+};
 
 export default tseslint.config(
   {
@@ -81,19 +86,24 @@ export default tseslint.config(
     },
   },
 
-  // 2. db/ may use Drizzle, but not transports/clocks.
+  // 2. db/ may use Drizzle, but not transports/clocks/suggesters.
   {
     files: ['apps/server/src/db/**/*.ts'],
     rules: {
-      'no-restricted-imports': ['error', { patterns: [banConcreteTransports, banConcreteClocks] }],
+      'no-restricted-imports': [
+        'error',
+        { patterns: [banConcreteTransports, banConcreteClocks, banConcreteSuggester] },
+      ],
     },
   },
 
-  // 3. transport/, clock/, composition.ts: may use their concretes, but not Drizzle.
+  // 3. transport/, clock/, sentiment/, composition.ts: may use their concretes,
+  //    but not Drizzle.
   {
     files: [
       'apps/server/src/transport/**/*.ts',
       'apps/server/src/clock/**/*.ts',
+      'apps/server/src/sentiment/**/*.ts',
       'apps/server/src/composition.ts',
     ],
     rules: {
@@ -101,7 +111,7 @@ export default tseslint.config(
     },
   },
 
-  // 4. everything else in src/: no Drizzle, no concrete transports/clocks.
+  // 4. everything else in src/: no Drizzle, no concrete transports/clocks/suggesters.
   {
     files: ['apps/server/src/**/*.ts'],
     ignores: [
@@ -109,12 +119,13 @@ export default tseslint.config(
       'apps/server/src/db/**',
       'apps/server/src/transport/**',
       'apps/server/src/clock/**',
+      'apps/server/src/sentiment/**',
       'apps/server/src/composition.ts',
     ],
     rules: {
       'no-restricted-imports': [
         'error',
-        { patterns: [banDrizzle, banConcreteTransports, banConcreteClocks] },
+        { patterns: [banDrizzle, banConcreteTransports, banConcreteClocks, banConcreteSuggester] },
       ],
     },
   },

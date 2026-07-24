@@ -144,7 +144,14 @@ describe('scheduler (B3.7/B3.8)', () => {
   it('4b: five consecutive transient failures pause the mailbox (smtp_failing) + alert', async () => {
     s = await scenario({ mailboxes: 1, sequence: fourStep });
     await s.importLeads(1);
-    s.onSend('L0001', { outcome: 'smtp_transient', times: 5 });
+    // A NON-throttle failure: an unbroken run of rate-limit answers means the
+    // provider is blocking us and takes the provider_blocked branch instead
+    // (docs/06 §6, covered in provider-blocked.test.ts).
+    s.onSend('L0001', {
+      outcome: 'smtp_transient',
+      times: 5,
+      error: '451 4.3.0 Temporary system problem',
+    });
     await s.enroll({ count: 1 });
 
     await s.advanceHours(3);

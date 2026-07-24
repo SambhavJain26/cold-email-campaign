@@ -63,6 +63,11 @@ classify(m) → { classification, events[], matchedEnrollment? }
    side:    reducer → REPLIED (or UNSUBSCRIBED), next_send_at = NULL (sequence stops)
    AI suggestion (decision E): if enabled, suggest sentiment from snippet → stored on
             incoming_messages.suggested_sentiment only. Failure/timeout (3s) → null, never blocks.
+            BUILT: `sentiment/anthropic.ts` behind the `SentimentSuggester` port
+            (`sentiment/types.ts`), wired by composition iff ANTHROPIC_API_KEY is set. One
+            Messages API call per matched human reply, `max_tokens: 64`, thinking disabled,
+            structured output (`{sentiment}` enum) - every failure path resolves to null, and
+            a STOP match skips the call because its sentiment is already known.
 
 4. UNRELATED: none of the above → logged with events []. Ignored.
 ```

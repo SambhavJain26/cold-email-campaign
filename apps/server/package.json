@@ -14,9 +14,11 @@
     "rebuild-projections": "tsx src/services/rebuildCli.ts",
     "rotate-secrets": "tsx src/services/rotateSecretsCli.ts",
     "self-check": "tsx src/services/selfCheckCli.ts",
+    "operator:set-password": "tsx src/services/operatorSetPasswordCli.ts",
     "golden:export": "tsx test/fixtures/golden/export-api-fixtures.ts"
   },
   "dependencies": {
+    "@anthropic-ai/sdk": "^0.115.0",
     "@coldemail/shared": "*",
     "@fastify/multipart": "^9.4.0",
     "@fastify/secure-session": "^8.3.0",

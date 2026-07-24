@@ -18,6 +18,7 @@ import {
   type NewIncomingMessage,
 } from '../db/repos/incomingMessagesRepo';
 import { classify, type ClassificationResult } from './classifier';
+import type { SentimentSuggester } from '../sentiment/types';
 
 export interface PollerDeps {
   db: Db;
@@ -25,6 +26,8 @@ export interface PollerDeps {
   transport: MailTransport;
   clock: Clock;
   alerts: AlertSink;
+  /** Decision E: absent unless ANTHROPIC_API_KEY is set - suggestion stays null. */
+  sentiment?: SentimentSuggester;
 }
 
 export interface PollResult {
@@ -103,7 +106,12 @@ export class Poller {
       const rowId = await nextIncomingMessageId(db);
       let classified: ClassificationResult;
       try {
-        classified = await classify(db, m, { settings, now, incomingMessageId: rowId });
+        classified = await classify(db, m, {
+          settings,
+          now,
+          incomingMessageId: rowId,
+          ...(this.deps.sentiment && { suggester: this.deps.sentiment }),
+        });
       } catch (err) {
         // Poison message isolation (docs/07 §5): log as unrelated, continue.
         classified = {
@@ -154,7 +162,10 @@ export class Poller {
   private async recordOnly(
     m: IncomingMessage,
     now: Date,
-    c: Pick<ClassificationResult, 'classification' | 'matchedEnrollmentId' | 'snippet' | 'events'>,
+    c: Pick<
+      ClassificationResult,
+      'classification' | 'matchedEnrollmentId' | 'snippet' | 'events' | 'suggestedSentiment'
+    >,
     id?: number,
   ): Promise<void> {
     await this.deps.db.transaction(async (tx) => {
@@ -166,7 +177,10 @@ export class Poller {
   private rowFor(
     m: IncomingMessage,
     now: Date,
-    c: Pick<ClassificationResult, 'classification' | 'matchedEnrollmentId' | 'snippet'>,
+    c: Pick<
+      ClassificationResult,
+      'classification' | 'matchedEnrollmentId' | 'snippet' | 'suggestedSentiment'
+    >,
   ): NewIncomingMessage {
     return {
       mailboxId: m.mailboxId,
@@ -182,6 +196,8 @@ export class Poller {
       resultingEventIds: [],
       dsnStatus: m.dsnStatus ?? null,
       snippet: c.snippet,
+      // Decision E: null when suggestion is off, failed, or wasn't attempted.
+      suggestedSentiment: c.suggestedSentiment ?? null,
     };
   }
 }

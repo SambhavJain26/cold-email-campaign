@@ -14,7 +14,7 @@ Single always-on VPS (finalized decision). Docker Compose primary; systemd alter
 | `OPERATOR_EMAIL` / `OPERATOR_INITIAL_PASSWORD` | ✅ first boot | - | seeds `operator` row (password changeable in UI) |
 | `MAIL_TRANSPORT` | ✅ | `mock` | `mock` \| `smtp_imap` - **the one switch that goes live (B8)** |
 | `MAIL_TLS_INSECURE` | | `false` | accept self-signed certs / skip STARTTLS on the mail servers. **Local test rig only** (the GreenMail container); boot refuses it with `NODE_ENV=production` |
-| `ROLE` | | `all` | `all` \| `api` \| `worker` (decision Y) |
+| `ROLE` | | `all` | `all` \| `api` \| `worker` (decision Y). `api` = HTTP only (no pg-boss); `worker` = jobs only and **does not listen**, so a worker container needs no `/health` probe |
 | `PORT` / `HOST` | | `3001` / `127.0.0.1` | app listens localhost-only; Caddy fronts it |
 | `ANTHROPIC_API_KEY` | | unset | unset = sentiment suggestion silently off (decision E) |
 | `ALERT_WEBHOOK_URL` | | unset | generic JSON POST per alert (decision V) |
@@ -43,7 +43,7 @@ Systemd alternative ([`deploy/systemd/`](../deploy/systemd)): OS Postgres + OS C
 - **Deploy/update:** `git pull && docker compose -f docker-compose.prod.yml --env-file .env.prod up -d --build` - the app entrypoint applies migrations before it listens; scheduler catch-up handles the downtime window (never-burst; expect a `catchup_backlog` alert if > a few hours).
 - **Backup now:** `docker compose exec backup /backup.sh` (or `BACKUP_DIR=./backups sh scripts/backup.sh`). **Restore drill (quarterly + the automated B7.2 gate in CI):** `DATABASE_URL=… BACKUP_DIR=… sh scripts/restore-drill.sh` - dumps, restores into a scratch DB, runs `rebuild-projections` then `--dry-run` (expect 0 diffs = the fold is deterministic), then `self-check` (expect 0 invariant violations). Data proven intact, not just present. Uses `pg_dump`/`pg_restore`/`psql` from PATH.
 - **Rotate `SECRET_KEY`:** run `npm run rotate-secrets -- --new-key <hex>` (decrypts+re-seals all `mailbox_secrets` in one tx), then update env, restart.
-- **Password reset (locked out):** `npm run operator:set-password` on the VPS.
+- **Password reset (locked out):** `NEW_PASSWORD='…' npm run operator:set-password` on the VPS (or `-- --password '…'`). `ensureOperator` seeds the row only at first boot, so editing `OPERATOR_INITIAL_PASSWORD` afterwards does nothing - this CLI is the recovery path.
 - **Disaster recovery:** restore dump → boot → `rebuild-projections` → reconcile via self-check. The event log *is* the recovery source (plan §9).
 - **Logs:** `docker compose logs -f app | npx pino-pretty`; alerts feed mirrors everything actionable.
 
@@ -68,13 +68,23 @@ Nothing fails silently: every pg-boss final failure emits `job_failed`.
 4. Raise caps conservatively (10 → 20 → 30 over a week); enable remaining mailboxes; enroll a small real cohort; reconcile its metrics against the model (the golden-cohort reconciliation, now on reality).
 5. Only then: full-volume operation. Revisit `List-Unsubscribe` header option.
 
-## 6. Security checklist (B7 gate)
+## 6. Security checklist (B7 gate) - verified
 
-- [ ] App unreachable except via Caddy TLS; `/api` 401s without session; login rate-limited
-- [ ] `events` UPDATE/DELETE rejected as `app_rw` in prod DB (verified, not assumed)
-- [ ] No secret material in logs (grep test over a full simulated run: B7.1)
-- [ ] Mailbox passwords absent from every API response (contract tests assert)
-- [ ] Backups exist, restore drill passed, `SECRET_KEY`/`SESSION_KEY` stored outside the repo (VPS env file, mode 600)
+- [x] App unreachable except via Caddy TLS; `/api` 401s without session; login rate-limited - §7 dry-run (app is `expose`d, not published) + the B6.1 auth suite
+- [x] `events` UPDATE/DELETE rejected as `app_rw` in prod DB (verified, not assumed) - `test/integration/events-append-only.test.ts`
+- [x] No secret material in logs (grep test over a full simulated run: B7.1) - `test/api/secret-redaction.test.ts`
+- [x] Mailbox passwords absent from every API response (contract tests assert) - `test/api/mailboxes.test.ts` (`.strict()` response schemas are the tripwire)
+- [x] Backups exist, restore drill passed, `SECRET_KEY`/`SESSION_KEY` stored outside the repo (VPS env file, mode 600) - `scripts/restore-drill.sh`, gated in CI
+
+## 6a. Pre-canary prerequisites (operator, before B8.3)
+
+The canary in §5 assumes warmed mailboxes on authenticated domains - the walkthrough's "4 mailboxes, already warmed, on secondary domains". None of this is code; all of it must exist before `MAIL_TRANSPORT=smtp_imap` sends anything real:
+
+- **Secondary sending domains** - never the primary business domain. A deliverability mistake burns the domain, not just the mailbox.
+- **SPF, DKIM, DMARC** published for each sending domain, and verified with a mail tester before the first send. Missing DKIM alone is enough to land in spam regardless of content.
+- **Warming** - each mailbox aged and ramped by a warming service or by hand over ~2-4 weeks before it carries campaign volume. The app's ramp (`ramp_days` / `ramp_daily_enroll_cap`) governs *enrollment*, not mailbox reputation.
+- **App passwords / provider auth** - the transport does password auth only (`auth_type` is stored but unused; no OAuth). Gmail/Outlook need an app password with IMAP enabled.
+- **Reverse DNS + a real reply-to inbox** the operator actually reads: replies are the product.
 
 ## 7. Clean-VPS deploy dry-run (B7.7) - verified 2026-07-24
 

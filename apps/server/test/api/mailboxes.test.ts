@@ -1,6 +1,6 @@
 // B6.2 - mailbox routes: CRUD, secret sealing, test-connection, pause/resume,
 // reconnect, volume. Mailbox mutations append NO events (docs/10 traceability).
-import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 import { MockTransport } from '../../src/transport/mock/mockTransport';
 import { VirtualClock } from '../../src/clock/virtual';
 import { getMailbox, getMailboxSecret, patchMailbox } from '../../src/db/repos/mailboxesRepo';
@@ -142,6 +142,37 @@ describe('B6.2 mailboxes', () => {
     const row = await getMailbox(h.services.db, 1);
     expect(row!.status).toBe('auth_failed');
     await patchMailbox(h.services.db, 1, { status: 'ok', statusReason: null });
+  });
+
+  it('registers the poll job for mailboxes created or recovered at runtime', async () => {
+    // Boot only registers the mailboxes that exist at boot (and skips
+    // auth_failed ones), so without these calls a mailbox added through the UI
+    // is never polled until the process restarts - its replies, bounces and
+    // STOPs stay invisible.
+    const register = vi.spyOn(h.services.jobs, 'registerMailboxPoll').mockResolvedValue(undefined);
+    try {
+      const created = await h.inject({
+        method: 'POST',
+        url: '/api/v1/mailboxes',
+        payload: { ...CREATE_BODY, from_address: 'poll-me@agency.dev' },
+      });
+      expect(created.statusCode).toBe(200);
+      expect(register).toHaveBeenCalledWith(created.json().id);
+
+      // A recovered auth_failed mailbox also needs (re-)registering.
+      register.mockClear();
+      await patchMailbox(h.services.db, 1, { status: 'auth_failed', statusReason: 'IMAP auth' });
+      transport.onVerify('sarah@agency.dev', { smtpOk: true, imapOk: true });
+      const reconnected = await h.inject({
+        method: 'POST',
+        url: '/api/v1/mailboxes/1/reconnect',
+        payload: { password: 'fresh-password' },
+      });
+      expect(reconnected.json().status).toBe('ok');
+      expect(register).toHaveBeenCalledWith(1);
+    } finally {
+      register.mockRestore();
+    }
   });
 
   it('volume returns per-mailbox series + imbalance boolean', async () => {

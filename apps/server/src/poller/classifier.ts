@@ -16,6 +16,7 @@ import {
 } from '../db/repos/enrollmentsRepo';
 import { findSentByMessageIds, latestSentToLead } from '../db/repos/sentMessagesRepo';
 import { detectStop, unquotedText } from './stopMatcher';
+import type { SentimentSuggester } from '../sentiment/types';
 
 /** Soft-bounce retry delay for the SAME step (docs/07 §2.1; default 4 h). */
 export const SOFT_RETRY_DELAY_MS = 4 * 3_600_000;
@@ -29,6 +30,8 @@ export interface ClassifyContext {
   now: Date;
   /** Pre-allocated incoming_messages id - human_reply's attributes point at it. */
   incomingMessageId: number;
+  /** Decision E: present only when ANTHROPIC_API_KEY is configured. */
+  suggester?: SentimentSuggester;
 }
 
 export interface ClassificationResult {
@@ -117,16 +120,38 @@ export async function classify(
         }),
       );
     }
+    // AI-assisted suggestion (decision E): advisory only - it is stored on the
+    // ledger row and rendered greyed-out, and it NEVER sets the reply's
+    // sentiment. A STOP match already knows the answer, so don't spend a call.
+    const suggested = stop.matched ? undefined : await suggestSentiment(ctx, snippet);
+
     return {
       classification: 'human_reply',
       matchedEnrollmentId: enrollment.id,
       events,
       snippet,
+      ...(suggested !== undefined && { suggestedSentiment: suggested }),
     };
   }
 
   // ── 4. UNRELATED ──────────────────────────────────────────────────────────
   return { classification: 'unrelated', events: [], snippet };
+}
+
+/**
+ * Belt-and-braces around the adapter's own guarantees: even a suggester that
+ * throws or hangs must never fail a poll (docs/07 §2 bucket 3).
+ */
+async function suggestSentiment(
+  ctx: ClassifyContext,
+  snippet: string,
+): Promise<Sentiment | undefined> {
+  if (!ctx.suggester) return undefined;
+  try {
+    return (await ctx.suggester.suggest(snippet)) ?? undefined;
+  } catch {
+    return undefined;
+  }
 }
 
 /** Threading walk (docs/07 §4): In-Reply-To first, then References newest→oldest. */

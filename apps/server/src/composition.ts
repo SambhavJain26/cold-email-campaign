@@ -10,6 +10,7 @@ import type { MailTransport } from './transport/types';
 import { MockTransport } from './transport/mock/mockTransport';
 import { SmtpImapTransport } from './transport/smtpImap/smtpImapTransport';
 import { DbMailboxConnectionProvider } from './services/mailboxConnections';
+import { AnthropicSentimentSuggester } from './sentiment/anthropic';
 import { createDb, type Db } from './db/client';
 import { EventStore } from './services/eventStore';
 import { Scheduler } from './scheduler/scheduler';
@@ -109,7 +110,20 @@ export function compose(config: Config, overrides: ComposeOverrides = {}): AppSe
     jobs: jobPort,
     alerts,
   });
-  const poller = new Poller({ db, store, transport, clock, alerts });
+  // Decision E: auto-enabled iff ANTHROPIC_API_KEY is set, otherwise silently
+  // off - the suggestion column simply stays null.
+  const sentiment = config.ANTHROPIC_API_KEY
+    ? new AnthropicSentimentSuggester({ apiKey: config.ANTHROPIC_API_KEY })
+    : undefined;
+
+  const poller = new Poller({
+    db,
+    store,
+    transport,
+    clock,
+    alerts,
+    ...(sentiment && { sentiment }),
+  });
   const jobs = new Jobs({
     connectionString: databaseUrl,
     db,
