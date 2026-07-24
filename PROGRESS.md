@@ -14,7 +14,7 @@
 |--|-----------|-----------|----------|--------|
 | M0 | Docs complete | All docs/ written; decisions locked | — | ✅ 2026-07-22 |
 | M1 | **Proven core** | Golden cohort passes at all 3 levels offline | B0–B3 | ✅ 2026-07-22 |
-| M2 | **Operable workflow** | Real API serving F0–F3 screens | B4–B6, F0–F3 | ◑ 2026-07-23 — screens built, mock-e2e green; real-mode replay at F8 |
+| M2 | **Operable workflow** | Real API serving F0–F3 screens | B4–B6, F0–F3 | ◑ 2026-07-23 — screens built, mock-e2e green; real-backend replay at B7 |
 | M3 | **Full product (offline)** | Walkthrough-replay e2e green; ops hardened | F4–F8, B7 | ◑ 2026-07-24 — F4–F8 built (mock-mode replay green); B7 + real-backend replay remain |
 | M4 | **Live** | Canary checklist done; real cohort reconciles | B8 | ☐ |
 
