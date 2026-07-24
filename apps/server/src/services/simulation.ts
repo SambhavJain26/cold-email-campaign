@@ -9,6 +9,12 @@ import type { Scheduler } from '../scheduler/scheduler';
 import type { Poller } from '../poller/poller';
 import { runConfirmDelivery, type ConfirmDeliveryDeps } from '../scheduler/confirmDelivery';
 import type { ConfirmDeliveryJob, JobPort } from '../scheduler/types';
+import type {
+  ScriptableTransport,
+  ScriptedSendOutcome,
+  SynthesizeInboundInput,
+  VerifyResult,
+} from '../transport/types';
 import { getSettings } from '../db/repos/settingsRepo';
 import { listMailboxesByStatus } from '../db/repos/mailboxesRepo';
 
@@ -35,10 +41,23 @@ export interface SimulationDeps {
   poller: Poller;
   queue: InlineJobQueue;
   confirmDelivery: ConfirmDeliveryDeps;
+  /** The mock transport, as its scripting surface (docs/13 §5). */
+  scripting: ScriptableTransport;
 }
 
 export class SimulationDriver {
   constructor(private readonly deps: SimulationDeps) {}
+
+  // ── test-only transport scripting (docs/13 §5) ─────────────────────────────
+  scriptInbound(input: SynthesizeInboundInput): { uid: number } | null {
+    return this.deps.scripting.synthesizeInbound(input);
+  }
+  scriptSendOutcome(recipient: string, outcome: ScriptedSendOutcome): void {
+    this.deps.scripting.onSend(recipient, outcome);
+  }
+  scriptVerify(fromAddress: string, result: VerifyResult): void {
+    this.deps.scripting.onVerify(fromAddress, result);
+  }
 
   /**
    * Step virtual time to now+duration in scheduler_tick_minutes increments;

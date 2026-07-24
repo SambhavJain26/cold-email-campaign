@@ -82,3 +82,38 @@ export interface MailTransport {
   /** "Test Connection" + health monitoring. */
   verify(config: MailboxVerifyConfig): Promise<VerifyResult>;
 }
+
+// ── SIMULATED_CLOCK scripting seam (docs/13 §5) ──────────────────────────────
+// The real-backend walkthrough replay drives the running server over HTTP, so
+// it needs to script the mock transport the way the in-process scenario runner
+// does. This interface is the boundary-safe surface: MockTransport implements
+// it; composition hands it to the SimulationDriver; the test-only system routes
+// call it. Nothing outside SIMULATED_CLOCK touches it.
+
+export type ScriptedSendOutcome =
+  | { kind: 'accept' }
+  | { kind: 'transient'; error?: string }
+  | { kind: 'permanent_recipient'; error?: string }
+  | { kind: 'permanent_mailbox'; error?: string };
+
+export interface SynthesizeInboundInput {
+  mailboxId: number;
+  kind: 'reply' | 'ooo' | 'bounce' | 'spam';
+  /** Recipient whose last accepted send we thread the reply/ooo onto. */
+  to?: string;
+  /** Sender address (defaults to `to` for a reply). */
+  from?: string;
+  subject?: string;
+  bodyText?: string;
+  /** DSN status for `bounce` (e.g. '5.1.1' hard, '4.2.2' soft). */
+  dsnStatus?: string;
+}
+
+export interface ScriptableTransport {
+  /** Build + queue a synthetic inbound message; null if no send to thread onto. */
+  synthesizeInbound(input: SynthesizeInboundInput): { uid: number } | null;
+  /** Queue the outcome of the next send to `recipient`. */
+  onSend(recipient: string, outcome: ScriptedSendOutcome): void;
+  /** Script the verify (Test Connection / health) result for a from-address. */
+  onVerify(fromAddress: string, result: VerifyResult): void;
+}
