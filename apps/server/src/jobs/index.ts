@@ -5,10 +5,12 @@
 // only a boot/schedule/execute smoke test.
 import { PgBoss } from 'pg-boss';
 import type { Db } from '../db/client';
+import type { Clock } from '../clock';
 import type { Scheduler } from '../scheduler/scheduler';
 import type { Poller } from '../poller/poller';
 import { runConfirmDelivery, type ConfirmDeliveryDeps } from '../scheduler/confirmDelivery';
-import type { ConfirmDeliveryJob, JobPort } from '../scheduler/types';
+import { runSelfCheckJob, runRebuildCompareJob } from './integrity';
+import type { ConfirmDeliveryJob, JobPort, SequenceProvider } from '../scheduler/types';
 import type { AlertSink } from '../alerts/types';
 import { getSettings } from '../db/repos/settingsRepo';
 import { listMailboxesByStatus } from '../db/repos/mailboxesRepo';
@@ -16,14 +18,20 @@ import { listMailboxesByStatus } from '../db/repos/mailboxesRepo';
 export interface JobsDeps {
   connectionString: string;
   db: Db;
+  clock: Clock;
   scheduler: Scheduler;
   poller: Poller;
+  sequences: SequenceProvider;
   confirmDelivery: ConfirmDeliveryDeps;
   alerts: AlertSink;
+  /** config.BACKUP_DIR — the daily self-check flags a missing/stale dump. */
+  backupDir?: string;
 }
 
 const TICK_QUEUE = 'scheduler-tick';
 const CONFIRM_QUEUE = 'confirm-delivery';
+const SELFCHECK_QUEUE = 'self-check';
+const REBUILD_COMPARE_QUEUE = 'rebuild-compare';
 const pollQueue = (mailboxId: number) => `imap-poll-${mailboxId}`;
 
 export class Jobs implements JobPort {
@@ -66,6 +74,30 @@ export class Jobs implements JobPort {
         }
       },
     );
+
+    // Scheduled integrity safety jobs (B7.3, docs/16 §4). Both raise a
+    // selfcheck_drift alert on failure rather than logging quietly.
+    await boss.createQueue(SELFCHECK_QUEUE);
+    await boss.work(SELFCHECK_QUEUE, async () => {
+      await runSelfCheckJob({
+        db,
+        alerts,
+        backupDir: this.deps.backupDir,
+        now: () => this.deps.clock.now(),
+      });
+    });
+    await boss.schedule(SELFCHECK_QUEUE, '0 3 * * *', undefined, { retryLimit: 1 }); // daily 03:00
+
+    await boss.createQueue(REBUILD_COMPARE_QUEUE);
+    await boss.work(REBUILD_COMPARE_QUEUE, async () => {
+      await runRebuildCompareJob({
+        db,
+        sequences: this.deps.sequences,
+        alerts,
+        now: () => this.deps.clock.now(),
+      });
+    });
+    await boss.schedule(REBUILD_COMPARE_QUEUE, '0 4 * * 0', undefined, { retryLimit: 1 }); // Sun 04:00
 
     // One poll queue per non-auth_failed mailbox (docs/07 §1). Mailboxes
     // added later re-register via registerMailboxPoll (B6 mailbox routes).

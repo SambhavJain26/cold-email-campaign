@@ -103,10 +103,13 @@ export function compose(config: Config, overrides: ComposeOverrides = {}): AppSe
   const jobs = new Jobs({
     connectionString: databaseUrl,
     db,
+    clock,
     scheduler,
     poller,
+    sequences,
     confirmDelivery: { db, store, clock },
     alerts,
+    backupDir: config.BACKUP_DIR,
   });
 
   const simulation =

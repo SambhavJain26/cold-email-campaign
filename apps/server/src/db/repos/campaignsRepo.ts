@@ -23,6 +23,12 @@ export async function getCampaign(db: DbLike, id: number): Promise<CampaignRow |
   return rows[0];
 }
 
+/** Every campaign id — the rebuild-compare job preloads a shape per campaign. */
+export async function listCampaignIds(db: DbLike): Promise<number[]> {
+  const rows = await db.select({ id: campaigns.id }).from(campaigns).orderBy(campaigns.id);
+  return rows.map((r) => r.id);
+}
+
 export function tierEffortOf(c: CampaignRow): TierEffortConfig {
   return c.tierEffortConfig as TierEffortConfig;
 }

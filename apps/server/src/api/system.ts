@@ -16,6 +16,7 @@ import { listIncoming, type IncomingMessageRow } from '../db/repos/incomingMessa
 import { listMailboxes } from '../db/repos/mailboxesRepo';
 import { getSettings } from '../db/repos/settingsRepo';
 import { rebuildProjections } from '../services/rebuildProjections';
+import { loadCampaignShapes } from '../services/campaignShapes';
 import type { ZodTypeProvider } from './plugins/zodCompilers';
 
 function toDebugRow(row: IncomingMessageRow) {
@@ -34,7 +35,7 @@ function toDebugRow(row: IncomingMessageRow) {
 
 export async function systemRoutes(app: FastifyInstance, services: AppServices): Promise<void> {
   const r = app.withTypeProvider<ZodTypeProvider>();
-  const { db, clock, config, scheduler, jobs } = services;
+  const { db, clock, config, scheduler, jobs, sequences } = services;
 
   r.get(
     '/system/status',
@@ -58,15 +59,11 @@ export async function systemRoutes(app: FastifyInstance, services: AppServices):
     { schema: { body: rebuildBodySchema, response: { 200: rebuildResponseSchema } } },
     async (req) => {
       const settings = await getSettings(db);
+      const shapeFor = await loadCampaignShapes(db, sequences, settings.softRetryMax);
       const result = await rebuildProjections(db, {
         dryRun: req.body.dry_run,
         campaignId: null,
-        // Same shape rule as the CLI: completion is derived per campaign at
-        // fold time; the DB sequence lookup arrives with B7's compare job.
-        shapeFor: () => ({
-          lastStepNo: Number.POSITIVE_INFINITY,
-          softRetryMax: settings.softRetryMax,
-        }),
+        shapeFor,
         deliveryConfirmMs: settings.deliveryConfirmHours * 3_600_000,
         now: clock.now(),
       });
