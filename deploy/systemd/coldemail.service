@@ -1,0 +1,24 @@
+# Bare-metal alternative to the compose `app` service (docs/16 §2).
+# OS-level Postgres + Caddy; this unit runs the Node app.
+#   sudo cp deploy/systemd/coldemail.service /etc/systemd/system/
+#   sudo install -m 600 .env.prod /etc/coldemail.env   # DATABASE_URL points at OS Postgres; HOST=127.0.0.1
+#   sudo systemctl daemon-reload && sudo systemctl enable --now coldemail
+[Unit]
+Description=Cold Email Campaign app (API + workers)
+After=network-online.target postgresql.service
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=coldemail
+WorkingDirectory=/opt/coldemail
+EnvironmentFile=/etc/coldemail.env
+# Apply migrations before the server starts (matches the container entrypoint).
+ExecStartPre=/usr/bin/npm run db:migrate -w @coldemail/server
+ExecStart=/usr/bin/npm run start -w @coldemail/server
+Restart=on-failure
+RestartSec=5
+# App binds localhost only; Caddy on the same host fronts it (set HOST=127.0.0.1).
+
+[Install]
+WantedBy=multi-user.target

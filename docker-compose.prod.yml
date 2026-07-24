@@ -1,0 +1,90 @@
+# Production stack (B7.5, docs/16 §2). Bring up with:
+#   cp .env.prod.example .env.prod && edit it   # generate keys, set DOMAIN
+#   docker compose -f docker-compose.prod.yml --env-file .env.prod up -d --build
+#
+# db + app + caddy + backup. Only caddy publishes ports (80/443); the app is
+# reachable only on the internal network. Postgres and dumps live on named
+# volumes.
+name: coldemail
+
+services:
+  db:
+    image: postgres:16
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-coldemail}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env.prod}
+      POSTGRES_DB: ${POSTGRES_DB:-coldemail}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U ${POSTGRES_USER:-coldemail} -d ${POSTGRES_DB:-coldemail}']
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  app:
+    build:
+      context: .
+      target: app
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgres://${POSTGRES_USER:-coldemail}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB:-coldemail}
+      SECRET_KEY: ${SECRET_KEY:?set SECRET_KEY in .env.prod}
+      SESSION_KEY: ${SESSION_KEY:?set SESSION_KEY in .env.prod}
+      OPERATOR_EMAIL: ${OPERATOR_EMAIL:?set OPERATOR_EMAIL in .env.prod}
+      OPERATOR_INITIAL_PASSWORD: ${OPERATOR_INITIAL_PASSWORD:?set OPERATOR_INITIAL_PASSWORD in .env.prod}
+      MAIL_TRANSPORT: ${MAIL_TRANSPORT:-mock}
+      ROLE: all
+      # bind all interfaces INSIDE the container - only caddy can reach it
+      HOST: 0.0.0.0
+      PORT: '3001'
+      NODE_ENV: production
+      LOG_LEVEL: ${LOG_LEVEL:-info}
+      BACKUP_DIR: /var/backups/coldemail
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+      ALERT_WEBHOOK_URL: ${ALERT_WEBHOOK_URL:-}
+    volumes:
+      - backups:/var/backups/coldemail:ro # read newest dump for the self-check freshness probe
+    expose:
+      - '3001'
+
+  caddy:
+    build:
+      context: .
+      target: caddy
+    restart: unless-stopped
+    depends_on:
+      - app
+    environment:
+      DOMAIN: ${DOMAIN:-localhost}
+      TLS_EMAIL: ${TLS_EMAIL:-}
+    ports:
+      - '80:80'
+      - '443:443'
+    volumes:
+      - caddy_data:/data
+      - caddy_config:/config
+
+  backup:
+    build:
+      context: .
+      dockerfile: docker/backup/Dockerfile
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgres://${POSTGRES_USER:-coldemail}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB:-coldemail}
+      BACKUP_DIR: /var/backups/coldemail
+    volumes:
+      - backups:/var/backups/coldemail
+
+volumes:
+  pgdata:
+  caddy_data:
+  caddy_config:
+  backups:

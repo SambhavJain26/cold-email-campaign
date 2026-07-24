@@ -26,13 +26,18 @@ Everything operator-tunable at runtime lives in the `settings` row, not env (02 
 
 ## 2. Production Docker Compose (profile `prod`)
 
-Services: **db** (postgres:16, volume `pgdata`, healthcheck) · **app** (multi-stage node:22 image; runs `db:migrate` then boot; `depends_on: db healthy`; `restart: unless-stopped`; serves built SPA statically from Fastify) · **caddy** (:80/:443, auto-TLS, reverse-proxy to app; basic-auth *not* used - app auth is the gate; Caddy adds TLS + rate-limit headroom) · **backup** (alpine+pg_dump cron sidecar running [`scripts/backup.sh`](../scripts/backup.sh): nightly 02:30 `pg_dump -Fc` to `BACKUP_DIR`, prune > 14 days; weekly copy kept 8 weeks).
+Concrete files: [`docker-compose.prod.yml`](../docker-compose.prod.yml) + the multi-stage [`Dockerfile`](../Dockerfile) (targets `app` and `caddy`) + [`docker/Caddyfile`](../docker/Caddyfile) + [`docker/backup/`](../docker/backup) + [`.env.prod.example`](../.env.prod.example).
 
-Systemd alternative (documented in runbook): OS Postgres + `coldemail.service` (Node, `EnvironmentFile=/etc/coldemail.env`) + `coldemail-backup.timer`.
+Services: **db** (postgres:16, volume `pgdata`, healthcheck) · **app** (multi-stage node:22 image; entrypoint applies `db:migrate` then boots via `tsx`; API + pg-boss workers; `depends_on: db healthy`; `restart: unless-stopped`; binds `0.0.0.0:3001` **inside its container** - `expose`d, never published, so only caddy reaches it) · **caddy** (:80/:443, auto-TLS for `$DOMAIN`; **serves the built SPA** baked into its image at `/srv` with history-API fallback, and reverse-proxies `/api/*` + `/health` to the app; basic-auth *not* used - app auth is the gate) · **backup** (alpine+pg_dump cron sidecar running [`scripts/backup.sh`](../scripts/backup.sh): nightly 02:30 `pg_dump -Fc` to `BACKUP_DIR`, prune > 14 days; weekly copy kept 8 weeks).
+
+> The SPA is served by Caddy (from the `web-build` stage), not Fastify - so the app image stays API/worker-only and there is no cross-container static volume. The bundle is built with `VITE_API_MODE=real` and calls same-origin `/api/v1`.
+
+Systemd alternative ([`deploy/systemd/`](../deploy/systemd)): OS Postgres + OS Caddy + `coldemail.service` (Node, `EnvironmentFile=/etc/coldemail.env`, `ExecStartPre` runs migrations, app binds `127.0.0.1`) + `coldemail-backup.service`/`.timer` (nightly 02:30).
 
 ## 3. Runbook (operations, in order of likely need)
 
-- **Deploy/update:** `git pull && docker compose --profile prod build app && docker compose --profile prod up -d` - migrations run on boot; scheduler catch-up handles the downtime window (never-burst; expect a `catchup_backlog` alert if > a few hours).
+- **First deploy:** `cp .env.prod.example .env.prod`, generate `SECRET_KEY`/`SESSION_KEY`, set `POSTGRES_PASSWORD`/`OPERATOR_*`/`DOMAIN`, then `docker compose -f docker-compose.prod.yml --env-file .env.prod up -d --build`.
+- **Deploy/update:** `git pull && docker compose -f docker-compose.prod.yml --env-file .env.prod up -d --build` - the app entrypoint applies migrations before it listens; scheduler catch-up handles the downtime window (never-burst; expect a `catchup_backlog` alert if > a few hours).
 - **Backup now:** `docker compose exec backup /backup.sh` (or `BACKUP_DIR=./backups sh scripts/backup.sh`). **Restore drill (quarterly + the automated B7.2 gate in CI):** `DATABASE_URL=… BACKUP_DIR=… sh scripts/restore-drill.sh` - dumps, restores into a scratch DB, runs `rebuild-projections` then `--dry-run` (expect 0 diffs = the fold is deterministic), then `self-check` (expect 0 invariant violations). Data proven intact, not just present. Uses `pg_dump`/`pg_restore`/`psql` from PATH.
 - **Rotate `SECRET_KEY`:** run `npm run rotate-secrets -- --new-key <hex>` (decrypts+re-seals all `mailbox_secrets` in one tx), then update env, restart.
 - **Password reset (locked out):** `npm run operator:set-password` on the VPS.

@@ -1,0 +1,12 @@
+# One-shot nightly backup (paired with coldemail-backup.timer). Bare-metal
+# alternative to the compose `backup` sidecar (docs/16 §2).
+[Unit]
+Description=Cold Email Campaign nightly pg_dump
+After=postgresql.service
+
+[Service]
+Type=oneshot
+User=coldemail
+EnvironmentFile=/etc/coldemail.env
+# DATABASE_URL + BACKUP_DIR come from the env file.
+ExecStart=/opt/coldemail/scripts/backup.sh

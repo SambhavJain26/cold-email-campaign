@@ -1,0 +1,12 @@
+# Fires coldemail-backup.service nightly at 02:30 (docs/16 §4).
+#   sudo cp deploy/systemd/coldemail-backup.* /etc/systemd/system/
+#   sudo systemctl daemon-reload && sudo systemctl enable --now coldemail-backup.timer
+[Unit]
+Description=Nightly Cold Email Campaign backup
+
+[Timer]
+OnCalendar=*-*-* 02:30:00
+Persistent=true
+
+[Install]
+WantedBy=timers.target
