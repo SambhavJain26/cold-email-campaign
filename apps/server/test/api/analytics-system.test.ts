@@ -59,6 +59,10 @@ describe('B6.9 analytics + B6.12 system', () => {
     // two leads, both delivered on step 1 (variants A and B), one positive
     // reply. Timestamps are VIRTUAL-clock-relative (window queries use the
     // harness clock), and projections match the fold exactly (rebuild test).
+    // Lead 2 is past the (1-step) sequence with its delivery-confirm window
+    // elapsed, so the fold COMPLETES it - terminal_at = last sent + 6h
+    // (delivery_confirm_hours default). Seeding it ACTIVE would (correctly)
+    // show as rebuild drift now that completion is shape-derived (B7.3).
     await h.pool.query(`
       INSERT INTO leads (email, first_name, tier) VALUES
         ('a1@x.dev', 'A1', 'C'), ('a2@x.dev', 'A2', 'C')`);
@@ -67,10 +71,11 @@ describe('B6.9 analytics + B6.12 system', () => {
       `INSERT INTO enrollments (campaign_id, lead_id, current_state, current_step_no,
                                 personalization_mode, enrolled_tier, best_reply_sentiment,
                                 meeting_booked, enrolled_at, terminal_at)
-       VALUES ($1, 1, 'REPLIED', 2, 'template_auto', 'C', 'positive', true,
+       VALUES ($1, 1, 'REPLIED',   2, 'template_auto', 'C', 'positive', true,
                $2::timestamptz - interval '5 days', $2::timestamptz - interval '2 days'),
-              ($1, 2, 'ACTIVE',  2, 'template_auto', 'C', NULL, false,
-               $2::timestamptz - interval '5 days', NULL)`,
+              ($1, 2, 'COMPLETED', 2, 'template_auto', 'C', NULL, false,
+               $2::timestamptz - interval '5 days',
+               $2::timestamptz - interval '4 days' + interval '6 hours')`,
       [campaignId, now],
     );
     await h.pool.query(

@@ -4,6 +4,8 @@
 import { loadDotenv } from '../config/dotenv';
 import { createDb } from '../db/client';
 import { getSettings } from '../db/repos/settingsRepo';
+import { DbSequenceProvider } from '../scheduler/dbSequenceProvider';
+import { loadCampaignShapes } from './campaignShapes';
 import { rebuildProjections } from './rebuildProjections';
 
 async function main(): Promise<void> {
@@ -20,15 +22,15 @@ async function main(): Promise<void> {
   const { db, pool } = createDb(url);
   try {
     const settings = await getSettings(db);
+    const shapeFor = await loadCampaignShapes(
+      db,
+      new DbSequenceProvider(db),
+      settings.softRetryMax,
+    );
     const result = await rebuildProjections(db, {
       dryRun,
       campaignId,
-      // Sequences land in B4; until the DB lookup exists, no enrollment can
-      // have finished a sequence, so completion derivation is inert.
-      shapeFor: () => ({
-        lastStepNo: Number.POSITIVE_INFINITY,
-        softRetryMax: settings.softRetryMax,
-      }),
+      shapeFor,
       deliveryConfirmMs: settings.deliveryConfirmHours * 3_600_000,
       now: new Date(),
     });

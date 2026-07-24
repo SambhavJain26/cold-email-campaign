@@ -54,8 +54,10 @@ describe('pg-boss wiring smoke (B3.16)', () => {
     jobs = new Jobs({
       connectionString: TEST_DATABASE_URL,
       db,
+      clock,
       scheduler,
       poller,
+      sequences,
       confirmDelivery: { db, store, clock },
       alerts,
     });
@@ -74,6 +76,8 @@ describe('pg-boss wiring smoke (B3.16)', () => {
     const names = schedules.rows.map((r: { name: string }) => r.name);
     expect(names).toContain('scheduler-tick');
     expect(names).toContain('imap-poll-1');
+    expect(names).toContain('self-check'); // B7.3 daily
+    expect(names).toContain('rebuild-compare'); // B7.3 weekly
   }, 30_000);
 
   it('a delayed confirm-delivery job runs and appends delivered', async () => {
