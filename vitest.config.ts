@@ -50,6 +50,18 @@ export default defineConfig({
       },
       {
         test: {
+          // B8.1: the live transport against a real SMTP+IMAP server
+          // (GreenMail container - `docker compose up -d greenmail`). Serial:
+          // the mail server is shared state, reset per test.
+          name: 'mail',
+          include: ['apps/server/test/mail/**/*.test.ts'],
+          globalSetup: ['./apps/server/test/helpers/global-setup.ts'],
+          fileParallelism: false,
+          testTimeout: 30_000,
+        },
+      },
+      {
+        test: {
           // The locked regression (docs/13 §3). NEVER skip - red here means
           // the math stopped closing. Separate required CI job.
           name: 'golden',

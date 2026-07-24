@@ -18,6 +18,11 @@ export const envSchema = z
     OPERATOR_INITIAL_PASSWORD: z.string().min(8),
     // wiring
     MAIL_TRANSPORT: z.enum(['mock', 'smtp_imap']).default('mock'),
+    /**
+     * B8.1: accept self-signed certs / skip STARTTLS on the mail servers. For a
+     * LOCAL test server (the GreenMail container) only - refused in production.
+     */
+    MAIL_TLS_INSECURE: z.stringbool().default(false),
     ROLE: z.enum(['all', 'api', 'worker']).default('all'),
     PORT: z.coerce.number().int().min(1).max(65535).default(3001),
     HOST: z.string().default('127.0.0.1'),
@@ -39,6 +44,15 @@ export const envSchema = z
         code: 'custom',
         path: ['SIMULATED_CLOCK'],
         message: 'SIMULATED_CLOCK requires MAIL_TRANSPORT=mock',
+      });
+    }
+    // Plaintext/unverified TLS to a real provider would leak the mailbox
+    // password on the wire - the flag exists for the local GreenMail rig only.
+    if (cfg.MAIL_TLS_INSECURE && cfg.NODE_ENV === 'production') {
+      ctx.addIssue({
+        code: 'custom',
+        path: ['MAIL_TLS_INSECURE'],
+        message: 'MAIL_TLS_INSECURE is refused in production (local test servers only)',
       });
     }
     if (cfg.SIMULATED_CLOCK && cfg.NODE_ENV === 'production') {

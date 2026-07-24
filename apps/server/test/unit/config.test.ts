@@ -51,4 +51,33 @@ describe('parseEnv', () => {
     const r = parseEnv({ ...validEnv, MAIL_TRANSPORT: 'sendgrid' });
     expect(r.success).toBe(false);
   });
+
+  // ── B8.1: the live transport's TLS escape hatch ───────────────────────────
+
+  it('MAIL_TLS_INSECURE defaults off and is refused in production', () => {
+    const off = parseEnv(validEnv);
+    expect(off.success && off.config.MAIL_TLS_INSECURE).toBe(false);
+
+    const dev = parseEnv({ ...validEnv, MAIL_TLS_INSECURE: 'true', NODE_ENV: 'test' });
+    expect(dev.success && dev.config.MAIL_TLS_INSECURE).toBe(true);
+
+    // Plaintext/unverified TLS to a real provider would put the mailbox
+    // password on the wire - the flag exists for the local GreenMail rig only.
+    const prod = parseEnv({
+      ...validEnv,
+      MAIL_TLS_INSECURE: 'true',
+      NODE_ENV: 'production',
+      MAIL_TRANSPORT: 'smtp_imap',
+    });
+    expect(prod.success).toBe(false);
+    if (prod.success) return;
+    expect(prod.issues.some((i) => i.startsWith('MAIL_TLS_INSECURE'))).toBe(true);
+  });
+
+  it('refuses a simulated clock against the live transport (burst-send guard)', () => {
+    const r = parseEnv({ ...validEnv, SIMULATED_CLOCK: 'true', MAIL_TRANSPORT: 'smtp_imap' });
+    expect(r.success).toBe(false);
+    if (r.success) return;
+    expect(r.issues.some((i) => i.startsWith('SIMULATED_CLOCK'))).toBe(true);
+  });
 });

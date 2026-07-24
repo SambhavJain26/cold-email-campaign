@@ -13,6 +13,7 @@ Single always-on VPS (finalized decision). Docker Compose primary; systemd alter
 | `SESSION_KEY` | ✅ | - | secure-session cookie key |
 | `OPERATOR_EMAIL` / `OPERATOR_INITIAL_PASSWORD` | ✅ first boot | - | seeds `operator` row (password changeable in UI) |
 | `MAIL_TRANSPORT` | ✅ | `mock` | `mock` \| `smtp_imap` - **the one switch that goes live (B8)** |
+| `MAIL_TLS_INSECURE` | | `false` | accept self-signed certs / skip STARTTLS on the mail servers. **Local test rig only** (the GreenMail container); boot refuses it with `NODE_ENV=production` |
 | `ROLE` | | `all` | `all` \| `api` \| `worker` (decision Y) |
 | `PORT` / `HOST` | | `3001` / `127.0.0.1` | app listens localhost-only; Caddy fronts it |
 | `ANTHROPIC_API_KEY` | | unset | unset = sentiment suggestion silently off (decision E) |
@@ -58,6 +59,8 @@ Systemd alternative ([`deploy/systemd/`](../deploy/systemd)): OS Postgres + OS C
 Nothing fails silently: every pg-boss final failure emits `job_failed`.
 
 ## 5. B8 live-canary checklist (condensed from plan Stage 9)
+
+**Already proven offline (B8.1/B8.2, docs/13 §5a)** against a real SMTP+IMAP server in Docker, so the canary is about *providers*, not about the code: SMTP send with our Message-ID · In-Reply-To/References intact on the wire · IMAP fetch honouring the UID high-water mark (and re-polling appending nothing) · real DSN → hard/soft bounce · real OOO → auto_reply · real threaded reply → human_reply and STOP → suppression · bad credentials → `auth_failed` · the whole scheduler+poller pipeline over the live transport with a zero-drift rebuild. The two things a local server cannot give: a 5xx recipient rejection, and each provider's own DSN/OOO wording.
 
 1. One real mailbox, `MAIL_TRANSPORT=smtp_imap`, caps=5/day, seed addresses only.
 2. Verify: Test-Connection round-trip · Message-ID/threading intact in real headers · reply from seed address → classified human, sequence stops · reply "STOP" → suppressed immediately · send to a known-dead address → DSN parsed hard, auto-pause math sane · seed OOO autoresponder → auto_reply, sequence continues · soft-bounce path (greylisting) if reproducible.
