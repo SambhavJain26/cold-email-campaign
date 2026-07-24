@@ -18,6 +18,7 @@ import { DbSequenceProvider } from './scheduler/dbSequenceProvider';
 import { RenderEngine } from './render/engine';
 import type { JobPort, Renderer, SequenceProvider } from './scheduler/types';
 import { DbAlertSink } from './alerts/emitter';
+import { HttpAlertWebhook } from './alerts/webhook';
 import { systemRng, type Rng } from './util/rng';
 import { MetricsEngine } from './services/metrics';
 import { InlineJobQueue, SimulationDriver } from './services/simulation';
@@ -70,7 +71,10 @@ export function compose(config: Config, overrides: ComposeOverrides = {}): AppSe
   const { db, pool } = createDb(databaseUrl);
 
   const store = new EventStore(db);
-  const alerts = new DbAlertSink(db); // webhook wired at B7.4
+  const alerts = new DbAlertSink(
+    db,
+    config.ALERT_WEBHOOK_URL ? new HttpAlertWebhook(config.ALERT_WEBHOOK_URL) : undefined,
+  );
   const sequences = overrides.sequences ?? new DbSequenceProvider(db); // 0003 tables (B4.1)
   const renderer = new RenderEngine(); // docs/08 — the only producer of outbound bodies
   const rng = overrides.rng ?? systemRng;
