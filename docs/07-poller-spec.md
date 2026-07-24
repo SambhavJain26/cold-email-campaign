@@ -26,7 +26,9 @@ on error:
   (stale detection is the scheduler's job: last_successful_poll_at older than stale_poll_hours → 'imap_stale' + pause sends + alert)
 ```
 
-Fetching is read-only on the real mailbox (messages are never deleted/moved by the app; IMAP `\Seen` may be set — configurable in B8).
+Fetching is read-only on the real mailbox: messages are never deleted or moved, and **`\Seen` is not set** — imapflow's `source` fetch uses `BODY.PEEK[]` (B8.1 settled the "configurable in B8" question: peek, always; the operator's own inbox must not have its unread state rewritten by the poller).
+
+**The `n:*` trap (B8.1).** `UID FETCH {last_poll_uid + 1}:*` does NOT return an empty set when the high-water mark is past the highest UID — IMAP clamps the range and returns the LAST message. `SmtpImapTransport.fetchNew` therefore filters `uid > last_poll_uid` client-side; without it every poll would re-deliver the newest message forever (the ledger would dedupe the events, but the poll would never be a no-op).
 
 ## 2. The classifier — strict order, first match wins (spec Part 6)
 

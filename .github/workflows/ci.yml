@@ -84,6 +84,51 @@ jobs:
         env:
           CI: 'true'
 
+  # B8.1: the live SmtpImapTransport against a REAL SMTP+IMAP server (GreenMail)
+  # plus Postgres — send, IMAP fetch with the UID high-water mark, DSN/OOO/reply
+  # parsing, and a full scheduler+poller run over the live transport. No real
+  # mailboxes and no accounts, so it runs on every push like any other suite.
+  mail:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: coldemail
+          POSTGRES_PASSWORD: coldemail_dev
+          POSTGRES_DB: coldemail
+        ports: ['5433:5432']
+        options: >-
+          --health-cmd "pg_isready -U coldemail -d coldemail"
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 10
+      greenmail:
+        image: greenmail/standalone:2.1.10
+        env:
+          # Same accounts as docker-compose.yml; login is the full address.
+          GREENMAIL_OPTS: >-
+            -Dgreenmail.setup.test.all
+            -Dgreenmail.hostname=0.0.0.0
+            -Dgreenmail.users=canary@coldemail.test:canarypw,second@coldemail.test:secondpw,seed@lead.test:seedpw,mailer-daemon@mx.coldemail.test:daemonpw
+        ports: ['3025:3025', '3143:3143', '18080:8080']
+        options: >-
+          --health-cmd "bash -c 'exec 3<>/dev/tcp/127.0.0.1/3025 && exec 4<>/dev/tcp/127.0.0.1/3143'"
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 20
+    env:
+      TEST_DATABASE_URL: postgres://coldemail:coldemail_dev@localhost:5433/coldemail_test
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+      - run: npm ci
+      - run: PGPASSWORD=coldemail_dev psql -h localhost -p 5433 -U coldemail -d coldemail -c 'CREATE DATABASE coldemail_test'
+      - run: npx vitest run --project mail
+
   # The locked regression (docs/13 §3). Required. Red here = the math stopped closing.
   golden:
     runs-on: ubuntu-latest

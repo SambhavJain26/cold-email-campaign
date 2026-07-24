@@ -19,5 +19,33 @@ services:
       timeout: 3s
       retries: 10
 
+  # B8.1: a real SMTP+IMAP server for the SmtpImapTransport tests — same idea as
+  # the Postgres test container (no real mailboxes, no accounts, deterministic).
+  # Users are declared explicitly (NOT greenmail.auth.disabled) so a wrong
+  # password really fails and the TransportAuthError path is exercised. The user
+  # spec is `<email>:<password>` (not `<local>:<pw>@<domain>`) so the LOGIN is the
+  # full address — the way Gmail/Outlook work, and the way the transport derives
+  # it from `fromAddress`.
+  greenmail:
+    image: greenmail/standalone:2.1.10
+    container_name: coldemail-greenmail
+    environment:
+      GREENMAIL_OPTS: >-
+        -Dgreenmail.setup.test.all
+        -Dgreenmail.hostname=0.0.0.0
+        -Dgreenmail.users=canary@coldemail.test:canarypw,second@coldemail.test:secondpw,seed@lead.test:seedpw,mailer-daemon@mx.coldemail.test:daemonpw
+        -Dgreenmail.verbose
+    ports:
+      - '3025:3025' # SMTP
+      - '3143:3143' # IMAP
+      - '18080:8080' # management API (purge between test runs)
+    healthcheck:
+      # The image has no curl/wget/nc — bash's /dev/tcp is the only probe available.
+      test:
+        ['CMD', 'bash', '-c', 'exec 3<>/dev/tcp/127.0.0.1/3025 && exec 4<>/dev/tcp/127.0.0.1/3143']
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
 volumes:
   coldemail_pgdata:

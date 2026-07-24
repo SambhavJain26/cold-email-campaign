@@ -12,7 +12,8 @@ Implements plan §5. Test code layout: `apps/server/test/{unit,integration,fixtu
 | Integration | Vitest + scenario runner | real scheduler+poller+eventStore over MockTransport+VirtualClock+test Postgres | every commit |
 | API | Vitest + `fastify.inject` | every endpoint over seeded golden DB | every commit |
 | E2E | Playwright | web ⇄ real backend (MockTransport) | pre-merge for F stages; full walkthrough replay at milestones |
-| Live canary | manual + script | B8 only — providers, not business rules | B8 |
+| Mail | Vitest + GreenMail container | `SmtpImapTransport` against a REAL SMTP+IMAP server; plus a full scheduler+poller run over it | every commit (B8.1) |
+| Live canary | manual + script | B8.3+ only — real providers (Gmail/Outlook quirks), not business rules | B8 |
 
 Test DB: dockerized Postgres, one schema per worker (`vitest` globalSetup runs migrations; each file gets a transaction-rollback or truncate isolation helper `withTestDb`).
 
@@ -61,8 +62,21 @@ One long Playwright spec mirroring the campaign lifecycle against backend+MockTr
 
 Plus small per-screen specs (login, settings validation, suppression-removal typed confirm).
 
+## 5a. The mail rig — a real SMTP+IMAP server in Docker (B8.1)
+
+`docker compose up -d greenmail` runs [GreenMail](https://greenmail-mail-test.github.io/greenmail/) (SMTP 3025 · IMAP 3143 · management API 18080) — the same "test container" pattern Postgres uses, so the live transport is exercised on every commit with **no real mailboxes and no accounts**. Run with `npm run test:mail` (vitest project `mail`, CI job `mail`).
+
+Accounts are declared in `docker-compose.yml` as `<email>:<password>` (**not** the `<local>:<pw>@<domain>` form) so the login is the FULL address, the way Gmail/Outlook work and the way `SmtpImapTransport` derives it from `fromAddress`. Auth is NOT disabled — a wrong password is a genuine 535/AUTHENTICATIONFAILED, which is how the `auth_failed` paths get tested. `POST /api/service/reset` purges all mailboxes between tests (users survive).
+
+Two suites:
+
+- **`test/mail/smtp-imap-transport.test.ts`** — the transport alone, over a `StaticConnections` provider (no DB): verify round-trip · our Message-ID and the In-Reply-To/References chain survive the wire · the UID high-water mark is honoured · reads are non-destructive · real DSN / OOO / threaded-reply messages parse into the shapes the classifier reads · bad credentials → `TransportAuthError` (IMAP) and mailbox-scoped permanent failure (SMTP) · rotated credentials are picked up without a restart.
+- **`test/mail/live-pipeline.test.ts`** — the offline dress rehearsal for the §5 canary: composition builds the transport from `MAIL_TRANSPORT=smtp_imap`, credentials come out of `mailbox_secrets`, the real scheduler sends over SMTP and the real poller fetches over IMAP → reply / STOP / hard-bounce classified, idempotent re-poll, and a rebuild-projections replay with **zero drift**.
+
+What GreenMail can't do: reject a recipient with a 5xx (it accepts every address). That branch is covered by the pure `classifySmtpError` unit suite over nodemailer's real error shapes, and confirmed for real at B8.3 against a known-dead address.
+
 ## 6. Coverage gates & CI
 
 - `domain/`: 100% branch (reducer table cells are enumerated tests). `render/`, poller classifier, hygiene: ≥95% line. Global server: ≥80%. Web: component tests for the shared interactive components; no numeric gate.
-- CI pipeline (GitHub Actions, `ci.yml`): typecheck → lint → unit+integration (Postgres service) → API tests → web build → web component tests → e2e-mock. `@golden` suite is a separate required job. E2E-real nightly + on milestone branches.
+- CI pipeline (GitHub Actions, `ci.yml`): typecheck → lint → unit+integration (Postgres service) → API tests → web build → web component tests → e2e-mock. `@golden` suite is a separate required job, as are `e2e-real` (Postgres) and `mail` (Postgres + GreenMail services).
 - Every bugfix lands with a failing-first regression test; every walkthrough number cited in code comments links back to spec part (`// spec P10: 72/867`).

@@ -74,6 +74,26 @@ export class TransportAuthError extends Error {
   }
 }
 
+/**
+ * What SmtpImapTransport needs to reach one mailbox (B8.1). `send`/`fetchNew`
+ * are called with a mailboxId only, but transport/ may not touch the DB (docs/02
+ * §1) — composition supplies this port over `mailboxes` + `mailbox_secrets`.
+ */
+export interface MailboxConnection extends MailboxVerifyConfig {
+  /** From-header display name (`"Sarah Chen" <sarah@…>`). */
+  displayName?: string;
+  /**
+   * IMAP UID high-water mark (`mailboxes.last_poll_uid`): fetchNew returns
+   * messages with UID **strictly greater** than this.
+   */
+  lastPollUid: number;
+}
+
+export interface MailboxConnectionProvider {
+  /** null when the mailbox row is gone or has no sealed secret. */
+  load(mailboxId: number): Promise<MailboxConnection | null>;
+}
+
 export interface MailTransport {
   /** Sending side — used by the scheduler (docs/06 §5). */
   send(msg: OutboundMessage): Promise<SendResult>;

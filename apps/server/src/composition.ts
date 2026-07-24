@@ -7,8 +7,9 @@ import type { Config } from './config/env';
 import type { Clock } from './clock';
 import { SystemClock } from './clock/system';
 import type { MailTransport } from './transport/types';
-import { NotImplementedTransport } from './transport/stub';
 import { MockTransport } from './transport/mock/mockTransport';
+import { SmtpImapTransport } from './transport/smtpImap/smtpImapTransport';
+import { DbMailboxConnectionProvider } from './services/mailboxConnections';
 import { createDb, type Db } from './db/client';
 import { EventStore } from './services/eventStore';
 import { Scheduler } from './scheduler/scheduler';
@@ -61,14 +62,19 @@ export function compose(config: Config, overrides: ComposeOverrides = {}): AppSe
   const clock =
     overrides.clock ?? (config.SIMULATED_CLOCK ? new VirtualClock() : new SystemClock());
 
+  const databaseUrl = overrides.databaseUrl ?? config.DATABASE_URL;
+  const { db, pool } = createDb(databaseUrl);
+
+  // THE live switch (docs/16 §1, B8.2). SmtpImapTransport reaches mailboxes
+  // through the connection provider — it never touches the DB itself.
   const transport =
     overrides.transport ??
     (config.MAIL_TRANSPORT === 'smtp_imap'
-      ? new NotImplementedTransport('SmtpImapTransport arrives in B8')
+      ? new SmtpImapTransport({
+          connections: new DbMailboxConnectionProvider({ db, secretKey: config.SECRET_KEY }),
+          insecureTls: config.MAIL_TLS_INSECURE,
+        })
       : new MockTransport(clock));
-
-  const databaseUrl = overrides.databaseUrl ?? config.DATABASE_URL;
-  const { db, pool } = createDb(databaseUrl);
 
   const store = new EventStore(db);
   const alerts = new DbAlertSink(

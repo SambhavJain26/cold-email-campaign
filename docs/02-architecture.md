@@ -42,7 +42,7 @@ email_campaign/
 │   │   │   ├── transport/
 │   │   │   │   ├── types.ts            # MailTransport interface
 │   │   │   │   ├── mock/               # MockTransport + scenario scripting
-│   │   │   │   └── smtpImap/           # Stage B8 only
+│   │   │   │   └── smtpImap/           # B8: transport + errors.ts + parse.ts
 │   │   │   ├── clock/                  # Clock, SystemClock, VirtualClock
 │   │   │   ├── scheduler/              # tick, pacing, rotation, capacity (docs/06)
 │   │   │   ├── poller/                 # fetch loop, classifier, threading (docs/07)
@@ -113,10 +113,13 @@ action (API handler, scheduler, poller)
 ```ts
 export function compose(cfg: Config) {
   const clock: Clock = cfg.NODE_ENV === 'test' ? /* injected by tests */ : new SystemClock();
-  const transport: MailTransport =
-    cfg.MAIL_TRANSPORT === 'smtp_imap' ? new SmtpImapTransport(secrets, logger)
-                                       : new MockTransport(clock);
   const db = createDb(cfg.DATABASE_URL);
+  // B8.1: the live transport gets mailbox host/credentials/UID-high-water through
+  // an injected provider — transport/ never touches the DB (§1).
+  const transport: MailTransport =
+    cfg.MAIL_TRANSPORT === 'smtp_imap'
+      ? new SmtpImapTransport({ connections: new DbMailboxConnectionProvider({ db, secretKey }) })
+      : new MockTransport(clock);
   const eventStore = new EventStore(db, clock);
   const scheduler = new Scheduler({ db, eventStore, transport, clock, render, settings });
   const poller = new Poller({ db, eventStore, transport, clock, settings, sentimentSuggester });
