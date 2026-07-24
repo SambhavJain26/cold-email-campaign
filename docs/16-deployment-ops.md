@@ -72,3 +72,16 @@ Nothing fails silently: every pg-boss final failure emits `job_failed`.
 - [ ] No secret material in logs (grep test over a full simulated run: B7.1)
 - [ ] Mailbox passwords absent from every API response (contract tests assert)
 - [ ] Backups exist, restore drill passed, `SECRET_KEY`/`SESSION_KEY` stored outside the repo (VPS env file, mode 600)
+
+## 7. Clean-VPS deploy dry-run (B7.7) — verified 2026-07-24
+
+Full stack built and brought up from a clean state (`docker compose -f docker-compose.prod.yml --env-file .env.prod up -d --build`), all checks green:
+
+- [x] All three images build (`app`, `caddy`, `backup`).
+- [x] Boot ordering holds: `db` healthy → `app` runs migrations + seeds the operator → `app` healthy → `caddy` starts.
+- [x] `GET /health` through Caddy TLS → `{ ok: true, db: true }`; the app is **not** reachable on the host (only Caddy publishes 80/443; app is `expose`d).
+- [x] Caddy serves the SPA (`GET /` → `index.html`) with history-API fallback (`GET /leads` → `index.html`).
+- [x] Login through Caddy → app succeeds (`POST /api/v1/auth/login` → `{ ok: true }`).
+- [x] Backup sidecar installs the nightly 02:30 cron; a live `backup.sh` writes a valid `pg_dump -Fc` to the `backups` volume and prunes.
+
+Remaining for a full **M3** close: the real-backend walkthrough replay (§5, `e2e/walkthrough.spec.ts` — Playwright web ⇄ real server + MockTransport + `advance-clock`), which the frontend track deferred here from F8.
