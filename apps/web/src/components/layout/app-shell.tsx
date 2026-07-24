@@ -24,7 +24,10 @@ export function AppShell() {
 
   return (
     <div className="flex min-h-screen">
-      <nav className="flex w-52 shrink-0 flex-col border-r border-border bg-sidebar">
+      <nav
+        aria-label="Primary"
+        className="flex w-52 shrink-0 flex-col border-r border-border bg-sidebar"
+      >
         <p className="px-4 py-3 text-sm font-semibold text-sidebar-foreground">Cold Email</p>
         <ul className="space-y-0.5 px-2">
           {NAV.map((entry) => (
