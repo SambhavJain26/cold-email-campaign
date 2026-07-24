@@ -781,6 +781,18 @@ export const handlers: RequestHandler[] = [
           ) / 10;
         db.outcomes.REPLIED.positive += delta;
         db.outcomes.REPLIED.neutral -= delta;
+        // The real event log attributes the positive to the step it landed on,
+        // so the per-step breakdown moves WITH the campaign total — keep the
+        // reconciliation footer honest by propagating the same delta here.
+        const step = db.steps.find((s) => s.step_no === item.step_no);
+        if (step) {
+          step.positive_replies += delta;
+          step.positive_rate.numerator += delta;
+          step.positive_rate.value =
+            Math.round(
+              (step.positive_rate.numerator / (step.positive_rate.denominator || 1)) * 1000,
+            ) / 10;
+        }
       }
       return HttpResponse.json({ ok: true });
     }),
@@ -1000,18 +1012,44 @@ export const handlers: RequestHandler[] = [
     authed(({ request }) => {
       const url = new URL(request.url);
       const classification = url.searchParams.get('classification');
-      const rows = db.unibox.map((item: UniboxItemDto, i) => ({
-        id: item.incoming_message_id,
-        mailbox_id: 1 + (i % 4),
-        from_address: `reply-${item.lead.id}@example.com`,
-        subject: `Re: Quick question about ${item.lead.company ?? 'your listings'}`,
-        classification:
-          item.incoming_message_id >= 200 ? ('auto_reply' as const) : ('human_reply' as const),
-        dsn_status: null,
-        matched_enrollment_id: item.enrollment_id,
-        resulting_event_ids: [item.incoming_message_id * 10],
-        processed_at: item.received_at ?? NOW,
-      }));
+      const rows = [
+        ...db.unibox.map((item: UniboxItemDto, i) => ({
+          id: item.incoming_message_id,
+          mailbox_id: 1 + (i % 4),
+          from_address: `reply-${item.lead.id}@example.com`,
+          subject: `Re: Quick question about ${item.lead.company ?? 'your listings'}`,
+          classification:
+            item.incoming_message_id >= 200 ? ('auto_reply' as const) : ('human_reply' as const),
+          dsn_status: null as string | null,
+          matched_enrollment_id: item.enrollment_id,
+          resulting_event_ids: [item.incoming_message_id * 10],
+          processed_at: item.received_at ?? NOW,
+        })),
+        // The other two classifier buckets (docs/07 §4) so the debug view is
+        // complete: a hard bounce with a DSN, and an unmatched stray.
+        {
+          id: 900,
+          mailbox_id: 2,
+          from_address: 'MAILER-DAEMON@example.com',
+          subject: 'Delivery Status Notification (Failure)',
+          classification: 'bounce' as const,
+          dsn_status: '5.1.1',
+          matched_enrollment_id: 105,
+          resulting_event_ids: [9001],
+          processed_at: NOW,
+        },
+        {
+          id: 901,
+          mailbox_id: 3,
+          from_address: 'newsletter@unrelated.example',
+          subject: 'Your weekly digest',
+          classification: 'unrelated' as const,
+          dsn_status: null,
+          matched_enrollment_id: null,
+          resulting_event_ids: [],
+          processed_at: NOW,
+        },
+      ];
       const filtered = classification
         ? rows.filter((r) => r.classification === classification)
         : rows;
