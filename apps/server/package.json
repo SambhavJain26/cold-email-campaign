@@ -11,6 +11,7 @@
     "db:rollback": "tsx src/db/cli.ts down",
     "db:status": "tsx src/db/cli.ts status",
     "rebuild-projections": "tsx src/services/rebuildCli.ts",
+    "rotate-secrets": "tsx src/services/rotateSecretsCli.ts",
     "golden:export": "tsx test/fixtures/golden/export-api-fixtures.ts"
   },
   "dependencies": {
