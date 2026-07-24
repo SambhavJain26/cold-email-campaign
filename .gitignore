@@ -3,6 +3,10 @@ dist/
 build/
 .env
 .env.local
+.env.prod
+.env.*
+!.env.example
+!.env.prod.example
 *.log
 .DS_Store
 coverage/

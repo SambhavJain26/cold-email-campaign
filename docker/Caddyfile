@@ -1,0 +1,23 @@
+# Caddy: the only public listener (docs/16 §2). Terminates TLS (auto-HTTPS via
+# Let's Encrypt for $DOMAIN), serves the built SPA, and reverse-proxies the API
+# and health check to the app container. App auth is the gate — no basic-auth.
+{
+	email {$TLS_EMAIL}
+}
+
+{$DOMAIN:localhost} {
+	encode gzip
+
+	# API + liveness → the Fastify app (not exposed to the host directly).
+	@backend path /api/* /health
+	handle @backend {
+		reverse_proxy app:3001
+	}
+
+	# Single-page app: serve static assets, fall back to index.html for routes.
+	handle {
+		root * /srv
+		try_files {path} /index.html
+		file_server
+	}
+}
