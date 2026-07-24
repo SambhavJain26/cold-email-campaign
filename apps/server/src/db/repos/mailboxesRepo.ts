@@ -92,3 +92,13 @@ export async function getMailboxSecret(db: DbLike, mailboxId: number): Promise<B
     .where(eq(mailboxSecrets.mailboxId, mailboxId));
   return rows[0]?.sealed ?? null;
 }
+
+/** Every sealed secret — the input set for key rotation (secrets/rotateSecrets.ts). */
+export async function listMailboxSecrets(
+  db: DbLike,
+): Promise<{ mailboxId: number; sealed: Buffer }[]> {
+  return db
+    .select({ mailboxId: mailboxSecrets.mailboxId, sealed: mailboxSecrets.sealed })
+    .from(mailboxSecrets)
+    .orderBy(mailboxSecrets.mailboxId);
+}

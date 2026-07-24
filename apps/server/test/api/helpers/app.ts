@@ -2,6 +2,7 @@
 // test DB + VirtualClock, exercised via fastify.inject — no listening socket.
 // inject() lazily logs in and auto-attaches the session cookie + CSRF header.
 import { Writable } from 'node:stream';
+import type { DestinationStream } from 'pino';
 import type { FastifyInstance, InjectOptions, LightMyRequestResponse } from 'fastify';
 import type { Pool } from 'pg';
 import { parseEnv, type Config } from '../../../src/config/env';
@@ -61,9 +62,16 @@ export interface ApiHarness {
   close(): Promise<void>;
 }
 
+/** Opt-in log capture — the B7.1 no-secret-in-logs proof feeds a collector here. */
+export interface HarnessLogging {
+  destination: DestinationStream;
+  level?: Config['LOG_LEVEL'];
+}
+
 export async function createApiHarness(
   overrides: ComposeOverrides = {},
   env: Record<string, string> = {},
+  logging?: HarnessLogging,
 ): Promise<ApiHarness> {
   const config = testConfig(env);
   const clock = (overrides.clock as VirtualClock | undefined) ?? new VirtualClock();
@@ -75,7 +83,10 @@ export async function createApiHarness(
   });
   const silent = new Writable({ write: (_c, _e, cb) => cb() });
   const app = buildServer({
-    logger: createLogger({ LOG_LEVEL: 'error', NODE_ENV: 'test' }, silent),
+    logger: createLogger(
+      { LOG_LEVEL: logging?.level ?? 'error', NODE_ENV: 'test' },
+      logging?.destination ?? silent,
+    ),
     services,
   });
   await app.ready();
