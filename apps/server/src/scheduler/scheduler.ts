@@ -43,6 +43,7 @@ import { insideWindow, startOfLocalDay } from './window';
 import { jitterFactor, minGapMs, paceReady } from './pacing';
 import { pickMailbox, type RotationCandidate } from './rotation';
 import { buildMessageId, buildThreadHeaders } from './mime';
+import { isRateLimitError, transientVerdict } from './providerBlock';
 
 const SCHEDULER_LOCK = [2, 0] as const; // advisory keyspace: (2,0) = tick
 
@@ -77,6 +78,8 @@ interface MailboxBudget extends RotationCandidate {
 export class Scheduler {
   /** Consecutive transient SMTP failures per mailbox (docs/06 §5 4b). */
   private transientFailures = new Map<number, number>();
+  /** …of which consecutive rate-limit answers (docs/06 §6 provider_blocked). */
+  private rateLimitFailures = new Map<number, number>();
   /** catchup_backlog is emitted once per downtime episode (docs/06 §1). */
   private catchupAlerted = false;
   /** compliance_missing_address is emitted once per episode (docs/08 §4). */
@@ -452,7 +455,32 @@ export class Scheduler {
       // 4b: append NOTHING; next_send_at unchanged — retried next tick.
       const failures = (this.transientFailures.get(mb.id) ?? 0) + 1;
       this.transientFailures.set(mb.id, failures);
-      if (failures >= 5) {
+      const rateLimited = isRateLimitError(result.transientError)
+        ? (this.rateLimitFailures.get(mb.id) ?? 0) + 1
+        : 0; // a non-rate-limit failure breaks the run
+      this.rateLimitFailures.set(mb.id, rateLimited);
+
+      const verdict = transientVerdict(failures, rateLimited);
+      if (verdict !== 'keep_retrying') {
+        this.transientFailures.delete(mb.id);
+        this.rateLimitFailures.delete(mb.id);
+      }
+      if (verdict === 'provider_blocked') {
+        // docs/06 §6: the provider keeps refusing us. Same shape as
+        // auth_failed — stop sending, alert, and hand unstarted enrollments
+        // back to rotation so the campaign keeps moving on other mailboxes.
+        await patchMailbox(db, mb.id, {
+          status: 'provider_blocked',
+          statusReason: result.transientError,
+          pausedAt: now,
+        });
+        await alerts.emit('provider_blocked', 'error', {
+          mailboxId: mb.id,
+          failures,
+          lastError: result.transientError,
+        });
+        await redistributeUnstarted(db, mb.id);
+      } else if (verdict === 'smtp_failing') {
         await patchMailbox(db, mb.id, {
           status: 'paused',
           statusReason: 'smtp_failing',
@@ -463,7 +491,6 @@ export class Scheduler {
           failures,
           lastError: result.transientError,
         });
-        this.transientFailures.delete(mb.id);
       }
       return 'transient';
     }

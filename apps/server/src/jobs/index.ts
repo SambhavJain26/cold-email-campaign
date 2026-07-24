@@ -36,6 +36,8 @@ const pollQueue = (mailboxId: number) => `imap-poll-${mailboxId}`;
 
 export class Jobs implements JobPort {
   private boss: PgBoss | null = null;
+  /** Mailbox ids whose poll queue+worker are already registered this process. */
+  private readonly registered = new Set<number>();
 
   constructor(private readonly deps: JobsDeps) {}
 
@@ -113,8 +115,21 @@ export class Jobs implements JobPort {
     }
   }
 
+  /**
+   * Register (once) the poll cron for a mailbox. Called at boot for existing
+   * mailboxes AND by the B6.2 routes when a mailbox is created or reconnected —
+   * without that, a mailbox added through the UI is never polled until the
+   * process restarts (its replies, bounces and STOPs stay invisible).
+   *
+   * No-op when pg-boss isn't running (ROLE=api, SIMULATED_CLOCK, tests): there
+   * are no polls to schedule in those modes. Idempotent — registering twice
+   * would attach a second worker to the same queue and double-poll.
+   */
   async registerMailboxPoll(mailboxId: number, cron?: string): Promise<void> {
-    const boss = this.mustBoss();
+    if (!this.boss) return;
+    if (this.registered.has(mailboxId)) return;
+    this.registered.add(mailboxId);
+    const boss = this.boss;
     const settings = await getSettings(this.deps.db);
     const queue = pollQueue(mailboxId);
     await boss.createQueue(queue);
@@ -158,6 +173,7 @@ export class Jobs implements JobPort {
     if (this.boss) {
       await this.boss.stop({ graceful: false });
       this.boss = null;
+      this.registered.clear();
     }
   }
 

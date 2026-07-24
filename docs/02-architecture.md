@@ -43,6 +43,7 @@ email_campaign/
 │   │   │   │   ├── types.ts            # MailTransport interface
 │   │   │   │   ├── mock/               # MockTransport + scenario scripting
 │   │   │   │   └── smtpImap/           # B8: transport + errors.ts + parse.ts
+│   │   │   ├── sentiment/              # SentimentSuggester port + Anthropic adapter (decision E)
 │   │   │   ├── clock/                  # Clock, SystemClock, VirtualClock
 │   │   │   ├── scheduler/              # tick, pacing, rotation, capacity (docs/06)
 │   │   │   ├── poller/                 # fetch loop, classifier, threading (docs/07)

@@ -80,6 +80,41 @@ describe('pg-boss wiring smoke (B3.16)', () => {
     expect(names).toContain('rebuild-compare'); // B7.3 weekly
   }, 30_000);
 
+  it('registers a runtime-added mailbox once, and is inert before start()', async () => {
+    // The B6.2 routes call this when a mailbox is created or recovers from
+    // auth_failed — twice must not attach a second worker to the same queue
+    // (that would double-poll the mailbox).
+    await pool.query(
+      `INSERT INTO mailboxes (display_name, from_address, smtp_host, imap_host)
+       VALUES ('Late', 'late@t.dev', 'smtp.t.dev', 'imap.t.dev')`,
+    );
+    const late = (await pool.query(`SELECT id FROM mailboxes WHERE from_address = 'late@t.dev'`))
+      .rows[0] as { id: number };
+
+    await jobs.registerMailboxPoll(late.id);
+    await jobs.registerMailboxPoll(late.id); // idempotent
+
+    const schedules = await pool.query(
+      `SELECT count(*)::int AS n FROM pgboss.schedule WHERE name = $1`,
+      [`imap-poll-${late.id}`],
+    );
+    expect(schedules.rows[0].n).toBe(1);
+
+    // Before start() (ROLE=api, SIMULATED_CLOCK, tests) there is nothing to
+    // schedule — the call must be a silent no-op, not a throw.
+    const notStarted = new Jobs({
+      connectionString: TEST_DATABASE_URL,
+      db,
+      clock: new SystemClock(),
+      scheduler: {} as never,
+      poller: {} as never,
+      sequences: new StaticSequenceProvider(),
+      confirmDelivery: { db, store: new EventStore(db), clock: new SystemClock() },
+      alerts: new CapturingAlerts(),
+    });
+    await expect(notStarted.registerMailboxPoll(999)).resolves.toBeUndefined();
+  }, 30_000);
+
   it('a delayed confirm-delivery job runs and appends delivered', async () => {
     const store = new EventStore(db);
     const sentAt = new Date(Date.now() - 6 * 3_600_000);

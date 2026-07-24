@@ -71,7 +71,7 @@ function patchColumns(body: PatchMailboxBody) {
 
 export async function mailboxesRoutes(app: FastifyInstance, services: AppServices): Promise<void> {
   const r = app.withTypeProvider<ZodTypeProvider>();
-  const { db, clock, transport, config } = services;
+  const { db, clock, transport, config, jobs } = services;
 
   const requireMailbox = async (id: number): Promise<MailboxRow> => {
     const row = await getMailbox(db, id);
@@ -133,6 +133,10 @@ export async function mailboxesRoutes(app: FastifyInstance, services: AppService
       });
       const sealed = await sealSecret(b.password, config.SECRET_KEY);
       await upsertMailboxSecret(db, row.id, sealed, clock.now());
+      // Start polling THIS mailbox now: boot only registered the mailboxes that
+      // existed then, so without this a mailbox added through the UI would go
+      // unpolled until the next restart (no-op when workers aren't running).
+      await jobs.registerMailboxPoll(row.id);
       return dtoOf(row);
     },
   );
@@ -237,6 +241,9 @@ export async function mailboxesRoutes(app: FastifyInstance, services: AppService
       });
       if (result.smtpOk && result.imapOk && row.status === 'auth_failed') {
         await patchMailbox(db, row.id, { status: 'ok', statusReason: null });
+        // auth_failed mailboxes are skipped at boot registration — a recovered
+        // one needs its poll queue (re-)registered to resume reply detection.
+        await jobs.registerMailboxPoll(row.id);
       }
       return dtoOf(await requireMailbox(req.params.id));
     },

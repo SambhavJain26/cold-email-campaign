@@ -47,7 +47,12 @@ export type LeadRef = string; // 'L0001' … — id 1…, email l0001@scenario.d
 export type ScriptedOutcome =
   | { outcome: 'hard_bounce'; dsn?: string }
   | { outcome: 'soft_bounce_then_deliver'; retries?: number; dsn?: string; atStep?: number }
-  | { outcome: 'smtp_transient'; times?: number };
+  /**
+   * `error` defaults to the mock's `421 4.7.0 try again later` — which reads as
+   * provider THROTTLING (docs/06 §6). Pass a non-throttle string to exercise
+   * the plain `smtp_failing` path.
+   */
+  | { outcome: 'smtp_transient'; times?: number; error?: string };
 
 interface PendingInbound {
   at: Date;
@@ -224,7 +229,10 @@ export class Scenario {
     const email = leadEmail(ref);
     if (script.outcome === 'smtp_transient') {
       for (let i = 0; i < (script.times ?? 1); i++) {
-        this.mock.onSend(email, { kind: 'transient' });
+        this.mock.onSend(email, {
+          kind: 'transient',
+          ...(script.error !== undefined && { error: script.error }),
+        });
       }
       return;
     }

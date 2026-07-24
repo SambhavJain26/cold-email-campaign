@@ -101,6 +101,8 @@ export interface MailTransport {
   fetchNew(mailboxId: number): Promise<IncomingMessage[]>;
   /** "Test Connection" + health monitoring. */
   verify(config: MailboxVerifyConfig): Promise<VerifyResult>;
+  /** Release pooled connections on shutdown. Optional — the mock has none. */
+  close?(): void | Promise<void>;
 }
 
 // ── SIMULATED_CLOCK scripting seam (docs/13 §5) ──────────────────────────────
