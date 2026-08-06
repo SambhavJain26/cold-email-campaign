@@ -86,6 +86,7 @@ The canary in §5 assumes warmed mailboxes on authenticated domains — the walk
 - **Warming** — each mailbox aged and ramped by a warming service or by hand over ~2–4 weeks before it carries campaign volume. The app's ramp (`ramp_days` / `ramp_daily_enroll_cap`) governs *enrollment*, not mailbox reputation.
 - **App passwords / provider auth** — the transport does password auth only (`auth_type` is stored but unused; no OAuth). Gmail/Outlook need an app password with IMAP enabled.
 - **Reverse DNS + a real reply-to inbox** the operator actually reads: replies are the product.
+- **A non-residential postal address** for `compliance_settings.physical_address`. It is legally required in commercial email (CAN-SPAM for US recipients; CASL and GDPR/ePrivacy impose comparable identification duties) and the renderer refuses ALL sends while it is empty — but it is published to every recipient, so **never use a home address**. Use a PO Box, a virtual-mailbox/CMRA address, a registered business address, or a coworking address. A missing or obviously fake footer address is also a negative deliverability signal. *(For the B8.3-local canary a placeholder is fine — the only recipients are addresses the operator owns.)*
 
 ## 7. Clean-VPS deploy dry-run (B7.7) — verified 2026-07-24
 
