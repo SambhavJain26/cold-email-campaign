@@ -4,7 +4,7 @@
 
 **Legend:** `[ ]` not started · `[~]` in progress · `[x]` done · `[!]` blocked (note why in the log)
 
-**Current focus:** → **B8.3+ (blocked on real infrastructure). No code work is outstanding.** **M3 ✅ closed.** **B8.1–B8.2 ✅** — the live `SmtpImapTransport` is built and proven against a real SMTP+IMAP server (GreenMail container), and `MAIL_TRANSPORT=smtp_imap` swaps in with the whole offline suite still green. **Post-M3 sweep ✅ (2026-07-25)** — every stage audited against docs/14/15 + the decision register; the four specified-but-unbuilt items found are closed (see the sweep entry in the log). Everything left in B8 (canary mailbox, real Gmail/Outlook DSN+OOO pattern tuning, ramp-up, real-cohort reconciliation) needs a VPS, a domain and real mailboxes — it is *operations*, not code; the pre-canary prerequisites are docs/16 §6a.
+**Current focus:** → **B8.3-local** (branch `b8.3-local-canary`, runbook [docs/17](docs/17-local-canary-runbook.md)) — a two-week validation against real Google servers on throwaway Gmail accounts, which de-risks B8.3 and banks most of B8.4 before any infrastructure is bought. Everything below still holds: **B8.3+ proper is blocked on real infrastructure. No code work is outstanding on `main`.** **M3 ✅ closed.** **B8.1–B8.2 ✅** — the live `SmtpImapTransport` is built and proven against a real SMTP+IMAP server (GreenMail container), and `MAIL_TRANSPORT=smtp_imap` swaps in with the whole offline suite still green. **Post-M3 sweep ✅ (2026-07-25)** — every stage audited against docs/14/15 + the decision register; the four specified-but-unbuilt items found are closed (see the sweep entry in the log). Everything left in B8 (canary mailbox, real Gmail/Outlook DSN+OOO pattern tuning, ramp-up, real-cohort reconciliation) needs a VPS, a domain and real mailboxes — it is *operations*, not code; the pre-canary prerequisites are docs/16 §6a.
 
 ---
 
@@ -57,6 +57,17 @@
 ### B8 — Live transport
 - [x] B8.1 SmtpImapTransport · [x] B8.2 flag-swap test · [ ] B8.3 canary mailbox · [ ] B8.4 real DSN/OOO pattern validation · [ ] B8.5 ramp caps + all mailboxes · [ ] B8.6 real cohort reconciliation
 - **Gate:** ☐ canary checklist (docs/16 §5) → **M4 LIVE**. B8.1–B8.2 done and proven against a REAL SMTP+IMAP server in Docker (GreenMail); **B8.3–B8.6 are blocked on the operator having a VPS, a domain and real mailboxes** — they cannot be built, only performed.
+
+### B8.3-local — two-week validation on throwaway Gmail *(not a docs/14 stage; de-risks B8.3–B8.4 before real infra)*
+Branch `b8.3-local-canary`. Runbook: **[docs/17-local-canary-runbook.md](docs/17-local-canary-runbook.md)**. Rig = 2 sender Gmails + 1 seed recipient + 1 dead address, on an Oracle Always-Free VM running the real prod stack. Deliverability is explicitly OUT of scope.
+- [x] tooling: `npm run capture-fixture` (`test/ops/capture-fixture.ts`) — real provider message → scrubbed `.eml` in the headers corpus
+- [ ] §1 host verified (outbound 587/993, ARM build) + prod stack deployed, §7 checklist re-run on real hardware
+- [ ] §2 mailboxes connected + **go/no-go gate** (plus-addressed reply threads to the right enrollment)
+- [ ] §3 core walkthrough cohort — all 4 classifier buckets, metrics, 0-drift rebuild
+- [ ] §4 fixtures captured + classifier patterns patched + offline suite green ← **most of B8.4**
+- [ ] §5 failure cohorts (auto-pause, rotation, redistribution, suppression, recycle guard)
+- [ ] §6 time-based (stale-poll, catch-up, backup freshness, runtime poll registration)
+- [ ] §7 wrap — docs/16 §5 evidence, merge fixtures + patches to `main`
 
 ### Post-M3 sweep *(not a docs/14 stage — gaps found by auditing the finished stages)*
 - [x] decision E — AI sentiment pre-suggestion (`SentimentSuggester` + Anthropic adapter; had no task ID anywhere)

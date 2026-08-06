@@ -15,6 +15,7 @@
     "rotate-secrets": "tsx src/services/rotateSecretsCli.ts",
     "self-check": "tsx src/services/selfCheckCli.ts",
     "operator:set-password": "tsx src/services/operatorSetPasswordCli.ts",
+    "capture-fixture": "tsx test/ops/capture-fixture.ts",
     "golden:export": "tsx test/fixtures/golden/export-api-fixtures.ts"
   },
   "dependencies": {

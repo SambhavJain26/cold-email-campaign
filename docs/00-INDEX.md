@@ -27,6 +27,7 @@ Progress is tracked in [PROGRESS.md](../PROGRESS.md) at the repo root.
 | 14 | [14-build-stages-backend.md](14-build-stages-backend.md) | **Backend track**: stages B0–B8, task-level breakdown with IDs | day 1 |
 | 15 | [15-build-stages-frontend.md](15-build-stages-frontend.md) | **Frontend track**: stages F0–F8, task-level breakdown with IDs | day 1 |
 | 16 | [16-deployment-ops.md](16-deployment-ops.md) | Env vars, Docker Compose, backups, runbook, canary checklist | B7–B8 |
+| 17 | [17-local-canary-runbook.md](17-local-canary-runbook.md) | **B8.3-local**: two-week validation on throwaway Gmail, before real infrastructure | B8.3 |
 
 ## Reading order
 
