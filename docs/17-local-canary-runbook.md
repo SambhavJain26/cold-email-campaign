@@ -18,6 +18,34 @@ not the campaign. §6a's prerequisites still gate the real canary.
 
 ---
 
+## 0. Findings log — everything the canary has surfaced
+
+**The durable record.** Task chips are not persisted; this table is. Nothing here is a
+theoretical review comment — every row is something that stopped, misled, or silently blocked a
+real operator during the pass. **Everything marked OPEN must be resolved before the real
+campaign**, not before M4 necessarily, but before a paying prospect receives anything.
+
+| # | Finding | Class | Status |
+|---|---|---|---|
+| 1 | Ops CLIs (`operator:set-password`, `rotate-secrets`, `self-check`) were documented as runnable "from the repo root". They aren't — no root proxy, so the **documented lockout-recovery path did not work**. | docs wrong | ✅ fixed — `-w @coldemail/server`, commit `d588de5` |
+| 2 | The compliance footer address is published to every recipient; docs never warned against using a home address, and it's legally required so it can't just be omitted. | docs gap | ✅ documented — docs/16 §6a, commit `590e75a` |
+| 3 | **Nothing tells the operator why sends aren't happening.** The window was closed; the scheduler ticked 23 times, correctly did nothing, and emitted no alert, no banner, no log line. Diagnosable only by reading the DB. | **observability** | 🔴 OPEN — highest priority |
+| 4 | `mailboxes.send_window` is not editable anywhere in the UI — `mailbox-dialog.tsx` explicitly `.omit()`s it. Every mailbox is pinned to `08:00–17:00 Mon–Fri`. API supports changing it; no screen does. | UI gap | 🔴 OPEN |
+| 5 | **No per-mailbox timezone exists at all.** `send_window` carries only start/end/days; the timezone is the single global `settings.default_timezone`. An operator cannot align sending hours to prospect business hours. | design gap | 🔴 OPEN |
+| 6 | Campaign status `archived` is reachable via `PATCH /campaigns/:id`, styled in the badge, and handled by the enroll panel — but **no UI control ever sets it**. Dead branches for a state the operator can't reach. | UI gap | 🔴 OPEN |
+| 7 | No delete for campaigns or sequences, even at **zero events** where deletion is provably safe. Combined with `tier_effort_config`/`ramp_config` being create-only, a mis-configured campaign is permanently useless *and* permanently undeletable. | UX gap | 🔴 OPEN |
+| 8 | No data-subject erasure path (GDPR Art. 17 / DPDP 2023). Suppression deliberately *retains* the email forever, so it is not erasure. | **legal** | 🔴 OPEN |
+| 9 | Tier A defaults to **Mode 1 (human-written)**, which the scheduler never sends — it waits for the manual composer. A new operator accepting defaults gets a campaign that silently never sends. Correct behaviour, invisible consequence. | UX trap | 🔴 OPEN |
+| 10 | Leads are import-only (no `POST /leads`). Deliberate — the ingest path owns hygiene, dedup and suppression — but adding one lead means hand-writing a CSV. | minor | 🟡 accepted, revisit |
+
+**The pattern worth naming:** findings 4, 5, 6 and 9 are all the same shape — *the backend
+implements it, the API exposes it, the UI never surfaces it, and the operator gets no feedback.*
+The offline suites cannot catch this class because they drive the API directly and never look at
+a screen. That is precisely the value this canary adds, and it argues for a **UI-coverage audit
+of every settings-shaped field** before the real campaign.
+
+---
+
 ## 0. The rig
 
 | Role | Account | Setup |
