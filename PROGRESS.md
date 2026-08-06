@@ -61,7 +61,7 @@
 ### B8.3-local — two-week validation on throwaway Gmail *(not a docs/14 stage; de-risks B8.3–B8.4 before real infra)*
 Branch `b8.3-local-canary`. Runbook: **[docs/17-local-canary-runbook.md](docs/17-local-canary-runbook.md)**. Rig = 2 sender Gmails + 1 seed recipient + 1 dead address, on an Oracle Always-Free VM running the real prod stack. Deliverability is explicitly OUT of scope.
 - [x] tooling: `npm run capture-fixture` (`test/ops/capture-fixture.ts`) — real provider message → scrubbed `.eml` in the headers corpus
-- [ ] §1 host verified (outbound 587/993, ARM build) + prod stack deployed, §7 checklist re-run on real hardware
+- [x] §1 host verified (**587 + 993 OPEN**, STARTTLS handshake against a valid Google cert chain) + prod stack deployed on the Oracle Always-Free VM, **§7 checklist all green on real hardware** (2026-08-07)
 - [ ] §2 mailboxes connected + **go/no-go gate** (plus-addressed reply threads to the right enrollment)
 - [ ] §3 core walkthrough cohort — all 4 classifier buckets, metrics, 0-drift rebuild
 - [ ] §4 fixtures captured + classifier patterns patched + offline suite green ← **most of B8.4**

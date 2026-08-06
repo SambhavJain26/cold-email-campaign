@@ -77,13 +77,31 @@ Ubuntu 24.04 (`2026.07.17-0`), **VM.Standard.E2.1.Micro — Always Free**, 1 OCP
 unchanged. Caddy's internal cert plus a browser warning is a fine fallback.
 
 **Deploy** with `docker-compose.prod.yml` + `.env.prod`, `MAIL_TRANSPORT=mock` initially, and
-re-run the §7 checklist on real hardware:
+re-run the §7 checklist on real hardware — **all green 2026-08-07**:
 
-- [ ] All three images build
-- [ ] Boot ordering: db healthy → app migrates + seeds operator → app healthy → caddy starts
-- [ ] `GET /health` through Caddy → `{ok:true,db:true}`; app not reachable on the host
-- [ ] SPA served with history fallback; login succeeds
-- [ ] Backup sidecar cron installed
+- [x] All three images build (`app`, `caddy`, `backup`) — the Vite build survives 1 GB + swap
+- [x] Boot ordering: db healthy → app migrates + seeds operator → app healthy → caddy starts
+- [x] `GET /health` through Caddy TLS → `{"ok":true,"db":true,"version":"0.0.0"}`
+- [x] App **not** reachable on the host (`:3001` refused; only caddy publishes)
+- [x] SPA served (`/` → 200 html) with history fallback (`/leads` → 200 html)
+- [x] Login through Caddy → `{"ok":true}` 200
+- [x] Backup sidecar cron installed (`30 2 * * *`)
+
+**Access is via SSH tunnel, not a public port** — `DOMAIN=localhost` so Caddy serves the
+tunnelled host. Nothing is exposed to the internet, which matters because Gmail app passwords
+are typed into this UI. iptables 80/443 are open and persisted, but the Oracle VCN security
+list is deliberately left closed; opening it (4 clicks) plus setting `DOMAIN` to the public IP
+is all that direct access would need.
+
+```
+ssh -i ~/.ssh/oracle_canary -L 8443:localhost:443 ubuntu@<PUBLIC_IP>   # then https://localhost:8443
+```
+
+> **Operational lesson (2026-08-07):** never `crontab -l` the backup sidecar in shared output —
+> the cron line embeds `DATABASE_URL` **including the Postgres password in plaintext**. Print
+> the schedule only (`grep -o '^[0-9* ]*'`). Doing this once already forced a password rotation
+> (`ALTER USER` + `.env.prod` + `up -d`). The same caution applies to `docker inspect` and
+> `docker compose config`, both of which render resolved env.
 
 Only then set `MAIL_TRANSPORT=smtp_imap`. Leave `MAIL_TLS_INSECURE` unset — boot refuses it under
 `NODE_ENV=production`, and it would send an app password over an unverified connection.
