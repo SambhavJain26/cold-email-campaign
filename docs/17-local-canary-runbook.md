@@ -45,12 +45,32 @@ real hardware.
 
 **Verify before building anything — any one of these fails the host:**
 
-- [ ] **Outbound 587 reaches `smtp.gmail.com`.** Most clouds block outbound 25; some block 587.
-      *Highest-risk unknown — check first.* Fallback: run the rig on the laptop instead.
-- [ ] **Outbound 993 reaches `imap.gmail.com`.**
-- [ ] **The ARM images build.** `@node-rs/argon2` ships `linux-arm64-gnu` prebuilds and
-      `libsodium-wrappers` is WASM, so this should be clean. Fallback: Oracle's x86 micro
-      instances (1 GB RAM — tight but workable).
+- [x] **Outbound 587 reaches `smtp.gmail.com`** — ✅ 2026-08-07. Socket open AND a full
+      STARTTLS handshake completes with a valid Google cert chain (`CN = smtp.gmail.com`,
+      GTS Root R1), so a real SMTP server answers — not just an open port.
+- [x] **Outbound 993 reaches `imap.gmail.com`** — ✅ 2026-08-07.
+- [x] **Architecture** — ✅ x86_64, so the ARM-prebuild question is moot.
+
+**Provisioned host (2026-08-07):** `coldemail-canary`, Mumbai (`ap-mumbai-1`, single-AD),
+Ubuntu 24.04 (`2026.07.17-0`), **VM.Standard.E2.1.Micro — Always Free**, 1 OCPU / 954 MB,
+46.6 GB boot. SSH key `~/.ssh/oracle_canary`.
+
+> **Two Oracle traps hit during provisioning, both recorded so they don't cost time twice:**
+>
+> 1. **`VM.Standard.A1.Flex` (free ARM, 4 OCPU / 24 GB) is out of capacity** in Mumbai and
+>    can't be worked around — Mumbai is single-AD, and Always Free resources only exist in the
+>    tenancy's home region, so neither "try another AD" nor "try another region" applies.
+>    Fell back to the x86 micro. Retry A1 later if a roomier box is wanted.
+> 2. **"Create new VCN" locks the "Automatically assign public IPv4 address" toggle** and the
+>    instance is created with **no public IP** — the Review page says `Public IPv4 address: No`,
+>    which is the only place it's stated plainly. Reproduced on a completely clean wizard, so
+>    it's Oracle behaviour, not a mis-click. Fix after creation: instance → Networking →
+>    Attached VNICs → primary VNIC → IP administration → row menu → Edit → **Ephemeral public
+>    IP** → Update.
+>
+> **1 GB RAM needs swap.** A 2 GB `/swapfile` is configured and persisted in `/etc/fstab`.
+> Postgres will also need tuning down (`shared_buffers`, `max_connections`) before the stack
+> runs comfortably.
 
 **Hostname/TLS:** no domain yet, so point a free DuckDNS subdomain at the VM's IP and set
 `DOMAIN` to it — Caddy then gets a real Let's Encrypt cert through the existing config,
