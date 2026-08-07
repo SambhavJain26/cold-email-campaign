@@ -80,7 +80,22 @@ export function leadFilterWhere(filter: LeadFilter): SQL | undefined {
   if (filter.tier !== undefined) {
     conds.push(filter.tier === 'untiered' ? isNull(leads.tier)! : eq(leads.tier, filter.tier)!);
   }
-  if (filter.state !== undefined) conds.push(eq(leads.state, filter.state)!);
+  // `state` is the ENROLLMENT state machine (docs/10 GET /leads — the values are
+  // NEW/ACTIVE/REPLIED/BOUNCED/UNSUBSCRIBED/COMPLETED), NOT `leads.state`, which
+  // is the postal/geographic column from the CSV ("Maharashtra"). Filtering the
+  // wrong column made every state filter return zero rows (docs/17 §0 finding 17).
+  // When a campaign is filtered too, both must hold for the SAME enrollment —
+  // otherwise "REPLIED in campaign 2" would match a lead who replied in some
+  // other campaign and merely happens to be enrolled in this one.
+  if (filter.state !== undefined) {
+    const campaignClause =
+      filter.campaignId === undefined ? sql`` : sql` AND e.campaign_id = ${filter.campaignId}`;
+    conds.push(
+      sql`EXISTS (SELECT 1 FROM ${enrollments} e
+                  WHERE e.lead_id = ${leads.id}
+                    AND e.current_state::text = ${filter.state}${campaignClause})`,
+    );
+  }
   if (filter.suppressed !== undefined) conds.push(eq(leads.isSuppressed, filter.suppressed)!);
   if (filter.q !== undefined && filter.q !== '') {
     const like = `%${filter.q}%`;

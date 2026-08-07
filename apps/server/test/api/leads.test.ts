@@ -45,8 +45,28 @@ describe('B6.3 leads', () => {
     expect(tierA.total).toBe(1);
     const untiered = (await h.inject({ method: 'GET', url: '/api/v1/leads?tier=untiered' })).json();
     expect(untiered.total).toBe(2);
+    // `state` is the ENROLLMENT state machine, not leads.state (the postal
+    // column — 'TX'/'CO' above). This assertion previously used `state=TX`,
+    // which quietly locked in the wrong semantics: the frontend sends
+    // ENROLLMENT_STATES values, so every state filter in the UI returned zero
+    // rows while the suite stayed green (docs/17 §0 finding 17).
+    const replied = (await h.inject({ method: 'GET', url: '/api/v1/leads?state=REPLIED' })).json();
+    expect(replied.total).toBe(0);
+    const active = (await h.inject({ method: 'GET', url: '/api/v1/leads?state=ACTIVE' })).json();
+    expect(active.total).toBe(1);
+    expect(active.items[0].email).toBe('cara@cedar.dev');
+    // A postal value must NOT match — proves we are not filtering leads.state.
     const tx = (await h.inject({ method: 'GET', url: '/api/v1/leads?state=TX' })).json();
-    expect(tx.total).toBe(2);
+    expect(tx.total).toBe(0);
+    // Campaign + state must hold for the SAME enrollment.
+    const activeInCamp = (
+      await h.inject({ method: 'GET', url: '/api/v1/leads?state=ACTIVE&campaign_id=1' })
+    ).json();
+    expect(activeInCamp.total).toBe(1);
+    const activeOtherCamp = (
+      await h.inject({ method: 'GET', url: '/api/v1/leads?state=ACTIVE&campaign_id=99' })
+    ).json();
+    expect(activeOtherCamp.total).toBe(0);
     const q = (await h.inject({ method: 'GET', url: '/api/v1/leads?q=bravo' })).json();
     expect(q.total).toBe(1);
     const inCamp = (await h.inject({ method: 'GET', url: '/api/v1/leads?campaign_id=1' })).json();
@@ -94,14 +114,14 @@ describe('B6.3 leads', () => {
     const byFilter = await h.inject({
       method: 'POST',
       url: '/api/v1/leads/bulk-tier',
-      payload: { filter: { state: 'TX', tier: 'untiered' }, tier: 'C' },
+      payload: { filter: { state: 'ACTIVE', tier: 'untiered' }, tier: 'C' },
     });
-    expect(byFilter.json()).toEqual({ updated: 1 }); // cara (amy is tier A)
+    expect(byFilter.json()).toEqual({ updated: 1 }); // cara — the only untiered lead with an ACTIVE enrollment
 
     const both = await h.inject({
       method: 'POST',
       url: '/api/v1/leads/bulk-tier',
-      payload: { lead_ids: [1], filter: { state: 'TX' }, tier: 'A' },
+      payload: { lead_ids: [1], filter: { state: 'ACTIVE' }, tier: 'A' },
     });
     expect(both.statusCode).toBe(400);
     const neither = await h.inject({

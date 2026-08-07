@@ -2,6 +2,7 @@ import { useMutation, useQueryClient, type QueryClient } from '@tanstack/react-q
 import {
   manualSendResponseSchema,
   okResponseSchema,
+  uniboxItemSchema,
   type ManualSendBody,
   type Sentiment,
   type UniboxItemDto,
@@ -68,7 +69,13 @@ export function useTagSentiment() {
       incomingMessageId: number;
       sentiment: Sentiment;
     }) =>
-      apiFetch(`/unibox/${incomingMessageId}/sentiment`, okResponseSchema, {
+      // Returns the updated ITEM, not {ok} — docs/10 and the route's own
+      // `response: { 200: uniboxItemSchema }`. Parsing it as okResponseSchema
+      // made every successful tag throw client-side: the server appended the
+      // event and returned 200, the client rejected the body and toasted
+      // "request failed", so the operator retried and produced duplicate
+      // sentiment_tagged events in an append-only log (docs/17 §0 finding 18).
+      apiFetch(`/unibox/${incomingMessageId}/sentiment`, uniboxItemSchema, {
         method: 'POST',
         body: { sentiment },
       }),

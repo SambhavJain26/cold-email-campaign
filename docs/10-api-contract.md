@@ -32,7 +32,10 @@ Shapes below in TS notation. `Metric = { numerator: number, denominator: number 
 ## Leads & imports
 | | |
 |---|---|
-| GET `/leads?tier=A\|B\|C\|nurture\|untiered&state=&campaign_id=&q=&suppressed=&page=` | → list of `Lead = {id, email, first_name, last_name, company, city, state, tier, is_suppressed, custom_fields, latest_enrollment?: {campaign_id, current_state, current_step_no}}` + `{untiered_count}` in meta |
+| GET `/leads?tier=A\|B\|C\|nurture\|untiered&state=NEW\|ACTIVE\|REPLIED\|BOUNCED\|UNSUBSCRIBED\|COMPLETED&campaign_id=&q=&suppressed=&page=` | → list of `Lead = {id, email, first_name, last_name, company, city, state, tier, is_suppressed, custom_fields, latest_enrollment?: {campaign_id, current_state, current_step_no}}` + `{untiered_count}` in meta |
+
+> **`state` is the ENROLLMENT state machine, not `leads.state`** (the postal column, which is returned in the DTO but is not filterable). The parameter was originally written as a bare `state=`; the frontend read it as the enrollment state and the backend implemented it against `leads.state`, so every state filter in the UI silently returned zero rows while the api suite — which asserted `state=TX` — stayed green. Disambiguated 2026-08-07 (docs/17 §0 finding 17). When `campaign_id` is also supplied, both must match the **same** enrollment.
+
 | GET `/leads/:id` | → `Lead & {notes, timeline: EventView[]}` — full event history for the profile screen |
 | PATCH `/leads/:id` | `{tier?, notes?, custom_fields?}` → `Lead` (edits `custom_observation` here) |
 | POST `/leads/bulk-tier` | `{lead_ids?: number[], filter?: LeadFilter, tier}` → `{updated: number}` |
