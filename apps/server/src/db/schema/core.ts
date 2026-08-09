@@ -49,6 +49,8 @@ export const leads = pgTable(
     importId: bigint('import_id', { mode: 'number' }),
     createdAt: tz('created_at').notNull().defaultNow(),
     updatedAt: tz('updated_at').notNull().defaultNow(),
+    isErased: boolean('is_erased').notNull().default(false),
+    erasedAt: tz('erased_at'),
   },
   (t) => [
     index('leads_tier')

@@ -4,6 +4,8 @@
 import type { FastifyInstance } from 'fastify';
 import {
   idParamSchema,
+  okResponseSchema,
+  deleteSequenceBodySchema,
   previewBodySchema,
   previewResponseSchema,
   sequenceSchema,
@@ -17,6 +19,7 @@ import {
 import type { AppServices } from '../composition';
 import {
   createSequence,
+  deleteSequenceIfUnreferenced,
   getSequenceNested,
   getVariantById,
   listSequencesNested,
@@ -142,6 +145,28 @@ export async function sequencesRoutes(app: FastifyInstance, services: AppService
         { retireOnly },
       );
       return toSequenceDto((await getSequenceNested(db, req.params.id))!);
+    },
+  );
+
+  r.delete(
+    '/sequences/:id',
+    {
+      schema: {
+        params: idParamSchema,
+        body: deleteSequenceBodySchema,
+        response: { 200: okResponseSchema },
+      },
+    },
+    async (req) => {
+      const sequence = await getSequenceNested(db, req.params.id);
+      if (!sequence) throw AppError.notFound('sequence');
+      if (req.body.confirm.trim() !== sequence.sequence.name) {
+        throw new AppError('validation', 400, 'confirm must equal the sequence name');
+      }
+      const result = await deleteSequenceIfUnreferenced(db, req.params.id);
+      if (!result.deleted)
+        throw new AppError('conflict', 409, result.reason ?? 'sequence cannot be deleted');
+      return { ok: true } as const;
     },
   );
 

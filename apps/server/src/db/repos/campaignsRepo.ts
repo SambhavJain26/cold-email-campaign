@@ -1,7 +1,7 @@
 import { eq, sql } from 'drizzle-orm';
 import type { PersonalizationMode } from '@coldemail/shared';
 import type { DbLike } from '../client';
-import { campaigns } from '../schema';
+import { campaigns, leads } from '../schema';
 
 export type CampaignRow = typeof campaigns.$inferSelect;
 
@@ -45,17 +45,28 @@ export function autoObservationsOf(c: CampaignRow): Record<string, string> | nul
 export interface CampaignCounts {
   enrolledCount: number;
   contactedCount: number;
+  manualOnlyCount: number;
 }
 
 /** enrolled = enrollments rows; contacted = distinct leads with ≥1 delivered (the denominator law). */
 export async function campaignCounts(db: DbLike, campaignId: number): Promise<CampaignCounts> {
   const res = await db.execute(sql`
     SELECT
-      (SELECT count(*)::int FROM enrollments e WHERE e.campaign_id = ${campaignId}) AS enrolled,
+      (SELECT count(*)::int FROM enrollments e JOIN ${leads} l ON l.id = e.lead_id AND NOT l.is_erased
+        WHERE e.campaign_id = ${campaignId}) AS enrolled,
       (SELECT count(DISTINCT ev.lead_id)::int FROM events ev
-        WHERE ev.campaign_id = ${campaignId} AND ev.type = 'delivered') AS contacted`);
-  const row = res.rows[0] as { enrolled: number; contacted: number };
-  return { enrolledCount: row.enrolled, contactedCount: row.contacted };
+        WHERE ev.campaign_id = ${campaignId} AND ev.type = 'delivered'
+          AND EXISTS (SELECT 1 FROM ${leads} l WHERE l.id = ev.lead_id AND NOT l.is_erased)) AS contacted,
+      (SELECT count(*)::int FROM enrollments e JOIN ${leads} l ON l.id = e.lead_id AND NOT l.is_erased
+        WHERE e.campaign_id = ${campaignId}
+          AND e.personalization_mode = 'human_written'
+          AND e.current_state IN ('NEW', 'ACTIVE')) AS manual_only`);
+  const row = res.rows[0] as { enrolled: number; contacted: number; manual_only: number };
+  return {
+    enrolledCount: row.enrolled,
+    contactedCount: row.contacted,
+    manualOnlyCount: row.manual_only,
+  };
 }
 
 /** B6.6 GET /campaigns — with the two display counts, one grouped pass. */
@@ -115,6 +126,26 @@ export async function patchCampaign(
   return rows[0];
 }
 
+export async function deleteCampaignIfUnreferenced(
+  db: DbLike,
+  campaignId: number,
+): Promise<{ deleted: boolean; reason?: string }> {
+  const refs = await db.execute(sql`
+    SELECT
+      (SELECT count(*)::int FROM enrollments WHERE campaign_id = ${campaignId}) AS enrollments,
+      (SELECT count(*)::int FROM events WHERE campaign_id = ${campaignId}) AS events,
+      (SELECT count(*)::int FROM campaigns WHERE recycled_from_campaign_id = ${campaignId}) AS recycled_by`);
+  const row = refs.rows[0] as { enrollments: number; events: number; recycled_by: number };
+  if (row.enrollments > 0 || row.events > 0 || row.recycled_by > 0) {
+    return { deleted: false, reason: 'campaign has enrollment, event, or recycle references' };
+  }
+  const removed = await db
+    .delete(campaigns)
+    .where(eq(campaigns.id, campaignId))
+    .returning({ id: campaigns.id });
+  return { deleted: removed.length === 1 };
+}
+
 /**
  * B6.6 outcomes panel — the exporter's exact grouping (fixture-locked):
  * REPLIED splits by the best_reply_sentiment projection (decision M's fold).
@@ -125,7 +156,8 @@ export async function outcomeCounts(
 ): Promise<Array<{ state: string; sentiment: string | null; n: number }>> {
   const res = await db.execute(sql`
     SELECT current_state AS state, best_reply_sentiment AS sentiment, count(*)::int AS n
-    FROM enrollments WHERE campaign_id = ${campaignId} GROUP BY 1, 2`);
+    FROM enrollments e JOIN ${leads} l ON l.id = e.lead_id AND NOT l.is_erased
+    WHERE e.campaign_id = ${campaignId} GROUP BY 1, 2`);
   return res.rows as Array<{ state: string; sentiment: string | null; n: number }>;
 }
 

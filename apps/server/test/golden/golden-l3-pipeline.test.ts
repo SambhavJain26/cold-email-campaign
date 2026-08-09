@@ -37,6 +37,9 @@ describe('@golden L3 — full pipeline over ~47 virtual days', () => {
       tickMinutes: 9, // divides the 18-min pace gap exactly
       pollMinutes: 54,
       jitterPct: 0, // exact-slot pacing: 30 sends fill the 9h window precisely
+      // The golden cohort validates scheduler/metric parity, not the
+      // operator's manual Tier-A workflow; keep its historic automated mix.
+      tierEffortConfig: { A: 'template_researched', B: 'template_researched', C: 'template_auto' },
     });
     // Leads have no state → default ET; ticking outside 12:00–23:00Z can't
     // produce work (window is 13:00–22:00Z) — skip those steps for speed.

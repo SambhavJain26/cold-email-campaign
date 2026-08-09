@@ -2,7 +2,7 @@
 // Append-only — there is deliberately no update/delete here.
 import { and, asc, desc, eq, gte, inArray, sql } from 'drizzle-orm';
 import type { DbLike } from '../client';
-import { events } from '../schema';
+import { events, leads } from '../schema';
 import { parseDomainEvent, type DomainEvent } from '../../domain/events';
 
 export type EventRow = typeof events.$inferSelect;
@@ -55,8 +55,14 @@ export async function countSentSince(db: DbLike, mailboxId: number, since: Date)
   const rows = await db
     .select({ n: sql<number>`count(*)::int` })
     .from(events)
+    .innerJoin(leads, eq(leads.id, events.leadId))
     .where(
-      and(eq(events.type, 'sent'), eq(events.mailboxId, mailboxId), gte(events.occurredAt, since)),
+      and(
+        eq(events.type, 'sent'),
+        eq(events.mailboxId, mailboxId),
+        gte(events.occurredAt, since),
+        eq(leads.isErased, false),
+      ),
     );
   return rows[0]?.n ?? 0;
 }
@@ -66,7 +72,10 @@ export async function lifetimeSentCount(db: DbLike, mailboxId: number): Promise<
   const rows = await db
     .select({ n: sql<number>`count(*)::int` })
     .from(events)
-    .where(and(eq(events.type, 'sent'), eq(events.mailboxId, mailboxId)));
+    .innerJoin(leads, eq(leads.id, events.leadId))
+    .where(
+      and(eq(events.type, 'sent'), eq(events.mailboxId, mailboxId), eq(leads.isErased, false)),
+    );
   return rows[0]?.n ?? 0;
 }
 

@@ -172,4 +172,61 @@ describe('B6.3 leads', () => {
     });
     expect(again.statusCode).toBe(404);
   });
+
+  it('POST /leads/:id/erase irreversibly redacts PII and stops an active enrollment', async () => {
+    await h.pool.query(`
+      INSERT INTO leads (email, first_name, last_name, company, notes, custom_fields)
+      VALUES ('dana@delta.dev', 'Dana', 'Doe', 'Delta Homes', 'private note', '{"source":"import"}')`);
+    await h.pool.query(`
+      INSERT INTO enrollments (campaign_id, lead_id, current_state, current_step_no, personalization_mode, enrolled_at)
+      VALUES (1, 4, 'ACTIVE', 1, 'template_auto', now())`);
+    await h.pool.query(`
+      INSERT INTO events (type, occurred_at, lead_id, enrollment_id, campaign_id, attributes)
+      VALUES ('enrolled', now(), 4, 2, 1, '{}')`);
+    await h.pool.query(`
+      INSERT INTO alerts (kind, severity, payload)
+      VALUES ('operator_note', 'warning', '{"email":"dana@delta.dev","note":"private"}')`);
+    await suppressLead(h.services.db, 4, 'manual', h.clock.now());
+
+    const wrong = await h.inject({
+      method: 'POST',
+      url: '/api/v1/leads/4/erase',
+      payload: { confirm: 'not-dana@delta.dev' },
+    });
+    expect(wrong.statusCode).toBe(400);
+
+    const erased = await h.inject({
+      method: 'POST',
+      url: '/api/v1/leads/4/erase',
+      payload: { confirm: 'dana@delta.dev' },
+    });
+    expect(erased.statusCode).toBe(200);
+    expect((await h.inject({ method: 'GET', url: '/api/v1/leads/4' })).statusCode).toBe(404);
+    expect((await h.inject({ method: 'GET', url: '/api/v1/leads?q=dana' })).json().total).toBe(0);
+
+    const lead = await h.pool.query(`
+      SELECT email, first_name, last_name, company, notes, custom_fields, is_suppressed, is_erased, erased_at
+      FROM leads WHERE id = 4`);
+    expect(lead.rows[0]).toMatchObject({
+      email: 'erased-lead-4@invalid.local',
+      first_name: null,
+      last_name: null,
+      company: null,
+      notes: null,
+      custom_fields: {},
+      is_suppressed: false,
+      is_erased: true,
+    });
+    expect(lead.rows[0].erased_at).not.toBeNull();
+    const enrollment = await h.pool.query(`SELECT current_state FROM enrollments WHERE id = 2`);
+    expect(enrollment.rows[0].current_state).toBe('UNSUBSCRIBED');
+    const eraseEvent = await h.pool.query(`
+      SELECT attributes FROM events WHERE enrollment_id = 2 AND type = 'unsubscribe'`);
+    expect(eraseEvent.rows[0].attributes).toEqual({ data_erasure: true });
+    expect((await h.pool.query(`SELECT 1 FROM suppressions WHERE lead_id = 4`)).rows).toHaveLength(
+      0,
+    );
+    const alert = await h.pool.query(`SELECT payload FROM alerts WHERE kind = 'operator_note'`);
+    expect(alert.rows[0].payload).toEqual({ lead_id: 4 });
+  });
 });

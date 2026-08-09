@@ -2,6 +2,8 @@ import { Link, useNavigate, useParams } from 'react-router-dom';
 import { toast } from 'sonner';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
+import { ConfirmTypedDialog } from '@/components/shared/confirm-typed-dialog';
 import { Skeleton } from '@/components/ui/skeleton';
 import { CatchupBanner } from '@/components/shared/catchup-banner';
 import { EmptyState } from '@/components/shared/empty-state';
@@ -10,9 +12,10 @@ import { StateBadge } from '@/components/shared/state-badge';
 import { useCampaignCapacity, useCampaignOutcomes, useCampaigns } from '@/api/queries/campaigns';
 import { useOverview } from '@/api/queries/analytics';
 import { useSequences } from '@/api/queries/sequences';
-import { usePatchCampaign } from '@/api/mutations/campaigns';
+import { useDeleteCampaign, usePatchCampaign } from '@/api/mutations/campaigns';
 import { CompletionPanel } from './completion-panel';
 import { CampaignStatusBadge } from './status-badge';
+import { useState } from 'react';
 
 const MODE_LABEL: Record<string, string> = {
   human_written: 'Mode 1 — human-written',
@@ -32,6 +35,9 @@ export default function CampaignDetailPage() {
   const outcomes = useCampaignOutcomes(campaignId);
   const overview = useOverview(campaignId);
   const patch = usePatchCampaign();
+  const remove = useDeleteCampaign();
+  const [archiveOpen, setArchiveOpen] = useState(false);
+  const [deleteOpen, setDeleteOpen] = useState(false);
 
   if (campaigns.isPending) {
     return (
@@ -105,6 +111,14 @@ export default function CampaignDetailPage() {
               Resume
             </Button>
           )}
+          {campaign.status !== 'archived' && (
+            <Button size="sm" variant="destructive" onClick={() => setArchiveOpen(true)}>
+              Archive
+            </Button>
+          )}
+          <Button size="sm" variant="ghost" onClick={() => setDeleteOpen(true)}>
+            Delete
+          </Button>
           <Button size="sm" variant="ghost" onClick={() => navigate('/campaigns')}>
             Back to list
           </Button>
@@ -112,6 +126,24 @@ export default function CampaignDetailPage() {
       </div>
 
       <CatchupBanner />
+
+      {campaign.tier_effort_config.A === 'human_written' && (
+        <Alert>
+          <AlertTitle>Tier A is manual-only</AlertTitle>
+          <AlertDescription>
+            The scheduler will not send {campaign.manual_only_count} active Tier A enrollment
+            {campaign.manual_only_count === 1 ? '' : 's'}. Open an individual Tier A lead and use
+            Manual compose to write and send it.{' '}
+            <Link
+              to={`/leads?campaign=${campaign.id}`}
+              className="font-medium underline underline-offset-2"
+            >
+              Open campaign leads
+            </Link>
+            .
+          </AlertDescription>
+        </Alert>
+      )}
 
       <div className="grid gap-4 lg:grid-cols-[minmax(0,340px)_minmax(0,1fr)]">
         <div className="rounded-lg border border-border bg-card p-4">
@@ -207,6 +239,46 @@ export default function CampaignDetailPage() {
           campaignId={campaign.id}
         />
       )}
+      <ConfirmTypedDialog
+        open={archiveOpen}
+        onOpenChange={setArchiveOpen}
+        title="Archive campaign"
+        description="Archiving immediately stops all future scheduling for this campaign. Type the campaign name to confirm."
+        expected={campaign.name}
+        confirmLabel="Archive campaign"
+        pending={patch.isPending}
+        onConfirm={() =>
+          patch.mutate(
+            { id: campaign.id, body: { status: 'archived' } },
+            {
+              onSuccess: () => {
+                toast.success(`${campaign.name} archived`);
+                setArchiveOpen(false);
+              },
+            },
+          )
+        }
+      />
+      <ConfirmTypedDialog
+        open={deleteOpen}
+        onOpenChange={setDeleteOpen}
+        title="Delete campaign"
+        description="Deletion is allowed only while this campaign has no event history or remaining references. Type the campaign name to confirm."
+        expected={campaign.name}
+        confirmLabel="Delete campaign"
+        pending={remove.isPending}
+        onConfirm={(typed) =>
+          remove.mutate(
+            { id: campaign.id, confirm: typed },
+            {
+              onSuccess: () => {
+                toast.success(`${campaign.name} deleted`);
+                navigate('/campaigns');
+              },
+            },
+          )
+        }
+      />
     </div>
   );
 }

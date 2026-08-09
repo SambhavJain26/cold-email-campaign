@@ -70,6 +70,7 @@ export interface RenderChecks {
 export interface RenderedMessage {
   subject: string;
   bodyText: string;
+  bodyHtml: string;
   /** Echoes variant.contentHash — stored on the sent event (decision Q). */
   contentHash: string;
   checks: RenderChecks;

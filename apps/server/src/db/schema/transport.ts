@@ -41,6 +41,7 @@ export const mailboxes = pgTable('mailboxes', {
     .$type<SendWindow>()
     .notNull()
     .default({ days: [1, 2, 3, 4, 5], start: '08:00', end: '17:00' }),
+  timezone: text('timezone').notNull().default('America/New_York'),
   status: mailboxStatusEnum('status').notNull().default('ok'),
   statusReason: text('status_reason'),
   resumeCap: integer('resume_cap'),

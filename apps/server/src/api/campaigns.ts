@@ -9,10 +9,12 @@ import {
   coldStorageQuerySchema,
   coldStorageResponseSchema,
   createCampaignBodySchema,
+  deleteCampaignBodySchema,
   enrollBodySchema,
   enrollResponseSchema,
   idParamSchema,
   outcomesResponseSchema,
+  okResponseSchema,
   pageQuerySchema,
   patchCampaignBodySchema,
   recycleBodySchema,
@@ -22,6 +24,7 @@ import type { AppServices } from '../composition';
 import {
   campaignCounts,
   createCampaign,
+  deleteCampaignIfUnreferenced,
   getCampaign,
   listCampaigns,
   outcomeCounts,
@@ -54,6 +57,7 @@ function toCampaignDto(row: CampaignRow, counts: CampaignCounts): CampaignDto {
     recycled_from_campaign_id: row.recycledFromCampaignId,
     enrolled_count: counts.enrolledCount,
     contacted_count: counts.contactedCount,
+    manual_only_count: counts.manualOnlyCount,
   };
 }
 
@@ -100,7 +104,7 @@ export async function campaignsRoutes(app: FastifyInstance, services: AppService
         tierEffortConfig: req.body.tier_effort_config,
         rampConfig: req.body.ramp_config,
       });
-      return toCampaignDto(row, { enrolledCount: 0, contactedCount: 0 });
+      return toCampaignDto(row, { enrolledCount: 0, contactedCount: 0, manualOnlyCount: 0 });
     },
   );
 
@@ -120,6 +124,28 @@ export async function campaignsRoutes(app: FastifyInstance, services: AppService
         status: req.body.status,
       });
       return toCampaignDto(row!, await campaignCounts(db, req.params.id));
+    },
+  );
+
+  r.delete(
+    '/campaigns/:id',
+    {
+      schema: {
+        params: idParamSchema,
+        body: deleteCampaignBodySchema,
+        response: { 200: okResponseSchema },
+      },
+    },
+    async (req) => {
+      const campaign = await requireCampaign(req.params.id);
+      if (req.body.confirm.trim() !== campaign.name) {
+        throw new AppError('validation', 400, 'confirm must equal the campaign name');
+      }
+      const result = await deleteCampaignIfUnreferenced(db, campaign.id);
+      if (!result.deleted) {
+        throw new AppError('conflict', 409, result.reason ?? 'campaign cannot be deleted');
+      }
+      return { ok: true } as const;
     },
   );
 

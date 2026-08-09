@@ -1,5 +1,10 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query';
-import { previewResponseSchema, sequenceSchema, type SequenceWriteBody } from '@coldemail/shared';
+import {
+  okResponseSchema,
+  previewResponseSchema,
+  sequenceSchema,
+  type SequenceWriteBody,
+} from '@coldemail/shared';
 import { apiFetch } from '../client';
 
 export function useCreateSequence() {
@@ -16,6 +21,15 @@ export function useUpdateSequence() {
   return useMutation({
     mutationFn: ({ id, body }: { id: number; body: SequenceWriteBody }) =>
       apiFetch(`/sequences/${id}`, sequenceSchema, { method: 'PATCH', body }),
+    onSuccess: () => void qc.invalidateQueries({ queryKey: ['sequences'] }),
+  });
+}
+
+export function useDeleteSequence() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, confirm }: { id: number; confirm: string }) =>
+      apiFetch(`/sequences/${id}`, okResponseSchema, { method: 'DELETE', body: { confirm } }),
     onSuccess: () => void qc.invalidateQueries({ queryKey: ['sequences'] }),
   });
 }

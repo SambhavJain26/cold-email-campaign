@@ -16,6 +16,7 @@ import {
 } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Checkbox } from '@/components/ui/checkbox';
 import {
   Select,
   SelectContent,
@@ -59,6 +60,7 @@ export function CampaignDialog({
     handleSubmit,
     reset,
     control,
+    watch,
     formState: { errors },
   } = useForm<FormValues>({ resolver: zodResolver(formSchema) });
 
@@ -73,8 +75,10 @@ export function CampaignDialog({
         C: 'template_auto',
       },
       ramp_config: { ramp_days: 7, ramp_daily_enroll_cap: 20 },
+      acknowledge_tier_a_manual: false,
     });
   }, [open, reset, sequences.data]);
+  const tierAMode = watch('tier_effort_config.A');
 
   const onSubmit = (values: FormValues) => {
     create.mutate(values, {
@@ -168,6 +172,32 @@ export function CampaignDialog({
               </div>
             ))}
           </fieldset>
+
+          {tierAMode === 'human_written' && (
+            <div className="rounded-lg border border-amber-500/40 bg-amber-500/5 p-3">
+              <Label className="flex cursor-pointer items-start gap-2 text-sm font-normal">
+                <Controller
+                  control={control}
+                  name="acknowledge_tier_a_manual"
+                  render={({ field }) => (
+                    <Checkbox
+                      checked={field.value ?? false}
+                      onCheckedChange={(checked) => field.onChange(checked === true)}
+                    />
+                  )}
+                />
+                <span>
+                  Tier A will never be sent by the scheduler. I will write and send these leads
+                  through the manual composer.
+                </span>
+              </Label>
+              {errors.acknowledge_tier_a_manual && (
+                <p role="alert" className="mt-2 text-xs text-destructive">
+                  {errors.acknowledge_tier_a_manual.message}
+                </p>
+              )}
+            </div>
+          )}
 
           <fieldset className="space-y-2 rounded-lg border border-border p-3">
             <legend className="px-1 text-xs font-medium">Ramp</legend>

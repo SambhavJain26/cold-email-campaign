@@ -99,6 +99,17 @@ Shapes below in TS notation. `Metric = { numerator: number, denominator: number 
 | GET `/system/status` | → `{scheduler_last_tick_at, transport_mode, pollers: {mailbox_id, last_successful_poll_at}[], pending_jobs}` |
 | POST `/system/rebuild-projections` | `{dry_run: boolean}` → `{diffs: number, details?}` |
 
+## Pre-canary contract additions
+
+| Endpoint / DTO | Contract |
+|---|---|
+| Mailbox create, patch, response | `timezone`: validated IANA timezone; mailbox-local midnight resets its daily capacity. |
+| GET `/system/status` | Adds `send_blockers: {code, message}[]`; empty when no due work is blocked. |
+| POST `/leads/:id/erase` | `{confirm: current_email}`; irreversible PII anonymization, with an unsubscribe event for active work. |
+| DELETE `/campaigns/:id` | `{confirm: campaign_name}`; 409 if any event, enrollment, or dependency remains. |
+| DELETE `/sequences/:id` | `{confirm: sequence_name}`; 409 if campaign or sent-content history remains. |
+| Outbound transport/render | Canonical text plus an optional matching escaped HTML alternative (`multipart/alternative` in SMTP). |
+
 ## Events emitted per mutating endpoint (traceability)
 
 | Endpoint | Events appended |

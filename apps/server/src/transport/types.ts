@@ -8,7 +8,9 @@ export interface OutboundMessage {
   mailboxId: number;
   to: string;
   subject: string;
-  bodyText: string; // plain text only (walkthrough Stage 4: no HTML, no images)
+  bodyText: string;
+  /** Minimal multipart alternative; text remains the canonical representation. */
+  bodyHtml?: string;
   headers: {
     messageId: string; // app-generated BEFORE send — the threading anchor
     inReplyTo?: string;
@@ -99,6 +101,8 @@ export interface MailTransport {
   send(msg: OutboundMessage): Promise<SendResult>;
   /** Receiving side — used by the poller; returns messages with UID > high-water mark (docs/07 §1). */
   fetchNew(mailboxId: number): Promise<IncomingMessage[]>;
+  /** Highest UID already present in INBOX (UIDNEXT - 1), for first-poll seeding. */
+  initialPollUid?(config: MailboxVerifyConfig): Promise<number>;
   /** "Test Connection" + health monitoring. */
   verify(config: MailboxVerifyConfig): Promise<VerifyResult>;
   /** Release pooled connections on shutdown. Optional — the mock has none. */

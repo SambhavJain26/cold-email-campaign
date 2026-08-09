@@ -60,7 +60,7 @@ describe('B6.6 campaigns', () => {
     const res = await h.inject({
       method: 'POST',
       url: '/api/v1/campaigns',
-      payload: { name: 'Spring Outreach', sequence_id: seqId },
+      payload: { name: 'Spring Outreach', sequence_id: seqId, acknowledge_tier_a_manual: true },
     });
     expect(res.statusCode).toBe(200);
     const c = res.json();
@@ -82,9 +82,19 @@ describe('B6.6 campaigns', () => {
     const bad = await h.inject({
       method: 'POST',
       url: '/api/v1/campaigns',
-      payload: { name: 'X', sequence_id: 999 },
+      payload: { name: 'X', sequence_id: 999, acknowledge_tier_a_manual: true },
     });
     expect(bad.statusCode).toBe(404);
+  });
+
+  it('requires explicit acknowledgement when Tier A remains manual', async () => {
+    const res = await h.inject({
+      method: 'POST',
+      url: '/api/v1/campaigns',
+      payload: { name: 'No acknowledgement', sequence_id: seqId },
+    });
+    expect(res.statusCode).toBe(400);
+    expect(res.json().error.code).toBe('validation');
   });
 
   it('PATCH activates; capacity meter shows the docs/06 §7 numbers', async () => {
@@ -231,7 +241,7 @@ describe('B6.6 campaigns', () => {
       await h.inject({
         method: 'POST',
         url: '/api/v1/campaigns',
-        payload: { name: 'Active Target', sequence_id: seqId },
+        payload: { name: 'Active Target', sequence_id: seqId, acknowledge_tier_a_manual: true },
       })
     ).json();
     await h.inject({
@@ -266,7 +276,7 @@ describe('B6.6 campaigns', () => {
       await h.inject({
         method: 'POST',
         url: '/api/v1/campaigns',
-        payload: { name: 'Pass 2 (conflict)', sequence_id: seqId },
+        payload: { name: 'Pass 2 (conflict)', sequence_id: seqId, acknowledge_tier_a_manual: true },
       })
     ).json();
     const conflicted = await h.inject({
@@ -290,7 +300,7 @@ describe('B6.6 campaigns', () => {
       await h.inject({
         method: 'POST',
         url: '/api/v1/campaigns',
-        payload: { name: 'Pass 2', sequence_id: freshSeqId },
+        payload: { name: 'Pass 2', sequence_id: freshSeqId, acknowledge_tier_a_manual: true },
       })
     ).json();
     const wm = await eventWatermark(h.pool);
@@ -305,5 +315,37 @@ describe('B6.6 campaigns', () => {
     const tagged = (await h.inject({ method: 'GET', url: '/api/v1/campaigns' })).json();
     const t = tagged.items.find((c: { id: number }) => c.id === target.id);
     expect(t.recycled_from_campaign_id).toBe(campaignId);
+  });
+
+  it('deletes only unreferenced campaigns with a typed name confirmation', async () => {
+    const disposable = (
+      await h.inject({
+        method: 'POST',
+        url: '/api/v1/campaigns',
+        payload: {
+          name: 'Disposable campaign',
+          sequence_id: seqId,
+          acknowledge_tier_a_manual: true,
+        },
+      })
+    ).json();
+    const wrong = await h.inject({
+      method: 'DELETE',
+      url: `/api/v1/campaigns/${disposable.id}`,
+      payload: { confirm: 'wrong name' },
+    });
+    expect(wrong.statusCode).toBe(400);
+    const deleted = await h.inject({
+      method: 'DELETE',
+      url: `/api/v1/campaigns/${disposable.id}`,
+      payload: { confirm: 'Disposable campaign' },
+    });
+    expect(deleted.statusCode).toBe(200);
+    const refused = await h.inject({
+      method: 'DELETE',
+      url: `/api/v1/campaigns/${campaignId}`,
+      payload: { confirm: 'Spring Outreach' },
+    });
+    expect(refused.statusCode).toBe(409);
   });
 });

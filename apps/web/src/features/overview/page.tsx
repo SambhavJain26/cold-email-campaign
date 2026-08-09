@@ -1,6 +1,7 @@
 import { AlertTriangle } from 'lucide-react';
 import { Link, useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Skeleton } from '@/components/ui/skeleton';
 import { CatchupBanner } from '@/components/shared/catchup-banner';
 import { EmptyState } from '@/components/shared/empty-state';
@@ -11,6 +12,7 @@ import { useCampaignParam } from '@/components/layout/campaign-selector';
 import { useOverview, useHealthTrend } from '@/api/queries/analytics';
 import { useCampaignOutcomes, useCampaigns } from '@/api/queries/campaigns';
 import { estimateCompletion } from './estimate';
+import { useSystemStatus } from '@/api/queries/system';
 
 /** Hard-bounce watch threshold (docs/05 §5) — the ✅/⚠️ on the tile. */
 const HARD_BOUNCE_WATCH_PCT = 4;
@@ -28,6 +30,7 @@ export default function OverviewPage() {
   const overview = useOverview(campaignId ?? 0);
   const health = useHealthTrend(30, campaignId);
   const outcomes = useCampaignOutcomes(campaignId ?? 0);
+  const system = useSystemStatus();
 
   if (campaigns.isPending) {
     return (
@@ -94,6 +97,13 @@ export default function OverviewPage() {
       </div>
 
       <CatchupBanner />
+
+      {(system.data?.send_blockers ?? []).map((blocker) => (
+        <Alert key={blocker.code} variant="destructive">
+          <AlertTitle>Sending blocked</AlertTitle>
+          <AlertDescription>{blocker.message}</AlertDescription>
+        </Alert>
+      ))}
 
       {data.watch_flags.map((flag) => (
         <div

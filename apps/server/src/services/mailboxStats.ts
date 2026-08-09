@@ -23,13 +23,16 @@ export async function mailboxStatsFor(
   const { db, clock } = deps;
   const now = clock.now();
   const settings = await getSettings(db);
-  const midnight = startOfLocalDay(now, settings.defaultTimezone);
   const sevenDaysAgo = new Date(now.getTime() - 7 * 86_400_000);
   const { sevenDayAvg } = mailboxImbalance(await mailboxVolume(db, sevenDaysAgo, now));
 
   const stats = new Map<number, MailboxStats>();
   for (const mb of rows) {
-    const sentToday = await countSentSince(db, mb.id, midnight);
+    const sentToday = await countSentSince(
+      db,
+      mb.id,
+      startOfLocalDay(now, mb.timezone || settings.defaultTimezone),
+    );
     const lifetime = await lifetimeSentCount(db, mb.id);
     const windowBounces = await hardBouncesInLastNSends(db, mb.id, settings.pauseWindowSends);
     const denom = Math.min(lifetime, settings.pauseWindowSends);

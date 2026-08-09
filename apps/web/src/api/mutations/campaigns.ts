@@ -12,6 +12,7 @@ export function useCreateCampaign() {
       sequence_id: number;
       tier_effort_config?: unknown;
       ramp_config?: unknown;
+      acknowledge_tier_a_manual?: boolean;
     }) => apiFetch('/campaigns', campaignSchema, { method: 'POST', body }),
     onSuccess: () => void qc.invalidateQueries({ queryKey: ['campaigns'] }),
   });
@@ -27,6 +28,15 @@ export function usePatchCampaign() {
       id: number;
       body: { name?: string; status?: 'active' | 'paused' | 'archived' };
     }) => apiFetch(`/campaigns/${id}`, campaignSchema, { method: 'PATCH', body }),
+    onSuccess: () => void qc.invalidateQueries({ queryKey: ['campaigns'] }),
+  });
+}
+
+export function useDeleteCampaign() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, confirm }: { id: number; confirm: string }) =>
+      apiFetch(`/campaigns/${id}`, okResponseSchema, { method: 'DELETE', body: { confirm } }),
     onSuccess: () => void qc.invalidateQueries({ queryKey: ['campaigns'] }),
   });
 }

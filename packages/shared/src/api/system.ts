@@ -16,6 +16,21 @@ export const systemStatusResponseSchema = z
         .strict(),
     ),
     pending_jobs: z.number().int(),
+    send_blockers: z.array(
+      z
+        .object({
+          code: z.enum([
+            'compliance_missing_address',
+            'no_healthy_mailbox',
+            'send_window_closed',
+            'daily_capacity_exhausted',
+            'pacing_delay',
+            'manual_only',
+          ]),
+          message: z.string(),
+        })
+        .strict(),
+    ),
   })
   .strict();
 

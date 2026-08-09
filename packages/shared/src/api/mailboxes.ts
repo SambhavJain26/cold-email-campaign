@@ -26,6 +26,7 @@ export const mailboxSchema = z
     daily_cap: z.number().int(),
     effective_cap: z.number().int(),
     send_window: sendWindowSchema,
+    timezone: z.string().min(1),
     status: z.enum(MAILBOX_STATUSES),
     status_reason: z.string().nullable(),
     sent_today: z.number().int(),
@@ -50,6 +51,7 @@ export const createMailboxBodySchema = z
     password: z.string().min(1),
     daily_cap: z.number().int().min(1).optional(),
     send_window: sendWindowSchema.optional(),
+    timezone: z.string().min(1).optional(),
   })
   .strict();
 export type CreateMailboxBody = z.infer<typeof createMailboxBodySchema>;

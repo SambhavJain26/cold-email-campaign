@@ -72,6 +72,13 @@ export function EnrollPanel({
       <h2 className="mb-3 text-sm font-semibold">TODAY</h2>
       <CapacityMeter capacity={capacity} />
 
+      {campaign?.tier_effort_config.A === 'human_written' && campaign.manual_only_count > 0 && (
+        <p className="mt-3 text-xs text-muted-foreground">
+          {campaign.manual_only_count} Tier A enrollment
+          {campaign.manual_only_count === 1 ? ' requires' : 's require'} manual compose.
+        </p>
+      )}
+
       {blocked ? (
         <p className="mt-3 text-xs text-muted-foreground" data-testid="enroll-blocked">
           {blocked}

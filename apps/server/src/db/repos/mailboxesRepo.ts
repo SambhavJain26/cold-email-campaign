@@ -15,6 +15,7 @@ export interface NewMailbox {
   authType?: string;
   dailyCap?: number;
   sendWindow?: MailboxRow['sendWindow'];
+  timezone?: string;
   status?: MailboxStatus;
 }
 
@@ -66,6 +67,7 @@ export async function patchMailbox(
       | 'imapHost'
       | 'imapPort'
       | 'authType'
+      | 'timezone'
     >
   >,
 ): Promise<void> {

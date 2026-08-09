@@ -31,6 +31,7 @@ export const campaignSchema = z
     recycled_from_campaign_id: z.number().int().nullable(),
     enrolled_count: z.number().int().min(0),
     contacted_count: z.number().int().min(0),
+    manual_only_count: z.number().int().min(0),
   })
   .strict();
 export type CampaignDto = z.infer<typeof campaignSchema>;
@@ -43,8 +44,21 @@ export const createCampaignBodySchema = z
     sequence_id: z.number().int().positive(),
     tier_effort_config: tierEffortConfigSchema.optional(),
     ramp_config: rampConfigSchema.optional(),
+    acknowledge_tier_a_manual: z.boolean().optional(),
   })
-  .strict();
+  .strict()
+  .superRefine((value, ctx) => {
+    if (
+      (value.tier_effort_config?.A ?? 'human_written') === 'human_written' &&
+      value.acknowledge_tier_a_manual !== true
+    ) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['acknowledge_tier_a_manual'],
+        message: 'Acknowledge that Tier A uses the manual composer',
+      });
+    }
+  });
 
 export const patchCampaignBodySchema = z
   .object({
@@ -52,6 +66,9 @@ export const patchCampaignBodySchema = z
     status: z.enum(['active', 'paused', 'archived']).optional(),
   })
   .strict();
+
+/** Typed confirmation for irreversible metadata deletion. */
+export const deleteCampaignBodySchema = z.object({ confirm: z.string().min(1) }).strict();
 
 export const capacityResponseSchema = z
   .object({

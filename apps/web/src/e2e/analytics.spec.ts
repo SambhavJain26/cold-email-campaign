@@ -88,6 +88,7 @@ test('cold storage lists rested leads and the recycle guard blocks identical con
   await page.getByRole('link', { name: 'Campaigns' }).click();
   await page.getByRole('button', { name: 'New Campaign' }).click();
   await page.getByLabel('Name').fill('Pass 2 — same message');
+  await page.getByRole('checkbox').check();
   await page.getByRole('button', { name: 'Create campaign' }).click();
   await expect(page).toHaveURL(/\/campaigns\/\d+$/);
 
@@ -122,6 +123,7 @@ test('recycling into a campaign with a new sequence succeeds', async ({ page }) 
   await page.getByLabel('Name').fill('Pass 2 — new angle');
   await page.getByLabel('Sequence').click();
   await page.getByRole('option', { name: /Listing automation angle/ }).click();
+  await page.getByRole('checkbox').check();
   await page.getByRole('button', { name: 'Create campaign' }).click();
 
   await page.getByRole('link', { name: 'Cold Storage' }).click();

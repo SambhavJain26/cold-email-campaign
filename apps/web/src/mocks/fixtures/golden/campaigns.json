@@ -16,7 +16,8 @@
       },
       "recycled_from_campaign_id": null,
       "enrolled_count": 885,
-      "contacted_count": 867
+      "contacted_count": 867,
+      "manual_only_count": 0
     }
   ],
   "total": 1,

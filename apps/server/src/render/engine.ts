@@ -12,6 +12,7 @@
 // subject}` via ctx.threadSubject; absent → `Re:` on the step's own subject.
 import { expandTokens, makeResolver } from './merge';
 import { appendFooter } from './footer';
+import { htmlOfText } from './html';
 import { runChecks } from './checks';
 import { resolveObservation } from './slots';
 import { spintaxRng } from './seed';
@@ -29,9 +30,11 @@ export class RenderEngine implements Renderer {
     // 1–3 are skipped; footer + checks still apply.
     if (ctx.literal) {
       const subject = this.threadedSubject(input, variant.subjectTemplate);
+      const bodyText = appendFooter(variant.bodyTemplate, ctx.compliance);
       return {
         subject,
-        bodyText: appendFooter(variant.bodyTemplate, ctx.compliance),
+        bodyText,
+        bodyHtml: htmlOfText(bodyText),
         contentHash: variant.contentHash,
         checks: runChecks({
           stepNo: step.stepNo,
@@ -69,9 +72,11 @@ export class RenderEngine implements Renderer {
       longestPick,
     );
 
+    const bodyText = appendFooter(bodyPreFooter, ctx.compliance);
     return {
       subject: this.threadedSubject(input, ownSubject),
-      bodyText: appendFooter(bodyPreFooter, ctx.compliance),
+      bodyText,
+      bodyHtml: htmlOfText(bodyText),
       contentHash: variant.contentHash,
       checks: runChecks({
         stepNo: step.stepNo,

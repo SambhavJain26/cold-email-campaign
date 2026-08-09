@@ -40,6 +40,12 @@ export interface ScenarioConfig {
   jitterPct?: number;
   /** Campaign ramp config; scenarios default to NO ramp (unlimited enroll). */
   ramp?: { ramp_days: number; ramp_daily_enroll_cap: number };
+  /** Test-only campaign mode mapping; production defaults keep Tier A manual. */
+  tierEffortConfig?: {
+    A: 'human_written' | 'template_researched' | 'template_auto';
+    B: 'human_written' | 'template_researched' | 'template_auto';
+    C: 'human_written' | 'template_researched' | 'template_auto';
+  };
 }
 
 export type LeadRef = string; // 'L0001' … — id 1…, email l0001@scenario.dev
@@ -170,8 +176,17 @@ export class Scenario {
     }
     const ramp = this.cfg.ramp ?? { ramp_days: 0, ramp_daily_enroll_cap: 0 }; // no ramp by default
     await this.pool.query(
-      `INSERT INTO campaigns (name, status, ramp_config) VALUES ('Scenario Campaign', 'active', $1)`,
-      [JSON.stringify(ramp)],
+      `INSERT INTO campaigns (name, status, ramp_config, tier_effort_config) VALUES ('Scenario Campaign', 'active', $1, $2)`,
+      [
+        JSON.stringify(ramp),
+        JSON.stringify(
+          this.cfg.tierEffortConfig ?? {
+            A: 'human_written',
+            B: 'template_researched',
+            C: 'template_auto',
+          },
+        ),
+      ],
     );
     // Settings survive resetCoreTables (single seeded row) — restore the
     // tunables tests mutate so runs stay order-independent.

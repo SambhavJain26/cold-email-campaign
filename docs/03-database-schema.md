@@ -353,8 +353,13 @@ GRANT  INSERT, SELECT ON events TO app_rw;
 
 `rebuild-projections` (docs/04 §5) reconstructs from `events` alone: `enrollments.{current_state, current_step_no, soft_bounce_retries, best_reply_sentiment, meeting_booked, terminal_at, next_send_at*}`, `sent_messages` (from `sent` events), `leads.is_suppressed` + `suppressions` (from `unsubscribe`/`hard_bounce`). (*`next_send_at` is recomputed from the sequence definition + last `sent`.) `incoming_messages` is a ledger, not a projection — it is **not** rebuilt.
 
+## Pre-canary additions (migration `0008_precanary`)
+
+- `mailboxes.timezone` is a required IANA timezone, backfilled to `America/New_York`. It defines that mailbox's daily-cap reset and is the fallback for leads without a resolvable recipient timezone.
+- `leads.is_erased` and `leads.erased_at` mark an irreversible privacy erasure. The row becomes a non-routable tombstone; events retain non-identifying lineage. Normal lead, enrollment, scheduler, capacity, outcome, and metric queries exclude erased leads.
+
 ## 6. Migration policy
 
 - Migrations are **hand-authored paired SQL files** (`NNNN_name.up.sql` / `NNNN_name.down.sql`) in `apps/server/src/db/migrations/`, executed by the in-repo runner (`src/db/migrate.ts`, tracked in `schema_migrations`), committed to git, applied on boot (prod) and by `npm run db:migrate` / `db:rollback` / `db:status`. drizzle-kit is generation-assist only (diff SQL from schema defs into gitignored `drizzle-kit-out/`, hand-copied in) — it cannot execute or roll back migrations. *(Changed at B0.4: drizzle-kit has no down-migration support, and this doc requires tested downs; hand-written DDL also fits the trigger/grant-heavy schema.)*
-- Numbered plan: `0001_core` (enums + events + leads + campaigns + enrollments + trigger/roles) → `0002_seed` → `0003_sequences` → `0004_transport_tables` (mailboxes, secrets, sent_messages, incoming_messages) → `0005_ingest` (imports, suppressions) → `0006_ops` (alerts) → `0007_operator` (operator + incoming_messages.body_text). Later stages add columns only via new migrations — never edit an applied migration.
+- Numbered plan: `0001_core` (enums + events + leads + campaigns + enrollments + trigger/roles) → `0002_seed` → `0003_sequences` → `0004_transport_tables` (mailboxes, secrets, sent_messages, incoming_messages) → `0005_ingest` (imports, suppressions) → `0006_ops` (alerts) → `0007_operator` (operator + incoming_messages.body_text) → `0008_precanary` (mailbox timezone, lead erasure markers). Later stages add columns only via new migrations — never edit an applied migration.
 - Rollback: every migration ships a `down`; tested in CI (apply → down → apply).

@@ -46,8 +46,13 @@ describe('bulk-tier (B5.6)', () => {
   });
 
   it('by filter — untiered + state, and q substring', async () => {
-    const r = await bulkTier({ db }, { filter: { tier: 'untiered', state: 'TX' }, tier: 'C' });
-    expect(r).toEqual({ updated: 1 }); // only a@x.dev (c@ is CA, b@ already C)
+    await pool.query(`INSERT INTO campaigns (name, status) VALUES ('filter campaign', 'active')`);
+    await pool.query(
+      `INSERT INTO enrollments (lead_id, campaign_id, current_state, personalization_mode, enrolled_at)
+       VALUES (1, 1, 'ACTIVE', 'template_auto', now())`,
+    );
+    const r = await bulkTier({ db }, { filter: { tier: 'untiered', state: 'ACTIVE' }, tier: 'C' });
+    expect(r).toEqual({ updated: 1 }); // only a@x.dev is both untiered and ACTIVE
 
     const q = await bulkTier({ db }, { filter: { q: 'acme' }, tier: 'A' });
     expect(q).toEqual({ updated: 2 }); // Acme Realty + Acme West

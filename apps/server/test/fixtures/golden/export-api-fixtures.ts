@@ -176,6 +176,7 @@ async function main(): Promise<void> {
           recycled_from_campaign_id: campaignRow.recycled_from_campaign_id,
           enrolled_count: outcomes.total,
           contacted_count: progress.numerator,
+          manual_only_count: 0, // golden replay config makes all tiers automated
         },
       ],
       total: 1,

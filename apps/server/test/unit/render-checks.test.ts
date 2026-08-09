@@ -175,17 +175,17 @@ describe('#8 body word count (warning)', () => {
 
 describe('#9 spam lexicon', () => {
   it('one phrase: −0.4', () => {
-    const r = render({ body: BODY + ' We guarantee results.' });
-    expect(r.checks.warnings.map((w) => w.id)).toEqual(['spam:guarantee']);
+    const r = render({ body: BODY + ' Just following up on this.' });
+    expect(r.checks.warnings.map((w) => w.id)).toEqual(['spam:just following up']);
     expect(r.checks.score).toBe(9.6);
   });
 
   it('three hits: −0.4 −0.3 −0.3 = 9.0', () => {
-    const r = render({ body: BODY + ' We guarantee it, act now, click here.' });
+    const r = render({ body: BODY + ' Just following up: act now, click here.' });
     expect(r.checks.warnings.map((w) => w.id).sort()).toEqual([
       'spam:act now',
       'spam:click here',
-      'spam:guarantee',
+      'spam:just following up',
     ]);
     expect(r.checks.score).toBe(9);
   });

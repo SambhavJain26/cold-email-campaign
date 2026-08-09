@@ -42,6 +42,7 @@ test('create → activate → enroll 20 → capacity math moves', async ({ page 
   await page.getByRole('button', { name: 'New Campaign' }).click();
 
   await page.getByLabel('Name').fill('Pass 2 — recycled');
+  await page.getByRole('checkbox').check();
   await page.getByRole('button', { name: 'Create campaign' }).click();
   await expect(page.getByText('Campaign "Pass 2 — recycled" created')).toBeVisible();
   await expect(page).toHaveURL(/\/campaigns\/\d+$/);

@@ -46,6 +46,7 @@ function toMailboxDto(row: MailboxRow, stats: MailboxStats): MailboxDto {
     daily_cap: row.dailyCap,
     effective_cap: row.resumeCap ?? row.dailyCap,
     send_window: row.sendWindow,
+    timezone: row.timezone,
     status: row.status,
     status_reason: row.statusReason,
     sent_today: stats.sentToday,
@@ -66,7 +67,16 @@ function patchColumns(body: PatchMailboxBody) {
     ...(body.auth_type !== undefined && { authType: body.auth_type }),
     ...(body.daily_cap !== undefined && { dailyCap: body.daily_cap }),
     ...(body.send_window !== undefined && { sendWindow: body.send_window }),
+    ...(body.timezone !== undefined && { timezone: body.timezone }),
   };
+}
+
+function assertIanaTimezone(timezone: string): void {
+  try {
+    new Intl.DateTimeFormat('en-US', { timeZone: timezone });
+  } catch {
+    throw new AppError('validation', 400, 'timezone must be a valid IANA timezone');
+  }
 }
 
 export async function mailboxesRoutes(app: FastifyInstance, services: AppServices): Promise<void> {
@@ -120,6 +130,7 @@ export async function mailboxesRoutes(app: FastifyInstance, services: AppService
     { schema: { body: createMailboxBodySchema, response: { 200: mailboxSchema } } },
     async (req) => {
       const b = req.body;
+      if (b.timezone !== undefined) assertIanaTimezone(b.timezone);
       const row = await createMailbox(db, {
         displayName: b.display_name,
         fromAddress: b.from_address,
@@ -130,9 +141,21 @@ export async function mailboxesRoutes(app: FastifyInstance, services: AppService
         authType: b.auth_type,
         dailyCap: b.daily_cap,
         sendWindow: b.send_window,
+        timezone: b.timezone,
       });
       const sealed = await sealSecret(b.password, config.SECRET_KEY);
       await upsertMailboxSecret(db, row.id, sealed, clock.now());
+      if (transport.initialPollUid) {
+        const cursor = await transport.initialPollUid({
+          smtpHost: row.smtpHost,
+          smtpPort: row.smtpPort,
+          imapHost: row.imapHost,
+          imapPort: row.imapPort,
+          fromAddress: row.fromAddress,
+          password: b.password,
+        });
+        await patchMailbox(db, row.id, { lastPollUid: cursor });
+      }
       // Start polling THIS mailbox now: boot only registered the mailboxes that
       // existed then, so without this a mailbox added through the UI would go
       // unpolled until the next restart (no-op when workers aren't running).
@@ -152,6 +175,7 @@ export async function mailboxesRoutes(app: FastifyInstance, services: AppService
     },
     async (req) => {
       await requireMailbox(req.params.id);
+      if (req.body.timezone !== undefined) assertIanaTimezone(req.body.timezone);
       const cols = patchColumns(req.body);
       if (Object.keys(cols).length > 0) await patchMailbox(db, req.params.id, cols);
       if (req.body.password !== undefined) {
@@ -244,6 +268,17 @@ export async function mailboxesRoutes(app: FastifyInstance, services: AppService
         // auth_failed mailboxes are skipped at boot registration — a recovered
         // one needs its poll queue (re-)registered to resume reply detection.
         await jobs.registerMailboxPoll(row.id);
+      }
+      if (result.smtpOk && result.imapOk && row.lastPollUid === 0 && transport.initialPollUid) {
+        const cursor = await transport.initialPollUid({
+          smtpHost: row.smtpHost,
+          smtpPort: row.smtpPort,
+          imapHost: row.imapHost,
+          imapPort: row.imapPort,
+          fromAddress: row.fromAddress,
+          password: req.body.password,
+        });
+        await patchMailbox(db, row.id, { lastPollUid: cursor });
       }
       return dtoOf(await requireMailbox(req.params.id));
     },

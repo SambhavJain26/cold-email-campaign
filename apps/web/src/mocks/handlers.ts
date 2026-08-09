@@ -11,7 +11,10 @@ import {
   complianceSchema,
   createCampaignBodySchema,
   createMailboxBodySchema,
+  deleteCampaignBodySchema,
+  deleteSequenceBodySchema,
   deleteSuppressionBodySchema,
+  eraseLeadBodySchema,
   loginBodySchema,
   manualSendBodySchema,
   patchCampaignBodySchema,
@@ -275,6 +278,7 @@ export const handlers: RequestHandler[] = [
         daily_cap: body.daily_cap ?? 30,
         effective_cap: body.daily_cap ?? 30,
         send_window: body.send_window ?? { days: [1, 2, 3, 4, 5], start: '08:00', end: '17:00' },
+        timezone: body.timezone ?? 'America/New_York',
         status: 'ok' as const,
         status_reason: null,
         sent_today: 0,
@@ -297,6 +301,19 @@ export const handlers: RequestHandler[] = [
       Object.assign(mailbox, patch);
       if (body.daily_cap !== undefined) mailbox.effective_cap = body.daily_cap;
       return HttpResponse.json(mailbox);
+    }),
+  ),
+  http.post(
+    `${BASE}/leads/:id/erase`,
+    authed(async ({ request, params }) => {
+      const index = db.leads.findIndex((lead) => lead.id === Number(params.id));
+      if (index === -1) return notFound('lead');
+      const body = await parseBody(request, eraseLeadBodySchema);
+      if (body instanceof Response) return body;
+      if (body.confirm !== db.leads[index]!.email)
+        return err('validation', 'confirm must equal the current email', 400);
+      db.leads.splice(index, 1);
+      return HttpResponse.json({ ok: true });
     }),
   ),
   http.post(
@@ -585,6 +602,22 @@ export const handlers: RequestHandler[] = [
       });
     }),
   ),
+  http.delete(
+    `${BASE}/sequences/:id`,
+    authed(async ({ request, params }) => {
+      const index = db.sequences.findIndex((sequence) => sequence.id === Number(params.id));
+      if (index === -1) return notFound('sequence');
+      const body = await parseBody(request, deleteSequenceBodySchema);
+      if (body instanceof Response) return body;
+      const sequence = db.sequences[index]!;
+      if (body.confirm !== sequence.name)
+        return err('validation', 'confirm must equal the sequence name', 400);
+      if (db.campaigns.some((campaign) => campaign.sequence_id === sequence.id))
+        return err('conflict', 'sequence has campaign references', 409);
+      db.sequences.splice(index, 1);
+      return HttpResponse.json({ ok: true });
+    }),
+  ),
   http.post(
     `${BASE}/sequences/validate-template`,
     authed(async ({ request }) => {
@@ -619,6 +652,7 @@ export const handlers: RequestHandler[] = [
         recycled_from_campaign_id: null,
         enrolled_count: 0,
         contacted_count: 0,
+        manual_only_count: 0,
       };
       db.campaigns.push(campaign);
       return HttpResponse.json(campaign, { status: 201 });
@@ -633,6 +667,22 @@ export const handlers: RequestHandler[] = [
       if (body instanceof Response) return body;
       Object.assign(campaign, body);
       return HttpResponse.json(campaign);
+    }),
+  ),
+  http.delete(
+    `${BASE}/campaigns/:id`,
+    authed(async ({ request, params }) => {
+      const index = db.campaigns.findIndex((campaign) => campaign.id === Number(params.id));
+      if (index === -1) return notFound('campaign');
+      const body = await parseBody(request, deleteCampaignBodySchema);
+      if (body instanceof Response) return body;
+      const campaign = db.campaigns[index]!;
+      if (body.confirm !== campaign.name)
+        return err('validation', 'confirm must equal the campaign name', 400);
+      if (campaign.enrolled_count > 0 || campaign.contacted_count > 0)
+        return err('conflict', 'campaign has history', 409);
+      db.campaigns.splice(index, 1);
+      return HttpResponse.json({ ok: true });
     }),
   ),
   http.get(
@@ -990,6 +1040,7 @@ export const handlers: RequestHandler[] = [
     authed(() =>
       HttpResponse.json({
         scheduler_last_tick_at: NOW,
+        send_blockers: [],
         transport_mode: 'mock',
         pollers: db.mailboxes.map((m) => ({
           mailbox_id: m.id,

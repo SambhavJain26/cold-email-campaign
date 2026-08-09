@@ -42,6 +42,19 @@ export class EventStore {
   constructor(private readonly db: Db) {}
 
   /**
+   * Serialize a scheduler send decision with any inbound event append for the
+   * same enrollment.  Cron offsets reduce contention; this lock is the actual
+   * correctness guarantee.
+   */
+  async withEnrollmentLock<T>(enrollmentId: number, work: (tx: Tx) => Promise<T>): Promise<T> {
+    return this.db.transaction(async (tx) => {
+      await acquireRebuildLockShared(tx);
+      await lockEnrollment(tx, enrollmentId);
+      return work(tx);
+    });
+  }
+
+  /**
    * Append events and update projections atomically. Events may span multiple
    * enrollments (batch import); each affected enrollment's projection is
    * recomputed by folding its FULL event history — projection == fold(log)
@@ -59,8 +72,6 @@ export class EventStore {
         softRetryMax: settings.softRetryMax,
       };
 
-      const ids = await insertEvents(tx, evs);
-
       const enrollmentIds = [
         ...new Set(
           evs
@@ -71,6 +82,10 @@ export class EventStore {
       for (const eid of enrollmentIds) {
         await lockEnrollment(tx, eid);
       }
+
+      // Serialize BEFORE inserting facts. Poller and scheduler therefore cannot
+      // both observe an enrollment as active and append contradictory outcomes.
+      const ids = await insertEvents(tx, evs);
 
       const byEnrollment = await listByEnrollments(tx, enrollmentIds);
       const terminalIds = new Set<number>();
@@ -101,6 +116,54 @@ export class EventStore {
 
       return ids;
     });
+  }
+
+  /**
+   * Append for the enrollment currently protected by `withEnrollmentLock`.
+   * It deliberately does not reacquire its advisory lock, which is already
+   * held by the caller for the lifetime of the SMTP decision.
+   */
+  async appendUnderEnrollmentLock(
+    tx: Tx,
+    enrollmentId: number,
+    evs: readonly DomainEvent[],
+    opts: AppendOptions = {},
+  ): Promise<number[]> {
+    if (evs.length === 0) return [];
+    const enrollmentIds = [
+      ...new Set(
+        evs
+          .map((e) => ('enrollmentId' in e ? e.enrollmentId : undefined))
+          .filter((v): v is number => v !== undefined),
+      ),
+    ];
+    if (enrollmentIds.length !== 1 || enrollmentIds[0] !== enrollmentId) {
+      throw new Error('appendUnderEnrollmentLock may only append its locked enrollment');
+    }
+    const settings = await getSettings(tx);
+    const shape: SequenceShape = {
+      lastStepNo: Number.POSITIVE_INFINITY,
+      softRetryMax: settings.softRetryMax,
+    };
+    const ids = await insertEvents(tx, evs);
+    const snapshot = foldEvents(
+      (await listByEnrollments(tx, enrollmentIds)).get(enrollmentId) ?? [],
+      shape,
+    );
+    await writeProjection(tx, enrollmentId, snapshot);
+    const terminal = snapshot.state !== 'NEW' && snapshot.state !== 'ACTIVE';
+    for (const p of opts.patches ?? []) {
+      await patchScheduling(tx, p.enrollmentId, terminal ? { ...p, nextSendAt: undefined } : p);
+    }
+    for (const e of evs) {
+      if (e.type === 'hard_bounce') {
+        await suppressLead(tx, e.leadId, 'hard_bounce', e.occurredAt);
+      } else if (e.type === 'unsubscribe' && settings.suppressUnsubs) {
+        await suppressLead(tx, e.leadId, 'unsubscribed', e.occurredAt);
+      }
+    }
+    if (opts.txWork) await opts.txWork(tx, ids);
+    return ids;
   }
 
   /**

@@ -41,3 +41,18 @@ export function useRemoveSuppression() {
     },
   });
 }
+
+/** Irreversible PII anonymization.  The append-only event lineage remains. */
+export function useEraseLead() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, confirm }: { id: number; confirm: string }) =>
+      apiFetch(`/leads/${id}/erase`, okResponseSchema, { method: 'POST', body: { confirm } }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['leads'] });
+      qc.invalidateQueries({ queryKey: ['analytics'] });
+      qc.invalidateQueries({ queryKey: ['campaigns'] });
+      qc.invalidateQueries({ queryKey: ['alerts'] });
+    },
+  });
+}

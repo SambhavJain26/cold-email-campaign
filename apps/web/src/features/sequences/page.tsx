@@ -1,4 +1,6 @@
 import { Plus } from 'lucide-react';
+import { useState } from 'react';
+import { toast } from 'sonner';
 import { Link, useNavigate } from 'react-router-dom';
 import type { SequenceDto } from '@coldemail/shared';
 import { Badge } from '@/components/ui/badge';
@@ -15,6 +17,8 @@ import {
 import { EmptyState } from '@/components/shared/empty-state';
 import { useCampaigns } from '@/api/queries/campaigns';
 import { useSequences } from '@/api/queries/sequences';
+import { useDeleteSequence } from '@/api/mutations/sequences';
+import { ConfirmTypedDialog } from '@/components/shared/confirm-typed-dialog';
 
 /** "0 / 3 / 4 / 5 days" — the wait pattern the walkthrough's step cards show. */
 function waitPattern(sequence: SequenceDto): string {
@@ -33,6 +37,8 @@ export default function SequencesPage() {
   const navigate = useNavigate();
   const { data, isPending, isError, refetch } = useSequences();
   const campaigns = useCampaigns();
+  const remove = useDeleteSequence();
+  const [deleteId, setDeleteId] = useState<number | null>(null);
 
   if (isPending) {
     return (
@@ -151,6 +157,9 @@ export default function SequencesPage() {
                       <Button variant="ghost" size="xs" asChild>
                         <Link to={`/sequences/${sequence.id}`}>Open</Link>
                       </Button>
+                      <Button variant="ghost" size="xs" onClick={() => setDeleteId(sequence.id)}>
+                        Delete
+                      </Button>
                     </TableCell>
                   </TableRow>
                 );
@@ -159,6 +168,33 @@ export default function SequencesPage() {
           </Table>
         </div>
       )}
+      {deleteId !== null &&
+        (() => {
+          const sequence = sequences.find((s) => s.id === deleteId);
+          if (!sequence) return null;
+          return (
+            <ConfirmTypedDialog
+              open
+              onOpenChange={(open) => !open && setDeleteId(null)}
+              title="Delete sequence"
+              description="Deletion is allowed only while this sequence has no campaign, event, or sent-content history. Type its name to confirm."
+              expected={sequence.name}
+              confirmLabel="Delete sequence"
+              pending={remove.isPending}
+              onConfirm={(typed) =>
+                remove.mutate(
+                  { id: sequence.id, confirm: typed },
+                  {
+                    onSuccess: () => {
+                      toast.success(`${sequence.name} deleted`);
+                      setDeleteId(null);
+                    },
+                  },
+                )
+              }
+            />
+          );
+        })()}
     </div>
   );
 }

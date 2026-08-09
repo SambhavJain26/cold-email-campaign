@@ -87,6 +87,7 @@ export class SmtpImapTransport implements MailTransport {
         to: msg.to,
         subject: msg.subject,
         text: msg.bodyText,
+        ...(msg.bodyHtml !== undefined && { html: msg.bodyHtml }),
         messageId, // OURS — never let the provider mint it (docs/07 §4)
         ...(msg.headers.inReplyTo !== undefined && { inReplyTo: msg.headers.inReplyTo }),
         ...(msg.headers.references !== undefined && { references: msg.headers.references }),
@@ -151,6 +152,24 @@ export class SmtpImapTransport implements MailTransport {
     }
 
     return messages.sort((a, b) => a.uid - b.uid);
+  }
+
+  async initialPollUid(config: MailboxVerifyConfig): Promise<number> {
+    const client = this.imapClient(config);
+    try {
+      await client.connect();
+      const lock = await client.getMailboxLock(this.opts.mailbox ?? 'INBOX');
+      try {
+        const mailbox = client.mailbox;
+        return Math.max(0, (mailbox && mailbox.uidNext ? mailbox.uidNext : 1) - 1);
+      } finally {
+        lock.release();
+      }
+    } catch (err) {
+      throw this.imapError(err);
+    } finally {
+      await client.logout().catch(() => client.close());
+    }
   }
 
   // ── Test Connection / health ───────────────────────────────────────────────

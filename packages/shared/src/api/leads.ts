@@ -100,3 +100,6 @@ export const bulkTierResponseSchema = z.object({ updated: z.number().int().min(0
 
 /** Decision U: the typed-confirm body — must equal the email being un-suppressed. */
 export const deleteSuppressionBodySchema = z.object({ confirm: z.string() }).strict();
+
+/** Irreversible privacy action: confirmation must match the current email. */
+export const eraseLeadBodySchema = z.object({ confirm: z.string() }).strict();

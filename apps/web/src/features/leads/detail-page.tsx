@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { ArrowLeft, PenLine } from 'lucide-react';
-import { Link, useParams } from 'react-router-dom';
+import { Link, useNavigate, useParams } from 'react-router-dom';
 import { toast } from 'sonner';
 import type { LeadDto, LeadTier } from '@coldemail/shared';
 import { Button } from '@/components/ui/button';
@@ -21,7 +21,7 @@ import { EmptyState } from '@/components/shared/empty-state';
 import { StateBadge } from '@/components/shared/state-badge';
 import { TierBadge } from '@/components/shared/tier-badge';
 import { useLead } from '@/api/queries/leads';
-import { usePatchLead, useRemoveSuppression } from '@/api/mutations/leads';
+import { useEraseLead, usePatchLead, useRemoveSuppression } from '@/api/mutations/leads';
 import { ManualComposer } from './manual-composer';
 import { Timeline } from './timeline';
 
@@ -32,9 +32,12 @@ const UNTIERED = '__untiered__';
 export default function LeadDetailPage() {
   const { id } = useParams();
   const leadId = Number(id);
+  const navigate = useNavigate();
   const { data: lead, isPending, isError, refetch } = useLead(leadId);
   const removeSuppression = useRemoveSuppression();
+  const erase = useEraseLead();
   const [confirmOpen, setConfirmOpen] = useState(false);
+  const [eraseOpen, setEraseOpen] = useState(false);
 
   if (isPending) {
     return (
@@ -69,6 +72,9 @@ export default function LeadDetailPage() {
         <div className="ml-auto flex items-center gap-2">
           <TierBadge tier={lead.tier} />
           {lead.latest_enrollment && <StateBadge state={lead.latest_enrollment.current_state} />}
+          <Button size="sm" variant="destructive" onClick={() => setEraseOpen(true)}>
+            Erase PII
+          </Button>
         </div>
       </div>
 
@@ -148,6 +154,27 @@ export default function LeadDetailPage() {
               onSuccess: () => {
                 toast.success('Suppression removed');
                 setConfirmOpen(false);
+              },
+            },
+          )
+        }
+      />
+      <ConfirmTypedDialog
+        open={eraseOpen}
+        onOpenChange={setEraseOpen}
+        title="Erase this lead's personal data"
+        description="This permanently anonymizes profile, import, inbox, and matching alert data. Event lineage remains without direct PII; backup copies expire under normal retention. Type the email to continue."
+        expected={lead.email}
+        confirmLabel="Erase PII"
+        pending={erase.isPending}
+        onConfirm={(typed) =>
+          erase.mutate(
+            { id: lead.id, confirm: typed },
+            {
+              onSuccess: () => {
+                toast.success('Lead personal data erased');
+                setEraseOpen(false);
+                navigate('/leads');
               },
             },
           )

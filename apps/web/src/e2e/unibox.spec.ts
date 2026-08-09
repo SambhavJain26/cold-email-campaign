@@ -96,6 +96,7 @@ test('manual composer prefills from step 1 and sends as a manual send', async ({
   await page.getByRole('link', { name: 'Campaigns' }).click();
   await page.getByRole('button', { name: 'New Campaign' }).click();
   await page.getByLabel('Name').fill('Manual send target');
+  await page.getByRole('checkbox').check();
   await page.getByRole('button', { name: 'Create campaign' }).click();
   await expect(page).toHaveURL(/\/campaigns\/\d+$/);
 

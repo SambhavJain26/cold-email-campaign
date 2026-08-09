@@ -15,6 +15,12 @@ export type AlertKind =
   | 'suppression_removed'
   | 'job_failed'
   | 'compliance_missing_address' // docs/08 §4 global send guard (B4.8)
+  | 'send_blocked_compliance_missing_address'
+  | 'send_blocked_no_healthy_mailbox'
+  | 'send_blocked_send_window_closed'
+  | 'send_blocked_daily_capacity_exhausted'
+  | 'send_blocked_pacing_delay'
+  | 'send_blocked_manual_only'
   | 'render_failed'; // fatal pre-send check blocked a send (B4.8)
 
 export interface AlertSink {

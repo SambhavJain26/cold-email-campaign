@@ -51,7 +51,7 @@ describe('B6.9 analytics + B6.12 system', () => {
       await h.inject({
         method: 'POST',
         url: '/api/v1/campaigns',
-        payload: { name: 'Analytics Camp', sequence_id: seqId },
+        payload: { name: 'Analytics Camp', sequence_id: seqId, acknowledge_tier_a_manual: true },
       })
     ).json();
     campaignId = camp.id;
@@ -245,7 +245,7 @@ describe('B6.12 SIMULATED_CLOCK advance-clock', () => {
       await h.inject({
         method: 'POST',
         url: '/api/v1/campaigns',
-        payload: { name: 'Sim Camp', sequence_id: seq.id },
+        payload: { name: 'Sim Camp', sequence_id: seq.id, acknowledge_tier_a_manual: true },
       })
     ).json();
     await h.inject({

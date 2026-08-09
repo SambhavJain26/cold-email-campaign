@@ -275,4 +275,32 @@ describe('B6.5 sequences', () => {
     expect(bad.errors.length).toBeGreaterThan(0);
     expect(bad.errors[0].offset).toBeGreaterThanOrEqual(0);
   });
+
+  it('deletes only unreferenced sequences with a typed name confirmation', async () => {
+    const disposable = (
+      await h.inject({
+        method: 'POST',
+        url: '/api/v1/sequences',
+        payload: { ...WRITE_BODY, name: 'Disposable sequence' },
+      })
+    ).json();
+    const wrong = await h.inject({
+      method: 'DELETE',
+      url: `/api/v1/sequences/${disposable.id}`,
+      payload: { confirm: 'wrong name' },
+    });
+    expect(wrong.statusCode).toBe(400);
+    const deleted = await h.inject({
+      method: 'DELETE',
+      url: `/api/v1/sequences/${disposable.id}`,
+      payload: { confirm: 'Disposable sequence' },
+    });
+    expect(deleted.statusCode).toBe(200);
+    const refused = await h.inject({
+      method: 'DELETE',
+      url: `/api/v1/sequences/${seqId}`,
+      payload: { confirm: 'Real Estate Outreach' },
+    });
+    expect(refused.statusCode).toBe(409);
+  });
 });

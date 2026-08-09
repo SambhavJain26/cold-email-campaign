@@ -36,6 +36,7 @@ export class MockTransport implements MailTransport, ScriptableTransport {
   private inbound = new Map<number, IncomingMessage[]>(); // mailboxId -> queue
   private nextUid = new Map<number, number>(); // mailboxId -> next IMAP UID
   private verifyScript = new Map<string, VerifyResult>(); // fromAddress -> result
+  private initialPollUids = new Map<string, number>(); // fromAddress -> existing UID high-water
   private fetchErrors = new Map<number, Error[]>(); // mailboxId -> FIFO of scripted fetch failures
 
   constructor(private readonly clock: Clock) {}
@@ -162,6 +163,14 @@ export class MockTransport implements MailTransport, ScriptableTransport {
     const q = this.inbound.get(mailboxId) ?? [];
     this.inbound.set(mailboxId, []);
     return Promise.resolve(q);
+  }
+
+  setInitialPollUid(address: string, uid: number): void {
+    this.initialPollUids.set(address.toLowerCase(), uid);
+  }
+
+  initialPollUid(config: MailboxVerifyConfig): Promise<number> {
+    return Promise.resolve(this.initialPollUids.get(config.fromAddress.toLowerCase()) ?? 0);
   }
 
   verify(config: MailboxVerifyConfig): Promise<VerifyResult> {

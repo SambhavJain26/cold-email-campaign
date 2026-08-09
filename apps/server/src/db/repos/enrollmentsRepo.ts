@@ -95,6 +95,7 @@ export async function listDue(db: DbLike, now: Date): Promise<DueEnrollment[]> {
         lte(enrollments.nextSendAt, now),
         or(isNull(enrollments.snoozedUntil), lte(enrollments.snoozedUntil, now)),
         eq(leads.isSuppressed, false),
+        eq(leads.isErased, false),
       ),
     )
     .orderBy(asc(enrollments.nextSendAt), asc(enrollments.id));
@@ -131,7 +132,8 @@ export async function activeCampaignIds(db: DbLike): Promise<number[]> {
   const rows = await db
     .selectDistinct({ campaignId: enrollments.campaignId })
     .from(enrollments)
-    .where(eq(enrollments.currentState, 'ACTIVE'));
+    .innerJoin(leads, eq(leads.id, enrollments.leadId))
+    .where(and(eq(enrollments.currentState, 'ACTIVE'), eq(leads.isErased, false)));
   return rows.map((r) => r.campaignId);
 }
 
@@ -160,11 +162,13 @@ export async function countFollowupsDue(db: DbLike, before: Date): Promise<numbe
   const rows = await db
     .select({ n: sql<number>`count(*)::int` })
     .from(enrollments)
+    .innerJoin(leads, eq(leads.id, enrollments.leadId))
     .where(
       and(
         eq(enrollments.currentState, 'ACTIVE'),
         isNotNull(enrollments.assignedMailboxId), // assigned at first send ⇒ ≥1 sent
         lt(enrollments.nextSendAt, before),
+        eq(leads.isErased, false),
       ),
     );
   return rows[0]?.n ?? 0;
@@ -179,7 +183,14 @@ export async function countEnrolledSince(
   const rows = await db
     .select({ n: sql<number>`count(*)::int` })
     .from(enrollments)
-    .where(and(eq(enrollments.campaignId, campaignId), gte(enrollments.enrolledAt, since)));
+    .innerJoin(leads, eq(leads.id, enrollments.leadId))
+    .where(
+      and(
+        eq(enrollments.campaignId, campaignId),
+        gte(enrollments.enrolledAt, since),
+        eq(leads.isErased, false),
+      ),
+    );
   return rows[0]?.n ?? 0;
 }
 
@@ -209,6 +220,7 @@ export async function coldStorageRows(
         eq(enrollments.campaignId, sourceCampaignId),
         eq(enrollments.currentState, 'COMPLETED'),
         eq(leads.isSuppressed, false),
+        eq(leads.isErased, false),
       ),
     )
     .orderBy(asc(enrollments.terminalAt), asc(enrollments.leadId));
@@ -286,6 +298,20 @@ export async function latestForLead(
 export async function getById(db: DbLike, id: number): Promise<EnrollmentRow | undefined> {
   const rows = await db.select().from(enrollments).where(eq(enrollments.id, id));
   return rows[0];
+}
+
+export async function listForLead(
+  db: DbLike,
+  leadId: number,
+): Promise<Array<Pick<EnrollmentRow, 'id' | 'campaignId' | 'currentState'>>> {
+  return db
+    .select({
+      id: enrollments.id,
+      campaignId: enrollments.campaignId,
+      currentState: enrollments.currentState,
+    })
+    .from(enrollments)
+    .where(eq(enrollments.leadId, leadId));
 }
 
 export async function listAll(db: DbLike, campaignId: number | null): Promise<EnrollmentRow[]> {

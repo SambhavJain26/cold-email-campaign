@@ -72,6 +72,9 @@ export const sequenceWriteBodySchema = z
   .strict();
 export type SequenceWriteBody = z.infer<typeof sequenceWriteBodySchema>;
 
+/** Typed confirmation for deleting a sequence that has no historical use. */
+export const deleteSequenceBodySchema = z.object({ confirm: z.string().min(1) }).strict();
+
 // ── preview + validate-template ─────────────────────────────────────────────
 
 export const previewBodySchema = z

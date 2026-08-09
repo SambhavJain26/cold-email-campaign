@@ -1,5 +1,13 @@
 # Decision Register
 
+## Pre-canary remediation decisions (2026-08-09)
+
+| ID | Decision | Rationale |
+|----|----------|-----------|
+| AA | **Mailbox-local operational time.** Recipient state resolves first; otherwise use the selected mailbox IANA timezone, then the global default. A mailbox daily cap resets at midnight in that mailbox's timezone. | It keeps prospect-local windows intact while making unknown-location behavior and capacity accounting predictable. |
+| AB | **Lead erasure is irreversible anonymization.** Active work receives an append-only unsubscribe marked `data_erasure`; direct PII in lead, import, inbound-message, and matching alert records is redacted. Erased leads are excluded from operational analytics and may later be re-imported. Backups expire on their ordinary retention schedule; a restored backup must replay erasures before service resumes. | Preserves audit lineage without retaining usable personal data. |
+| AC | **Outbound mail is minimal multipart/alternative.** Plain text remains canonical; a safely escaped matching HTML alternative has only paragraphs, line breaks, and a muted legible compliance footer. No images, pixels, hidden text, external assets, or branding treatment. | Provides compatible modern rendering without adding tracking or deliverability-risky markup. |
+
 Every design decision, in one place. Decisions **A–F** come from [build_plan.md](../build_plan.md) §1 and are now **confirmed and locked**. Decisions **G–Z** are new low-level choices made to take the plan from "architecture" to "start typing" — each has a rationale and a swap cost so revisiting any of them is a bounded change, not archaeology.
 
 Status meaning: 🔒 locked (change requires editing this file first) · 🔧 default (safe to flip via config/settings without touching docs).

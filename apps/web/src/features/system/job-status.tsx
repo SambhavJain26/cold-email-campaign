@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { toast } from 'sonner';
 import { Badge } from '@/components/ui/badge';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
 import {
   Dialog,
@@ -74,6 +75,13 @@ export function JobStatus() {
           <dd className="mt-1 text-sm font-medium tabular-nums">{data.pollers.length}</dd>
         </div>
       </dl>
+
+      {data.send_blockers.map((blocker) => (
+        <Alert key={blocker.code} variant="destructive">
+          <AlertTitle>Sending blocked</AlertTitle>
+          <AlertDescription>{blocker.message}</AlertDescription>
+        </Alert>
+      ))}
 
       <div className="overflow-x-auto rounded-lg border border-border">
         <table className="w-full text-sm">

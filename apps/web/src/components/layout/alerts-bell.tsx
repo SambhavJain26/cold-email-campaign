@@ -14,6 +14,16 @@ import { useAckAlert } from '@/api/mutations/alerts';
 function describe(alert: AlertDto): { title: string; detail?: string } {
   const p = alert.payload as Record<string, unknown>;
   switch (alert.kind) {
+    case 'send_blocked_compliance_missing_address':
+    case 'send_blocked_no_healthy_mailbox':
+    case 'send_blocked_send_window_closed':
+    case 'send_blocked_daily_capacity_exhausted':
+    case 'send_blocked_pacing_delay':
+    case 'send_blocked_manual_only':
+      return {
+        title: 'Sending blocked',
+        detail: typeof p.message === 'string' ? p.message : undefined,
+      };
     case 'mailbox_auto_paused':
       return {
         title: `Mailbox ${p.mailbox_id} auto-paused`,

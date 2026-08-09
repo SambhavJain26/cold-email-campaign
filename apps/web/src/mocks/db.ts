@@ -118,6 +118,7 @@ function buildMailboxes(): MailboxDto[] {
       daily_cap: 30,
       effective_cap: autoPaused ? 15 : 30,
       send_window: { days: [1, 2, 3, 4, 5], start: '08:00', end: '17:00' },
+      timezone: 'America/New_York',
       status: authFailed ? 'auth_failed' : autoPaused ? 'auto_paused' : 'ok',
       status_reason: authFailed
         ? 'IMAP authentication failed (535)'

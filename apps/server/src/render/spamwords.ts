@@ -5,11 +5,17 @@
 // EXCLAMATION_MAX exclamation marks, are one hit each.
 
 export const SPAM_PHRASES: string[] = [
-  'free!!!',
-  'guarantee',
+  // Transparent cold-email cliché warnings, not a deliverability prediction.
+  'just following up',
+  'circling back',
+  'touching base',
+  'hope this finds you well',
+  'reaching out',
+  'pick your brain',
+  '15 minutes',
+  'per my last email',
   'act now',
   'risk-free',
-  '100% free',
   'click here',
 ];
 

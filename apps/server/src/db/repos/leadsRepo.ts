@@ -1,18 +1,24 @@
 import { and, eq, ilike, inArray, isNull, or, sql, type SQL } from 'drizzle-orm';
 import type { LeadTier } from '@coldemail/shared';
 import type { DbLike } from '../client';
-import { enrollments, leads } from '../schema';
+import { enrollments, importRows, incomingMessages, leads } from '../schema';
 
 export type LeadRow = typeof leads.$inferSelect;
 
 /** Lookup by normalized email (decision L: trim + lowercase, stored normalized). */
 export async function getLeadByEmail(db: DbLike, email: string): Promise<LeadRow | undefined> {
-  const rows = await db.select().from(leads).where(eq(leads.email, email.trim().toLowerCase()));
+  const rows = await db
+    .select()
+    .from(leads)
+    .where(and(eq(leads.email, email.trim().toLowerCase()), eq(leads.isErased, false)));
   return rows[0];
 }
 
 export async function getLeadById(db: DbLike, id: number): Promise<LeadRow | undefined> {
-  const rows = await db.select().from(leads).where(eq(leads.id, id));
+  const rows = await db
+    .select()
+    .from(leads)
+    .where(and(eq(leads.id, id), eq(leads.isErased, false)));
   return rows[0];
 }
 
@@ -21,7 +27,7 @@ export async function leadsByIds(db: DbLike, ids: readonly number[]): Promise<Le
   return db
     .select()
     .from(leads)
-    .where(inArray(leads.id, [...ids]));
+    .where(and(inArray(leads.id, [...ids]), eq(leads.isErased, false)));
 }
 
 export interface NewImportedLead {
@@ -76,7 +82,7 @@ export interface LeadFilter {
 }
 
 export function leadFilterWhere(filter: LeadFilter): SQL | undefined {
-  const conds: SQL[] = [];
+  const conds: SQL[] = [eq(leads.isErased, false)!];
   if (filter.tier !== undefined) {
     conds.push(filter.tier === 'untiered' ? isNull(leads.tier)! : eq(leads.tier, filter.tier)!);
   }
@@ -205,7 +211,7 @@ export async function untieredCount(db: DbLike): Promise<number> {
   const rows = await db
     .select({ n: sql<number>`count(*)::int` })
     .from(leads)
-    .where(and(isNull(leads.tier), eq(leads.isSuppressed, false)));
+    .where(and(isNull(leads.tier), eq(leads.isSuppressed, false), eq(leads.isErased, false)));
   return rows[0]?.n ?? 0;
 }
 
@@ -228,7 +234,7 @@ export async function patchLead(
       ...(patch.customFields !== undefined && { customFields: patch.customFields }),
       updatedAt: at,
     })
-    .where(eq(leads.id, id))
+    .where(and(eq(leads.id, id), eq(leads.isErased, false)))
     .returning();
   return rows[0];
 }
@@ -242,7 +248,7 @@ export async function updateTierByIds(
   const rows = await db
     .update(leads)
     .set({ tier })
-    .where(inArray(leads.id, [...ids]))
+    .where(and(inArray(leads.id, [...ids]), eq(leads.isErased, false)))
     .returning({ id: leads.id });
   return rows.length;
 }
@@ -252,6 +258,15 @@ export async function updateTierByFilter(
   filter: LeadFilter,
   tier: LeadTier | null,
 ): Promise<number> {
+  if (
+    filter.tier === undefined &&
+    filter.state === undefined &&
+    filter.campaignId === undefined &&
+    filter.q === undefined &&
+    filter.suppressed === undefined
+  ) {
+    throw new Error('bulk-tier filter matched no constraints');
+  }
   const where = leadFilterWhere(filter);
   // An empty filter would retier EVERY lead — refuse; that can't be intended.
   if (where === undefined) throw new Error('bulk-tier filter matched no constraints');
@@ -267,10 +282,56 @@ export async function existingEmails(db: DbLike, emails: readonly string[]): Pro
     const rows = await db
       .select({ email: leads.email })
       .from(leads)
-      .where(inArray(leads.email, [...emails.slice(i, i + CHUNK)]));
+      .where(and(inArray(leads.email, [...emails.slice(i, i + CHUNK)]), eq(leads.isErased, false)));
     for (const r of rows) found.add(r.email);
   }
   return found;
+}
+
+/** Irreversible PII anonymization while retaining non-identifying event lineage. */
+export async function anonymizeLeadPii(
+  db: DbLike,
+  input: { leadId: number; enrollmentIds: number[]; at: Date },
+): Promise<void> {
+  if (input.enrollmentIds.length > 0) {
+    await db
+      .update(incomingMessages)
+      .set({
+        fromAddress: null,
+        subject: null,
+        snippet: null,
+        bodyText: null,
+        messageId: null,
+        inReplyTo: null,
+      })
+      .where(inArray(incomingMessages.matchedEnrollmentId, input.enrollmentIds));
+  }
+  await db
+    .update(importRows)
+    .set({ raw: {}, emailNormalized: null })
+    .where(eq(importRows.leadId, input.leadId));
+  await db
+    .update(leads)
+    .set({
+      email: `erased-lead-${input.leadId}@invalid.local`,
+      firstName: null,
+      lastName: null,
+      company: null,
+      website: null,
+      city: null,
+      state: null,
+      phone: null,
+      notes: null,
+      customFields: {},
+      tier: null,
+      isSuppressed: false,
+      suppressionReason: null,
+      suppressedAt: null,
+      isErased: true,
+      erasedAt: input.at,
+      updatedAt: input.at,
+    })
+    .where(eq(leads.id, input.leadId));
 }
 
 export interface EligibleLead {
@@ -305,7 +366,7 @@ export async function selectEligibleLeads(
     .select({ id: leads.id, tier: leads.tier })
     .from(leads)
     .where(
-      sql`NOT ${leads.isSuppressed}
+      sql`NOT ${leads.isSuppressed} AND NOT ${leads.isErased}
         AND ${leads.tier} IS DISTINCT FROM 'nurture'
         AND (${tierParam}::lead_tier IS NULL OR ${leads.tier} = ${tierParam}::lead_tier)
         AND NOT EXISTS (

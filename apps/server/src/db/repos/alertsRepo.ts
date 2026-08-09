@@ -52,3 +52,16 @@ export async function getAlert(db: DbLike, id: number): Promise<AlertRow | undef
 export async function acknowledgeAlert(db: DbLike, id: number, at: Date): Promise<void> {
   await db.update(alerts).set({ acknowledgedAt: at }).where(eq(alerts.id, id));
 }
+
+/** Replace operator-visible payloads containing erased direct PII with lineage only. */
+export async function redactAlertsContaining(
+  db: DbLike,
+  email: string,
+  leadId: number,
+): Promise<void> {
+  await db.execute(sql`
+    UPDATE alerts
+    SET payload = jsonb_build_object('lead_id', ${leadId}::integer)
+    WHERE payload::text ILIKE ${`%${email}%`}
+  `);
+}

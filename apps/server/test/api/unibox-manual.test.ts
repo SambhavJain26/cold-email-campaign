@@ -48,7 +48,7 @@ describe('B6.7 unibox + B6.8 manual-sends', () => {
       await h.inject({
         method: 'POST',
         url: '/api/v1/campaigns',
-        payload: { name: 'Unibox Camp', sequence_id: seqId },
+        payload: { name: 'Unibox Camp', sequence_id: seqId, acknowledge_tier_a_manual: true },
       })
     ).json().id;
     await h.inject({

@@ -81,7 +81,9 @@ const unsubscribe_ = base.extend({
   enrollmentId: id,
   campaignId: id,
   source: z.enum(UNSUBSCRIBE_SOURCES),
-  attributes: z.object({ matched_keyword: z.string().optional() }).default({}),
+  attributes: z
+    .object({ matched_keyword: z.string().optional(), data_erasure: z.boolean().optional() })
+    .default({}),
 });
 const meetingBooked_ = base.extend({
   type: z.literal('meeting_booked'),

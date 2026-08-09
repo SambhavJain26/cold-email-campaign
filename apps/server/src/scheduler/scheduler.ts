@@ -22,6 +22,7 @@ import {
 } from '../db/repos/eventsRepo';
 import {
   activeCampaignIds,
+  getById as getEnrollmentById,
   listDue,
   redistributeUnstarted,
   type DueEnrollment,
@@ -70,8 +71,20 @@ export interface TickResult {
   overdueLeft: number;
 }
 
+export type SendBlocker = {
+  code:
+    | 'compliance_missing_address'
+    | 'no_healthy_mailbox'
+    | 'send_window_closed'
+    | 'daily_capacity_exhausted'
+    | 'pacing_delay'
+    | 'manual_only';
+  message: string;
+};
+
 interface MailboxBudget extends RotationCandidate {
   window: SendWindow;
+  timezone: string;
   fromAddress: string;
 }
 
@@ -82,8 +95,6 @@ export class Scheduler {
   private rateLimitFailures = new Map<number, number>();
   /** catchup_backlog is emitted once per downtime episode (docs/06 §1). */
   private catchupAlerted = false;
-  /** compliance_missing_address is emitted once per episode (docs/08 §4). */
-  private complianceAlerted = false;
   /** render_failed alerted once per variant per process run. */
   private renderFailAlerted = new Set<number>();
   /** Per-tick caches: compliance row, per-campaign auto_observations, round-robin counters. */
@@ -95,9 +106,29 @@ export class Scheduler {
 
   /** Last completed tick (in-memory — single process, GET /system/status). */
   private _lastTickAt: Date | null = null;
+  private _sendBlockers: SendBlocker[] = [];
+  private blockerAlerted = new Set<SendBlocker['code']>();
 
   get lastTickAt(): Date | null {
     return this._lastTickAt;
+  }
+
+  get sendBlockers(): readonly SendBlocker[] {
+    return this._sendBlockers;
+  }
+
+  private async setSendBlockers(blockers: SendBlocker[]): Promise<void> {
+    this._sendBlockers = blockers;
+    const active = new Set(blockers.map((b) => b.code));
+    for (const blocker of blockers) {
+      if (!this.blockerAlerted.has(blocker.code)) {
+        await this.deps.alerts.emit(`send_blocked_${blocker.code}`, 'warning', {
+          code: blocker.code,
+          message: blocker.message,
+        });
+      }
+    }
+    this.blockerAlerted = active;
   }
 
   constructor(private readonly deps: SchedulerDeps) {}
@@ -146,27 +177,28 @@ export class Scheduler {
     await this.refreshMailboxHealth(now, settings);
     const completed = await this.completeFinished(now, settings);
 
-    // CAN-SPAM global guard (docs/08 §4): empty physical address → refuse ALL
-    // sends, alert once per episode. Housekeeping/completion still ran.
+    // CAN-SPAM global guard (docs/08 §4): empty physical address → refuse all
+    // sends. setSendBlockers emits one durable alert per blocker episode.
     if (compliance.physicalAddress.trim() === '') {
-      if (!this.complianceAlerted) {
-        await alerts.emit('compliance_missing_address', 'error', {
-          reason: 'compliance_settings.physical_address is empty — sends refused globally',
-        });
-        this.complianceAlerted = true;
-      }
+      await this.setSendBlockers([
+        {
+          code: 'compliance_missing_address',
+          message: 'Set a physical address in Settings → Compliance.',
+        },
+      ]);
       return { ran: true, sent: 0, completed, overdueLeft: 0 };
     }
-    this.complianceAlerted = false;
 
-    // B. per-mailbox budgets. Cap-reset midnight is the operator's zone
-    // (settings.default_timezone) — mailboxes carry no tz of their own.
-    const midnight = startOfLocalDay(now, settings.defaultTimezone);
+    // B. Per-mailbox budgets reset at midnight in the mailbox timezone.
     const boxes = await listMailboxesByStatus(db, ['ok']);
     const budgets = new Map<number, MailboxBudget>();
     for (const mb of boxes) {
       const capToday = mb.resumeCap ?? mb.dailyCap;
-      const sentToday = await countSentSince(db, mb.id, midnight);
+      const sentToday = await countSentSince(
+        db,
+        mb.id,
+        startOfLocalDay(now, mb.timezone || settings.defaultTimezone),
+      );
       const gap = minGapMs(mb.sendWindow, capToday) * jitterFactor(rng, settings.sendJitterPct);
       const remaining = Math.max(0, capToday - sentToday);
       budgets.set(mb.id, {
@@ -176,21 +208,73 @@ export class Scheduler {
         budget: paceReady(now, mb.lastSendAt, gap) ? remaining : 0,
         lastSendAt: mb.lastSendAt,
         window: mb.sendWindow,
+        timezone: mb.timezone,
         fromAddress: mb.fromAddress,
       });
     }
 
     // C. due work, oldest-first — this ordering + budgets IS never-burst catch-up.
     const due = await listDue(db, now);
+    const blockers: SendBlocker[] = [];
+    const automaticDue = due.filter((e) => e.personalizationMode !== 'human_written');
+    const manualDue = due.filter((e) => e.personalizationMode === 'human_written');
+    if (due.length > 0 && budgets.size === 0) {
+      blockers.push({
+        code: 'no_healthy_mailbox',
+        message: 'Reconnect or resume a mailbox before sending.',
+      });
+    }
+    if (manualDue.length > 0) {
+      blockers.push({
+        code: 'manual_only',
+        message: `${manualDue.length} due Tier A enrollment${manualDue.length === 1 ? '' : 's'} require the manual composer.`,
+      });
+    }
+    if (automaticDue.length > 0 && budgets.size > 0) {
+      const windowOpen =
+        !settings.enforceSendWindow ||
+        automaticDue.some((e) =>
+          [...budgets.values()].some((b) =>
+            insideWindow(
+              b.window,
+              now,
+              resolveTimezone(e.leadState, b.timezone || settings.defaultTimezone),
+            ),
+          ),
+        );
+      const capacityAvailable = [...budgets.values()].some((b) => b.capToday > b.sentToday);
+      const paceAvailable = [...budgets.values()].some((b) => b.budget > 0);
+      if (!windowOpen) {
+        blockers.push({
+          code: 'send_window_closed',
+          message: 'Wait for the recipient-local send window to open.',
+        });
+      } else if (!capacityAvailable) {
+        blockers.push({
+          code: 'daily_capacity_exhausted',
+          message: 'Increase capacity or wait for the next mailbox-local day.',
+        });
+      } else if (!paceAvailable) {
+        blockers.push({
+          code: 'pacing_delay',
+          message: 'Mailbox pacing is active; the next send resumes after its minimum gap.',
+        });
+      }
+    }
+    await this.setSendBlockers(blockers);
     const attempted = new Set<number>(); // one send attempt per mailbox per tick (pacing)
     let sent = 0;
     let terminal = 0;
     for (const e of due) {
-      const tz = resolveTimezone(e.leadState, settings.defaultTimezone);
+      // Mode 1 is an explicit operator action only.  Leaving these due makes
+      // the blocker/guidance visible without letting the scheduler silently
+      // turn a human-written enrollment into an automated send.
+      if (e.personalizationMode === 'human_written') continue;
       const windowSource = e.assignedMailboxId
         ? budgets.get(e.assignedMailboxId)
         : budgets.values().next().value;
       if (!windowSource) continue; // follow-up's mailbox not ok, or no ok mailboxes
+      const tz = resolveTimezone(e.leadState, windowSource.timezone || settings.defaultTimezone);
       if (settings.enforceSendWindow && !insideWindow(windowSource.window, now, tz)) {
         continue; // stays due; retried next tick
       }
@@ -397,15 +481,24 @@ export class Scheduler {
       to: e.leadEmail,
       subject: rendered.subject,
       bodyText: rendered.bodyText,
+      bodyHtml: rendered.bodyHtml,
       headers: { messageId, inReplyTo, references },
     };
 
-    const result = await transport.send(msg);
+    // `listDue` is a snapshot.  Re-read and send while holding the same
+    // enrollment lock EventStore uses for inbound poller appends.  A reply that
+    // gets the lock first turns the projection terminal and this sends nothing.
+    const result = await store.withEnrollmentLock(e.id, async (tx) => {
+      const current = await getEnrollmentById(tx, e.id);
+      if (!current || current.currentState !== 'ACTIVE') return null;
+      const delivery = await transport.send(msg);
+      if (!delivery.accepted) return delivery;
 
-    if (result.accepted) {
       const nextStep = stepOf(seq, stepNo + 1);
       const nextSendAt = nextStep ? new Date(now.getTime() + nextStep.waitDays * 86_400_000) : null;
-      await store.append(
+      await store.appendUnderEnrollmentLock(
+        tx,
+        e.id,
         [
           buildEvent.sent({
             leadId: e.leadId,
@@ -427,8 +520,8 @@ export class Scheduler {
               assignedMailboxId: e.assignedMailboxId ?? mb.id,
             },
           ],
-          txWork: async (tx) => {
-            await insertSentMessage(tx, {
+          txWork: async (lockedTx) => {
+            await insertSentMessage(lockedTx, {
               messageId,
               enrollmentId: e.id,
               leadId: e.leadId,
@@ -440,6 +533,11 @@ export class Scheduler {
           },
         },
       );
+      return delivery;
+    });
+    if (result === null) return 'no_step';
+
+    if (result.accepted) {
       await patchMailbox(db, mb.id, { lastSendAt: now });
       await jobs.scheduleConfirmDelivery({
         enrollmentId: e.id,

@@ -6,6 +6,7 @@ import {
   bulkTierBodySchema,
   bulkTierResponseSchema,
   deleteSuppressionBodySchema,
+  eraseLeadBodySchema,
   idParamSchema,
   leadDetailResponseSchema,
   leadSchema,
@@ -21,6 +22,7 @@ import type { AppServices } from '../composition';
 import type { EnrollmentState } from '@coldemail/shared';
 import {
   getLeadById,
+  anonymizeLeadPii,
   latestEnrollmentLite,
   listLeads,
   patchLead,
@@ -30,6 +32,9 @@ import {
 } from '../db/repos/leadsRepo';
 import { listRowsByLead, type EventRow } from '../db/repos/eventsRepo';
 import { removeSuppression } from '../db/repos/suppressionsRepo';
+import { redactAlertsContaining } from '../db/repos/alertsRepo';
+import { listForLead } from '../db/repos/enrollmentsRepo';
+import { buildEvent } from '../domain/events';
 import { insertAlert } from '../db/repos/alertsRepo';
 import { bulkTier } from '../services/tiering';
 import { AppError } from './errors';
@@ -74,7 +79,7 @@ const suppressionParamsSchema = z.object({ email: z.string() });
 
 export async function leadsRoutes(app: FastifyInstance, services: AppServices): Promise<void> {
   const r = app.withTypeProvider<ZodTypeProvider>();
-  const { db, clock } = services;
+  const { db, clock, store } = services;
 
   r.get(
     '/leads',
@@ -102,7 +107,7 @@ export async function leadsRoutes(app: FastifyInstance, services: AppServices): 
     { schema: { params: idParamSchema, response: { 200: leadDetailResponseSchema } } },
     async (req) => {
       const row = await getLeadById(db, req.params.id);
-      if (!row) throw AppError.notFound('lead');
+      if (!row || row.isErased) throw AppError.notFound('lead');
       const timeline = await listRowsByLead(db, row.id);
       return {
         ...toLeadDto(row, await latestEnrollmentLite(db, row.id)),
@@ -132,7 +137,7 @@ export async function leadsRoutes(app: FastifyInstance, services: AppServices): 
         },
         clock.now(),
       );
-      if (!updated) throw AppError.notFound('lead');
+      if (!updated || updated.isErased) throw AppError.notFound('lead');
       return toLeadDto(updated, await latestEnrollmentLite(db, updated.id));
     },
   );
@@ -181,6 +186,51 @@ export async function leadsRoutes(app: FastifyInstance, services: AppServices): 
       if (!removed) throw AppError.notFound('suppression');
       // decision U: audit-logged as an alert row
       await insertAlert(db, 'suppression_removed', 'warning', { email });
+      return { ok: true } as const;
+    },
+  );
+
+  r.post(
+    '/leads/:id/erase',
+    {
+      schema: {
+        params: idParamSchema,
+        body: eraseLeadBodySchema,
+        response: { 200: okResponseSchema },
+      },
+    },
+    async (req) => {
+      const lead = await getLeadById(db, req.params.id);
+      if (!lead || lead.isErased) throw AppError.notFound('lead');
+      if (req.body.confirm.trim().toLowerCase() !== lead.email) {
+        throw new AppError('validation', 400, 'confirm must equal the current email');
+      }
+      const enrollmentsForLead = await listForLead(db, lead.id);
+      const now = clock.now();
+      const active = enrollmentsForLead.filter(
+        (e) => e.currentState === 'ACTIVE' || e.currentState === 'NEW',
+      );
+      if (active.length > 0) {
+        await store.append(
+          active.map((e) =>
+            buildEvent.unsubscribe({
+              leadId: lead.id,
+              enrollmentId: e.id,
+              campaignId: e.campaignId,
+              occurredAt: now,
+              source: 'manual',
+              attributes: { data_erasure: true },
+            }),
+          ),
+        );
+      }
+      await removeSuppression(db, lead.email, now).catch(() => undefined);
+      const ids = enrollmentsForLead.map((e) => e.id);
+      // Alert payloads are operator-visible.  Any payload containing the old
+      // address is replaced by a non-identifying lineage reference.
+      await redactAlertsContaining(db, lead.email, lead.id);
+      await anonymizeLeadPii(db, { leadId: lead.id, enrollmentIds: ids, at: now });
+      await insertAlert(db, 'lead_erased', 'warning', { lead_id: lead.id });
       return { ok: true } as const;
     },
   );

@@ -4,6 +4,7 @@
 // (shapes, rounding, watch rules) is services/metrics.
 import { sql, type SQL } from 'drizzle-orm';
 import type { DbLike } from '../client';
+import { leads } from '../schema';
 
 export interface MetricScope {
   campaignId?: number | null;
@@ -11,7 +12,9 @@ export interface MetricScope {
 }
 
 function evFilter(alias: string, scope: MetricScope): SQL {
-  const parts: SQL[] = [];
+  const parts: SQL[] = [
+    sql` AND EXISTS (SELECT 1 FROM ${leads} l WHERE l.id = ${sql.raw(alias)}.lead_id AND NOT l.is_erased)`,
+  ];
   if (scope.campaignId != null)
     parts.push(sql` AND ${sql.raw(alias)}.campaign_id = ${scope.campaignId}`);
   if (scope.asOf != null) parts.push(sql` AND ${sql.raw(alias)}.occurred_at <= ${scope.asOf}`);
@@ -89,8 +92,9 @@ export async function countEnrollments(db: DbLike, campaignId: number | null): P
   return (
     await one<{ n: number }>(
       db,
-      sql`SELECT count(*)::int n FROM enrollments
-          WHERE ${campaignId != null ? sql`campaign_id = ${campaignId}` : sql`true`}`,
+      sql`SELECT count(*)::int n FROM enrollments en
+          JOIN ${leads} l ON l.id = en.lead_id AND NOT l.is_erased
+          WHERE ${campaignId != null ? sql`en.campaign_id = ${campaignId}` : sql`true`}`,
     )
   ).n;
 }
@@ -145,8 +149,8 @@ export async function tierStats(db: DbLike, scope: MetricScope): Promise<TierSta
             WHERE e.type = 'meeting_booked'${evFilter('e', scope)} GROUP BY 1),
       md AS (SELECT enrolled_tier tier,
                     mode() WITHIN GROUP (ORDER BY personalization_mode)::text AS mode
-             FROM enrollments
-             WHERE ${scope.campaignId != null ? sql`campaign_id = ${scope.campaignId}` : sql`true`}
+             FROM enrollments en JOIN ${leads} l ON l.id = en.lead_id AND NOT l.is_erased
+             WHERE ${scope.campaignId != null ? sql`en.campaign_id = ${scope.campaignId}` : sql`true`}
              GROUP BY 1)
       SELECT c.tier::text, c.contacted,
              COALESCE(r.repliers, 0) repliers,
@@ -228,6 +232,7 @@ export async function dailySeries(
            count(*) FILTER (WHERE e.type = 'unsubscribe')::int unsubscribes
         FROM events e
         WHERE e.occurred_at >= ${from} AND e.occurred_at <= ${to}
+          AND EXISTS (SELECT 1 FROM ${leads} l WHERE l.id = e.lead_id AND NOT l.is_erased)
           ${scope.campaignId != null ? sql`AND e.campaign_id = ${scope.campaignId}` : sql``}
         GROUP BY 1 ORDER BY 1`,
   );
@@ -241,6 +246,7 @@ export async function tierCEngagedCount(db: DbLike, scope: MetricScope): Promise
   const row = await one<{ n: number }>(
     db,
     sql`SELECT count(*)::int AS n FROM enrollments e
+        JOIN ${leads} l ON l.id = e.lead_id AND NOT l.is_erased
         WHERE e.enrolled_tier = 'C'
           ${scope.campaignId != null ? sql`AND e.campaign_id = ${scope.campaignId}` : sql``}
           AND EXISTS (SELECT 1 FROM events hr
@@ -263,6 +269,7 @@ export async function mailboxVolume(db: DbLike, from: Date, to: Date): Promise<M
            count(*)::int sends
         FROM events e
         WHERE e.type = 'sent' AND e.mailbox_id IS NOT NULL
+          AND EXISTS (SELECT 1 FROM ${leads} l WHERE l.id = e.lead_id AND NOT l.is_erased)
           AND e.occurred_at >= ${from} AND e.occurred_at <= ${to}
         GROUP BY 1, 2 ORDER BY 1, 2`,
   );
@@ -327,8 +334,8 @@ export async function selfCheckViolations(
       'terminal suppression event without suppressed lead',
       sql`SELECT count(DISTINCT l.id)::int n FROM leads l
           JOIN events e ON e.lead_id = l.id AND e.type IN ('unsubscribe', 'hard_bounce')
-          WHERE NOT l.is_suppressed
-             OR NOT EXISTS (SELECT 1 FROM suppressions s WHERE s.email = l.email)`,
+           WHERE NOT l.is_erased AND (NOT l.is_suppressed
+              OR NOT EXISTS (SELECT 1 FROM suppressions s WHERE s.email = l.email))`,
     ],
   ];
 

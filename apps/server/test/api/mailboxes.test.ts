@@ -175,6 +175,36 @@ describe('B6.2 mailboxes', () => {
     }
   });
 
+  it('initializes a new or legacy-zero IMAP cursor without replacing a nonzero cursor', async () => {
+    transport.setInitialPollUid('cursor@agency.dev', 55);
+    const created = await h.inject({
+      method: 'POST',
+      url: '/api/v1/mailboxes',
+      payload: { ...CREATE_BODY, from_address: 'cursor@agency.dev' },
+    });
+    const cursorMailbox = await getMailbox(h.services.db, created.json().id);
+    expect(cursorMailbox!.lastPollUid).toBe(55);
+
+    // A reconnect repairs only old zero-cursor mailboxes. It must not discard
+    // messages that arrived while a real mailbox was temporarily unavailable.
+    await patchMailbox(h.services.db, 1, { lastPollUid: 0 });
+    transport.setInitialPollUid('sarah@agency.dev', 72);
+    await h.inject({
+      method: 'POST',
+      url: '/api/v1/mailboxes/1/reconnect',
+      payload: { password: 'fresh-password' },
+    });
+    expect((await getMailbox(h.services.db, 1))!.lastPollUid).toBe(72);
+    await patchMailbox(h.services.db, 1, { lastPollUid: 73 });
+    transport.setInitialPollUid('sarah@agency.dev', 99);
+    await h.inject({
+      method: 'POST',
+      url: '/api/v1/mailboxes/1/reconnect',
+      payload: { password: 'fresh-password' },
+    });
+    expect((await getMailbox(h.services.db, 1))!.lastPollUid).toBe(73);
+  });
+
   it('volume returns per-mailbox series + imbalance boolean', async () => {
     const res = await h.inject({ method: 'GET', url: '/api/v1/mailboxes/volume?days=30' });
     expect(res.statusCode).toBe(200);

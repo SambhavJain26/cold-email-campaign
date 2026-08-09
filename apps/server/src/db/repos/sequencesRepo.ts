@@ -220,6 +220,28 @@ export async function sequenceHasSends(db: DbLike, sequenceId: number): Promise<
   return rows.rows.length > 0;
 }
 
+export async function deleteSequenceIfUnreferenced(
+  db: DbLike,
+  sequenceId: number,
+): Promise<{ deleted: boolean; reason?: string }> {
+  const refs = await db.execute(sql`
+    SELECT
+      (SELECT count(*)::int FROM campaigns WHERE sequence_id = ${sequenceId}) AS campaigns,
+      (SELECT count(*)::int FROM sent_messages sm
+        JOIN enrollments e ON e.id = sm.enrollment_id
+        JOIN campaigns c ON c.id = e.campaign_id
+        WHERE c.sequence_id = ${sequenceId}) AS sends`);
+  const row = refs.rows[0] as { campaigns: number; sends: number };
+  if (row.campaigns > 0 || row.sends > 0) {
+    return { deleted: false, reason: 'sequence has campaign or sent-message references' };
+  }
+  const removed = await db
+    .delete(sequences)
+    .where(eq(sequences.id, sequenceId))
+    .returning({ id: sequences.id });
+  return { deleted: removed.length === 1 };
+}
+
 /** A save violated the after-sends edit policy → 422 sequence_invalid. */
 export class SequenceEditConflictError extends Error {
   constructor(readonly details: string[]) {

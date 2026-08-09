@@ -3,7 +3,7 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { useForm } from 'react-hook-form';
 import { toast } from 'sonner';
 import { z } from 'zod';
-import { createMailboxBodySchema, type MailboxDto } from '@coldemail/shared';
+import { createMailboxBodySchema, sendWindowSchema, type MailboxDto } from '@coldemail/shared';
 import { Button } from '@/components/ui/button';
 import {
   Dialog,
@@ -15,6 +15,7 @@ import {
 } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Checkbox } from '@/components/ui/checkbox';
 import { useCreateMailbox, usePatchMailbox, useTestConnection } from '@/api/mutations/mailboxes';
 
 /** The shared create schema, narrowed to the form's shape: ports/cap always
@@ -25,6 +26,8 @@ const formSchema = createMailboxBodySchema.omit({ auth_type: true, send_window: 
   imap_port: z.number().int().min(1).max(65535),
   daily_cap: z.number().int().min(1),
   password: z.string(),
+  timezone: z.string().min(1),
+  send_window: sendWindowSchema,
 });
 type FormValues = z.infer<typeof formSchema>;
 
@@ -50,10 +53,17 @@ export function MailboxDialog({
     handleSubmit,
     reset,
     setError,
+    setValue,
+    watch,
     formState: { errors },
   } = useForm<FormValues>({
     resolver: zodResolver(formSchema),
   });
+  const selectedDays = watch('send_window.days') ?? [];
+  const timezones =
+    typeof Intl.supportedValuesOf === 'function'
+      ? Intl.supportedValuesOf('timeZone')
+      : ['America/New_York', 'America/Chicago', 'America/Denver', 'America/Los_Angeles', 'UTC'];
 
   // Stale test results are cleared in handleOpenChange (an event handler) —
   // setState inside this effect trips the react-hooks compiler rule.
@@ -69,6 +79,8 @@ export function MailboxDialog({
             imap_host: mailbox.imap_host,
             imap_port: mailbox.imap_port,
             daily_cap: mailbox.daily_cap,
+            timezone: mailbox.timezone,
+            send_window: mailbox.send_window,
             password: '',
           }
         : {
@@ -79,6 +91,8 @@ export function MailboxDialog({
             imap_host: '',
             imap_port: 993,
             daily_cap: 30,
+            timezone: 'America/New_York',
+            send_window: { days: [1, 2, 3, 4, 5], start: '08:00', end: '17:00' },
             password: '',
           },
     );
@@ -157,6 +171,73 @@ export function MailboxDialog({
               'password',
             )}
             {field('daily_cap', 'Daily cap', 'number')}
+            <div className="space-y-1">
+              <Label htmlFor="mb-timezone">Fallback timezone</Label>
+              <Input
+                id="mb-timezone"
+                list="mailbox-timezones"
+                placeholder="America/New_York"
+                {...register('timezone')}
+              />
+              <datalist id="mailbox-timezones">
+                {timezones.map((zone) => (
+                  <option key={zone} value={zone} />
+                ))}
+              </datalist>
+              <p className="text-xs text-muted-foreground">
+                Used only when a lead has no known local timezone.
+              </p>
+            </div>
+            <div className="col-span-2 grid grid-cols-2 gap-3">
+              <div className="space-y-1">
+                <Label htmlFor="mb-window-start">Send window start</Label>
+                <Input id="mb-window-start" type="time" {...register('send_window.start')} />
+              </div>
+              <div className="space-y-1">
+                <Label htmlFor="mb-window-end">Send window end</Label>
+                <Input id="mb-window-end" type="time" {...register('send_window.end')} />
+              </div>
+            </div>
+            <div className="col-span-2 space-y-2">
+              <Label>Send days</Label>
+              <div className="flex flex-wrap gap-x-3 gap-y-2">
+                {[
+                  [1, 'Mon'],
+                  [2, 'Tue'],
+                  [3, 'Wed'],
+                  [4, 'Thu'],
+                  [5, 'Fri'],
+                  [6, 'Sat'],
+                  [7, 'Sun'],
+                ].map(([day, label]) => {
+                  const n = Number(day);
+                  const checked = selectedDays.includes(n);
+                  return (
+                    <Label
+                      key={n}
+                      className="flex cursor-pointer items-center gap-1.5 text-sm font-normal"
+                    >
+                      <Checkbox
+                        checked={checked}
+                        onCheckedChange={(next) =>
+                          setValue(
+                            'send_window.days',
+                            next
+                              ? [...selectedDays, n].sort((a, b) => a - b)
+                              : selectedDays.filter((d) => d !== n),
+                            { shouldValidate: true },
+                          )
+                        }
+                      />
+                      {label}
+                    </Label>
+                  );
+                })}
+              </div>
+              {errors.send_window?.days && (
+                <p className="text-xs text-destructive">{errors.send_window.days.message}</p>
+              )}
+            </div>
           </div>
           {testResult && (
             <p className="text-sm" data-testid="test-result">

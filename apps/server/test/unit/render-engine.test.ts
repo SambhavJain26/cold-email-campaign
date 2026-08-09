@@ -121,6 +121,17 @@ describe('footer is unconditional (docs/08 §4)', () => {
   it('subject never gets the footer', () => {
     expect(engine.render(input({})).subject).not.toContain('---');
   });
+
+  it('creates a matching escaped minimal HTML alternative with a legible footer', () => {
+    const r = engine.render(
+      input({ body: 'Hi {{first_name|there}}, <unsafe>\n\nSecond paragraph.' }),
+    );
+    expect(r.bodyHtml).toContain('<p>Hi Jane, &lt;unsafe&gt;</p>');
+    expect(r.bodyHtml).toContain('<p>Second paragraph.</p>');
+    expect(r.bodyHtml).toContain('font-size:11px');
+    expect(r.bodyHtml).toContain('123 Main St');
+    expect(r.bodyHtml).not.toContain('<unsafe>');
+  });
 });
 
 describe('spintax seed determinism (docs/08 §2)', () => {

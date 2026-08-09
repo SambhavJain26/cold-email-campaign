@@ -100,3 +100,28 @@ Full stack built and brought up from a clean state (`docker compose -f docker-co
 - [x] Backup sidecar installs the nightly 02:30 cron; a live `backup.sh` writes a valid `pg_dump -Fc` to the `backups` volume and prunes.
 
 Remaining for a full **M3** close: the real-backend walkthrough replay (§5, `e2e/walkthrough.spec.ts` — Playwright web ⇄ real server + MockTransport + `advance-clock`), which the frontend track deferred here from F8.
+
+## 8. Deferred shared-VPS deployment plan (recorded 2026-08-09)
+
+Deployment is deliberately deferred until the B8.3-local Gmail validation is complete. The
+production VPS has already been purchased, unboxed, and is running Ubuntu. It also hosts the
+operator's other website, so this application will share the machine rather than receive a
+dedicated VM.
+
+- **Reverse proxy:** the operator is replacing the existing Nginx setup with **Caddy**. Keep the
+  Compose/Caddy deployment design in this repository; Caddy will own public ports 80/443 and route
+  sites by hostname. Do not run Nginx and Caddy concurrently on those ports.
+- **Memory:** approximately **1.5 GiB RAM** is free after Ubuntu and the existing website. Create
+  a **2 GiB swap file** before building or starting the Docker stack. Swap is disk-backed virtual
+  memory: it reduces the risk of OOM kills during Node/Docker builds and under memory pressure, but
+  it is slower than RAM and is **not a backup**.
+- **Database backups:** retain the application's nightly `pg_dump` backup sidecar and its restore
+  drill. Those dumps are useful for database-level recovery but, while stored on the same VM, do
+  not protect against total VM loss.
+- **VPS backups:** Spaceship Starlight AutoBackup is a separate off-site VM-backup layer. It is
+  recommended before the app holds real campaign/business data (and would also protect the other
+  website), but it can be deferred during throwaway local/Gmail canary testing. It does not replace
+  database-level dumps or eventual independent off-VM archival copies.
+- **Before real launch:** enable an off-VM recovery layer (Spaceship AutoBackup or an equivalent),
+  verify a restore path, and arrange an independent copy of database backups. Do not treat a swap
+  file as relevant to recovery.

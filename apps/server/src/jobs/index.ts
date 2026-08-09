@@ -53,7 +53,10 @@ export class Jobs implements JobPort {
 
     const settings = await getSettings(db);
     const tickCron = `*/${Math.min(59, Math.max(1, settings.schedulerTickMinutes))} * * * *`;
-    const pollCron = `*/${Math.min(59, Math.max(1, settings.pollIntervalMinutes))} * * * *`;
+    const pollEvery = Math.min(59, Math.max(1, settings.pollIntervalMinutes));
+    // Offset polling from the scheduler whenever the interval permits. The
+    // enrollment lock remains the correctness guarantee when it does not.
+    const pollCron = pollEvery > 1 ? `2-59/${pollEvery} * * * *` : '* * * * *';
 
     await boss.createQueue(TICK_QUEUE);
     await boss.work(TICK_QUEUE, async () => {

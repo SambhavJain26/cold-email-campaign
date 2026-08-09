@@ -83,6 +83,21 @@ describe('SmtpImapTransport over a real server (B8.1)', () => {
     expect(stored!.source).toContain('Noticed you handle listings in Austin.');
   });
 
+  it('send: text plus HTML becomes a minimal multipart alternative', async () => {
+    await transport.send({
+      mailboxId: CANARY_ID,
+      to: LEAD.address,
+      subject: 'A safe subject',
+      bodyText: 'Hi Sarah\n\n---\n123 Main St\nReply STOP',
+      bodyHtml: '<p>Hi Sarah</p><p style="font-size:11px;color:#666">123 Main St<br>Reply STOP</p>',
+      headers: { messageId: '<ce-html-1@coldemail.test>' },
+    });
+    const [stored] = await readInbox(LEAD);
+    expect(stored!.source).toMatch(/Content-Type: multipart\/alternative/i);
+    expect(stored!.source).toContain('Hi Sarah');
+    expect(stored!.source).toContain('font-size:11px');
+  });
+
   it('send: In-Reply-To and References survive the wire for in-thread follow-ups', async () => {
     const step1 = '<ce-101-1-1750000000000@coldemail.test>';
     const step2 = '<ce-101-2-1750259200000@coldemail.test>';

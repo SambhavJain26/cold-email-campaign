@@ -82,6 +82,7 @@ export async function systemRoutes(app: FastifyInstance, services: AppServices):
           last_successful_poll_at: mb.lastSuccessfulPollAt?.toISOString() ?? null,
         })),
         pending_jobs: await jobs.pendingCount(),
+        send_blockers: [...scheduler.sendBlockers],
       };
     },
   );

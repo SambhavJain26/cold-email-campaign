@@ -52,7 +52,11 @@ export async function capacityToday(
   let sentSoFar = 0;
   for (const mb of boxes) {
     total += mb.resumeCap ?? mb.dailyCap;
-    sentSoFar += await countSentSince(db, mb.id, midnight);
+    sentSoFar += await countSentSince(
+      db,
+      mb.id,
+      startOfLocalDay(now, mb.timezone || settings.defaultTimezone),
+    );
   }
   const followupsDue = await countFollowupsDue(db, endOfDay);
   const roomForNew = Math.max(0, total - sentSoFar - followupsDue);

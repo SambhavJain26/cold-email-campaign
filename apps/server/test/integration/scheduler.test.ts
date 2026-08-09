@@ -48,6 +48,47 @@ describe('scheduler (B3.7/B3.8)', () => {
     expect(sm.rows[0].n).toBe(3);
   });
 
+  it('reply-first enrollment lock suppresses a concurrently due follow-up', async () => {
+    s = await scenario({ mailboxes: 1, sequence: twoStep });
+    await s.importLeads(1);
+    await s.enroll({ count: 1 });
+
+    let markReplyLockHeld!: () => void;
+    const replyLockHeld = new Promise<void>((resolve) => {
+      markReplyLockHeld = resolve;
+    });
+    let releaseReply!: () => void;
+    const releaseReplyGate = new Promise<void>((resolve) => {
+      releaseReply = resolve;
+    });
+    const reply = s.store.withEnrollmentLock(1, async (tx) => {
+      markReplyLockHeld();
+      await releaseReplyGate;
+      await s.store.appendUnderEnrollmentLock(tx, 1, [
+        buildEvent.humanReply({
+          leadId: 1,
+          enrollmentId: 1,
+          campaignId: s.campaignId,
+          occurredAt: s.clock.now(),
+          stepNo: 1,
+        }),
+      ]);
+    });
+    await replyLockHeld;
+
+    // The scheduler can discover the old due snapshot, but it cannot make the
+    // SMTP decision until the reply transaction releases this same lock.
+    const tick = s.scheduler.tick();
+    await new Promise<void>((resolve) => setImmediate(resolve));
+    releaseReply();
+    await reply;
+    const result = await tick;
+
+    expect(result.sent).toBe(0);
+    expect(s.mock.sentTo(leadEmail('L0001'))).toHaveLength(0);
+    await s.expectEnrollment('L0001', { state: 'REPLIED' });
+  });
+
   it('walks a 2-step sequence to COMPLETED: sent → delivered ×2 → derived completion', async () => {
     s = await scenario({ mailboxes: 1, sequence: twoStep, tickMinutes: 30 });
     await s.importLeads(1);
