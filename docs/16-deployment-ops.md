@@ -125,3 +125,29 @@ dedicated VM.
 - **Before real launch:** enable an off-VM recovery layer (Spaceship AutoBackup or an equivalent),
   verify a restore path, and arrange an independent copy of database backups. Do not treat a swap
   file as relevant to recovery.
+
+### Unsubscribe URL and Gmail one-click plan — before real domains
+
+The current canary footer keeps a reply-based opt-out (`STOP`) because the application does not
+yet expose a public unsubscribe endpoint. Before sending from real domains, add this as a small,
+separate deployment feature:
+
+- **Host:** use a first-party HTTPS subdomain of the sending domain, such as
+  `https://unsubscribe.<sending-domain>/u/<opaque-token>`. Do not use an IP address, a URL
+  shortener, a third-party redirect, or an address/lead identifier in the URL.
+- **Token:** generate a high-entropy opaque token, store only its hash, and resolve it server-side
+  to the intended lead/enrollment. It must remain usable long enough to honour an opt-out and
+  must never expose the recipient's email address in a URL, page title, logs, or analytics.
+- **Browser flow:** `GET /u/<token>` renders a minimal confirmation page; `POST /u/<token>`
+  immediately appends the unsubscribe fact and creates the global suppression. The GET must not
+  unsubscribe by itself because security scanners and privacy tools may prefetch links.
+- **Gmail one-click flow:** send `List-Unsubscribe: <https://…/u/<token>>` and
+  `List-Unsubscribe-Post: List-Unsubscribe=One-Click`; the same endpoint accepts Gmail's POST and
+  suppresses immediately. This is the standards-based one-click mechanism for bulk promotional
+  Gmail traffic, not merely a body hyperlink.
+- **Footer:** retain “Reply STOP to unsubscribe” as the plaintext fallback, and add a clear,
+  untracked `Unsubscribe` body link in the HTML alternative. Do not require login, an email form,
+  a survey, or a preferences screen before honouring the request.
+- **Caddy/ops:** add the route under the existing HTTPS app host/subdomain, monitor endpoint
+  availability, and test normal browser POST, Gmail header POST, expired/invalid tokens, duplicate
+  requests, and no-PII logging before enabling real-domain traffic.
