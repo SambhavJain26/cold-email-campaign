@@ -39,7 +39,7 @@ as work closes.
 | #14 | ✅ implemented and locally verified | Transparent cold-email cliché rubric, including subject lines. |
 | #15–16 | ✅ implemented and locally verified | Reply-first lock regression and UIDNEXT cursor initialization coverage. |
 | #19 | ✅ implemented and locally verified | GreenMail verifies minimal `multipart/alternative` text + HTML. |
-| #13 | ⏳ operator checklist before cohort | Add Gmail’s “never send it to Spam” filter to every canary account; production monitoring remains `INBOX` only. |
+| #13 | ⚠️ intentionally bypassed for this controlled test | Operator elected to proceed without Gmail’s “never send it to Spam” filters. Messages or replies placed in Spam may be invisible because monitoring reads `INBOX` only. |
 | All code findings | ✅ deployed to Oracle | Commit `95de5a3` deployed on 2026-08-10; containers healthy, HTTPS `/health` returned 200, and production `rebuild-projections --dry-run` returned 0 diffs. |
 
 | # | Finding report | Class | Current status |
