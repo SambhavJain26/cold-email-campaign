@@ -203,10 +203,12 @@ function EditCard({ lead }: { lead: LeadDto & { notes: string | null } }) {
         body: {
           tier: tier === UNTIERED ? null : (tier as LeadTier),
           notes: notes === '' ? null : notes,
-          custom_fields: {
-            ...lead.custom_fields,
-            ...(observation === '' ? {} : { custom_observation: observation }),
-          },
+          custom_fields: (() => {
+            const fields = { ...lead.custom_fields };
+            if (observation === '') delete fields.custom_observation;
+            else fields.custom_observation = observation;
+            return fields;
+          })(),
         },
       },
       { onSuccess: () => toast.success('Lead updated') },

@@ -24,11 +24,7 @@ import {
 import { PreviewPanel, type PreviewTarget } from './preview-panel';
 import { StepCard } from './step-card';
 
-const STOP_CONDITIONS = [
-  { key: 'stop_on_reply', label: 'Stop on reply' },
-  { key: 'stop_on_hard_bounce', label: 'Stop on hard bounce' },
-  { key: 'stop_on_unsubscribe', label: 'Stop on unsubscribe' },
-] as const;
+const STOP_CONDITIONS = [{ key: 'stop_on_reply', label: 'Stop on reply' }] as const;
 
 /** F4.2/F4.3/F4.4 — the sequence builder (docs/12 §5). Mounted with `key={sequence.id}`
  *  so a different sequence remounts with fresh state initializers (no setState-in-effect). */

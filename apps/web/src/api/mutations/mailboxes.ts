@@ -7,6 +7,7 @@ import {
   type PatchMailboxBody,
 } from '@coldemail/shared';
 import { apiFetch } from '../client';
+import { invalidateOperational } from '../operational-cache';
 
 // Fire-and-forget: returning the invalidation promise from a mutation-level
 // onSuccess makes React Query AWAIT the refetch before per-call callbacks —
@@ -14,7 +15,7 @@ import { apiFetch } from '../client';
 // disappears on success), its mutate() callbacks are silently skipped.
 function useInvalidateMailboxes() {
   const qc = useQueryClient();
-  return () => void qc.invalidateQueries({ queryKey: ['mailboxes'] });
+  return () => invalidateOperational(qc);
 }
 
 export function useCreateMailbox() {

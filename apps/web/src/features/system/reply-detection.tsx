@@ -85,6 +85,7 @@ export function ReplyDetectionTable() {
                 <TableHead className="text-xs">Class</TableHead>
                 <TableHead className="text-xs">DSN</TableHead>
                 <TableHead className="text-xs">Enrollment</TableHead>
+                <TableHead className="text-xs">Lead</TableHead>
                 <TableHead className="text-right text-xs">Events</TableHead>
               </TableRow>
             </TableHeader>
@@ -113,11 +114,18 @@ export function ReplyDetectionTable() {
                       {row.matched_enrollment_id === null ? (
                         <span className="text-muted-foreground">unmatched</span>
                       ) : (
+                        `#${row.matched_enrollment_id}`
+                      )}
+                    </TableCell>
+                    <TableCell className="py-1.5 text-xs">
+                      {row.matched_lead_id === null ? (
+                        <span className="text-muted-foreground">unmatched</span>
+                      ) : (
                         <Link
-                          to={`/leads/${row.matched_enrollment_id}`}
+                          to={`/leads/${row.matched_lead_id}`}
                           className="underline underline-offset-2"
                         >
-                          #{row.matched_enrollment_id}
+                          #{row.matched_lead_id}
                         </Link>
                       )}
                     </TableCell>

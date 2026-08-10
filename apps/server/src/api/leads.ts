@@ -34,6 +34,7 @@ import { listRowsByLead, type EventRow } from '../db/repos/eventsRepo';
 import { removeSuppression } from '../db/repos/suppressionsRepo';
 import { redactAlertsContaining } from '../db/repos/alertsRepo';
 import { listForLead } from '../db/repos/enrollmentsRepo';
+import { getCampaign } from '../db/repos/campaignsRepo';
 import { buildEvent } from '../domain/events';
 import { insertAlert } from '../db/repos/alertsRepo';
 import { bulkTier } from '../services/tiering';
@@ -55,6 +56,7 @@ function toLeadDto(row: LeadRow, latest: LeadListItem['latestEnrollment']): Lead
     ...(latest && {
       latest_enrollment: {
         campaign_id: latest.campaignId,
+        campaign_name: latest.campaignName,
         current_state: latest.currentState as EnrollmentState,
         current_step_no: latest.currentStepNo,
       },
@@ -109,10 +111,31 @@ export async function leadsRoutes(app: FastifyInstance, services: AppServices): 
       const row = await getLeadById(db, req.params.id);
       if (!row || row.isErased) throw AppError.notFound('lead');
       const timeline = await listRowsByLead(db, row.id);
+      const manualSendable = (
+        await Promise.all(
+          (await listForLead(db, row.id)).map(async (enrollment) => {
+            if (
+              enrollment.currentState !== 'ACTIVE' ||
+              enrollment.personalizationMode !== 'human_written'
+            ) {
+              return null;
+            }
+            const campaign = await getCampaign(db, enrollment.campaignId);
+            return campaign?.status === 'active'
+              ? {
+                  enrollment_id: enrollment.id,
+                  campaign_id: campaign.id,
+                  campaign_name: campaign.name,
+                }
+              : null;
+          }),
+        )
+      ).filter((entry): entry is NonNullable<typeof entry> => entry !== null);
       return {
         ...toLeadDto(row, await latestEnrollmentLite(db, row.id)),
         notes: row.notes,
         timeline: timeline.map(toEventView),
+        manual_sendable_enrollments: manualSendable,
       };
     },
   );

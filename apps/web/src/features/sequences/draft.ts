@@ -30,8 +30,6 @@ export interface DraftStep {
 export interface SequenceDraft {
   name: string;
   stop_on_reply: boolean;
-  stop_on_hard_bounce: boolean;
-  stop_on_unsubscribe: boolean;
   steps: DraftStep[];
 }
 
@@ -45,8 +43,6 @@ export function draftFromSequence(sequence: SequenceDto): SequenceDraft {
   return {
     name: sequence.name,
     stop_on_reply: sequence.stop_on_reply,
-    stop_on_hard_bounce: sequence.stop_on_hard_bounce,
-    stop_on_unsubscribe: sequence.stop_on_unsubscribe,
     steps: [...sequence.steps]
       .sort((a, b) => a.step_no - b.step_no)
       .map((step) => ({
@@ -83,8 +79,6 @@ export function blankDraft(): SequenceDraft {
   return {
     name: '',
     stop_on_reply: true,
-    stop_on_hard_bounce: true,
-    stop_on_unsubscribe: true,
     steps: [blankStep(false, 0)],
   };
 }
@@ -104,8 +98,6 @@ export function toWriteBody(draft: SequenceDraft): SequenceWriteBody {
   return {
     name: draft.name.trim(),
     stop_on_reply: draft.stop_on_reply,
-    stop_on_hard_bounce: draft.stop_on_hard_bounce,
-    stop_on_unsubscribe: draft.stop_on_unsubscribe,
     steps: draft.steps.map((step, index) => ({
       ...(step.id === undefined ? {} : { id: step.id }),
       step_no: index + 1,

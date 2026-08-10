@@ -79,6 +79,30 @@ function assertIanaTimezone(timezone: string): void {
   }
 }
 
+function localDateKey(at: Date, timezone: string): string {
+  const parts = new Intl.DateTimeFormat('en-CA', {
+    timeZone: timezone,
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  }).formatToParts(at);
+  const field = (type: Intl.DateTimeFormatPartTypes) =>
+    parts.find((part) => part.type === type)!.value;
+  return `${field('year')}-${field('month')}-${field('day')}`;
+}
+
+function localCalendarDays(now: Date, timezone: string, count: number): string[] {
+  const [year, month, day] = localDateKey(now, timezone).split('-').map(Number) as [
+    number,
+    number,
+    number,
+  ];
+  return Array.from({ length: count }, (_, index) => {
+    const date = new Date(Date.UTC(year, month - 1, day - (count - 1 - index)));
+    return date.toISOString().slice(0, 10);
+  });
+}
+
 export async function mailboxesRoutes(app: FastifyInstance, services: AppServices): Promise<void> {
   const r = app.withTypeProvider<ZodTypeProvider>();
   const { db, clock, transport, config, jobs } = services;
@@ -110,17 +134,30 @@ export async function mailboxesRoutes(app: FastifyInstance, services: AppService
     },
     async (req) => {
       const now = clock.now();
-      const from = new Date(now.getTime() - req.query.days * 86_400_000);
+      const from = new Date(now.getTime() - (req.query.days + 1) * 86_400_000);
       const volume = await mailboxVolume(db, from, now);
-      const byMailbox = new Map<number, { date: string; sends: number }[]>();
+      const rows = await listMailboxes(db);
+      const byMailbox = new Map<number, Map<string, number>>();
       for (const row of volume) {
-        const series = byMailbox.get(row.mailbox_id) ?? [];
-        series.push({ date: row.day, sends: row.sends });
+        const series = byMailbox.get(row.mailbox_id) ?? new Map<string, number>();
+        series.set(row.day, row.sends);
         byMailbox.set(row.mailbox_id, series);
       }
+      const allRows = rows.flatMap((mailbox) =>
+        localCalendarDays(now, mailbox.timezone, req.query.days).map((day) => ({
+          mailbox_id: mailbox.id,
+          day,
+          sends: byMailbox.get(mailbox.id)?.get(day) ?? 0,
+        })),
+      );
       return {
-        items: [...byMailbox.entries()].map(([mailbox_id, series]) => ({ mailbox_id, series })),
-        imbalance: mailboxImbalance(volume).flag !== null,
+        items: rows.map((mailbox) => ({
+          mailbox_id: mailbox.id,
+          series: allRows
+            .filter((row) => row.mailbox_id === mailbox.id)
+            .map(({ day, sends }) => ({ date: day, sends })),
+        })),
+        imbalance: mailboxImbalance(allRows).flag !== null,
       };
     },
   );

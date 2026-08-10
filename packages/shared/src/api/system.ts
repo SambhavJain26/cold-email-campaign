@@ -11,6 +11,7 @@ export const systemStatusResponseSchema = z
       z
         .object({
           mailbox_id: z.number().int(),
+          mailbox_address: z.string(),
           last_successful_poll_at: isoDateTime.nullable(),
         })
         .strict(),
@@ -66,6 +67,7 @@ export const incomingMessageDebugRowSchema = z
     classification: z.enum(INCOMING_CLASSES),
     dsn_status: z.string().nullable(),
     matched_enrollment_id: z.number().int().nullable(),
+    matched_lead_id: z.number().int().nullable(),
     resulting_event_ids: z.array(z.number().int()),
     processed_at: isoDateTime,
   })

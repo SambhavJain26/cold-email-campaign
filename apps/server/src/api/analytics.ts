@@ -106,11 +106,19 @@ export async function analyticsRoutes(app: FastifyInstance, services: AppService
     '/analytics/variants',
     { schema: { querystring: variantsQuerySchema, response: { 200: variantsResponseSchema } } },
     async (req) => {
-      const nested = await getSequenceNested(db, req.query.sequence_id);
+      const campaign = await requireCampaign(req.query.campaign_id);
+      if (campaign.sequenceId === null)
+        throw new AppError('conflict', 409, 'campaign has no sequence');
+      const nested = await getSequenceNested(db, campaign.sequenceId);
       if (!nested) throw AppError.notFound('sequence');
       const stepEntry = nested.steps.find((s) => s.step.stepNo === req.query.step_no);
       if (!stepEntry) throw AppError.notFound('step');
-      const stats = new Map((await metrics.variantAnalytics({})).map((v) => [v.variantId, v]));
+      const stats = new Map(
+        (await metrics.variantAnalytics({ campaignId: req.query.campaign_id })).map((v) => [
+          v.variantId,
+          v,
+        ]),
+      );
       return {
         items: stepEntry.variants.map((v) => {
           const s = stats.get(v.id);

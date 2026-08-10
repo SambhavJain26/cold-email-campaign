@@ -37,6 +37,7 @@ describe('B6.3 leads', () => {
     expect(all.items[0]).toMatchObject({ email: 'amy@acme.dev', tier: 'A' });
     expect(all.items[2].latest_enrollment).toEqual({
       campaign_id: 1,
+      campaign_name: 'Camp 1',
       current_state: 'ACTIVE',
       current_step_no: 2,
     });

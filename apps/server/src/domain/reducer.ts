@@ -17,6 +17,8 @@ export interface SequenceShape {
   lastStepNo: number;
   /** Soft bounces beyond this count become terminal BOUNCED (settings.soft_retry_max, default 2). */
   softRetryMax: number;
+  /** Defaults to true for legacy/static sequences that predate this control. */
+  stopOnReply?: boolean;
 }
 
 export interface EnrollmentSnapshot {
@@ -86,7 +88,10 @@ export function applyEvent(
 
     case 'human_reply': {
       if (e.id === undefined) throw new Error('human_reply event must have an id before folding');
-      return toTerminal(bumpSentiment(s, e.id, e.sentiment), 'REPLIED', e.occurredAt);
+      const withSentiment = bumpSentiment(s, e.id, e.sentiment);
+      return ctx.stopOnReply === false
+        ? withSentiment
+        : toTerminal(withSentiment, 'REPLIED', e.occurredAt);
     }
 
     case 'unsubscribe':

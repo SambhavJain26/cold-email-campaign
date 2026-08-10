@@ -15,6 +15,7 @@ import { z } from 'zod';
 import type { AppServices } from '../composition';
 import { listIncoming, type IncomingMessageRow } from '../db/repos/incomingMessagesRepo';
 import { listMailboxes } from '../db/repos/mailboxesRepo';
+import { getById as getEnrollmentById } from '../db/repos/enrollmentsRepo';
 import { getSettings } from '../db/repos/settingsRepo';
 import { rebuildProjections } from '../services/rebuildProjections';
 import { loadCampaignShapes } from '../services/campaignShapes';
@@ -51,7 +52,11 @@ const scriptVerifyBodySchema = z
   })
   .strict();
 
-function toDebugRow(row: IncomingMessageRow) {
+async function toDebugRow(services: AppServices, row: IncomingMessageRow) {
+  const enrollment =
+    row.matchedEnrollmentId === null
+      ? null
+      : await getEnrollmentById(services.db, row.matchedEnrollmentId);
   return {
     id: row.id,
     mailbox_id: row.mailboxId,
@@ -60,6 +65,7 @@ function toDebugRow(row: IncomingMessageRow) {
     classification: row.classification,
     dsn_status: row.dsnStatus,
     matched_enrollment_id: row.matchedEnrollmentId,
+    matched_lead_id: enrollment?.leadId ?? null,
     resulting_event_ids: row.resultingEventIds,
     processed_at: row.processedAt.toISOString(),
   };
@@ -79,6 +85,7 @@ export async function systemRoutes(app: FastifyInstance, services: AppServices):
         transport_mode: config.MAIL_TRANSPORT,
         pollers: boxes.map((mb) => ({
           mailbox_id: mb.id,
+          mailbox_address: mb.fromAddress,
           last_successful_poll_at: mb.lastSuccessfulPollAt?.toISOString() ?? null,
         })),
         pending_jobs: await jobs.pendingCount(),
@@ -130,7 +137,12 @@ export async function systemRoutes(app: FastifyInstance, services: AppServices):
         page,
         perPage: per_page,
       });
-      return { items: items.map(toDebugRow), total, page, per_page };
+      return {
+        items: await Promise.all(items.map((item) => toDebugRow(services, item))),
+        total,
+        page,
+        per_page,
+      };
     },
   );
 

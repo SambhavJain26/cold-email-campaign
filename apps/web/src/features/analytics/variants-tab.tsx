@@ -1,4 +1,3 @@
-import { useState } from 'react';
 import { Trophy } from 'lucide-react';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
@@ -10,13 +9,6 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
 import { Skeleton } from '@/components/ui/skeleton';
 import {
   Table,
@@ -28,7 +20,6 @@ import {
 } from '@/components/ui/table';
 import { EmptyState } from '@/components/shared/empty-state';
 import { useVariantAnalytics } from '@/api/queries/analytics';
-import { useSequences } from '@/api/queries/sequences';
 import { useDeactivateVariant } from '@/api/mutations/campaigns';
 import { variantsMeetings, winningVariant } from './reconciliation';
 
@@ -36,16 +27,24 @@ const SMALL_SAMPLE = 300;
 
 /** F7.1 — 13a variant comparison. The endpoint is sequence-scoped (not campaign-
  *  scoped), so the sequence is chosen here — defaulting to the campaign's own. */
-export function VariantsTab({ campaignSequenceId }: { campaignSequenceId: number | null }) {
-  const sequences = useSequences();
-  const [sequenceId, setSequenceId] = useState<number | undefined>(undefined);
-  const effectiveId = sequenceId ?? campaignSequenceId ?? sequences.data?.items[0]?.id ?? undefined;
-  const { data, isPending, isError, refetch } = useVariantAnalytics(effectiveId ?? 0, 1);
+export function VariantsTab({
+  campaignId,
+  campaignSequenceId,
+}: {
+  campaignId: number;
+  campaignSequenceId: number | null;
+}) {
+  const { data, isPending, isError, refetch } = useVariantAnalytics(campaignId, 1);
   const deactivate = useDeactivateVariant();
   const [confirmId, setConfirmId] = useState<number | null>(null);
 
-  if (effectiveId === undefined) {
-    return <EmptyState title="No sequences yet" description="Variant analysis needs a sequence." />;
+  if (campaignSequenceId === null) {
+    return (
+      <EmptyState
+        title="No sequence assigned"
+        description="Variant analysis needs this campaign's sequence."
+      />
+    );
   }
   if (isPending) return <Skeleton className="h-40 w-full" />;
   if (isError) {
@@ -62,21 +61,7 @@ export function VariantsTab({ campaignSequenceId }: { campaignSequenceId: number
 
   return (
     <div className="space-y-3">
-      <div className="flex items-center gap-2">
-        <span className="text-xs text-muted-foreground">Step-1 openers of</span>
-        <Select value={String(effectiveId)} onValueChange={(value) => setSequenceId(Number(value))}>
-          <SelectTrigger size="sm" className="w-64" aria-label="Sequence">
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            {(sequences.data?.items ?? []).map((sequence) => (
-              <SelectItem key={sequence.id} value={String(sequence.id)}>
-                {sequence.name}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-      </div>
+      <p className="text-xs text-muted-foreground">Step-1 openers for this campaign.</p>
 
       <div className="overflow-x-auto rounded-lg border border-border">
         <Table>
@@ -185,3 +170,4 @@ export function VariantsTab({ campaignSequenceId }: { campaignSequenceId: number
     </div>
   );
 }
+import { useState } from 'react';

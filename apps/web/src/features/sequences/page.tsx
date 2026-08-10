@@ -65,7 +65,10 @@ export default function SequencesPage() {
   return (
     <div className="space-y-4 p-6">
       <div className="flex items-center justify-between">
-        <h1 className="text-lg font-semibold">Sequences</h1>
+        <div>
+          <h1 className="text-lg font-semibold">Sequences</h1>
+          <p className="text-xs text-muted-foreground">All campaigns</p>
+        </div>
         <Button size="sm" onClick={() => navigate('/sequences/new')}>
           <Plus className="size-4" /> New Sequence
         </Button>
@@ -123,16 +126,9 @@ export default function SequencesPage() {
                             reply
                           </Badge>
                         )}
-                        {sequence.stop_on_hard_bounce && (
-                          <Badge variant="secondary" className="text-[10px]">
-                            hard bounce
-                          </Badge>
-                        )}
-                        {sequence.stop_on_unsubscribe && (
-                          <Badge variant="secondary" className="text-[10px]">
-                            unsubscribe
-                          </Badge>
-                        )}
+                        <Badge variant="secondary" className="text-[10px]">
+                          hard bounce / STOP
+                        </Badge>
                       </div>
                     </TableCell>
                     <TableCell className="py-1.5">

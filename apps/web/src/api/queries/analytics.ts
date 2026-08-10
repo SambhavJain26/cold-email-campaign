@@ -20,13 +20,14 @@ export function useOverview(campaignId: number) {
   });
 }
 
-export function useVariantAnalytics(sequenceId: number, stepNo = 1) {
+export function useVariantAnalytics(campaignId: number, stepNo = 1) {
   return useQuery({
-    queryKey: ['analytics', 'variants', sequenceId, stepNo],
+    queryKey: ['analytics', 'variants', campaignId, stepNo],
     queryFn: () =>
       apiFetch('/analytics/variants', variantsResponseSchema, {
-        query: { sequence_id: sequenceId, step_no: stepNo },
+        query: { campaign_id: campaignId, step_no: stepNo },
       }),
+    refetchInterval: POLL.operational,
   });
 }
 
@@ -35,6 +36,7 @@ export function useStepAnalytics(params: { sequence_id?: number; campaign_id?: n
     queryKey: ['analytics', 'steps', params],
     queryFn: () => apiFetch('/analytics/steps', stepsResponseSchema, { query: { ...params } }),
     enabled: params.sequence_id !== undefined || params.campaign_id !== undefined,
+    refetchInterval: POLL.operational,
   });
 }
 
@@ -43,6 +45,7 @@ export function useTierAnalytics(campaignId: number) {
     queryKey: ['analytics', 'tiers', campaignId],
     queryFn: () =>
       apiFetch('/analytics/tiers', tiersResponseSchema, { query: { campaign_id: campaignId } }),
+    refetchInterval: POLL.operational,
   });
 }
 
@@ -53,5 +56,6 @@ export function useHealthTrend(days = 30, campaignId?: number) {
       apiFetch('/analytics/health-trend', healthTrendResponseSchema, {
         query: { days, campaign_id: campaignId },
       }),
+    refetchInterval: POLL.operational,
   });
 }

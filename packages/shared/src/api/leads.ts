@@ -21,6 +21,7 @@ export const leadSchema = z
     latest_enrollment: z
       .object({
         campaign_id: z.number().int(),
+        campaign_name: z.string(),
         current_state: z.enum(ENROLLMENT_STATES),
         current_step_no: z.number().int(),
       })
@@ -64,6 +65,15 @@ export const leadDetailResponseSchema = leadSchema
   .extend({
     notes: z.string().nullable(),
     timeline: z.array(eventViewSchema),
+    manual_sendable_enrollments: z.array(
+      z
+        .object({
+          enrollment_id: z.number().int(),
+          campaign_id: z.number().int(),
+          campaign_name: z.string(),
+        })
+        .strict(),
+    ),
   })
   .strict();
 

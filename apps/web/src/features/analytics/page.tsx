@@ -52,7 +52,7 @@ export default function AnalyticsPage() {
         </TabsList>
 
         <TabsContent value="variants" className="pt-4">
-          <VariantsTab campaignSequenceId={campaign?.sequence_id ?? null} />
+          <VariantsTab campaignId={campaignId} campaignSequenceId={campaign?.sequence_id ?? null} />
         </TabsContent>
         <TabsContent value="steps" className="pt-4">
           <StepsTab

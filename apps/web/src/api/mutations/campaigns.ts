@@ -1,6 +1,7 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { campaignSchema, enrollResponseSchema, okResponseSchema } from '@coldemail/shared';
 import { apiFetch } from '../client';
+import { invalidateOperational } from '../operational-cache';
 
 type EnrollBody = { count: number } | { lead_ids: number[]; force?: boolean };
 
@@ -14,7 +15,7 @@ export function useCreateCampaign() {
       ramp_config?: unknown;
       acknowledge_tier_a_manual?: boolean;
     }) => apiFetch('/campaigns', campaignSchema, { method: 'POST', body }),
-    onSuccess: () => void qc.invalidateQueries({ queryKey: ['campaigns'] }),
+    onSuccess: () => invalidateOperational(qc),
   });
 }
 
@@ -28,7 +29,7 @@ export function usePatchCampaign() {
       id: number;
       body: { name?: string; status?: 'active' | 'paused' | 'archived' };
     }) => apiFetch(`/campaigns/${id}`, campaignSchema, { method: 'PATCH', body }),
-    onSuccess: () => void qc.invalidateQueries({ queryKey: ['campaigns'] }),
+    onSuccess: () => invalidateOperational(qc),
   });
 }
 
@@ -37,7 +38,7 @@ export function useDeleteCampaign() {
   return useMutation({
     mutationFn: ({ id, confirm }: { id: number; confirm: string }) =>
       apiFetch(`/campaigns/${id}`, okResponseSchema, { method: 'DELETE', body: { confirm } }),
-    onSuccess: () => void qc.invalidateQueries({ queryKey: ['campaigns'] }),
+    onSuccess: () => invalidateOperational(qc),
   });
 }
 
@@ -49,11 +50,7 @@ export function useEnroll() {
         method: 'POST',
         body,
       }),
-    onSuccess: (_data, { campaignId }) => {
-      qc.invalidateQueries({ queryKey: ['campaigns'] });
-      qc.invalidateQueries({ queryKey: ['overview', campaignId] });
-      qc.invalidateQueries({ queryKey: ['leads'] });
-    },
+    onSuccess: () => invalidateOperational(qc),
   });
 }
 
@@ -71,11 +68,7 @@ export function useRecycle() {
         method: 'POST',
         body: { source_campaign_id: sourceCampaignId },
       }),
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ['campaigns'] });
-      qc.invalidateQueries({ queryKey: ['cold-storage'] });
-      qc.invalidateQueries({ queryKey: ['leads'] });
-    },
+    onSuccess: () => invalidateOperational(qc),
   });
 }
 
@@ -87,8 +80,8 @@ export function useDeactivateVariant() {
         method: 'POST',
       }),
     onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ['analytics'] });
-      qc.invalidateQueries({ queryKey: ['sequences'] });
+      invalidateOperational(qc);
+      void qc.invalidateQueries({ queryKey: ['sequences'] });
     },
   });
 }

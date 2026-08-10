@@ -17,6 +17,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Checkbox } from '@/components/ui/checkbox';
 import { useCreateMailbox, usePatchMailbox, useTestConnection } from '@/api/mutations/mailboxes';
+import { useSettings } from '@/api/queries/settings';
 
 /** The shared create schema, narrowed to the form's shape: ports/cap always
  *  present here (prefilled defaults), password validated per-mode at submit —
@@ -46,6 +47,7 @@ export function MailboxDialog({
   const create = useCreateMailbox();
   const patch = usePatchMailbox();
   const test = useTestConnection();
+  const settings = useSettings();
   const [testResult, setTestResult] = useState<string | null>(null);
 
   const {
@@ -91,7 +93,7 @@ export function MailboxDialog({
             imap_host: '',
             imap_port: 993,
             daily_cap: 30,
-            timezone: 'America/New_York',
+            timezone: settings.data?.default_timezone ?? 'UTC',
             send_window: { days: [1, 2, 3, 4, 5], start: '08:00', end: '17:00' },
             password: '',
           },

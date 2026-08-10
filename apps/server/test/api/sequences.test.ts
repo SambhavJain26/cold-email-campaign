@@ -127,7 +127,7 @@ describe('B6.5 sequences', () => {
     expect(res.statusCode).toBe(200);
     const seq = res.json();
     expect(seq.name).toBe('Renamed Outreach');
-    expect(seq.stop_on_unsubscribe).toBe(false);
+    expect(seq.stop_on_unsubscribe).toBe(true); // mandatory runtime terminal behavior
     expect(seq.steps).toHaveLength(1);
     expect(seq.steps[0].variants).toHaveLength(1); // B is GONE, not retired
     expect(seq.steps[0].variants[0].subject_template).toBe('Question about {{company}}');

@@ -1,7 +1,7 @@
 import { and, eq, ilike, inArray, isNull, or, sql, type SQL } from 'drizzle-orm';
 import type { LeadTier } from '@coldemail/shared';
 import type { DbLike } from '../client';
-import { enrollments, importRows, incomingMessages, leads } from '../schema';
+import { campaigns, enrollments, importRows, incomingMessages, leads } from '../schema';
 
 export type LeadRow = typeof leads.$inferSelect;
 
@@ -125,7 +125,12 @@ export function leadFilterWhere(filter: LeadFilter): SQL | undefined {
 
 export interface LeadListItem {
   lead: LeadRow;
-  latestEnrollment: { campaignId: number; currentState: string; currentStepNo: number } | null;
+  latestEnrollment: {
+    campaignId: number;
+    campaignName: string;
+    currentState: string;
+    currentStepNo: number;
+  } | null;
 }
 
 /**
@@ -153,7 +158,7 @@ export async function listLeads(
 
   const latestByLead = new Map<
     number,
-    { campaignId: number; currentState: string; currentStepNo: number }
+    { campaignId: number; campaignName: string; currentState: string; currentStepNo: number }
   >();
   if (rows.length > 0) {
     const enr = await db
@@ -163,19 +168,30 @@ export async function listLeads(
         currentState: enrollments.currentState,
         currentStepNo: enrollments.currentStepNo,
         id: enrollments.id,
+        campaignName: campaigns.name,
       })
       .from(enrollments)
+      .innerJoin(campaigns, eq(campaigns.id, enrollments.campaignId))
       .where(
-        inArray(
-          enrollments.leadId,
-          rows.map((r) => r.id),
-        ),
+        filter.campaignId === undefined
+          ? inArray(
+              enrollments.leadId,
+              rows.map((r) => r.id),
+            )
+          : and(
+              inArray(
+                enrollments.leadId,
+                rows.map((r) => r.id),
+              ),
+              eq(enrollments.campaignId, filter.campaignId),
+            ),
       )
       .orderBy(enrollments.leadId, enrollments.id);
     for (const e of enr) {
       // ordered by id asc — the last write per lead wins = newest enrollment
       latestByLead.set(e.leadId, {
         campaignId: e.campaignId,
+        campaignName: e.campaignName,
         currentState: e.currentState,
         currentStepNo: e.currentStepNo,
       });
@@ -196,10 +212,12 @@ export async function latestEnrollmentLite(
   const rows = await db
     .select({
       campaignId: enrollments.campaignId,
+      campaignName: campaigns.name,
       currentState: enrollments.currentState,
       currentStepNo: enrollments.currentStepNo,
     })
     .from(enrollments)
+    .innerJoin(campaigns, eq(campaigns.id, enrollments.campaignId))
     .where(eq(enrollments.leadId, leadId))
     .orderBy(sql`${enrollments.id} DESC`)
     .limit(1);

@@ -125,7 +125,7 @@ describe('B6.9 analytics + B6.12 system', () => {
     const res = (
       await h.inject({
         method: 'GET',
-        url: `/api/v1/analytics/variants?sequence_id=${seqId}&step_no=1`,
+        url: `/api/v1/analytics/variants?campaign_id=${campaignId}&step_no=1`,
       })
     ).json();
     expect(res.items).toHaveLength(2);

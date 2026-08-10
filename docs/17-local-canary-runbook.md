@@ -1,5 +1,20 @@
 # Local canary runbook (B8.3-local) — two-week validation on throwaway Gmail
 
+## UI data-consistency remediation (2026-08-10)
+
+The UI consistency implementation and its database-backed verification gate are complete locally;
+the verified release is ready for Oracle deployment. `contacted` is now the distinct-lead union of `delivered` and
+`human_reply`, campaign analytics and lead state are correctly scoped, visible operational data
+refreshes every 30 seconds, and operator actions invalidate dependent live views immediately.
+Mailbox charts are chronological, zero-filled, timezone-aware all-campaign series. Scheduler
+blockers are database-backed episodes, so worker restarts cannot duplicate their alerts.
+
+Reply stopping is per sequence. With `stop_on_reply` disabled, a human reply records metrics while
+later steps remain active; hard bounces and STOP/unsubscribe always end sending. The manual
+composer offers only active manual-sendable enrollments and healthy mailboxes. Database-backed
+suites, migration up/down, and the local projection dry-run are green. The Oracle controlled-Gmail
+replay remains the post-deployment confirmation, not an implementation task.
+
 ## Pre-cohort readiness update (2026-08-09)
 
 The 20-lead Gmail cohort remains paused until the pre-canary remediation gate is green. The operator-facing Gmail setup checklist includes a filter on every canary account that **never sends mail to Spam**. Production reply monitoring currently reads `INBOX` only; provider Spam folders are intentionally out of scope for this phase.
@@ -40,7 +55,8 @@ as work closes.
 | #15–16 | ✅ implemented and locally verified | Reply-first lock regression and UIDNEXT cursor initialization coverage. |
 | #19 | ✅ implemented and locally verified | GreenMail verifies minimal `multipart/alternative` text + HTML. |
 | #13 | ⚠️ intentionally bypassed for this controlled test | Operator elected to proceed without Gmail’s “never send it to Spam” filters. Messages or replies placed in Spam may be invisible because monitoring reads `INBOX` only. |
-| All code findings | ✅ deployed to Oracle | Commit `95de5a3` deployed on 2026-08-10; containers healthy, HTTPS `/health` returned 200, and production `rebuild-projections --dry-run` returned 0 diffs. |
+| Earlier pre-canary release | ✅ deployed to Oracle | Commit `95de5a3` deployed on 2026-08-10; containers healthy, HTTPS `/health` returned 200, and production `rebuild-projections --dry-run` returned 0 diffs. |
+| UI data-consistency release | ✅ implementation and local gate complete | Ready to deploy; Oracle health and projection checks, followed by the controlled Gmail confirmation, are the remaining release steps. |
 
 | # | Finding report | Class | Current status |
 |---|---|---|---|

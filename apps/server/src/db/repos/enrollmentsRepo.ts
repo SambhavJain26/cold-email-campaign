@@ -303,12 +303,15 @@ export async function getById(db: DbLike, id: number): Promise<EnrollmentRow | u
 export async function listForLead(
   db: DbLike,
   leadId: number,
-): Promise<Array<Pick<EnrollmentRow, 'id' | 'campaignId' | 'currentState'>>> {
+): Promise<
+  Array<Pick<EnrollmentRow, 'id' | 'campaignId' | 'currentState' | 'personalizationMode'>>
+> {
   return db
     .select({
       id: enrollments.id,
       campaignId: enrollments.campaignId,
       currentState: enrollments.currentState,
+      personalizationMode: enrollments.personalizationMode,
     })
     .from(enrollments)
     .where(eq(enrollments.leadId, leadId));

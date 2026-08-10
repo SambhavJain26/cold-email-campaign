@@ -58,7 +58,7 @@ describe('draftFromSequence / toWriteBody', () => {
       [10, 1],
       [20, 2],
     ]);
-    expect(body.stop_on_unsubscribe).toBe(false);
+    expect(body.stop_on_reply).toBe(true);
   });
 
   it('carries retired variants through the save — dropping them would DELETE at zero sends', () => {

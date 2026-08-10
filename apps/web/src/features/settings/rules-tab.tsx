@@ -84,16 +84,10 @@ export function RulesTab({
           <CardTitle className="text-sm">Deliverability rules</CardTitle>
         </CardHeader>
         <CardContent className="divide-y divide-border">
-          {toggle(
-            'stop_on_reply',
-            'Stop on reply',
-            'A human reply ends the sequence for that lead.',
-          )}
-          {toggle(
-            'stop_on_hard_bounce',
-            'Stop on hard bounce',
-            'A permanent bounce ends the sequence immediately.',
-          )}
+          <p className="py-1 text-xs text-muted-foreground">
+            Reply handling is configured on each sequence. Hard bounces and STOP/unsubscribe
+            requests always end sending.
+          </p>
           {toggle(
             'suppress_unsubs',
             'Suppress unsubscribes globally',

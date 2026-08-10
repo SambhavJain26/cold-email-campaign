@@ -30,8 +30,16 @@ export const settingsSchema = z
   })
   .strict();
 
-/** PUT body: the full editable row (PUT = replace semantics). */
-export const putSettingsBodySchema = settingsSchema;
+/**
+ * Legacy stop columns remain readable for old data, but are not operator
+ * controls: sequence reply policy owns replies and bounces/STOP always stop.
+ */
+export const putSettingsBodySchema = settingsSchema
+  .omit({
+    stop_on_reply: true,
+    stop_on_hard_bounce: true,
+  })
+  .strip();
 export type PutSettingsBody = z.infer<typeof putSettingsBodySchema>;
 
 /** GET response: the row + updated_at. */

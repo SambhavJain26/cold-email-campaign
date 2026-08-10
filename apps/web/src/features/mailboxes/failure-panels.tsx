@@ -78,8 +78,8 @@ function AuthFailedPanel({ mailbox }: { mailbox: MailboxDto }) {
     >
       <p className="text-muted-foreground">
         {mailbox.status_reason ?? 'The provider rejected the stored app password.'} Its scheduled
-        follow-ups were redistributed to healthy mailboxes; new sends from this address are on hold
-        until it reconnects.
+        follow-ups remain queued for this mailbox; new sends from this address are on hold until it
+        reconnects.
       </p>
       <div className="flex max-w-md gap-2">
         <Input

@@ -385,6 +385,16 @@ export const handlers: RequestHandler[] = [
         ...lead,
         notes: db.leadNotes.get(lead.id) ?? null,
         timeline: buildTimeline(lead),
+        manual_sendable_enrollments:
+          lead.latest_enrollment?.current_state === 'ACTIVE'
+            ? [
+                {
+                  enrollment_id: lead.id,
+                  campaign_id: 1,
+                  campaign_name: 'Local mock campaign',
+                },
+              ]
+            : [],
       });
     }),
   ),
@@ -508,8 +518,8 @@ export const handlers: RequestHandler[] = [
         id: db.nextId++,
         name: body.name,
         stop_on_reply: body.stop_on_reply,
-        stop_on_hard_bounce: body.stop_on_hard_bounce,
-        stop_on_unsubscribe: body.stop_on_unsubscribe,
+        stop_on_hard_bounce: true,
+        stop_on_unsubscribe: true,
         steps: body.steps.map((step) => ({
           id: db.nextId++,
           step_no: step.step_no,
@@ -545,8 +555,8 @@ export const handlers: RequestHandler[] = [
         id: existing.id,
         name: body.name,
         stop_on_reply: body.stop_on_reply,
-        stop_on_hard_bounce: body.stop_on_hard_bounce,
-        stop_on_unsubscribe: body.stop_on_unsubscribe,
+        stop_on_hard_bounce: true,
+        stop_on_unsubscribe: true,
         steps: body.steps.map((step) => ({
           id: step.id ?? db.nextId++,
           step_no: step.step_no,
@@ -1044,6 +1054,7 @@ export const handlers: RequestHandler[] = [
         transport_mode: 'mock',
         pollers: db.mailboxes.map((m) => ({
           mailbox_id: m.id,
+          mailbox_address: m.from_address,
           last_successful_poll_at: m.last_successful_poll_at,
         })),
         pending_jobs: 0,
@@ -1073,6 +1084,7 @@ export const handlers: RequestHandler[] = [
             item.incoming_message_id >= 200 ? ('auto_reply' as const) : ('human_reply' as const),
           dsn_status: null as string | null,
           matched_enrollment_id: item.enrollment_id,
+          matched_lead_id: item.lead.id,
           resulting_event_ids: [item.incoming_message_id * 10],
           processed_at: item.received_at ?? NOW,
         })),
@@ -1086,6 +1098,7 @@ export const handlers: RequestHandler[] = [
           classification: 'bounce' as const,
           dsn_status: '5.1.1',
           matched_enrollment_id: 105,
+          matched_lead_id: 105,
           resulting_event_ids: [9001],
           processed_at: NOW,
         },
@@ -1097,6 +1110,7 @@ export const handlers: RequestHandler[] = [
           classification: 'unrelated' as const,
           dsn_status: null,
           matched_enrollment_id: null,
+          matched_lead_id: null,
           resulting_event_ids: [],
           processed_at: NOW,
         },

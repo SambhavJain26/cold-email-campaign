@@ -51,7 +51,7 @@ The build is contract-first. [10-api-contract.md](10-api-contract.md) is the sea
 | **Event** | One immutable row in `events` — the only source of truth |
 | **Projection** | Derived state (enrollment state, `sent_messages`, counters) rebuildable from events |
 | **Enrollment** | One lead's participation in one campaign; the state machine lives here |
-| **Contacted** | Lead with ≥1 `delivered` event (not merely `sent`) |
+| **Contacted** | Lead with ≥1 `delivered` or `human_reply` event (not merely `sent`) |
 | **Terminal state** | `REPLIED / BOUNCED / UNSUBSCRIBED / COMPLETED` — mutually exclusive, sums to total |
 | **Golden cohort** | The spec Part 10 worked 885-lead dataset, used as a locked regression test |
 | **Scenario runner** | Test harness driving real scheduler+poller over `MockTransport` + `VirtualClock` |

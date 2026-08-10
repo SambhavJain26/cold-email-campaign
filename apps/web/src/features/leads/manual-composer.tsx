@@ -31,7 +31,14 @@ import { useManualSend } from '@/api/mutations/unibox';
 
 const AUTO_ROTATE = '__auto__';
 
-type ComposerLead = LeadDto & { notes?: string | null };
+type ComposerLead = LeadDto & {
+  notes?: string | null;
+  manual_sendable_enrollments?: Array<{
+    enrollment_id: number;
+    campaign_id: number;
+    campaign_name: string;
+  }>;
+};
 
 /** F6.4 — Mode-1 manual composer (docs/12 §14). The step-1 render is a STARTING
  *  POINT the operator deviates from — that deviation is what makes it Mode 1. */
@@ -48,9 +55,13 @@ export function ManualComposer({
   const sequences = useSequences();
   const [campaignId, setCampaignId] = useState<number | undefined>(undefined);
 
-  const items = campaigns.data?.items ?? [];
-  const campaign =
-    items.find((c) => c.id === campaignId) ?? items.find((c) => c.status === 'active') ?? items[0];
+  const eligibleIds = new Set(
+    (lead.manual_sendable_enrollments ?? []).map((entry) => entry.campaign_id),
+  );
+  const items = (campaigns.data?.items ?? []).filter(
+    (campaign) => campaign.status === 'active' && eligibleIds.has(campaign.id),
+  );
+  const campaign = items.find((c) => c.id === campaignId) ?? items[0];
   const sequence = sequences.data?.items.find((s) => s.id === campaign?.sequence_id);
   const variant = sequence?.steps.find((s) => s.step_no === 1)?.variants.find((v) => v.active);
 
@@ -103,6 +114,11 @@ export function ManualComposer({
               ))}
             </SelectContent>
           </Select>
+          {items.length === 0 && (
+            <p className="text-xs text-warning">
+              This lead has no active manual-sendable enrollment.
+            </p>
+          )}
         </div>
 
         {preview.isFetching ? (
@@ -152,7 +168,9 @@ function ComposerForm({
   const [checks, setChecks] = useState<RenderChecks | null>(initialChecks);
   const [blockedReason, setBlockedReason] = useState<string | null>(null);
 
-  const suggestedMailbox = mailboxes.data?.items.find((m) => m.status === 'ok');
+  const healthyMailboxes = (mailboxes.data?.items ?? []).filter(
+    (mailbox) => mailbox.status === 'ok',
+  );
 
   const submit = () => {
     if (!campaign) return;
@@ -199,9 +217,9 @@ function ComposerForm({
           </SelectTrigger>
           <SelectContent>
             <SelectItem value={AUTO_ROTATE}>
-              Auto-rotated{suggestedMailbox ? `: ${suggestedMailbox.from_address}` : ''}
+              Auto-rotate — scheduler chooses a healthy mailbox
             </SelectItem>
-            {(mailboxes.data?.items ?? []).map((mailbox) => (
+            {healthyMailboxes.map((mailbox) => (
               <SelectItem key={mailbox.id} value={String(mailbox.id)}>
                 {mailbox.from_address}
               </SelectItem>

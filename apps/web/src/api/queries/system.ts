@@ -1,11 +1,13 @@
 import { useQuery } from '@tanstack/react-query';
 import { incomingMessagesResponseSchema, systemStatusResponseSchema } from '@coldemail/shared';
 import { apiFetch } from '../client';
+import { POLL } from '../queryClient';
 
 export function useSystemStatus() {
   return useQuery({
     queryKey: ['system', 'status'],
     queryFn: () => apiFetch('/system/status', systemStatusResponseSchema),
+    refetchInterval: POLL.operational,
   });
 }
 
@@ -21,5 +23,6 @@ export function useIncomingMessages(query: IncomingMessagesQuery = {}) {
     queryKey: ['system', 'incoming-messages', query],
     queryFn: () =>
       apiFetch('/incoming-messages', incomingMessagesResponseSchema, { query: { ...query } }),
+    refetchInterval: POLL.operational,
   });
 }

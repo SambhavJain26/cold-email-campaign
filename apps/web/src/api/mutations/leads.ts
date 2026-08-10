@@ -7,13 +7,14 @@ import {
   type PatchLeadBody,
 } from '@coldemail/shared';
 import { apiFetch } from '../client';
+import { invalidateOperational } from '../operational-cache';
 
 export function usePatchLead() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: ({ id, body }: { id: number; body: PatchLeadBody }) =>
       apiFetch(`/leads/${id}`, leadSchema, { method: 'PATCH', body }),
-    onSuccess: () => void qc.invalidateQueries({ queryKey: ['leads'] }),
+    onSuccess: () => invalidateOperational(qc),
   });
 }
 
@@ -22,7 +23,7 @@ export function useBulkTier() {
   return useMutation({
     mutationFn: (body: BulkTierBody) =>
       apiFetch('/leads/bulk-tier', bulkTierResponseSchema, { method: 'POST', body }),
-    onSuccess: () => void qc.invalidateQueries({ queryKey: ['leads'] }),
+    onSuccess: () => invalidateOperational(qc),
   });
 }
 
@@ -35,10 +36,7 @@ export function useRemoveSuppression() {
         method: 'DELETE',
         body: { confirm },
       }),
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ['leads'] });
-      qc.invalidateQueries({ queryKey: ['alerts'] });
-    },
+    onSuccess: () => invalidateOperational(qc),
   });
 }
 
@@ -48,11 +46,6 @@ export function useEraseLead() {
   return useMutation({
     mutationFn: ({ id, confirm }: { id: number; confirm: string }) =>
       apiFetch(`/leads/${id}/erase`, okResponseSchema, { method: 'POST', body: { confirm } }),
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ['leads'] });
-      qc.invalidateQueries({ queryKey: ['analytics'] });
-      qc.invalidateQueries({ queryKey: ['campaigns'] });
-      qc.invalidateQueries({ queryKey: ['alerts'] });
-    },
+    onSuccess: () => invalidateOperational(qc),
   });
 }

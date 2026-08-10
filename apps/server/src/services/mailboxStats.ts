@@ -16,6 +16,29 @@ export interface MailboxStats {
   sevenDayAvg: number;
 }
 
+function localDateKey(at: Date, timezone: string): string {
+  const parts = new Intl.DateTimeFormat('en-CA', {
+    timeZone: timezone,
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  }).formatToParts(at);
+  const field = (type: Intl.DateTimeFormatPartTypes) =>
+    parts.find((part) => part.type === type)!.value;
+  return `${field('year')}-${field('month')}-${field('day')}`;
+}
+
+function previousCalendarDays(now: Date, timezone: string, count: number): string[] {
+  const [year, month, day] = localDateKey(now, timezone).split('-').map(Number) as [
+    number,
+    number,
+    number,
+  ];
+  return Array.from({ length: count }, (_, index) =>
+    new Date(Date.UTC(year, month - 1, day - (count - 1 - index))).toISOString().slice(0, 10),
+  );
+}
+
 export async function mailboxStatsFor(
   deps: { db: Db; clock: Clock },
   rows: MailboxRow[],
@@ -23,8 +46,19 @@ export async function mailboxStatsFor(
   const { db, clock } = deps;
   const now = clock.now();
   const settings = await getSettings(db);
-  const sevenDaysAgo = new Date(now.getTime() - 7 * 86_400_000);
-  const { sevenDayAvg } = mailboxImbalance(await mailboxVolume(db, sevenDaysAgo, now));
+  const sevenDaysAgo = new Date(now.getTime() - 8 * 86_400_000);
+  const rawVolume = await mailboxVolume(db, sevenDaysAgo, now);
+  const sentByMailboxDay = new Map(
+    rawVolume.map((row) => [`${row.mailbox_id}:${row.day}`, row.sends]),
+  );
+  const sevenDayRows = rows.flatMap((mailbox) =>
+    previousCalendarDays(now, mailbox.timezone || settings.defaultTimezone, 7).map((day) => ({
+      mailbox_id: mailbox.id,
+      day,
+      sends: sentByMailboxDay.get(`${mailbox.id}:${day}`) ?? 0,
+    })),
+  );
+  const { sevenDayAvg } = mailboxImbalance(sevenDayRows);
 
   const stats = new Map<number, MailboxStats>();
   for (const mb of rows) {

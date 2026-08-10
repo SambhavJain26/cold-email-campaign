@@ -78,7 +78,11 @@ export function ReplyCard({
           Auto-reply — NOT counted as a reply. Sequence continues normally.
         </p>
       ) : (
-        <p className="text-xs text-muted-foreground">↳ sequence auto-stopped ✓</p>
+        <p className="text-xs text-muted-foreground">
+          {item.sequence_continues
+            ? '↳ this sequence continues: stop on reply is disabled'
+            : '↳ sequence stopped after this reply'}
+        </p>
       )}
 
       {item.auto_unsubscribed && (

@@ -26,7 +26,7 @@ export async function sequenceIdForCampaign(
  */
 export async function loadSequenceDef(db: DbLike, sequenceId: number): Promise<SequenceDef | null> {
   const seqRows = await db
-    .select({ id: sequences.id })
+    .select({ id: sequences.id, stopOnReply: sequences.stopOnReply })
     .from(sequences)
     .where(eq(sequences.id, sequenceId));
   if (seqRows.length === 0) return null;
@@ -53,6 +53,7 @@ export async function loadSequenceDef(db: DbLike, sequenceId: number): Promise<S
 
   return {
     id: sequenceId,
+    stopOnReply: seqRows[0]!.stopOnReply,
     steps: steps.map((s) => ({
       stepNo: s.stepNo,
       waitDays: s.waitDays,
@@ -119,8 +120,10 @@ export async function createSequence(db: DbLike, input: CreateSequenceInput): Pr
     .values({
       name: input.name,
       ...(input.stopOnReply !== undefined && { stopOnReply: input.stopOnReply }),
-      ...(input.stopOnHardBounce !== undefined && { stopOnHardBounce: input.stopOnHardBounce }),
-      ...(input.stopOnUnsubscribe !== undefined && { stopOnUnsubscribe: input.stopOnUnsubscribe }),
+      // These columns remain for backwards-compatible storage only. Runtime
+      // behaviour is intentionally mandatory for bounces and STOP requests.
+      stopOnHardBounce: true,
+      stopOnUnsubscribe: true,
     })
     .returning({
       id: sequences.id,
@@ -253,8 +256,6 @@ export class SequenceEditConflictError extends Error {
 export interface SequenceSaveInput {
   name: string;
   stopOnReply: boolean;
-  stopOnHardBounce: boolean;
-  stopOnUnsubscribe: boolean;
   steps: Array<{
     id?: number;
     stepNo: number;
@@ -293,8 +294,8 @@ export async function updateSequenceReplaceSet(
       .set({
         name: input.name,
         stopOnReply: input.stopOnReply,
-        stopOnHardBounce: input.stopOnHardBounce,
-        stopOnUnsubscribe: input.stopOnUnsubscribe,
+        stopOnHardBounce: true,
+        stopOnUnsubscribe: true,
       })
       .where(eq(sequences.id, sequenceId));
 

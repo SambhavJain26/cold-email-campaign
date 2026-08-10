@@ -38,6 +38,7 @@ function toUniboxItemDto(row: UniboxRow): UniboxItemDto {
     effective_sentiment: row.effectiveSentiment as UniboxItemDto['effective_sentiment'],
     suggested_sentiment: row.suggestedSentiment as UniboxItemDto['suggested_sentiment'],
     auto_unsubscribed: row.autoUnsubscribed,
+    sequence_continues: row.enrollmentState === 'ACTIVE' || row.enrollmentState === 'NEW',
     meeting_booked: row.meetingBooked,
     enrollment_id: row.enrollmentId,
   };

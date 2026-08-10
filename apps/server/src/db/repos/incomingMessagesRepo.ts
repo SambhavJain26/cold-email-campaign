@@ -48,6 +48,7 @@ export interface UniboxRow {
   leadCompany: string | null;
   leadEmail: string;
   meetingBooked: boolean;
+  enrollmentState: string;
   effectiveSentiment: string | null;
   autoUnsubscribed: boolean;
   replyEventId: number | null;
@@ -61,7 +62,7 @@ const uniboxSelect = sql`
            AS received_at,
          im.snippet, im.body_text,
          im.suggested_sentiment,
-         e.id AS enrollment_id, e.campaign_id, e.lead_id, e.meeting_booked,
+         e.id AS enrollment_id, e.campaign_id, e.lead_id, e.meeting_booked, e.current_state AS enrollment_state,
          l.first_name AS lead_first_name, l.last_name AS lead_last_name,
          l.company AS lead_company, l.email AS lead_email,
          hr.id AS reply_event_id, hr.step_no,
@@ -91,6 +92,7 @@ interface RawUniboxRow {
   campaign_id: number;
   lead_id: number;
   meeting_booked: boolean;
+  enrollment_state: string;
   lead_first_name: string | null;
   lead_last_name: string | null;
   lead_company: string | null;
@@ -118,6 +120,7 @@ function toUniboxRow(r: RawUniboxRow): UniboxRow {
     leadCompany: r.lead_company,
     leadEmail: r.lead_email,
     meetingBooked: r.meeting_booked,
+    enrollmentState: r.enrollment_state,
     effectiveSentiment: r.effective_sentiment,
     autoUnsubscribed: r.auto_unsubscribed,
     replyEventId: r.reply_event_id,

@@ -230,6 +230,7 @@ export async function manualSend(
 
   const campaign = await getCampaign(db, input.campaignId);
   if (!campaign) throw new Error(`campaign ${input.campaignId} not found`);
+  if (campaign.status !== 'active') throw new Error(`campaign ${input.campaignId} is not active`);
   const lead = await getLeadById(db, input.leadId);
   if (!lead) throw new Error(`lead ${input.leadId} not found`);
 

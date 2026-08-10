@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import { useEffect, useRef } from 'react';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { Controller, useForm } from 'react-hook-form';
 import { toast } from 'sonner';
@@ -54,6 +54,7 @@ export function CampaignDialog({
   const navigate = useNavigate();
   const sequences = useSequences();
   const create = useCreateCampaign();
+  const wasOpen = useRef(false);
 
   const {
     register,
@@ -65,7 +66,9 @@ export function CampaignDialog({
   } = useForm<FormValues>({ resolver: zodResolver(formSchema) });
 
   useEffect(() => {
-    if (!open) return;
+    const opening = open && !wasOpen.current;
+    wasOpen.current = open;
+    if (!opening) return;
     reset({
       name: '',
       sequence_id: sequences.data?.items[0]?.id,

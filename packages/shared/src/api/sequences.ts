@@ -30,6 +30,7 @@ export const sequenceSchema = z
     id: z.number().int(),
     name: z.string(),
     stop_on_reply: z.boolean(),
+    /** Legacy read-only compatibility; bounces and STOP always terminate. */
     stop_on_hard_bounce: z.boolean(),
     stop_on_unsubscribe: z.boolean(),
     steps: z.array(stepSchema),
@@ -61,15 +62,11 @@ export const stepWriteSchema = z
   })
   .strict();
 
-export const sequenceWriteBodySchema = z
-  .object({
-    name: z.string().min(1),
-    stop_on_reply: z.boolean().default(true),
-    stop_on_hard_bounce: z.boolean().default(true),
-    stop_on_unsubscribe: z.boolean().default(true),
-    steps: z.array(stepWriteSchema).min(1),
-  })
-  .strict();
+export const sequenceWriteBodySchema = z.object({
+  name: z.string().min(1),
+  stop_on_reply: z.boolean().default(true),
+  steps: z.array(stepWriteSchema).min(1),
+});
 export type SequenceWriteBody = z.infer<typeof sequenceWriteBodySchema>;
 
 /** Typed confirmation for deleting a sequence that has no historical use. */

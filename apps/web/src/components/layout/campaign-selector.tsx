@@ -1,3 +1,4 @@
+import { useEffect, useMemo } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import {
   Select,
@@ -22,7 +23,14 @@ export function CampaignSelector() {
   const [searchParams, setSearchParams] = useSearchParams();
   const selected = useCampaignParam();
 
-  const items = data?.items ?? [];
+  const items = useMemo(() => data?.items ?? [], [data]);
+
+  useEffect(() => {
+    if (selected === undefined || items.some((campaign) => campaign.id === selected)) return;
+    const next = new URLSearchParams(searchParams);
+    next.delete('campaign');
+    setSearchParams(next, { replace: true });
+  }, [items, searchParams, selected, setSearchParams]);
 
   return (
     <Select

@@ -22,6 +22,8 @@ export interface SequenceStepDef {
 
 export interface SequenceDef {
   id: number;
+  /** Omitted only by legacy/static providers; those retain the safe default. */
+  stopOnReply?: boolean;
   steps: SequenceStepDef[]; // ordered by stepNo
 }
 
@@ -34,7 +36,7 @@ export function lastStepNo(seq: SequenceDef): number {
 }
 
 export function shapeOf(seq: SequenceDef, softRetryMax: number): SequenceShape {
-  return { lastStepNo: lastStepNo(seq), softRetryMax };
+  return { lastStepNo: lastStepNo(seq), softRetryMax, stopOnReply: seq.stopOnReply ?? true };
 }
 
 /** Every active content hash in the sequence — the recycle guard's needle set (decision Q). */

@@ -6,9 +6,10 @@ import { toast } from 'sonner';
 import { AppApiError } from './client';
 
 export const POLL = {
+  operational: 30_000,
   overview: 30_000,
-  unibox: 60_000,
-  mailboxes: 60_000,
+  unibox: 30_000,
+  mailboxes: 30_000,
   alerts: 30_000,
 } as const;
 

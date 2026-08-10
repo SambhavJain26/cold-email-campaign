@@ -4,7 +4,7 @@
 // (shapes, rounding, watch rules) is services/metrics.
 import { sql, type SQL } from 'drizzle-orm';
 import type { DbLike } from '../client';
-import { leads } from '../schema';
+import { leads, mailboxes } from '../schema';
 
 export interface MetricScope {
   campaignId?: number | null;
@@ -56,8 +56,21 @@ const distinctLeads = async (db: DbLike, type: string, scope: MetricScope): Prom
     )
   ).n;
 
-export const countContacted = (db: DbLike, scope: MetricScope) =>
-  distinctLeads(db, 'delivered', scope);
+/**
+ * A lead is contacted as soon as we have either a delivery confirmation or a
+ * human reply.  Replies can arrive before the delayed delivery-confirmation
+ * job runs; counting the union makes that real-world outcome visible without
+ * ever double-counting a lead when the confirmation arrives later.
+ */
+export async function countContacted(db: DbLike, scope: MetricScope): Promise<number> {
+  return (
+    await one<{ n: number }>(
+      db,
+      sql`SELECT count(DISTINCT e.lead_id)::int n FROM events e
+          WHERE e.type IN ('delivered', 'human_reply')${evFilter('e', scope)}`,
+    )
+  ).n;
+}
 export const countLeadsSentTo = (db: DbLike, scope: MetricScope) =>
   distinctLeads(db, 'sent', scope);
 export const countDistinctRepliers = (db: DbLike, scope: MetricScope) =>
@@ -265,9 +278,11 @@ export interface MailboxVolumeRow {
 export async function mailboxVolume(db: DbLike, from: Date, to: Date): Promise<MailboxVolumeRow[]> {
   return all<MailboxVolumeRow>(
     db,
-    sql`SELECT e.mailbox_id::int, to_char(date_trunc('day', e.occurred_at), 'YYYY-MM-DD') AS day,
+    sql`SELECT e.mailbox_id::int,
+           to_char(e.occurred_at AT TIME ZONE mb.timezone, 'YYYY-MM-DD') AS day,
            count(*)::int sends
         FROM events e
+        JOIN ${mailboxes} mb ON mb.id = e.mailbox_id
         WHERE e.type = 'sent' AND e.mailbox_id IS NOT NULL
           AND EXISTS (SELECT 1 FROM ${leads} l WHERE l.id = e.lead_id AND NOT l.is_erased)
           AND e.occurred_at >= ${from} AND e.occurred_at <= ${to}

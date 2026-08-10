@@ -94,6 +94,7 @@ function buildLeads(): LeadDto[] {
       custom_fields: i % 7 === 0 ? { listing_note: 'Saw the Elm St listing' } : {},
       latest_enrollment: {
         campaign_id: 1,
+        campaign_name: 'Local mock campaign',
         current_state: state,
         current_step_no: bounced ? 1 : state === 'REPLIED' ? Math.min(1 + (i % 4), 4) : 4,
       },
@@ -254,6 +255,7 @@ function buildUnibox(leads: LeadDto[]): UniboxItemDto[] {
       effective_sentiment: tagged || autoUnsubscribed ? sentiment : null,
       suggested_sentiment: tagged || autoUnsubscribed ? null : sentiment,
       auto_unsubscribed: autoUnsubscribed,
+      sequence_continues: false,
       meeting_booked: n === 0,
       enrollment_id: lead.id,
     });
@@ -275,6 +277,7 @@ function buildUnibox(leads: LeadDto[]): UniboxItemDto[] {
       effective_sentiment: null,
       suggested_sentiment: null,
       auto_unsubscribed: false,
+      sequence_continues: true,
       meeting_booked: false,
       enrollment_id: lead.id,
     });
@@ -299,7 +302,7 @@ function buildAlerts(): AlertDto[] {
         id: 2,
         kind: 'catchup_backlog',
         severity: 'warning',
-        payload: { missed_sends: 41, downtime_hours: 14 },
+        payload: { overdue: 41, remainingBudgetToday: 9 },
         created_at: NOW,
         acknowledged_at: null,
       },

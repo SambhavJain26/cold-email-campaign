@@ -21,6 +21,7 @@ export const uniboxItemSchema = z
     effective_sentiment: z.enum(SENTIMENTS).nullable(),
     suggested_sentiment: z.enum(SENTIMENTS).nullable(),
     auto_unsubscribed: z.boolean(),
+    sequence_continues: z.boolean(),
     meeting_booked: z.boolean(),
     enrollment_id: z.number().int(),
   })

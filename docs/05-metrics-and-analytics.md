@@ -1,6 +1,6 @@
 # Metrics & Analytics Engine — Exact Queries
 
-Implements spec Part 5 (formulas), Part 10 (golden numbers), walkthrough §13 (analytics screens) and §15 (metric reference). Public API in `apps/server/src/services/metrics/`; the SQL lives in `db/repos/metrics*` (repos are the SQL boundary — docs/02 §1). **Denominator law: campaign bounce rates ÷ distinct `leads sent-to` (≥1 `sent` event — Part 10's 18÷885=2.0% only reconciles this way, since the log holds ~3,315 sent *events* incl. follow-ups); reply/positive/unsub/meetings rates ÷ `contacted` leads (≥1 `delivered`). Per-mailbox auto-pause windows (§5) remain over send events per Part 11 — that is a different, operational metric.**
+Implements spec Part 5 (formulas), Part 10 (golden numbers), walkthrough §13 (analytics screens) and §15 (metric reference). Public API in `apps/server/src/services/metrics/`; the SQL lives in `db/repos/metrics*` (repos are the SQL boundary — docs/02 §1). **Denominator law: campaign bounce rates ÷ distinct `leads sent-to` (≥1 `sent` event — Part 10's 18÷885=2.0% only reconciles this way, since the log holds ~3,315 sent *events* incl. follow-ups); reply/positive/unsub/meetings rates ÷ `contacted` leads (≥1 `delivered` or `human_reply`). A human reply therefore counts immediately, even before the later delivery-confirmation job runs. Per-mailbox auto-pause windows (§5) remain over send events per Part 11 — that is a different, operational metric.**
 
 All queries take `(campaignId?)` — null = all campaigns — and are covered by the `ev_campaign` / `ev_mailbox` indexes.
 
@@ -9,10 +9,11 @@ All queries take `(campaignId?)` — null = all campaigns — and are covered by
 ## 1. Base building blocks
 
 ```sql
--- contacted: leads with ≥1 delivered (NOT sent) — spec Part 5
+-- contacted: leads with ≥1 delivered OR human_reply (NOT merely sent)
 -- golden: 885 - 18 = 867
 SELECT count(DISTINCT lead_id) FROM events
-WHERE type = 'delivered' AND ($1::bigint IS NULL OR campaign_id = $1);
+WHERE type IN ('delivered', 'human_reply')
+  AND ($1::bigint IS NULL OR campaign_id = $1);
 
 -- sent event count (denominator for bounce rates)          -- golden: 885+ (incl. follow-ups; step-1 sent = 885)
 SELECT count(*) FROM events WHERE type = 'sent' AND ...;

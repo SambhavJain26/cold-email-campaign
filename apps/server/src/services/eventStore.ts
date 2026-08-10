@@ -2,7 +2,7 @@
 // enter the system. Appends event(s) and updates the affected projections in
 // ONE Postgres transaction. Nothing else writes `events` or
 // `enrollments.current_state`.
-import type { Db, Tx } from '../db/client';
+import type { Db, DbLike, Tx } from '../db/client';
 import { insertEvents, listByEnrollments } from '../db/repos/eventsRepo';
 import {
   writeProjection,
@@ -11,6 +11,8 @@ import {
 } from '../db/repos/enrollmentsRepo';
 import { suppressLead } from '../db/repos/suppressionsRepo';
 import { getSettings } from '../db/repos/settingsRepo';
+import { loadSequenceDef } from '../db/repos/sequencesRepo';
+import { getCampaign } from '../db/repos/campaignsRepo';
 import { acquireRebuildLockShared, lockEnrollment } from '../db/repos/locksRepo';
 import type { DomainEvent } from '../domain/events';
 import {
@@ -42,6 +44,26 @@ export class EventStore {
   constructor(private readonly db: Db) {}
 
   /**
+   * The event ledger is shared by scheduler, poller, and manual actions, so
+   * the reducer must load the sequence's reply policy here rather than relying
+   * on a caller-specific scheduler shape.  Legacy/no-sequence campaigns retain
+   * the historically safe "stop on reply" default.
+   */
+  private async shapeForCampaign(
+    db: DbLike,
+    campaignId: number,
+    softRetryMax: number,
+  ): Promise<SequenceShape> {
+    const campaign = await getCampaign(db, campaignId);
+    const sequence = campaign?.sequenceId ? await loadSequenceDef(db, campaign.sequenceId) : null;
+    return {
+      lastStepNo: Number.POSITIVE_INFINITY,
+      softRetryMax,
+      stopOnReply: sequence?.stopOnReply ?? true,
+    };
+  }
+
+  /**
    * Serialize a scheduler send decision with any inbound event append for the
    * same enrollment.  Cron offsets reduce contention; this lock is the actual
    * correctness guarantee.
@@ -67,11 +89,6 @@ export class EventStore {
       await acquireRebuildLockShared(tx);
 
       const settings = await getSettings(tx);
-      const shape: SequenceShape = {
-        lastStepNo: Number.POSITIVE_INFINITY, // completion is a separate derived step
-        softRetryMax: settings.softRetryMax,
-      };
-
       const enrollmentIds = [
         ...new Set(
           evs
@@ -90,7 +107,13 @@ export class EventStore {
       const byEnrollment = await listByEnrollments(tx, enrollmentIds);
       const terminalIds = new Set<number>();
       for (const eid of enrollmentIds) {
-        const snapshot = foldEvents(byEnrollment.get(eid) ?? [], shape);
+        const history = byEnrollment.get(eid) ?? [];
+        const campaignId = history[0]?.campaignId;
+        if (campaignId === undefined) throw new Error(`enrollment ${eid} has no campaign history`);
+        const snapshot = foldEvents(
+          history,
+          await this.shapeForCampaign(tx, campaignId, settings.softRetryMax),
+        );
         await writeProjection(tx, eid, snapshot);
         if (snapshot.state !== 'NEW' && snapshot.state !== 'ACTIVE') terminalIds.add(eid);
       }
@@ -141,14 +164,14 @@ export class EventStore {
       throw new Error('appendUnderEnrollmentLock may only append its locked enrollment');
     }
     const settings = await getSettings(tx);
-    const shape: SequenceShape = {
-      lastStepNo: Number.POSITIVE_INFINITY,
-      softRetryMax: settings.softRetryMax,
-    };
     const ids = await insertEvents(tx, evs);
+    const history = (await listByEnrollments(tx, enrollmentIds)).get(enrollmentId) ?? [];
+    const campaignId = history[0]?.campaignId;
+    if (campaignId === undefined)
+      throw new Error(`enrollment ${enrollmentId} has no campaign history`);
     const snapshot = foldEvents(
-      (await listByEnrollments(tx, enrollmentIds)).get(enrollmentId) ?? [],
-      shape,
+      history,
+      await this.shapeForCampaign(tx, campaignId, settings.softRetryMax),
     );
     await writeProjection(tx, enrollmentId, snapshot);
     const terminal = snapshot.state !== 'NEW' && snapshot.state !== 'ACTIVE';

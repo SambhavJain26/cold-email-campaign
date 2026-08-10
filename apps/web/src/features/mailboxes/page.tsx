@@ -56,7 +56,10 @@ export default function MailboxesPage() {
   return (
     <div className="space-y-4 p-6">
       <div className="flex items-center justify-between">
-        <h1 className="text-lg font-semibold">Mailboxes</h1>
+        <div>
+          <h1 className="text-lg font-semibold">Mailboxes</h1>
+          <p className="text-xs text-muted-foreground">All campaigns</p>
+        </div>
         <Button
           size="sm"
           onClick={() => {

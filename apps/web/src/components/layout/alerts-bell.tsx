@@ -39,7 +39,7 @@ function describe(alert: AlertDto): { title: string; detail?: string } {
     case 'catchup_backlog':
       return {
         title: 'Scheduler catch-up in progress',
-        detail: `${p.missed_sends ?? '?'} sends were due during ${p.downtime_hours ?? '?'}h of downtime — pacing resumes, never bursts.`,
+        detail: `${p.overdue ?? '?'} sends are overdue; ${p.remainingBudgetToday ?? '?'} mailbox slots remain today. Pacing never bursts.`,
       };
     case 'compliance_missing_address':
       return {

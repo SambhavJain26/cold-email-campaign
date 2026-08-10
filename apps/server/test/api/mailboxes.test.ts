@@ -209,6 +209,13 @@ describe('B6.2 mailboxes', () => {
     const res = await h.inject({ method: 'GET', url: '/api/v1/mailboxes/volume?days=30' });
     expect(res.statusCode).toBe(200);
     const body = res.json();
-    expect(body).toEqual({ items: [], imbalance: false }); // no sends yet
+    expect(body.imbalance).toBe(false);
+    expect(body.items).toHaveLength(3);
+    expect(body.items.every((item: { series: unknown[] }) => item.series.length === 30)).toBe(true);
+    expect(
+      body.items.every((item: { series: Array<{ sends: number }> }) =>
+        item.series.every((point) => point.sends === 0),
+      ),
+    ).toBe(true);
   });
 });

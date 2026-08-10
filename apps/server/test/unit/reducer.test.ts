@@ -145,6 +145,11 @@ describe('transition matrix — one test per cell', () => {
   it('ACTIVE + human_reply -> REPLIED', () => {
     expect(applyEvent(snapIn('ACTIVE'), col.reply(), ctx).state).toBe('REPLIED');
   });
+  it('ACTIVE + human_reply stays active when the sequence allows follow-ups', () => {
+    const s = applyEvent(snapIn('ACTIVE'), col.reply(), { ...ctx, stopOnReply: false });
+    expect(s.state).toBe('ACTIVE');
+    expect(s.bestReplySentiment).toBeNull();
+  });
   it('ACTIVE + unsubscribe -> UNSUBSCRIBED', () => {
     expect(applyEvent(snapIn('ACTIVE'), col.unsub(), ctx).state).toBe('UNSUBSCRIBED');
   });

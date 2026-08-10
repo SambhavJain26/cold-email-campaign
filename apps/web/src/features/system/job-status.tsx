@@ -94,7 +94,10 @@ export function JobStatus() {
           <tbody data-testid="poller-freshness">
             {data.pollers.map((poller) => (
               <tr key={poller.mailbox_id} className="border-b border-border/60 last:border-b-0">
-                <td className="px-3 py-1.5 tabular-nums">{poller.mailbox_id}</td>
+                <td className="px-3 py-1.5">
+                  <span>{poller.mailbox_address}</span>
+                  <span className="ml-1 text-xs text-muted-foreground">#{poller.mailbox_id}</span>
+                </td>
                 <td className="px-3 py-1.5 text-xs text-muted-foreground">
                   {poller.last_successful_poll_at
                     ? formatRelativeTime(poller.last_successful_poll_at)

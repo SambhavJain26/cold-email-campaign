@@ -38,7 +38,10 @@ export function VolumeChart({ mailboxes }: { mailboxes: MailboxDto[] }) {
         byDate.set(point.date, row);
       }
     }
-    return { rows: [...byDate.values()], mailboxIds: ids };
+    return {
+      rows: [...byDate.values()].sort((a, b) => String(a.date).localeCompare(String(b.date))),
+      mailboxIds: ids,
+    };
   }, [data]);
 
   if (!data) return null;
@@ -47,7 +50,7 @@ export function VolumeChart({ mailboxes }: { mailboxes: MailboxDto[] }) {
   return (
     <Card>
       <CardHeader>
-        <CardTitle className="text-sm">Send volume — last 30 days</CardTitle>
+        <CardTitle className="text-sm">All-campaign send volume — last 30 days</CardTitle>
       </CardHeader>
       <CardContent className="space-y-3">
         {data.imbalance && (

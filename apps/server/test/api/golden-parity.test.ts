@@ -86,9 +86,26 @@ describe('B6.14 golden parity — API === committed fixtures', () => {
     expect(res.items).toEqual(fixture('health-trend.json'));
   });
 
-  it('GET /mailboxes/volume matches mailbox-volume.json (metric #5)', async () => {
+  it('GET /mailboxes/volume retains golden sends in zero-filled calendar series', async () => {
     const res = (await h.inject({ method: 'GET', url: '/api/v1/mailboxes/volume?days=60' })).json();
-    expect(res).toEqual(fixture('mailbox-volume.json'));
+    const prior = fixture('mailbox-volume.json') as {
+      items: Array<{ mailbox_id: number; series: Array<{ date: string; sends: number }> }>;
+      imbalance: boolean;
+    };
+    expect(res.imbalance).toBe(prior.imbalance);
+    expect(res.items).toHaveLength(prior.items.length);
+    for (const expected of prior.items) {
+      const actual = res.items.find(
+        (item: { mailbox_id: number }) => item.mailbox_id === expected.mailbox_id,
+      );
+      expect(actual.series).toHaveLength(60);
+      expect(actual.series.map((point: { date: string }) => point.date)).toEqual(
+        [...actual.series.map((point: { date: string }) => point.date)].sort(),
+      );
+      for (const point of expected.series) {
+        expect(actual.series).toContainEqual(point);
+      }
+    }
   });
 
   // NOTE: no rebuild zero-drift assertion here — the golden campaign has no

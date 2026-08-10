@@ -15,5 +15,6 @@ export function useMailboxVolume(days = 30) {
   return useQuery({
     queryKey: ['mailboxes', 'volume', days],
     queryFn: () => apiFetch('/mailboxes/volume', mailboxVolumeResponseSchema, { query: { days } }),
+    refetchInterval: POLL.operational,
   });
 }

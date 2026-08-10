@@ -45,6 +45,7 @@ import { jitterFactor, minGapMs, paceReady } from './pacing';
 import { pickMailbox, type RotationCandidate } from './rotation';
 import { buildMessageId, buildThreadHeaders } from './mime';
 import { isRateLimitError, transientVerdict } from './providerBlock';
+import { reconcileSendBlockerEpisodes } from '../db/repos/sendBlockerEpisodesRepo';
 
 const SCHEDULER_LOCK = [2, 0] as const; // advisory keyspace: (2,0) = tick
 
@@ -107,7 +108,6 @@ export class Scheduler {
   /** Last completed tick (in-memory — single process, GET /system/status). */
   private _lastTickAt: Date | null = null;
   private _sendBlockers: SendBlocker[] = [];
-  private blockerAlerted = new Set<SendBlocker['code']>();
 
   get lastTickAt(): Date | null {
     return this._lastTickAt;
@@ -119,16 +119,19 @@ export class Scheduler {
 
   private async setSendBlockers(blockers: SendBlocker[]): Promise<void> {
     this._sendBlockers = blockers;
-    const active = new Set(blockers.map((b) => b.code));
+    const opened = await reconcileSendBlockerEpisodes(
+      this.deps.db,
+      blockers.map((blocker) => blocker.code),
+      this.deps.clock.now(),
+    );
     for (const blocker of blockers) {
-      if (!this.blockerAlerted.has(blocker.code)) {
+      if (opened.has(blocker.code)) {
         await this.deps.alerts.emit(`send_blocked_${blocker.code}`, 'warning', {
           code: blocker.code,
           message: blocker.message,
         });
       }
     }
-    this.blockerAlerted = active;
   }
 
   constructor(private readonly deps: SchedulerDeps) {}

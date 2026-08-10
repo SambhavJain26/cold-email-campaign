@@ -48,8 +48,6 @@ function toSettingsDto(row: SettingsRow): SettingsDto {
 
 function toSettingsColumns(body: PutSettingsBody) {
   return {
-    stopOnReply: body.stop_on_reply,
-    stopOnHardBounce: body.stop_on_hard_bounce,
     softRetryMax: body.soft_retry_max,
     suppressUnsubs: body.suppress_unsubs,
     enforceSendWindow: body.enforce_send_window,

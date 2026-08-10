@@ -6,13 +6,17 @@ import {
   type PutSettingsBody,
 } from '@coldemail/shared';
 import { apiFetch } from '../client';
+import { invalidateOperational } from '../operational-cache';
 
 export function usePutSettings() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: (body: PutSettingsBody) =>
       apiFetch('/settings', settingsResponseSchema, { method: 'PUT', body }),
-    onSuccess: () => void qc.invalidateQueries({ queryKey: ['settings'] }),
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: ['settings'] });
+      invalidateOperational(qc);
+    },
   });
 }
 
@@ -21,6 +25,9 @@ export function usePutCompliance() {
   return useMutation({
     mutationFn: (body: ComplianceDto) =>
       apiFetch('/compliance', complianceSchema, { method: 'PUT', body }),
-    onSuccess: () => void qc.invalidateQueries({ queryKey: ['compliance'] }),
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: ['compliance'] });
+      invalidateOperational(qc);
+    },
   });
 }

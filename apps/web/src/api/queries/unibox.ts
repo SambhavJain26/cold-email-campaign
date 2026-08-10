@@ -24,5 +24,6 @@ export function useUniboxItem(incomingMessageId: number) {
   return useQuery({
     queryKey: ['unibox', 'detail', incomingMessageId],
     queryFn: () => apiFetch(`/unibox/${incomingMessageId}`, uniboxDetailResponseSchema),
+    refetchInterval: POLL.operational,
   });
 }

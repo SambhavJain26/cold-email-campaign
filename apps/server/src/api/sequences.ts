@@ -39,8 +39,8 @@ function toSequenceDto(n: NestedSequence): SequenceDto {
     id: n.sequence.id,
     name: n.sequence.name,
     stop_on_reply: n.sequence.stopOnReply,
-    stop_on_hard_bounce: n.sequence.stopOnHardBounce,
-    stop_on_unsubscribe: n.sequence.stopOnUnsubscribe,
+    stop_on_hard_bounce: true,
+    stop_on_unsubscribe: true,
     steps: n.steps.map(({ step, variants }) => ({
       id: step.id,
       step_no: step.stepNo,
@@ -110,8 +110,6 @@ export async function sequencesRoutes(app: FastifyInstance, services: AppService
       const id = await createSequence(db, {
         name: req.body.name,
         stopOnReply: req.body.stop_on_reply,
-        stopOnHardBounce: req.body.stop_on_hard_bounce,
-        stopOnUnsubscribe: req.body.stop_on_unsubscribe,
         steps: toSaveSteps(req.body).map(({ id: _new, ...s }) => s),
       });
       return toSequenceDto((await getSequenceNested(db, id))!);
@@ -138,8 +136,6 @@ export async function sequencesRoutes(app: FastifyInstance, services: AppService
         {
           name: req.body.name,
           stopOnReply: req.body.stop_on_reply,
-          stopOnHardBounce: req.body.stop_on_hard_bounce,
-          stopOnUnsubscribe: req.body.stop_on_unsubscribe,
           steps: toSaveSteps(req.body),
         },
         { retireOnly },

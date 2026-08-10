@@ -39,7 +39,10 @@ export default function UniboxPage() {
   return (
     <div className="space-y-4 p-6">
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <h1 className="text-lg font-semibold">Unibox</h1>
+        <div>
+          <h1 className="text-lg font-semibold">Unibox</h1>
+          <p className="text-xs text-muted-foreground">All campaigns</p>
+        </div>
         {tagOnlyMode && (
           <span className="text-xs text-muted-foreground" data-testid="tag-only-mode">
             Opt-out detection is <strong>tag_only</strong> — STOP replies are tagged, never
