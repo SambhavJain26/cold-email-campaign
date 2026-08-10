@@ -63,6 +63,15 @@ Nothing fails silently: every pg-boss final failure emits `job_failed`.
 
 **Already proven offline (B8.1/B8.2, docs/13 §5a)** against a real SMTP+IMAP server in Docker, so the canary is about *providers*, not about the code: SMTP send with our Message-ID · In-Reply-To/References intact on the wire · IMAP fetch honouring the UID high-water mark (and re-polling appending nothing) · real DSN → hard/soft bounce · real OOO → auto_reply · real threaded reply → human_reply and STOP → suppression · bad credentials → `auth_failed` · the whole scheduler+poller pipeline over the live transport with a zero-drift rebuild. The two things a local server cannot give: a 5xx recipient rejection, and each provider's own DSN/OOO wording.
 
+**Current local-canary evidence (2026-08-10):** Oracle has additionally proven real Gmail
+threading/replies and STOP suppression with the controlled account set. Its projection dry-run is
+0 diffs across 4 retained enrollments; containers are healthy; both mailbox poll timestamps
+advanced; and the backup sidecar has a dump dated 2026-08-10. The no-send regression/UI pass is
+also green (full serial DB projects, GreenMail, golden, mock UI E2E, and real-backend UI E2E).
+This does **not** prove real-domain deliverability, provider 5xx wording, a new failure cohort, or
+multi-day live timing behavior; those checks remain gated by explicit authorization to send new
+external mail.
+
 1. One real mailbox, `MAIL_TRANSPORT=smtp_imap`, caps=5/day, seed addresses only.
 2. Verify: Test-Connection round-trip · Message-ID/threading intact in real headers · reply from seed address → classified human, sequence stops · reply "STOP" → suppressed immediately · send to a known-dead address → DSN parsed hard, auto-pause math sane · seed OOO autoresponder → auto_reply, sequence continues · soft-bounce path (greylisting) if reproducible.
 3. Diff real Gmail/Outlook DSN/OOO messages against `headers/` fixtures; patch patterns; offline suite re-run (B8.4).

@@ -52,7 +52,7 @@ test('auth_failed panel reconnects with a new app password', async ({ page }) =>
 
   const panel = page.getByTestId('auth-failed-3');
   await expect(panel).toBeVisible();
-  await expect(panel.getByText(/redistributed to healthy mailboxes/)).toBeVisible();
+  await expect(panel.getByText(/follow-ups remain queued/)).toBeVisible();
 
   // No password → button disabled.
   await expect(panel.getByRole('button', { name: 'Reconnect Mailbox' })).toBeDisabled();

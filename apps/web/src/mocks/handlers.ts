@@ -381,20 +381,19 @@ export const handlers: RequestHandler[] = [
     authed(({ params }) => {
       const lead = db.leads.find((l) => l.id === Number(params.id));
       if (!lead) return notFound('lead');
+      const enrollment = lead.latest_enrollment;
+      const campaign = enrollment
+        ? db.campaigns.find((item) => item.id === enrollment.campaign_id)
+        : undefined;
+      const manualSendable =
+        enrollment?.current_state === 'ACTIVE' && campaign?.status === 'active'
+          ? [{ enrollment_id: lead.id, campaign_id: campaign.id, campaign_name: campaign.name }]
+          : [];
       return HttpResponse.json({
         ...lead,
         notes: db.leadNotes.get(lead.id) ?? null,
         timeline: buildTimeline(lead),
-        manual_sendable_enrollments:
-          lead.latest_enrollment?.current_state === 'ACTIVE'
-            ? [
-                {
-                  enrollment_id: lead.id,
-                  campaign_id: 1,
-                  campaign_name: 'Local mock campaign',
-                },
-              ]
-            : [],
+        manual_sendable_enrollments: manualSendable,
       });
     }),
   ),
@@ -1004,7 +1003,8 @@ export const handlers: RequestHandler[] = [
     authed(async ({ request }) => {
       const body = await parseBody(request, putSettingsBodySchema);
       if (body instanceof Response) return body;
-      db.settings = { ...body, updated_at: NOW };
+      // PUT omits legacy read-only stop fields; responses retain them.
+      db.settings = { ...db.settings, ...body, updated_at: NOW };
       return HttpResponse.json(db.settings);
     }),
   ),

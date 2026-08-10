@@ -32,7 +32,7 @@ test('list shows the fixture sequence with its steps, waits and stop conditions'
   await expect(row).toContainText('0 / 3 / 4 / 5 days');
   await expect(row).toContainText('reply');
   await expect(row).toContainText('hard bounce');
-  await expect(row).toContainText('unsubscribe');
+  await expect(row).toContainText('STOP');
 
   await row.getByRole('link', { name: 'Open' }).click();
   await expect(page).toHaveURL(/\/sequences\/1$/);

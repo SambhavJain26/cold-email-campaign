@@ -9,7 +9,7 @@ test('feed lists human replies with suggested tags and auto-stop caption', async
   await page.getByRole('link', { name: 'Unibox' }).click();
 
   const feed = page.getByTestId('unibox-feed');
-  await expect(feed).toContainText('sequence auto-stopped');
+  await expect(feed).toContainText('sequence stopped after this reply');
   // Untagged items carry the AI-assisted suggestion, greyed.
   await expect(feed.getByText('(AI-assisted)').first()).toBeVisible();
 
@@ -101,14 +101,14 @@ test('manual composer prefills from step 1 and sends as a manual send', async ({
   await expect(page).toHaveURL(/\/campaigns\/\d+$/);
 
   await page.getByRole('link', { name: 'Leads' }).click();
+  await page.getByPlaceholder('Search email, name, company…').fill('manual.eligible@example.com');
   await page.getByRole('table').getByRole('row').nth(1).click();
   await expect(page).toHaveURL(/\/leads\/\d+$/);
   await page.getByRole('button', { name: 'Manual compose' }).click();
 
   // Scope to the dialog — the top bar has its own campaign selector.
   const dialog = page.getByRole('dialog');
-  await dialog.getByLabel('Campaign').click();
-  await page.getByRole('option', { name: /Manual send target/ }).click();
+  await expect(dialog.getByLabel('Campaign')).toContainText('Manual Send Fixture');
 
   // Prefilled from the step-1 render for THIS lead — the starting point.
   await expect(dialog.getByLabel('Subject')).toHaveValue(/Quick question about/);

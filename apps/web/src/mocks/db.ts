@@ -100,6 +100,28 @@ function buildLeads(): LeadDto[] {
       },
     });
   }
+  // A separate active Mode-1 enrollment keeps the manual-composer path
+  // truthful: terminal golden-cohort leads cannot be manually sent again.
+  leads.push({
+    id: 886,
+    email: 'manual.eligible@example.com',
+    first_name: 'Manual',
+    last_name: 'Eligible',
+    company: 'Fixture Realty',
+    city: 'Austin',
+    state: 'TX',
+    // Kept out of the golden campaign's A/B/C distribution; its active
+    // Mode-1 enrollment is a separate manual-composer fixture.
+    tier: 'nurture',
+    is_suppressed: false,
+    custom_fields: {},
+    latest_enrollment: {
+      campaign_id: 2,
+      campaign_name: 'Manual Send Fixture',
+      current_state: 'ACTIVE',
+      current_step_no: 0,
+    },
+  });
   return leads;
 }
 

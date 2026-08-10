@@ -77,7 +77,7 @@ test('catch-up banner explains the backlog and acknowledges', async ({ page }) =
   await login(page);
 
   const banner = page.getByTestId('catchup-banner');
-  await expect(banner).toContainText('41 sends came due during 14h offline');
+  await expect(banner).toContainText('41 sends are overdue');
   await expect(banner).toContainText('never bursts');
 
   await banner.getByRole('button', { name: 'Acknowledge' }).click();

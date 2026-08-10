@@ -24,6 +24,29 @@ Both mailbox poll timestamps advanced after the result was ingested. A late Imap
 event found during this confirmation could restart the worker; it is fixed in commit `5ae3265`, whose
 focused real SMTP/IMAP suite passed before the Oracle redeploy.
 
+### No-send regression and UI/data audit — completed (2026-08-10)
+
+With no new external campaign mail authorized, the remaining pre-real-domain pass was run locally
+and against Oracle without enrolling or activating a new cohort. Migration `0009` was rolled back
+and reapplied; local and Oracle `rebuild-projections --dry-run` checks returned 0 diffs (Oracle:
+4 enrollments). The full current regression gate passed: web 54, unit 287, integration 159, API 82,
+SMTP/IMAP GreenMail 33, golden 47, mock UI E2E 50, and real-backend UI E2E 1. The mock UI sweep
+initially exposed stale fixture coverage after the UI-consistency changes: the Golden campaign was
+missing its sequence relation, the settings mock discarded read-only legacy fields on PUT, and the
+manual composer fixture did not model an active Mode-1 enrollment. Those test-harness defects are
+fixed and the complete sweep is green.
+
+Oracle remains healthy on `daef77a`: app and database health checks are green, no post-redeploy
+application error appears in the logs, and nightly database dumps exist through 2026-08-10. Direct
+read-only reconciliation reports the original one-lead gate plus the three-account campaign as 4
+contacted leads total: `REPLIED` 3, `UNSUBSCRIBED` 1, and one global `unsubscribed` suppression.
+The three-account campaign itself remains exactly two normal replies and one STOP suppression.
+
+The unchecked cohort, failure-cohort, and time-based **live** scenarios below are intentionally
+still open. They require new external mail or a new active cohort and must not be run without
+explicit authorization; their no-send code paths are covered by the serial integration, API, mail,
+golden, and UI gates above.
+
 ## Pre-cohort readiness update (2026-08-09)
 
 The 20-lead Gmail cohort remains paused until the pre-canary remediation gate is green. The operator-facing Gmail setup checklist includes a filter on every canary account that **never sends mail to Spam**. Production reply monitoring currently reads `INBOX` only; provider Spam folders are intentionally out of scope for this phase.
