@@ -13,7 +13,16 @@ Reply stopping is per sequence. With `stop_on_reply` disabled, a human reply rec
 later steps remain active; hard bounces and STOP/unsubscribe always end sending. The manual
 composer offers only active manual-sendable enrollments and healthy mailboxes. Database-backed
 suites, migration up/down, and the local projection dry-run are green. The Oracle controlled-Gmail
-replay remains the post-deployment confirmation, not an implementation task.
+replay is complete, including reply, reply-before-delivery, and STOP suppression paths.
+
+### Oracle controlled Gmail result — completed (2026-08-10)
+
+The three-lead live campaign now reconciles to three contacted leads: two normal replies are in
+`REPLIED`, and the third replied with `STOP`, creating an `unsubscribe` event with
+`matched_keyword: "stop"`, an `UNSUBSCRIBED` enrollment, and a global `unsubscribed` suppression.
+Both mailbox poll timestamps advanced after the result was ingested. A late ImapFlow connection-close
+event found during this confirmation could restart the worker; it is fixed in commit `5ae3265`, whose
+focused real SMTP/IMAP suite passed before the Oracle redeploy.
 
 ## Pre-cohort readiness update (2026-08-09)
 
@@ -56,7 +65,7 @@ as work closes.
 | #19 | ✅ implemented and locally verified | GreenMail verifies minimal `multipart/alternative` text + HTML. |
 | #13 | ⚠️ intentionally bypassed for this controlled test | Operator elected to proceed without Gmail’s “never send it to Spam” filters. Messages or replies placed in Spam may be invisible because monitoring reads `INBOX` only. |
 | Earlier pre-canary release | ✅ deployed to Oracle | Commit `95de5a3` deployed on 2026-08-10; containers healthy, HTTPS `/health` returned 200, and production `rebuild-projections --dry-run` returned 0 diffs. |
-| UI data-consistency release | ✅ deployed and verified | Commit `556c9b2` deployed on 2026-08-10; all containers are healthy, HTTPS `/health` returned 200, and production `rebuild-projections --dry-run` returned 0 diffs across 4 enrollments. The controlled Gmail confirmation is the next operational test. |
+| UI data-consistency release | ✅ deployed and live-verified | Commit `556c9b2` deployed on 2026-08-10; all containers are healthy, HTTPS `/health` returned 200, and production `rebuild-projections --dry-run` returned 0 diffs across 4 enrollments. The controlled Gmail campaign verified normal replies, reply-before-delivery accounting, and STOP suppression. |
 
 | # | Finding report | Class | Current status |
 |---|---|---|---|
