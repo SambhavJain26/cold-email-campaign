@@ -2,8 +2,8 @@
 
 ## UI data-consistency remediation (2026-08-10)
 
-The UI consistency implementation and its database-backed verification gate are complete locally;
-the verified release is ready for Oracle deployment. `contacted` is now the distinct-lead union of `delivered` and
+The UI consistency implementation is deployed to Oracle and its database-backed verification gate
+is complete. `contacted` is now the distinct-lead union of `delivered` and
 `human_reply`, campaign analytics and lead state are correctly scoped, visible operational data
 refreshes every 30 seconds, and operator actions invalidate dependent live views immediately.
 Mailbox charts are chronological, zero-filled, timezone-aware all-campaign series. Scheduler
@@ -56,7 +56,7 @@ as work closes.
 | #19 | ✅ implemented and locally verified | GreenMail verifies minimal `multipart/alternative` text + HTML. |
 | #13 | ⚠️ intentionally bypassed for this controlled test | Operator elected to proceed without Gmail’s “never send it to Spam” filters. Messages or replies placed in Spam may be invisible because monitoring reads `INBOX` only. |
 | Earlier pre-canary release | ✅ deployed to Oracle | Commit `95de5a3` deployed on 2026-08-10; containers healthy, HTTPS `/health` returned 200, and production `rebuild-projections --dry-run` returned 0 diffs. |
-| UI data-consistency release | ✅ implementation and local gate complete | Ready to deploy; Oracle health and projection checks, followed by the controlled Gmail confirmation, are the remaining release steps. |
+| UI data-consistency release | ✅ deployed and verified | Commit `556c9b2` deployed on 2026-08-10; all containers are healthy, HTTPS `/health` returned 200, and production `rebuild-projections --dry-run` returned 0 diffs across 4 enrollments. The controlled Gmail confirmation is the next operational test. |
 
 | # | Finding report | Class | Current status |
 |---|---|---|---|
