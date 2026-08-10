@@ -40,7 +40,7 @@ as work closes.
 | #15–16 | ✅ implemented and locally verified | Reply-first lock regression and UIDNEXT cursor initialization coverage. |
 | #19 | ✅ implemented and locally verified | GreenMail verifies minimal `multipart/alternative` text + HTML. |
 | #13 | ⏳ operator checklist before cohort | Add Gmail’s “never send it to Spam” filter to every canary account; production monitoring remains `INBOX` only. |
-| All code findings | ⏳ deployment gate | Deploy commit `926fdb6` to Oracle and run the production-container projection dry-run before any Gmail cohort mail. |
+| All code findings | ✅ deployed to Oracle | Commit `95de5a3` deployed on 2026-08-10; containers healthy, HTTPS `/health` returned 200, and production `rebuild-projections --dry-run` returned 0 diffs. |
 
 | # | Finding report | Class | Current status |
 |---|---|---|---|
@@ -72,8 +72,8 @@ of every settings-shaped field** before the real campaign.
 
 ### Pre-canary remediation implementation notes (2026-08-09)
 
-The completed items above do not authorize a Gmail cohort until the post-deploy Oracle check is
-recorded.
+The completed items above are deployed and the Oracle check is recorded. The Gmail cohort remains
+paused until the #13 account filters are set.
 
 - **#3:** Scheduler blockers are exposed in System and Overview and emitted once per active
   blocker episode; the alert names the cause and next action.
