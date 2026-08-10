@@ -253,7 +253,7 @@ export class SmtpImapTransport implements MailTransport {
 
   private imapClient(config: MailboxVerifyConfig): ImapFlow {
     const timeout = this.opts.timeoutMs ?? DEFAULT_TIMEOUT_MS;
-    return new ImapFlow({
+    const client = new ImapFlow({
       host: config.imapHost,
       port: config.imapPort,
       secure: config.imapPort === 993,
@@ -265,6 +265,14 @@ export class SmtpImapTransport implements MailTransport {
       socketTimeout: timeout,
       ...(this.opts.insecureTls && { tls: { rejectUnauthorized: false } }),
     });
+    // `logout()` can race a remote socket close. ImapFlow then emits a later
+    // `error` event even though the polling call has already caught its
+    // promise rejection; without a listener Node treats that event as fatal
+    // and restarts the worker. The caller still receives operational errors
+    // from connect/fetch/logout, while this listener safely absorbs only the
+    // late close notification.
+    client.on('error', () => undefined);
+    return client;
   }
 
   /**
