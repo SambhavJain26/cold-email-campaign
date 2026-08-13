@@ -91,10 +91,59 @@ System. Visible counts, states, capacities, mailbox health/polls, settings, draf
 replies, STOP suppression, and analytics agree with the copied database. No Oracle state was
 changed and no new Gmail message was sent during this gate.
 
-The remaining accelerated live-provider gate requires a precisely reviewed controlled-recipient
-batch and operator action on the received messages. It remains pending explicit approval of the
-exact recipients, senders, content, and campaign mutations. Deployment of the local fixes is a
-separate later approval gate.
+### Accelerated controlled live-provider gate — completed (2026-08-14)
+
+The operator approved one precisely reviewed two-message batch using only owned Gmail accounts.
+Commit `ef5071d` was deployed first; HTTPS health, database health, and a four-enrollment
+zero-drift projection check passed before activation. Campaign **Gmail Learning Canary - Aug
+2026** used the one-step **Gmail Learning Canary - Gate 1** sequence, a 10-day/2-per-day ramp,
+Tier-A `human_written` enrollment snapshots, and one explicitly selected healthy sender per lead.
+The visible lead tiers were restored to C immediately after enrollment.
+
+Exactly these sends were accepted and written once to the append-only ledger:
+
+- enrollment 5: `worksambhav26@gmail.com` to the controlled `+lead02` recipient, subject
+  **Controlled QA check A**, Message-ID `<ce-5-1-1786643649013@gmail.com>`;
+- enrollment 6: `sambhavcopywriting@gmail.com` to the controlled `+lead03` recipient, subject
+  **Controlled QA check B**, Message-ID `<ce-6-1-1786643840813@gmail.com>`.
+
+The first one-off operational invocation sent and committed message A before refusing to schedule
+its delayed confirmation because that standalone process had not started `Jobs`. The ledger and
+`sent_messages` table were checked before any retry, so A was not duplicated. Its one missing
+confirmation job was restored, the normal job queue was started for B, and both exact jobs were
+then advanced to run immediately for this accelerated test. Both completed once and appended one
+`delivered` event per enrollment.
+
+Manual mailbox polls ingested exactly one reply per mailbox with zero duplicates. `received`
+threaded through `In-Reply-To` to enrollment 5 and produced `human_reply` -> `REPLIED`. `STOP`
+threaded to enrollment 6 and atomically produced `human_reply` plus `unsubscribe` with
+`matched_keyword: "stop"` -> `UNSUBSCRIBED`, negative effective sentiment, and a global
+`unsubscribed` suppression for the controlled `+lead03` address. A second poll processed zero new
+messages. The campaign reconciled to 2/2 contacted, 2/2 replies, one unsubscribe, zero bounces,
+step 1 delivered/replied 2/2, and Tier A human-written contacted/replied 2/2. After Asia/Kolkata
+midnight, the UI correctly reset daily capacity to 0/10 sent, room 10, and ramp room 2.
+
+The copied-data UI pass exposed three additional visibility defects, all fixed in `12bd0cc`:
+
+1. The campaign outcomes endpoint counted only explicitly positive/neutral REPLIED sentiment, so
+   untagged or negative terminal replies disappeared from the mutually exclusive completion sum.
+   Its UI `neutral` field now means the documented neutral/negative/untagged non-positive remainder.
+2. The global campaign selector cleared a valid `?campaign=4` deep link while the campaigns query
+   was still loading, silently switching Overview/Leads/Analytics to the first campaign.
+3. Variant analytics measured bespoke manual-send variants in the database but omitted them from
+   the UI because the sequence builder intentionally hides those historical artifacts. Sent manual
+   variants now appear as clearly labelled read-only analytics rows and cannot enter the editable
+   A/B deactivation decision.
+
+The focused and full regression gates passed: API 77, web component 47, golden 47, focused shell
+browser 6, plus TypeScript, lint, and formatting. A sanitized Oracle snapshot excluded mailbox
+secrets and the operator row; its final screen-level verification passed across campaign outcomes
+and capacity, both lead rows, suppression visibility, both Unibox cards, variants, steps, tiers,
+and Overview. The snapshot database, dump, logs, and temporary scripts were removed afterward.
+Commit `12bd0cc` is deployed; HTTPS and database health are green, the deployed data returns the
+correct two terminal outcomes and two 1/1 manual variant rows, and the final production projection
+check returned `checked 6 enrollments — 0 diff(s)`. The completed test campaign is paused to prevent
+accidental future enrollment. No prospect, external-domain, DNS, or real-domain work was performed.
 
 ### Post-canary real-domain implementation backlog — approved, not started (2026-08-13)
 
