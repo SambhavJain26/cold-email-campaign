@@ -26,11 +26,15 @@ export function CampaignSelector() {
   const items = useMemo(() => data?.items ?? [], [data]);
 
   useEffect(() => {
+    // An empty array before the campaigns query resolves is not evidence that
+    // a deep-linked campaign is invalid. Clearing it here silently switches
+    // analytics/leads/overview to the first campaign during initial load.
+    if (data === undefined) return;
     if (selected === undefined || items.some((campaign) => campaign.id === selected)) return;
     const next = new URLSearchParams(searchParams);
     next.delete('campaign');
     setSearchParams(next, { replace: true });
-  }, [items, searchParams, selected, setSearchParams]);
+  }, [data, items, searchParams, selected, setSearchParams]);
 
   return (
     <Select

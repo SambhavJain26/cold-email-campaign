@@ -258,6 +258,21 @@ describe('B6.7 unibox + B6.8 manual-sends', () => {
     const e = await getById(h.services.db, body.enrollment_id);
     expect(e!.personalizationMode).toBe('human_written');
     expect(e!.currentStepNo).toBe(2); // sent advanced the step
+
+    const variants = (
+      await h.inject({
+        method: 'GET',
+        url: `/api/v1/analytics/variants?campaign_id=${campaignId}&step_no=1`,
+      })
+    ).json().items;
+    expect(variants).toContainEqual(
+      expect.objectContaining({
+        label: `Manual · enrollment ${body.enrollment_id}`,
+        subject_template: 'Saw your work at Fresh LLC',
+        deactivatable: false,
+        sent: 1,
+      }),
+    );
   });
 
   it('manual-send maps refusals: fatal checks 422, suppressed 409, no mailbox 409', async () => {

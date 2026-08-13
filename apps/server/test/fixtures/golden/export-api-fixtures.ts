@@ -48,10 +48,12 @@ async function main(): Promise<void> {
             (sentiment === undefined || r.best_reply_sentiment === sentiment),
         )
         .reduce((a, r) => a + r.n, 0);
+    const replied = count('REPLIED');
+    const repliedPositive = count('REPLIED', 'positive');
     const outcomes = {
       UNSUBSCRIBED: count('UNSUBSCRIBED'),
       BOUNCED: count('BOUNCED'),
-      REPLIED: { positive: count('REPLIED', 'positive'), neutral: count('REPLIED', 'neutral') },
+      REPLIED: { positive: repliedPositive, neutral: replied - repliedPositive },
       COMPLETED: count('COMPLETED'),
       ACTIVE: count('ACTIVE'),
       NEW: count('NEW'),

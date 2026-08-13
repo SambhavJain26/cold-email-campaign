@@ -19,7 +19,7 @@ import {
 import type { AppServices } from '../composition';
 import { campaignIdsForSequence, getCampaign } from '../db/repos/campaignsRepo';
 import { tierCEngagedCount, mailboxVolume, type MetricScope } from '../db/repos/metricsRepo';
-import { deactivateVariant, getSequenceNested } from '../db/repos/sequencesRepo';
+import { deactivateVariant, getSequenceNested, getVariantById } from '../db/repos/sequencesRepo';
 import { capacityToday } from '../services/enrollment';
 import {
   mailboxImbalance,
@@ -119,13 +119,26 @@ export async function analyticsRoutes(app: FastifyInstance, services: AppService
           v,
         ]),
       );
+      const variants = [...stepEntry.variants];
+      for (const variantId of stats.keys()) {
+        if (variantId === null || variants.some((variant) => variant.id === variantId)) continue;
+        const historical = await getVariantById(db, variantId);
+        if (historical?.stepId === stepEntry.step.id) variants.push(historical);
+      }
       return {
-        items: stepEntry.variants.map((v) => {
+        items: variants.map((v) => {
           const s = stats.get(v.id);
+          const bespoke = v.attributes.bespoke === true;
+          const enrollment = bespoke ? /bespoke-e(\d+)s/.exec(v.label)?.[1] : undefined;
           return {
             variant_id: v.id,
-            label: v.label,
+            label: bespoke
+              ? enrollment === undefined
+                ? 'Manual send'
+                : `Manual · enrollment ${enrollment}`
+              : v.label,
             subject_template: v.subjectTemplate,
+            deactivatable: !bespoke,
             sent: s?.sent ?? 0,
             reply_rate: s?.replyRate ?? pct(0, 0),
             positive_rate: s?.positiveRate ?? pct(0, 0),

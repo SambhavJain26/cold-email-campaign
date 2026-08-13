@@ -80,6 +80,7 @@ describe('13a winner', () => {
     variant_id: label.charCodeAt(0),
     label,
     subject_template: 's',
+    deactivatable: true,
     sent: 200,
     reply_rate: m(10, 200, 5),
     positive_rate: m(positive, 200, positive),

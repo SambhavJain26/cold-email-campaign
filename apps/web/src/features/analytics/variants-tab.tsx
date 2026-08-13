@@ -54,9 +54,10 @@ export function VariantsTab({
   }
 
   const rows = data.items;
-  const winner = winningVariant(rows);
+  const comparableRows = rows.filter((row) => row.deactivatable);
+  const winner = winningVariant(comparableRows);
   const smallSample = rows.some((row) => row.sent < SMALL_SAMPLE);
-  const loser = rows.find((row) => row.variant_id !== winner?.variant_id);
+  const loser = comparableRows.find((row) => row.variant_id !== winner?.variant_id);
   const confirmTarget = rows.find((row) => row.variant_id === confirmId);
 
   return (
@@ -87,6 +88,11 @@ export function VariantsTab({
                     <Trophy className="mr-1 inline size-3.5 text-success" aria-label="winner" />
                   )}
                   {row.label}
+                  {!row.deactivatable && (
+                    <span className="ml-1 text-xs font-normal text-muted-foreground">
+                      (read-only)
+                    </span>
+                  )}
                 </TableCell>
                 <TableCell className="py-1.5 font-mono text-xs text-muted-foreground">
                   {row.subject_template}

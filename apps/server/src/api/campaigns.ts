@@ -199,10 +199,15 @@ export async function campaignsRoutes(app: FastifyInstance, services: AppService
             (x) => x.state === state && (sentiment === undefined || x.sentiment === sentiment),
           )
           .reduce((a, x) => a + x.n, 0);
+      const replied = count('REPLIED');
+      const repliedPositive = count('REPLIED', 'positive');
       return {
         UNSUBSCRIBED: count('UNSUBSCRIBED'),
         BOUNCED: count('BOUNCED'),
-        REPLIED: { positive: count('REPLIED', 'positive'), neutral: count('REPLIED', 'neutral') },
+        // The public "neutral" bucket is the UI's "neutral/negative"
+        // remainder. Untagged replies are terminal replies too and must not
+        // disappear from the mutually-exclusive outcome sum.
+        REPLIED: { positive: repliedPositive, neutral: replied - repliedPositive },
         COMPLETED: count('COMPLETED'),
         ACTIVE: count('ACTIVE'),
         NEW: count('NEW'),

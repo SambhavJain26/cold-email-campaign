@@ -197,22 +197,28 @@ describe('B6.6 campaigns', () => {
     // hand-place states on the 6 enrollments (projection is fair game in tests)
     await h.pool.query(`
       UPDATE enrollments SET current_state = 'REPLIED', best_reply_sentiment = 'positive'
-      WHERE id IN (SELECT id FROM enrollments ORDER BY id LIMIT 2)`);
+      WHERE id IN (SELECT id FROM enrollments ORDER BY id LIMIT 1)`);
     await h.pool.query(`
       UPDATE enrollments SET current_state = 'REPLIED', best_reply_sentiment = 'neutral'
+      WHERE id IN (SELECT id FROM enrollments ORDER BY id OFFSET 1 LIMIT 1)`);
+    await h.pool.query(`
+      UPDATE enrollments SET current_state = 'REPLIED', best_reply_sentiment = NULL
       WHERE id IN (SELECT id FROM enrollments ORDER BY id OFFSET 2 LIMIT 1)`);
     await h.pool.query(`
+      UPDATE enrollments SET current_state = 'REPLIED', best_reply_sentiment = 'negative'
+      WHERE id IN (SELECT id FROM enrollments ORDER BY id OFFSET 3 LIMIT 1)`);
+    await h.pool.query(`
       UPDATE enrollments SET current_state = 'COMPLETED'
-      WHERE id IN (SELECT id FROM enrollments ORDER BY id OFFSET 3 LIMIT 2)`);
+      WHERE id IN (SELECT id FROM enrollments ORDER BY id OFFSET 4 LIMIT 2)`);
     const res = (
       await h.inject({ method: 'GET', url: `/api/v1/campaigns/${campaignId}/outcomes` })
     ).json();
     expect(res).toEqual({
       UNSUBSCRIBED: 0,
       BOUNCED: 0,
-      REPLIED: { positive: 2, neutral: 1 },
+      REPLIED: { positive: 1, neutral: 3 },
       COMPLETED: 2,
-      ACTIVE: 1, // enrolled events fold NEW → ACTIVE at append
+      ACTIVE: 0, // every enrollment was placed into a terminal state above
       NEW: 0,
       total: 6,
     });

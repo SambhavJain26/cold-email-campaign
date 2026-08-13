@@ -43,6 +43,16 @@ test('campaign selection is URL-synced and survives navigation', async ({ page }
   await expect(page.getByRole('combobox', { name: 'Campaign' })).toContainText('Golden Pass 1');
 });
 
+test('a valid deep-linked campaign survives the initial campaigns load', async ({ page }) => {
+  await login(page);
+  await page.goto('/analytics?campaign=2');
+
+  await expect(page).toHaveURL(/\/analytics\?campaign=2$/);
+  await expect(page.getByRole('combobox', { name: 'Campaign' })).toContainText(
+    'Manual Send Fixture',
+  );
+});
+
 test('transport chip announces mock mode', async ({ page }) => {
   await login(page);
   await expect(page.getByText('mock', { exact: true })).toBeVisible();

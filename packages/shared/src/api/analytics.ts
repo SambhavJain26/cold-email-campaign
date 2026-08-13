@@ -40,6 +40,7 @@ export const variantAnalyticsRowSchema = z
     variant_id: z.number().int(),
     label: z.string(),
     subject_template: z.string(),
+    deactivatable: z.boolean(),
     sent: z.number().int(),
     reply_rate: metricSchema,
     positive_rate: metricSchema,
