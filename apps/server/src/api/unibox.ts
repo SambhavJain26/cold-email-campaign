@@ -99,6 +99,12 @@ export async function uniboxRoutes(app: FastifyInstance, services: AppServices):
       if (row.replyEventId === null) {
         throw new AppError('conflict', 409, 'only human replies can be sentiment-tagged');
       }
+      // Clicking the already-selected tag is not a new operator fact. Keep
+      // the append-only ledger meaningful and make retries safe after a slow
+      // response or lost connection.
+      if (row.effectiveSentiment === req.body.sentiment) {
+        return toUniboxItemDto(row);
+      }
       await store.append([
         buildEvent.sentimentTagged({
           leadId: row.leadId,

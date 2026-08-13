@@ -36,6 +36,10 @@ export default defineConfig({
           // Multi-day VirtualClock scenarios run hundreds of real DB ticks;
           // the 5s default flakes on slower runs (B4 added per-tick queries).
           testTimeout: 30_000,
+          // Full serial runs can leave Postgres checkpointing while the next
+          // file resets shared tables. Keep suite hooks on the same budget as
+          // the DB-backed tests so a slow reset cannot skip an entire file.
+          hookTimeout: 30_000,
         },
       },
       {
@@ -46,6 +50,7 @@ export default defineConfig({
           globalSetup: ['./apps/server/test/helpers/global-setup.ts'],
           fileParallelism: false,
           testTimeout: 30_000,
+          hookTimeout: 30_000,
         },
       },
       {
@@ -58,6 +63,7 @@ export default defineConfig({
           globalSetup: ['./apps/server/test/helpers/global-setup.ts'],
           fileParallelism: false,
           testTimeout: 30_000,
+          hookTimeout: 30_000,
         },
       },
       {
@@ -69,6 +75,7 @@ export default defineConfig({
           globalSetup: ['./apps/server/test/helpers/global-setup.ts'],
           fileParallelism: false,
           testTimeout: 120_000,
+          hookTimeout: 120_000,
         },
       },
     ],

@@ -239,6 +239,34 @@ function buildSequence(): SequenceDto {
   };
 }
 
+/**
+ * Keep the committed golden fixture byte-for-byte equal to the real API seed.
+ * Mock-only relationships and the active Mode-1 example belong here instead
+ * of in that parity fixture.
+ */
+function buildCampaigns(): CampaignDto[] {
+  const [golden] = structuredClone(campaignsFx.items) as CampaignDto[];
+  return [
+    { ...golden!, sequence_id: 1 },
+    {
+      id: 2,
+      name: 'Manual Send Fixture',
+      status: 'active',
+      sequence_id: 1,
+      tier_effort_config: {
+        A: 'human_written',
+        B: 'template_researched',
+        C: 'template_auto',
+      },
+      ramp_config: { ramp_days: 7, ramp_daily_enroll_cap: 20 },
+      recycled_from_campaign_id: null,
+      enrolled_count: 1,
+      contacted_count: 0,
+      manual_only_count: 1,
+    },
+  ];
+}
+
 function buildUnibox(leads: LeadDto[]): UniboxItemDto[] {
   const items: UniboxItemDto[] = [];
   // 10 human replies off the REPLIED cohort: a mix of tagged / suggested-only /
@@ -404,7 +432,7 @@ function build(): MockDb {
   return {
     authenticated: sessionAuthed(),
     operatorEmail: OPERATOR_EMAIL,
-    campaigns: structuredClone(campaignsFx.items) as CampaignDto[],
+    campaigns: buildCampaigns(),
     outcomes: structuredClone(outcomesFx),
     overview: structuredClone(overviewFx),
     steps: structuredClone(stepsFx),

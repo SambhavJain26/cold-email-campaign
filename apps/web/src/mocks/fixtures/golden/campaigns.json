@@ -4,7 +4,7 @@
       "id": 1,
       "name": "Golden Pass 1",
       "status": "active",
-      "sequence_id": 1,
+      "sequence_id": null,
       "tier_effort_config": {
         "A": "human_written",
         "B": "template_researched",
@@ -18,28 +18,9 @@
       "enrolled_count": 885,
       "contacted_count": 867,
       "manual_only_count": 0
-    },
-    {
-      "id": 2,
-      "name": "Manual Send Fixture",
-      "status": "active",
-      "sequence_id": 1,
-      "tier_effort_config": {
-        "A": "human_written",
-        "B": "template_researched",
-        "C": "template_auto"
-      },
-      "ramp_config": {
-        "ramp_days": 7,
-        "ramp_daily_enroll_cap": 20
-      },
-      "recycled_from_campaign_id": null,
-      "enrolled_count": 1,
-      "contacted_count": 0,
-      "manual_only_count": 1
     }
   ],
-  "total": 2,
+  "total": 1,
   "page": 1,
   "per_page": 50
 }

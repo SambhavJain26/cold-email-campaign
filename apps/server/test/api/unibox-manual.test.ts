@@ -160,6 +160,16 @@ describe('B6.7 unibox + B6.8 manual-sends', () => {
     expect(res.json().effective_sentiment).toBe('positive');
     await expectAppended(h.pool, wm, { sentiment_tagged: 1 });
 
+    // A retry or second click on the selected value is idempotent.
+    const sameValueWatermark = await eventWatermark(h.pool);
+    const sameValue = await h.inject({
+      method: 'POST',
+      url: '/api/v1/unibox/1/sentiment',
+      payload: { sentiment: 'positive' },
+    });
+    expect(sameValue.json().effective_sentiment).toBe('positive');
+    await expectNoNewEvents(h.pool, sameValueWatermark);
+
     // re-tag: latest wins (decision M)
     const retag = await h.inject({
       method: 'POST',

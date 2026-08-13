@@ -42,6 +42,7 @@ test('tagging positive moves the Overview positive rate', async ({ page }) => {
   await card.getByRole('button', { name: 'Tag positive' }).click();
   // Optimistic: the confirmed tag replaces the suggestion immediately.
   await expect(card.getByText('positive', { exact: false }).first()).toBeVisible();
+  await expect(card.getByRole('button', { name: 'Tag positive' })).toBeDisabled();
 
   await page.getByRole('link', { name: 'Overview' }).click();
   // 28 → 29 positives over the same 867 contacted = 3.3%.

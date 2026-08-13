@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { zodResolver } from '@hookform/resolvers/zod';
-import { useForm } from 'react-hook-form';
+import { useForm, useWatch } from 'react-hook-form';
 import { toast } from 'sonner';
 import { z } from 'zod';
 import { createMailboxBodySchema, sendWindowSchema, type MailboxDto } from '@coldemail/shared';
@@ -56,12 +56,12 @@ export function MailboxDialog({
     reset,
     setError,
     setValue,
-    watch,
+    control,
     formState: { errors },
   } = useForm<FormValues>({
     resolver: zodResolver(formSchema),
   });
-  const selectedDays = watch('send_window.days') ?? [];
+  const selectedDays = useWatch({ control, name: 'send_window.days' }) ?? [];
   const timezones =
     typeof Intl.supportedValuesOf === 'function'
       ? Intl.supportedValuesOf('timeZone')
@@ -98,7 +98,7 @@ export function MailboxDialog({
             password: '',
           },
     );
-  }, [open, mailbox, reset]);
+  }, [open, mailbox, reset, settings.data?.default_timezone]);
 
   const handleOpenChange = (next: boolean) => {
     if (!next) setTestResult(null);

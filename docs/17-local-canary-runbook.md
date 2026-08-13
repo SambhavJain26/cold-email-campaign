@@ -47,6 +47,78 @@ still open. They require new external mail or a new active cohort and must not b
 explicit authorization; their no-send code paths are covered by the serial integration, API, mail,
 golden, and UI gates above.
 
+### Day 2 Gate 1 readiness check — completed (2026-08-13)
+
+The Oracle stack remains healthy: Caddy's HTTPS `/health` returned `{ ok: true, db: true }`, and
+the production projection comparison returned `checked 4 enrollments — 0 diff(s)`. Both registered
+Gmail sender mailboxes passed a fresh non-sending Test Connection (SMTP and IMAP both successful;
+4.43 s and 4.12 s respectively). Both are `ok`, have recent successful IMAP polls, a daily cap of
+5, `Asia/Kolkata` timezone, and an enforced Monday–Friday 10:00–18:00 local send window.
+
+The requested isolated assets already exist without activation: **Gmail Learning Canary - Gate 1**
+is a one-step sequence with one active variant and reply stopping enabled; **Gmail Learning Canary
+- Aug 2026** is a draft campaign with zero enrollments and zero contacted leads. Its current shared
+mailbox capacity is 10 total sends, with 0 sent and 0 follow-ups due today; its 10-day ramp caps
+new enrollments at 2 per day. No activation, enrollment, or outbound message was performed during
+this check.
+
+### Accelerated full-system QA — local and Oracle read-only gate complete (2026-08-13)
+
+The operator replaced the planned ten-day cadence with an accelerated, feature-by-feature pass.
+The no-send portion is complete. Local Postgres and GreenMail were used for the full current gate:
+TypeScript, formatting, and lint are clean; unit 287, web component 47, integration 159, API 77,
+golden 47, real SMTP/IMAP 23, mock-browser E2E 50, and real-backend browser E2E 1 all pass.
+The real-backend journey covers import, enrollment, virtual-time send, reply and STOP ingestion,
+sentiment tagging, metrics, and terminal completion. The local projection dry-run returned 0 diffs.
+
+This pass found and locally fixed three test/operation quality defects:
+
+1. DB-project hooks retained Vitest's 10-second default even though their tests had larger budgets;
+   under sustained load the metrics suite timed out during setup and skipped all eight cases. Hook
+   budgets now match their DB projects, and the full 159-test serial integration run passes.
+2. A mock-only manual-send campaign had been written into the committed golden API fixture, making
+   full API parity contradict the real golden database seed. The parity fixture is real-data-only
+   again; mock-only relationships and the Mode-1 demo campaign are constructed in the mock DB.
+3. Re-clicking an already-selected Unibox sentiment could append a redundant `sentiment_tagged`
+   fact. Same-value tags are now server-idempotent and the selected UI tag is disabled; genuine
+   retagging still appends a new fact. Focused API and Unibox browser coverage pass.
+
+Oracle remains deployed on `daef77a`; none of these local fixes has been deployed. The live stack
+is healthy and its projection dry-run remains 0 diffs across 4 enrollments. A local read-only UI
+snapshot of Oracle data (with mailbox secrets and the operator row excluded) was inspected across
+Overview, Leads, Mailboxes, Sequences, Campaigns, Unibox, Analytics, Cold Storage, Settings, and
+System. Visible counts, states, capacities, mailbox health/polls, settings, draft Gate-1 assets,
+replies, STOP suppression, and analytics agree with the copied database. No Oracle state was
+changed and no new Gmail message was sent during this gate.
+
+The remaining accelerated live-provider gate requires a precisely reviewed controlled-recipient
+batch and operator action on the received messages. It remains pending explicit approval of the
+exact recipients, senders, content, and campaign mutations. Deployment of the local fixes is a
+separate later approval gate.
+
+### Post-canary real-domain implementation backlog — approved, not started (2026-08-13)
+
+After the controlled ten-day Gmail learning canary is complete, and before any real-domain
+prospect send, the operator has approved this implementation sequence:
+
+1. Public opaque-token unsubscribe endpoint, body link, and `List-Unsubscribe` / one-click
+   headers; retain reply `STOP` as a fallback.
+2. Hard launch guardrails: review and enforce conservative mailbox/campaign ceilings and staged
+   enrollment so a configuration mistake cannot create an unsafe initial ramp.
+3. Domain-readiness preflight: surface the operator checks for authenticated sending domains,
+   reply inboxes, compliance address, mailbox health, conservative caps, and unsubscribe readiness.
+   DNS and warming remain operator work, not app-managed configuration.
+4. Per-mailbox Google Workspace OAuth connection flow with encrypted refresh-token storage and a
+   clear reconnect state. Start with individual authorization for the outreach inboxes; do not use
+   domain-wide delegation initially.
+5. Retain and audit the existing deterministic spintax/variant support and copy-risk checks. They
+   provide controlled wording variation and review, not a promise to evade spam filters or make
+   every message unique.
+
+These items are deferred implementation work, not completed functionality and not part of the
+current Gmail canary. No deployment, real-domain configuration, or prospect sending is authorized
+by this record alone.
+
 ## Pre-cohort readiness update (2026-08-09)
 
 The 20-lead Gmail cohort remains paused until the pre-canary remediation gate is green. The operator-facing Gmail setup checklist includes a filter on every canary account that **never sends mail to Spam**. Production reply monitoring currently reads `INBOX` only; provider Spam folders are intentionally out of scope for this phase.

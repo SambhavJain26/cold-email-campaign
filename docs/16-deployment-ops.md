@@ -160,3 +160,31 @@ separate deployment feature:
 - **Caddy/ops:** add the route under the existing HTTPS app host/subdomain, monitor endpoint
   availability, and test normal browser POST, Gmail header POST, expired/invalid tokens, duplicate
   requests, and no-PII logging before enabling real-domain traffic.
+
+### Operator-confirmed post-canary build order — not started (2026-08-13)
+
+The controlled ten-day Gmail learning canary comes first. After it closes, the following is the
+approved implementation order before any real-domain prospect send:
+
+1. **Unsubscribe and one-click support** — implement and deploy the preceding plan, including the
+   public endpoint, opaque tokens, clear body link, `List-Unsubscribe` headers, Gmail one-click
+   POST handling, suppression, and endpoint/no-PII-log tests.
+2. **Hard launch guardrails** — make conservative mailbox and campaign ceilings plus staged
+   enrollment explicit and enforceable. The objective is to prevent an operator configuration error
+   from creating an unsafe initial volume; it does not replace domain warming or recipient consent.
+3. **Domain-readiness preflight** — provide an operator-facing readiness check for SPF, DKIM,
+   DMARC/alignment, reply inbox/MX, compliance address, mailbox health, conservative caps, warming
+   status, and unsubscribe deployment. The app may record/check readiness, but must not pretend it
+   can configure DNS or establish reputation itself.
+4. **Google Workspace OAuth** — replace the current app-password-only transport with individual
+   OAuth authorization for each outreach inbox, server-side encrypted refresh-token storage,
+   refresh/revocation handling, and a reconnect UI. Use the operator-owned internal Workspace OAuth
+   client; keep the main-domain super-admin inbox out of the sending set; do not introduce
+   domain-wide delegation initially.
+5. **Controlled copy variation** — deterministic spintax, step variants, and copy-risk checks are
+   already implemented. Audit and retain them; do not add artificial "unique every time" logic or
+   treat variation as an anti-spam bypass. Outbound mail remains untracked: no pixels, click
+   tracking, or tracking-domain redirect.
+
+This is a deferred roadmap, not a claim that these capabilities exist today. It does not authorize
+DNS changes, a deploy, or any real-domain sending.

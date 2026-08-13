@@ -1,6 +1,6 @@
 import { useEffect, useRef } from 'react';
 import { zodResolver } from '@hookform/resolvers/zod';
-import { Controller, useForm } from 'react-hook-form';
+import { Controller, useForm, useWatch } from 'react-hook-form';
 import { toast } from 'sonner';
 import { useNavigate } from 'react-router-dom';
 import { z } from 'zod';
@@ -61,7 +61,6 @@ export function CampaignDialog({
     handleSubmit,
     reset,
     control,
-    watch,
     formState: { errors },
   } = useForm<FormValues>({ resolver: zodResolver(formSchema) });
 
@@ -81,7 +80,7 @@ export function CampaignDialog({
       acknowledge_tier_a_manual: false,
     });
   }, [open, reset, sequences.data]);
-  const tierAMode = watch('tier_effort_config.A');
+  const tierAMode = useWatch({ control, name: 'tier_effort_config.A' });
 
   const onSubmit = (values: FormValues) => {
     create.mutate(values, {

@@ -101,6 +101,7 @@ export function ReplyCard({
                 size="xs"
                 aria-label={`Tag ${sentiment}`}
                 aria-pressed={item.effective_sentiment === sentiment}
+                disabled={tag.isPending || item.effective_sentiment === sentiment}
                 className={cn(
                   'px-2',
                   item.effective_sentiment === sentiment && 'border-primary bg-accent',

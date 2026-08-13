@@ -1,5 +1,5 @@
 import { useEffect } from 'react';
-import { useForm } from 'react-hook-form';
+import { useForm, useWatch } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { toast } from 'sonner';
 import { complianceSchema, type ComplianceDto } from '@coldemail/shared';
@@ -24,7 +24,7 @@ export function ComplianceTab({
   const {
     register,
     handleSubmit,
-    watch,
+    control,
     reset,
     formState: { errors, isDirty },
   } = useForm<ComplianceDto>({
@@ -34,8 +34,8 @@ export function ComplianceTab({
 
   useEffect(() => onDirtyChange(isDirty), [isDirty, onDirtyChange]);
 
-  const address = watch('physical_address');
-  const optout = watch('optout_text');
+  const address = useWatch({ control, name: 'physical_address' });
+  const optout = useWatch({ control, name: 'optout_text' });
   const addressEmpty = address.trim() === '';
 
   const onSubmit = (body: ComplianceDto) =>
