@@ -4,16 +4,26 @@
 
 The project is in **pre-real-domain testing**. Until the operator explicitly changes that scope:
 
-- Perform testing, verification, diagnosis, and documentation only.
-- Do not implement domain/DNS work, a public unsubscribe endpoint, `List-Unsubscribe` headers,
-  production mailbox configuration, Caddy/domain changes, or other deployment features.
+- **Approved build scope (operator-approved plan, 2026-08-15) — the only feature work
+  authorized:** the public unsubscribe endpoint with opaque tokens, `List-Unsubscribe` /
+  one-click headers and the footer link; hard launch guardrails; the domain-readiness preflight;
+  per-folder IMAP polling (finding 13); and single-lead creation (finding 10). Outside that list,
+  the rule is unchanged: testing, verification, diagnosis, and documentation only.
+- Do not implement domain/DNS work, production mailbox configuration, Caddy/domain changes, or
+  other deployment features. Google Workspace OAuth is explicitly deferred until a real domain and
+  inbox exist.
+- The unsubscribe endpoint is being built **dormant**: with no `unsubscribe_base_url` configured
+  it emits no link and no header, and the footer falls back to reply-`STOP` only. Do not point it
+  at a real hostname, open a public port, or treat Gmail one-click as proven — that needs a
+  publicly reachable URL and its own approval.
 - Do not start a real cohort or send new external campaign mail without explicit approval for that
   specific send.
 - The approved, controlled Gmail acceptance batch is complete. The test campaign is paused; do
   not resume it or create additional test sends without new, per-send operator approval. Read the
   runbook for the authoritative recipient, outcome, and verification record.
-- The unsubscribe URL design in `docs/16-deployment-ops.md` is a future deployment plan, not
-  implemented functionality.
+- The unsubscribe URL design in `docs/16-deployment-ops.md` §8 is the specification the approved
+  build follows. The rest of that section — hard launch guardrails beyond the approved scope,
+  Workspace OAuth, and every real-domain deployment step — remains a plan, not functionality.
 
 ## Read first
 
