@@ -232,12 +232,80 @@ as work closes.
 | 18 | **Sentiment tagging reported failure on every success, and the retries wrote junk into an append-only log.** `POST /unibox/:id/sentiment` returns the updated **item** (contract docs/10; route declares `response: { 200: uniboxItemSchema }`), but the client parsed it with `okResponseSchema`. Server returned 200 and appended the event; the client's zod parse rejected the body and the global mutation handler toasted "request failed". The operator clicked seven times, producing **seven duplicate `sentiment_tagged` events** that can never be deleted. Note the client-side decision-H tripwire worked exactly as designed — it caught a genuine client/server disagreement; the client was simply the wrong side. Fixed: parse `uniboxItemSchema`. | **correctness (schema mismatch)** | ✅ fixed |
 | 19 | **Every email is 100% plain text, so the footer/signature cannot be visually de-emphasized — and it reads worse than comparable real cold emails as a result.** Confirmed end to end: `render/footer.ts` appends the compliance footer as plain text (`\n\n---\n{address}\n{optout}`), and the scheduler's `sendMail` call passes only `text: msg.bodyText` to nodemailer — there is no `html:` field anywhere in the send path. In plain text every character renders identically, so the unsubscribe line and address are exactly as visually prominent as the message body; a human reader clocks it immediately as automated. **This is very likely a deliberate deliverability choice** (plain text avoids images, tracking pixels, embedded fonts, and hidden-text tricks that spam filters key on) — but it is a false tradeoff. Commercial cold-email tools (Smartlead, Instantly, Apollo, lemlist) send **multipart** email: the same message carries a plain-text part *and* a minimal HTML part side by side (nodemailer supports this natively — passing both `text` and `html` produces `multipart/alternative`); the client renders whichever it prefers, almost always the HTML one. The HTML stays deliberately plain — no images, no tracking, no complex layout — just enough CSS (e.g. `font-size:11px;color:#888`) to de-emphasize the footer the way a real signature block does. What spam filters actually penalize is image-heavy HTML, tracking pixels, excessive links and hidden-text tricks, not the mere presence of minimal inline CSS. **Legal constraint to design around:** CAN-SPAM requires the opt-out and sender identification to be "clear and conspicuous" — de-emphasized-but-legible is standard practice and compliant; genuinely hidden (1px, white-on-white) would not be. | product / deliverability | ✅ completed locally — matching text + minimal escaped HTML, verified by GreenMail |
 | 14 | **The deliverability score's spam lexicon models the wrong era.** `render/spamwords.ts` is the entire vocabulary behind check #9 and decision W's rubric: `['free!!!', 'guarantee', 'act now', 'risk-free', '100% free', 'click here']`. That is a 1990s bulk-mail word list. It contains **zero** burned cold-email phrases — `quick question`, `just following up`, `circling back`, `touching base`, `hope this finds you well`, `reaching out`, `pick your brain`, `15 minutes`, `per my last email`. An operator can therefore write the most template-smelling subject in the industry and the checker will score it clean, which is worse than having no checker: it manufactures false confidence. **Note carefully — this stands on its own as a fact about the code, and is NOT evidence-backed by finding 11**, which turned out to be unmeasurable. The justification is that the lexicon is self-evidently stale, not that any particular phrase was proven to cause filtering. Structurally cheap: decision W says the rubric is DATA and the file header says to tune the lexicon, not `checks.ts`. Worth considering separately whether the subject deserves its own weighting — check #9 currently flattens subject and body into one string (`content = subject + "\n" + body`) and scores a hit identically wherever it appears — but that change should be justified on its own merits, not on this canary's contaminated data. | product gap | ✅ completed locally — transparent cliché rubric in subject/body; warning only |
+| 20 | **Alert history is unreachable once acknowledged.** `GET /alerts` accepts `unacked=false` and `alertsRepo` returns acknowledged rows, but every call site in the web app hardcodes `useAlerts(true)` — `components/layout/alerts-bell.tsx:65`, `components/shared/catchup-banner.tsx:8`, `features/mailboxes/failure-panels.tsx:149` — and no screen lists alert history. Acknowledging an alert therefore removes it from the operator's view permanently. A past auto-pause, `imap_stale`, `selfcheck_drift` or `catchup_backlog` cannot be reviewed after the fact: the audit trail exists in the database and is served by the API, and is invisible in the product. Directly the same shape as finding 3, and it matters more once real campaigns run, because the alert feed is the only operator-facing record of why sending stopped. | **observability** | 🟡 open — found by the 2026-08-15 UI-coverage audit |
+| 21 | **Two `mailbox_id` filters are exposed by the API and absent from the UI.** `uniboxQuerySchema.mailbox_id` and `incomingMessagesQuerySchema.mailbox_id` both filter server-side, but the Unibox screen wires only bucket/sentiment/unhandled and the System reply-detection table wires only `classification` — the latter even renders `mailbox_id` as a column while offering no way to filter on it. With more than one sender, isolating a single mailbox's replies or ingested messages is impossible from the product, which is exactly what a per-mailbox deliverability or threading problem would require. | UI gap | 🟡 open — found by the 2026-08-15 UI-coverage audit |
+| 22 | **Arbitrary `custom_fields` are display-only.** `PATCH /leads/:id` accepts any `custom_fields` map, and `render/merge.ts` resolves arbitrary keys as merge tags after the reserved names — so an import can define custom fields that templates then merge. Lead detail renders every key (`features/leads/detail-page.tsx:117`) but the edit card writes back only `custom_observation`. A custom field imported with a wrong value can only be corrected by re-importing the lead. | UI gap | 🟡 open — found by the 2026-08-15 UI-coverage audit |
 
 **The pattern worth naming:** findings 4, 5, 6 and 9 are all the same shape — *the backend
 implements it, the API exposes it, the UI never surfaces it, and the operator gets no feedback.*
 The offline suites cannot catch this class because they drive the API directly and never look at
 a screen. That is precisely the value this canary adds, and it argues for a **UI-coverage audit
 of every settings-shaped field** before the real campaign.
+
+### UI-coverage audit — completed (2026-08-15)
+
+The audit the paragraph above asks for has now been run: every request-body and query field in
+`packages/shared/src/api/` was walked against the screens in `apps/web/src/features/`. It found
+**three** gaps, recorded as findings 20–22. All three are the same shape as 4/5/6/9 and none is
+a correctness defect; finding 20 is the one worth fixing before real campaigns, because the
+alert feed is the operator's only record of why sending stopped.
+
+The negative result is the more useful half, because it bounds the class. These surfaces were
+checked and are **fully covered** — every writable field reachable from a screen:
+
+- **Settings** — all 17 `PUT /settings` fields plus both compliance fields (`rules-tab.tsx`,
+  `compliance-tab.tsx`). The class that produced findings 4 and 5 is closed.
+- **Mailboxes** — every `createMailboxBodySchema` field except `auth_type`, which docs/16 §6a
+  records as stored-but-unused (password auth only, no OAuth). Deliberate, not a gap.
+- **Campaigns** — create (name, sequence, `tier_effort_config`, `ramp_config`,
+  `acknowledge_tier_a_manual`), patch (name/status), typed-confirm delete, enrol, recycle.
+- **Sequences** — write body, typed-confirm delete, preview, and live `validate-template`.
+- **Leads** — tier, notes, `custom_observation`, bulk-tier by ids *and* by filter, typed-confirm
+  suppression removal and erasure; list filters tier/state/campaign/q/suppressed.
+- **Imports** — both `drop_flagged` and `import_all` commit modes.
+- **Unibox** — bucket, sentiment filter, untagged-only, sentiment tagging, snooze, manual send.
+- **System** — rebuild dry-run, incoming-message classification filter.
+
+This audit is diagnosis only; no behaviour was changed and no fix is implied by this record.
+
+### Copy-variation audit — completed (2026-08-15)
+
+docs/16 §8 item 5 asks that the existing spintax/variant/copy-risk features be audited and
+retained rather than replaced with "unique every time" logic. This is that audit.
+
+**What exists, and is sound.** Spintax `{a|b|c}` is picked by `seededPick` (`render/spintax.ts`)
+from a per-send RNG seeded `fnv1a(enrollmentId:stepNo:variantId)` (`render/seed.ts`), so a send
+is **deterministic and reproducible** — a soft-bounce retry re-renders byte-identically, which is
+what makes retries safe and the golden replay stable. Step variants give A/B copy per step, and
+each variant's `contentHash` (computed at save time, decision Q, echoed never recomputed) is what
+blocks recycling from re-sending an identical message. `{{custom_observation}}` resolves per
+personalization mode with a segment-rule fallback and an `observation_fallback` warning
+(`render/slots.ts`). **No change recommended to any of this** — it is controlled, auditable
+variation, not filter evasion, which is exactly what the build order asks for.
+
+**Four observations on the copy-risk rubric (check #9).** None is a correctness defect; the
+rubric is a warning surface by design and is documented as such.
+
+1. **`quick question` is not in the lexicon.** Finding 14 lists it *first* among burned
+   cold-email phrases, and it is the subject line at the centre of finding 11's narrative. The
+   remediation added seven cliché phrases (`render/spamwords.ts`) but not that one; `just
+   checking in` is also absent. Cheapest possible fix — the file header says the lexicon is data.
+2. **Three phrases from the original list were dropped** — `free!!!`, `guarantee`, `100% free`.
+   Plausibly deliberate, since finding 14's whole argument is that the old list modelled the
+   wrong era. But `free!!!` and `100% free` are still live signals in commercial mail, so this
+   should be a recorded decision rather than a silent loss.
+3. **The subject is still not weighted separately.** Check #9 flattens
+   `subject + "\n" + body` into one string and scores a hit identically wherever it lands
+   (`render/checks.ts:46,101-109`). Finding 14 raised this and explicitly deferred it as needing
+   its own justification — that deferral still stands, and is worth revisiting on the merits,
+   because in cold email a cliché in the subject line costs more than the same phrase in the body.
+4. **The score is forgiving.** Spam hits penalise `0.4 + 0.3 × (hits − 1)`, and each other
+   warning class is capped at `0.8`, so a message carrying five cliché phrases still scores 8.4
+   out of 10. That is defensible for a warning rubric and indefensible if anyone reads the number
+   as a deliverability prediction — which is precisely what finding 14 warned about. The number
+   should either bite harder or be presented less like a grade.
+
+Diagnosis only. Items 1–4 are proposals; none has been implemented.
 
 ### Pre-canary remediation implementation notes (2026-08-09)
 
