@@ -101,7 +101,10 @@ test('manual composer prefills from step 1 and sends as a manual send', async ({
   await page.getByRole('button', { name: 'Create campaign' }).click();
   await expect(page).toHaveURL(/\/campaigns\/\d+$/);
 
-  await page.getByRole('link', { name: 'Leads' }).click();
+  // exact: true — this is the only nav click made FROM a campaign detail page,
+  // which also renders "Open campaign leads". Substring matching (Playwright's
+  // default) hits both and trips strict mode.
+  await page.getByRole('link', { name: 'Leads', exact: true }).click();
   await page.getByPlaceholder('Search email, name, company…').fill('manual.eligible@example.com');
   await page.getByRole('table').getByRole('row').nth(1).click();
   await expect(page).toHaveURL(/\/leads\/\d+$/);
