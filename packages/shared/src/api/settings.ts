@@ -46,10 +46,32 @@ export type PutSettingsBody = z.infer<typeof putSettingsBodySchema>;
 export const settingsResponseSchema = settingsSchema.extend({ updated_at: isoDateTime }).strict();
 export type SettingsDto = z.infer<typeof settingsResponseSchema>;
 
+/**
+ * Base URL of the public unsubscribe endpoint (docs/16 §8). Empty is the
+ * normal state until a real sending domain exists — the renderer then emits no
+ * link and no List-Unsubscribe header. HTTPS only, no trailing slash, and no
+ * query/fragment: the token is appended as `/u/<token>` and must never share a
+ * URL with anything that could carry recipient data.
+ */
+export const unsubscribeBaseUrlSchema = z.string().refine(
+  (v) => {
+    if (v === '') return true;
+    if (!v.startsWith('https://') || v.endsWith('/')) return false;
+    try {
+      const u = new URL(v);
+      return u.search === '' && u.hash === '' && u.hostname.includes('.');
+    } catch {
+      return false;
+    }
+  },
+  { message: 'must be empty or an https:// URL with no trailing slash, query or fragment' },
+);
+
 export const complianceSchema = z
   .object({
     physical_address: z.string(),
     optout_text: z.string().min(1),
+    unsubscribe_base_url: unsubscribeBaseUrlSchema,
   })
   .strict();
 export type ComplianceDto = z.infer<typeof complianceSchema>;

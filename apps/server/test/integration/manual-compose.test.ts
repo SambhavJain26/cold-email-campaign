@@ -113,7 +113,9 @@ describe('manual compose (B4.10)', () => {
     expect(sent).toHaveLength(1);
     expect(sent[0]!.msg.subject).toBe(SUBJECT);
     expect(sent[0]!.msg.bodyText.startsWith(BODY)).toBe(true);
-    expect(sent[0]!.msg.bodyText).toContain(`\n\n---\n${TEST_ADDRESS}\n`);
+    // Footer shape since 0010: "{opt-out clause} | {address}" on one line.
+    expect(sent[0]!.msg.bodyText).toContain(`\n\n---\n`);
+    expect(sent[0]!.msg.bodyText).toContain(` | ${TEST_ADDRESS}`);
 
     // Bespoke variant row: inactive + flagged, real hash (decision Q).
     const v = await pool.query(

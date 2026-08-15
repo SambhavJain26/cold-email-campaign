@@ -5,6 +5,24 @@ import { complianceSettings, settings } from '../schema';
 export type SettingsRow = typeof settings.$inferSelect;
 export type SettingsPatch = Partial<Omit<SettingsRow, 'id' | 'updatedAt'>>;
 
+/**
+ * The render footer's ingredients (docs/08 §4) plus the unsubscribe base URL
+ * (0010). `unsubscribeBaseUrl` is '' whenever the feature is dormant.
+ */
+export interface ComplianceRow {
+  physicalAddress: string;
+  optoutText: string;
+  unsubscribeBaseUrl: string;
+}
+
+function toComplianceRow(row: typeof complianceSettings.$inferSelect): ComplianceRow {
+  return {
+    physicalAddress: row.physicalAddress,
+    optoutText: row.optoutText,
+    unsubscribeBaseUrl: row.unsubscribeBaseUrl,
+  };
+}
+
 export async function getSettings(db: DbLike): Promise<SettingsRow> {
   const rows = await db.select().from(settings);
   const row = rows[0];
@@ -13,13 +31,11 @@ export async function getSettings(db: DbLike): Promise<SettingsRow> {
 }
 
 /** The render footer's ingredients (docs/08 §4) — single seeded row (id = 1). */
-export async function getComplianceSettings(
-  db: DbLike,
-): Promise<{ physicalAddress: string; optoutText: string }> {
+export async function getComplianceSettings(db: DbLike): Promise<ComplianceRow> {
   const rows = await db.select().from(complianceSettings);
   const row = rows[0];
   if (!row) throw new Error('compliance_settings row missing — was 0002_seed applied?');
-  return { physicalAddress: row.physicalAddress, optoutText: row.optoutText };
+  return toComplianceRow(row);
 }
 
 /** B6.10 PUT /settings — range validation is the API layer's job (shared schema). */
@@ -39,14 +55,13 @@ export async function updateSettings(
 /** B6.10 PUT /compliance — the empty-address 422 guard lives in the route. */
 export async function updateComplianceSettings(
   db: DbLike,
-  patch: { physicalAddress?: string; optoutText?: string },
+  patch: Partial<ComplianceRow>,
   at: Date,
-): Promise<{ physicalAddress: string; optoutText: string }> {
+): Promise<ComplianceRow> {
   const rows = await db
     .update(complianceSettings)
     .set({ ...patch, updatedAt: at })
     .where(eq(complianceSettings.id, 1))
     .returning();
-  const row = rows[0]!;
-  return { physicalAddress: row.physicalAddress, optoutText: row.optoutText };
+  return toComplianceRow(rows[0]!);
 }

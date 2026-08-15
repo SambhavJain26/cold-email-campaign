@@ -72,7 +72,7 @@ field      := first_name | company | market | custom_observation
 
 ## 6. Threading headers (with docs/07 §4)
 
-`render` returns text; the scheduler's `buildMime` adds: `Message-ID` (app-generated), `In-Reply-To`/`References` for in-thread steps, `Re: `-prefixed step-1 subject for follow-ups, `From: {display_name} <{from_address}>`. No `List-Unsubscribe` header (plain-text opt-out is the finalized mechanism; header can be added in B8 if providers reward it — noted as a B8 tuning option).
+`render` returns text; the scheduler's `buildMime` adds: `Message-ID` (app-generated), `In-Reply-To`/`References` for in-thread steps, `Re: `-prefixed step-1 subject for follow-ups, `From: {display_name} <{from_address}>`. `List-Unsubscribe: <url>` **and** `List-Unsubscribe-Post: List-Unsubscribe=One-Click` (RFC 8058) when `compliance_settings.unsubscribe_base_url` is set — both headers or neither, emitted by the transport from `OutboundMessage.headers.listUnsubscribeUrl` so the pair cannot disagree. With no base URL configured the feature is dormant: no headers, no body link, and the footer carries the operator's `optout_text` reply-`STOP` wording alone. Reply-`STOP` remains a permanent fallback either way, because some clients strip links.
 
 ## 7. Tests (B4)
 

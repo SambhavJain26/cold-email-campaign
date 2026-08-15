@@ -91,6 +91,15 @@ export class SmtpImapTransport implements MailTransport {
         messageId, // OURS — never let the provider mint it (docs/07 §4)
         ...(msg.headers.inReplyTo !== undefined && { inReplyTo: msg.headers.inReplyTo }),
         ...(msg.headers.references !== undefined && { references: msg.headers.references }),
+        // RFC 8058 one-click. Both headers or neither — Gmail ignores
+        // List-Unsubscribe-Post without a List-Unsubscribe URL, and a
+        // List-Unsubscribe without the Post header gets no native button.
+        ...(msg.headers.listUnsubscribeUrl !== undefined && {
+          headers: {
+            'List-Unsubscribe': `<${msg.headers.listUnsubscribeUrl}>`,
+            'List-Unsubscribe-Post': 'List-Unsubscribe=One-Click',
+          },
+        }),
       });
 
       // A resolved send can still carry a rejected recipient (multi-RCPT

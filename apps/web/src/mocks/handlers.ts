@@ -597,8 +597,14 @@ export const handlers: RequestHandler[] = [
       const subject = expand(variant.subject_template);
       const bodyPreFooter = expand(variant.body_template);
       // The real engine appends the footer after all expansion (docs/08 §4) —
-      // separator included so the panel can split it back out.
-      const footer = `\n\n---\n${db.compliance.physical_address}\n${db.compliance.optout_text}`;
+      // separator included so the panel can split it back out. Mirrors
+      // render/footer.ts appendFooter, including the dormant-URL fallback.
+      const base = db.compliance.unsubscribe_base_url.trim();
+      const optoutLine =
+        base === ''
+          ? db.compliance.optout_text
+          : `Unsubscribe: ${base}/u/preview-token or reply STOP`;
+      const footer = `\n\n---\n${optoutLine} | ${db.compliance.physical_address}`;
       return HttpResponse.json({
         subject,
         body: bodyPreFooter + footer,

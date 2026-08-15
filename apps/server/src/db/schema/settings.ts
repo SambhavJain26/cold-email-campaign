@@ -32,5 +32,7 @@ export const complianceSettings = pgTable('compliance_settings', {
   physicalAddress: text('physical_address').notNull().default(''),
   optoutText: text('optout_text').notNull(),
   fromNameRules: text('from_name_rules'),
+  /** Base URL of the public unsubscribe endpoint; '' = feature dormant (0010). */
+  unsubscribeBaseUrl: text('unsubscribe_base_url').notNull().default(''),
   updatedAt: tz('updated_at').notNull().defaultNow(),
 });

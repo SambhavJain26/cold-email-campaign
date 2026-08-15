@@ -73,7 +73,11 @@ describe('B6.10 settings + compliance', () => {
     const updated = await h.inject({
       method: 'PUT',
       url: '/api/v1/compliance',
-      payload: { physical_address: '1 Main St, Denver CO 80202', optout_text: before.optout_text },
+      payload: {
+        physical_address: '1 Main St, Denver CO 80202',
+        optout_text: before.optout_text,
+        unsubscribe_base_url: before.unsubscribe_base_url,
+      },
     });
     expect(updated.statusCode).toBe(200);
     expect((await getComplianceSettings(h.services.db)).physicalAddress).toBe(
@@ -83,7 +87,11 @@ describe('B6.10 settings + compliance', () => {
     const empty = await h.inject({
       method: 'PUT',
       url: '/api/v1/compliance',
-      payload: { physical_address: '   ', optout_text: before.optout_text },
+      payload: {
+        physical_address: '   ',
+        optout_text: before.optout_text,
+        unsubscribe_base_url: before.unsubscribe_base_url,
+      },
     });
     expect(empty.statusCode).toBe(422);
     expect(empty.json().error.code).toBe('validation');

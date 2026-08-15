@@ -36,7 +36,13 @@ export function ComplianceTab({
 
   const address = useWatch({ control, name: 'physical_address' });
   const optout = useWatch({ control, name: 'optout_text' });
+  const unsubBase = useWatch({ control, name: 'unsubscribe_base_url' });
   const addressEmpty = address.trim() === '';
+
+  // Mirrors render/footer.ts appendFooter — the two must agree or the preview
+  // lies about what recipients receive.
+  const optoutLine =
+    unsubBase.trim() === '' ? optout : `Unsubscribe: ${unsubBase.trim()}/u/⟨token⟩ or reply STOP`;
 
   const onSubmit = (body: ComplianceDto) =>
     put.mutate(body, {
@@ -73,8 +79,28 @@ export function ComplianceTab({
           <div className="space-y-1">
             <Label htmlFor="compliance-optout">Opt-out text</Label>
             <Input id="compliance-optout" {...register('optout_text')} />
+            <p className="text-xs text-muted-foreground">
+              Used verbatim while no unsubscribe URL is set. Once one is, the footer switches to a
+              one-click link and keeps &ldquo;or reply STOP&rdquo; as the fallback.
+            </p>
             {errors.optout_text && (
               <p className="text-xs text-destructive">{errors.optout_text.message}</p>
+            )}
+          </div>
+          <div className="space-y-1">
+            <Label htmlFor="compliance-unsub-url">Unsubscribe base URL</Label>
+            <Input
+              id="compliance-unsub-url"
+              placeholder="https://unsubscribe.example.com"
+              {...register('unsubscribe_base_url')}
+            />
+            <p className="text-xs text-muted-foreground">
+              Leave blank until you have a real sending domain. Blank means no link and no
+              <code className="mx-1">List-Unsubscribe</code>
+              header — recipients opt out by replying STOP. HTTPS only, no trailing slash.
+            </p>
+            {errors.unsubscribe_base_url && (
+              <p className="text-xs text-destructive">{errors.unsubscribe_base_url.message}</p>
             )}
           </div>
         </CardContent>
@@ -89,7 +115,7 @@ export function ComplianceTab({
             className="rounded-md border border-dashed border-border bg-muted/30 p-3 font-mono text-xs whitespace-pre-wrap text-muted-foreground"
             data-testid="footer-preview"
           >
-            {`—\n${address || '⟨no address — sends blocked⟩'}\n${optout}`}
+            {`—\n${optoutLine} | ${address || '⟨no address — sends blocked⟩'}`}
           </div>
         </CardContent>
       </Card>

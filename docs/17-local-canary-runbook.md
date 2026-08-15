@@ -224,7 +224,7 @@ as work closes.
 | 9 | Tier A defaults to **Mode 1 (human-written)**, which the scheduler never sends — it waits for the manual composer. A new operator accepting defaults gets a campaign that silently never sends. Correct behaviour, invisible consequence. | UX trap | ✅ completed locally — acknowledgement, count, and manual-composer route shown |
 | 10 | Leads are import-only (no `POST /leads`). Deliberate — the ingest path owns hygiene, dedup and suppression — but adding one lead means hand-writing a CSV. | minor | 🟡 accepted, revisit |
 | 11 | **First real send landed in SPAM — cause UNDETERMINED, and this rig cannot determine it.** Three hypotheses were advanced and each was falsified by the next round of sends: (a) the unconditional footer + omitted `List-Unsubscribe`, killed when identical content reached the inbox; (b) per-account reputation, killed when the "bad" account delivered 3 of 5; (c) the subject line `"quick question"`, which filtered twice and then reached the inbox on a later send with the same subject. **The filter state was moving throughout, and no send was independent of the ones before it.** (An earlier version of this row blamed "Not spam" marking; the operator had *not* marked anything — that explanation was wrong and is corrected here. Getting the contamination mechanism itself wrong is a fair illustration of how many uncontrolled variables are in play.) What is certain: Gmail placement is not a deterministic function of message content but an adaptive per-recipient model weighing engagement, sender↔recipient history, cross-user aggregates and volume/recency. Every send in this series added history to a pair that previously had none, and the operator opened and read each message to see where it landed — itself an engagement signal. Seven-plus sends in two hours between a previously-silent pair is a pattern change on its own. **Methodological conclusion: n=1 recipient, an adaptive filter, and an observer training it cannot yield a causal answer.** Real deliverability measurement needs seed lists across providers, meaningful volume, and a purpose-built placement tool — which is week-5 work on warmed domains, not this. | deliverability (unmeasurable here) | 🟢 closed as **not answerable with this instrument** — reinforces the runbook's opening statement that deliverability is out of scope. Do not re-litigate it on the canary rig. |
-| 12 | The `List-Unsubscribe` question (docs/14 B8.6 "decision revisit", docs/08 §75) remains **genuinely open** — finding 11 shows it is not what triggered *this* filtering, but says nothing about how it performs on real warmed domains at volume, which is the case the deferral was actually about. Do not treat finding 11 as having answered it. | decision | 🟡 open, deferred to the real canary |
+| 12 | The `List-Unsubscribe` question (docs/14 B8.6 "decision revisit", docs/08 §75) remains **genuinely open** — finding 11 shows it is not what triggered *this* filtering, but says nothing about how it performs on real warmed domains at volume, which is the case the deferral was actually about. Do not treat finding 11 as having answered it. | decision | 🟢 **built 2026-08-15, still unanswered.** The mechanism now exists: opaque-token endpoint, `List-Unsubscribe` + one-click POST headers, body link, all shipped **dormant** (no `unsubscribe_base_url` ⇒ no header, no link, reply-`STOP` only). GreenMail proves both headers reach the wire. What is still open is the original *question* — whether it helps on warmed domains at volume — and that remains unanswerable without real domains. Building it does not answer it; do not record this row as closed. |
 | 13 | **The poller reads `INBOX` only.** Anything Gmail files into Spam is invisible to it — so a reply landing in a *sender* mailbox's spam folder makes the reply-detection path appear broken when it is not. For the canary this needs a "never send to Spam" filter in all three accounts. For production it is a real failure mode worth documenting: a provider silently spam-filing a reply looks identical to a poller bug. | operational | 🟡 mitigated in the rig, document for prod |
 | 15 | **RACE: a lead who replied still received the follow-up.** `human_reply` at `08:05:15.207`, `sent` (step 2) at `08:05:15.400` — 193 ms later, with `stop_on_reply = true`. The follow-up really went out (`<ce-1-2-1786089915400@gmail.com>`). Cause: `scheduler-tick` and `imap-poll-*` are both registered on `*/5 * * * *`, so **they are scheduled to run in the same minute, every time** — this is a designed-in collision, not a rare interleaving. The scheduler read the enrollment as ACTIVE-and-due, rendered, sent over SMTP and appended `sent`, while the poller was concurrently matching the reply and appending `human_reply`. The scheduler's read preceded the reply's commit. **The offline suites structurally cannot catch this** — the scenario runner drives jobs through an inline queue, so poll and tick never execute concurrently and the interleaving cannot occur. Only real pg-boss workers on real crons expose it. Worst-case production impact is the most embarrassing failure a cold-email tool has: a prospect replies and is immediately auto-followed-up, which is exactly what `stop_on_reply` exists to prevent. Fix direction: re-check enrollment state inside the send transaction immediately before append (the eventStore append is already the single transactional chokepoint, so the guard belongs there), and/or stagger the two crons. | **correctness / concurrency** | ✅ completed locally — enrollment lock + send-time projection re-read; poll cron staggered |
 | 16 | **Connecting a mailbox ingests its entire history.** `mailboxes.last_poll_uid` defaults to `0`, so the first poll of a real mailbox fetches every message it has ever received — here **12,581 messages going back to 2022-06-10**, four years of unrelated personal mail, stored in `incoming_messages` with full subjects and sender addresses. 44 historical Amazon/Internshala notifications were classified `auto_reply` and 2 old Gmail DSNs as `bounce`; none produced events because no enrollment matched (that guard held correctly), but the rows are all persisted. Consequences: needless DB bloat, a very slow first poll, and — more seriously — a large volume of unrelated third-party PII pulled into the product's database, which interacts badly with finding 8 (no erasure path). Fix direction: initialise `last_poll_uid` to the mailbox's current `UIDNEXT` at creation/reconnect so polling starts from "now" rather than from the beginning of time. | **data hygiene / privacy** | ✅ completed locally — initialize from UIDNEXT on create and legacy-zero reconnect |
@@ -307,6 +307,42 @@ rubric is a warning surface by design and is documented as such.
    should either bite harder or be presented less like a grade.
 
 Diagnosis only. Items 1–4 are proposals; none has been implemented.
+
+### Public unsubscribe endpoint — built dormant (2026-08-15)
+
+Migration `0010`. Opaque-token endpoint (`GET|POST /u/:token`, registered outside `/api/v1` so it
+inherits neither the session plugin nor the CSRF check), `List-Unsubscribe` + RFC 8058 one-click
+headers, and a footer link. **Ships dormant:** with `compliance_settings.unsubscribe_base_url`
+empty — its default and the only correct value until a real sending domain exists — no link and
+no header are emitted and the footer carries the operator's `optout_text` reply-`STOP` wording.
+
+Two production defects were found by writing the tests, neither of which any existing suite could
+have caught:
+
+1. **Gmail's one-click POST would have returned 500.** Fastify registers no
+   `application/x-www-form-urlencoded` parser by default, and that is exactly the content type
+   RFC 8058 specifies. The failure would have been invisible from here — it happens at Google.
+2. **The capability token was written to the logs on every click.** Fastify's default request
+   logger serialises the full URL, and the token *is* the URL. docs/16 §8 forbids this explicitly.
+   Fixed with a path-redacting `req` serializer in `config/logger.ts`. The first attempt at that
+   fix spread the raw request object and dumped request bodies — including passwords — into the
+   log stream; B7.1's sentinel grep (`test/api/secret-redaction.test.ts`) caught it immediately.
+
+Design notes worth keeping: tokens are minted **per send attempt**, not per enrollment, because
+storing only the sha256 makes a raw token unrecoverable, so a soft-retry cannot reuse the original
+— every token issued for an enrollment therefore stays redeemable, which is also what an
+honour-the-opt-out window requires. Tokens are deliberately **not** derived from `SECRET_KEY`:
+rotating that key would silently kill the unsubscribe link in every already-delivered email. The
+footer's plain-text and HTML forms live adjacent in `render/footer.ts` so they cannot drift
+(finding 19), with a test asserting they stay semantically identical.
+
+Gate: unit 293, web 52, integration 159, API 87, GreenMail 25, golden **47** (unchanged), mock
+browser 51/51, migration `0010` down/up/down clean. The local projection dry-run reports
+`checked 0 enrollments` against an empty dev database and proves only that the CLI runs.
+
+**Not proven and not provable here:** Gmail actually rendering its native unsubscribe button and
+POSTing to the endpoint. That needs a publicly reachable HTTPS URL, which the Oracle canary
+deliberately does not have. Do not record the one-click flow as verified.
 
 ### Pre-canary remediation implementation notes (2026-08-09)
 

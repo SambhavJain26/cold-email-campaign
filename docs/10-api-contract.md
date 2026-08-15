@@ -1,6 +1,6 @@
 # API Contract — v1 (frozen seam between backend and frontend)
 
-All routes under `/api/v1`. JSON in/out. Session-cookie auth on everything except `POST /auth/login` and `GET /health`. Conventions per decision Z: error envelope `{"error":{"code","message","details?"}}`; lists return `{items, total, page, per_page}` with `?page=1&per_page=50` (max 200); timestamps ISO-8601 UTC. Executable schemas live in `packages/shared/src/api/` (decision H) — **a contract change edits this file and that package in the same commit.**
+All routes under `/api/v1` **except** `GET /health` and the public unsubscribe pair `GET|POST /u/:token`, which are registered outside that scope so they inherit neither the session plugin nor the CSRF-header check. JSON in/out (the `/u/:token` pair returns HTML). Session-cookie auth on everything except `POST /auth/login`, `GET /health` and `/u/:token`. Conventions per decision Z: error envelope `{"error":{"code","message","details?"}}`; lists return `{items, total, page, per_page}` with `?page=1&per_page=50` (max 200); timestamps ISO-8601 UTC. Executable schemas live in `packages/shared/src/api/` (decision H) — **a contract change edits this file and that package in the same commit.**
 
 Shapes below in TS notation. `Metric = { numerator: number, denominator: number | null, value: number }` (docs/05 §2).
 
@@ -93,9 +93,11 @@ Shapes below in TS notation. `Metric = { numerator: number, denominator: number 
 | | |
 |---|---|
 | GET/PUT `/settings` | full `settings` row (docs/03) — PUT validates ranges (e.g. `pause_hard_pct` 1–20) |
-| GET/PUT `/compliance` | `{physical_address, optout_text}` — PUT with empty address → 422 (sends would halt) |
+| GET/PUT `/compliance` | `{physical_address, optout_text, unsubscribe_base_url}` — PUT with empty address → 422 (sends would halt). `unsubscribe_base_url` is `''` (dormant, no link and no `List-Unsubscribe` header) or an `https://` origin with no trailing slash, query or fragment; tokens are appended as `/u/<token>` |
 | GET `/alerts?unacked=true` · POST `/alerts/:id/ack` | `Alert = {id, kind, severity, payload, created_at, acknowledged_at}` — feeds banners: `catchup_backlog` → downtime panel; `mailbox_*` → failure panels |
 | GET `/health` | → `{ok, db, version}` (unauthenticated) |
+| GET `/u/:token` | **Not under `/api/v1`.** Unauthenticated, no CSRF. Returns an HTML confirmation page and **never unsubscribes** — scanners and privacy proxies prefetch links. An unknown token renders the same generic page as a valid one (no enumeration oracle) |
+| POST `/u/:token` | **Not under `/api/v1`.** Unauthenticated, no CSRF — Gmail's RFC 8058 one-click POST carries neither cookie nor custom header. Appends `unsubscribe` with `source: 'link'` and creates the global suppression; idempotent when the enrollment is already `UNSUBSCRIBED`. Returns HTML, not JSON. Never logs the token, email or lead id |
 | GET `/system/status` | → `{scheduler_last_tick_at, transport_mode, pollers: {mailbox_id, last_successful_poll_at}[], pending_jobs}` |
 | POST `/system/rebuild-projections` | `{dry_run: boolean}` → `{diffs: number, details?}` |
 

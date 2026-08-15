@@ -26,15 +26,22 @@ export async function resetCoreTables(pool: Pool): Promise<void> {
     `TRUNCATE events, enrollments, suppressions, campaigns, leads,
              incoming_messages, sent_messages, mailbox_secrets, mailboxes,
              step_variants, sequence_steps, sequences, import_rows, imports,
-             operator, alerts, send_blocker_episodes
+             operator, alerts, send_blocker_episodes, unsubscribe_tokens
      RESTART IDENTITY CASCADE`,
   );
   // compliance_settings survives TRUNCATE (single seeded row) and its seed
   // default physical_address is '' — which trips the B4 global send guard
   // (docs/08 §4). Restore a test address so every DB suite can send; suites
   // testing the guard itself blank it explicitly.
+  //
+  // unsubscribe_base_url is reset to '' (dormant) for the same reason in
+  // reverse: a suite that configures it would otherwise leak a live
+  // unsubscribe link into every later suite's rendered footers.
   await pool.query(
-    `UPDATE compliance_settings SET physical_address = '100 Test Street, Austin TX 78701' WHERE id = 1`,
+    `UPDATE compliance_settings
+        SET physical_address = '100 Test Street, Austin TX 78701',
+            unsubscribe_base_url = ''
+      WHERE id = 1`,
   );
 }
 

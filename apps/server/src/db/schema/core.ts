@@ -144,3 +144,31 @@ export const suppressions = pgTable('suppressions', {
   leadId: bigint('lead_id', { mode: 'number' }).references(() => leads.id),
   createdAt: tz('created_at').notNull().defaultNow(),
 });
+
+/**
+ * Mirrors 0010_unsubscribe.up.sql. Capability tokens for the public one-click
+ * endpoint: only the sha256 is stored, so a database leak yields no working
+ * unsubscribe URLs. One row per SEND ATTEMPT — the raw token is unrecoverable,
+ * so a soft-retry mints a fresh one and every token for an enrollment stays
+ * valid.
+ */
+export const unsubscribeTokens = pgTable(
+  'unsubscribe_tokens',
+  {
+    id: bigint('id', { mode: 'number' }).primaryKey().generatedAlwaysAsIdentity(),
+    tokenHash: text('token_hash').notNull().unique(),
+    enrollmentId: bigint('enrollment_id', { mode: 'number' })
+      .notNull()
+      .references(() => enrollments.id),
+    leadId: bigint('lead_id', { mode: 'number' })
+      .notNull()
+      .references(() => leads.id),
+    campaignId: bigint('campaign_id', { mode: 'number' })
+      .notNull()
+      .references(() => campaigns.id),
+    stepNo: integer('step_no').notNull(),
+    createdAt: tz('created_at').notNull().defaultNow(),
+    usedAt: tz('used_at'),
+  },
+  (t) => [index('unsub_tok_enrollment').on(t.enrollmentId)],
+);

@@ -7,6 +7,7 @@ import {
   complianceSchema,
   putSettingsBodySchema,
   settingsResponseSchema,
+  type ComplianceDto,
   type PutSettingsBody,
   type SettingsDto,
 } from '@coldemail/shared';
@@ -16,10 +17,19 @@ import {
   getSettings,
   updateComplianceSettings,
   updateSettings,
+  type ComplianceRow,
   type SettingsRow,
 } from '../db/repos/settingsRepo';
 import { AppError } from './errors';
 import type { ZodTypeProvider } from './plugins/zodCompilers';
+
+function toComplianceDto(row: ComplianceRow): ComplianceDto {
+  return {
+    physical_address: row.physicalAddress,
+    optout_text: row.optoutText,
+    unsubscribe_base_url: row.unsubscribeBaseUrl,
+  };
+}
 
 function toSettingsDto(row: SettingsRow): SettingsDto {
   return {
@@ -85,10 +95,9 @@ export async function settingsRoutes(app: FastifyInstance, services: AppServices
     },
   );
 
-  r.get('/compliance', { schema: { response: { 200: complianceSchema } } }, async () => {
-    const row = await getComplianceSettings(db);
-    return { physical_address: row.physicalAddress, optout_text: row.optoutText };
-  });
+  r.get('/compliance', { schema: { response: { 200: complianceSchema } } }, async () =>
+    toComplianceDto(await getComplianceSettings(db)),
+  );
 
   r.put(
     '/compliance',
@@ -104,10 +113,14 @@ export async function settingsRoutes(app: FastifyInstance, services: AppServices
       }
       const row = await updateComplianceSettings(
         db,
-        { physicalAddress: req.body.physical_address, optoutText: req.body.optout_text },
+        {
+          physicalAddress: req.body.physical_address,
+          optoutText: req.body.optout_text,
+          unsubscribeBaseUrl: req.body.unsubscribe_base_url.trim(),
+        },
         clock.now(),
       );
-      return { physical_address: row.physicalAddress, optout_text: row.optoutText };
+      return toComplianceDto(row);
     },
   );
 }

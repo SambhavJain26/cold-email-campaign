@@ -13,6 +13,10 @@ import { testConfig } from './helpers/app';
 /** The contract manifest (docs/10) — METHOD + path of every v1 route. */
 const CONTRACT_ROUTES = [
   'GET /health',
+  // Public unsubscribe (docs/16 §8) — deliberately outside /api/v1 so it
+  // inherits neither the session plugin nor the CSRF check.
+  'GET /u/:token',
+  'POST /u/:token',
   'POST /api/v1/auth/login',
   'POST /api/v1/auth/logout',
   'GET /api/v1/auth/me',

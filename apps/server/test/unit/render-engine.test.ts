@@ -20,7 +20,7 @@ const compliance = {
   optoutText: "Don't want future emails? Reply STOP and I'll remove you immediately.",
 };
 
-const FOOTER = `\n\n---\n${compliance.physicalAddress}\n${compliance.optoutText}`;
+const FOOTER = `\n\n---\n${compliance.optoutText} | ${compliance.physicalAddress}`;
 
 const SUBJECT = 'Quick question about {{company|your listings}}';
 const BODY =
@@ -131,6 +131,61 @@ describe('footer is unconditional (docs/08 §4)', () => {
     expect(r.bodyHtml).toContain('font-size:11px');
     expect(r.bodyHtml).toContain('123 Main St');
     expect(r.bodyHtml).not.toContain('<unsafe>');
+  });
+});
+
+// The unsubscribe URL is minted per send by the CALLER (scheduler) and handed
+// to the renderer; the engine only decides how it appears. Dormant is the
+// default state until a real sending domain exists.
+describe('unsubscribe link in the footer (0010, docs/16 §8)', () => {
+  const URL = 'https://unsubscribe.example.com/u/tok123';
+  const withLink = () =>
+    engine.render(input({ ctx: { compliance: { ...compliance, unsubscribeUrl: URL } } }));
+
+  it('dormant: no URL configured → operator opt-out text, no link, no scheme', () => {
+    const r = engine.render(input({}));
+    expect(r.bodyText).toContain(`${compliance.optoutText} | ${compliance.physicalAddress}`);
+    expect(r.bodyText).not.toContain('https://');
+    expect(r.bodyHtml).not.toContain('<a href');
+  });
+
+  it('live: the plain-text part carries the raw URL and keeps the STOP fallback', () => {
+    expect(withLink().bodyText).toContain(
+      `Unsubscribe: ${URL} or reply STOP | ${compliance.physicalAddress}`,
+    );
+  });
+
+  it('live: the HTML part says the SAME thing with the word linked', () => {
+    const html = withLink().bodyHtml;
+    expect(html).toContain(`<a href="${URL}">Unsubscribe</a> or reply STOP | `);
+    expect(html).toContain(compliance.physicalAddress);
+    // De-emphasised but legible — CAN-SPAM "clear and conspicuous".
+    expect(html).toContain('font-size:11px');
+  });
+
+  it('the two parts stay semantically identical (finding 19)', () => {
+    const r = withLink();
+    const textFooter = r.bodyText.split('\n\n---\n')[1]!;
+    const htmlFooter = r.bodyHtml.slice(r.bodyHtml.lastIndexOf('<p style='));
+    for (const fragment of ['Unsubscribe', 'or reply STOP', compliance.physicalAddress, URL]) {
+      expect(textFooter).toContain(fragment);
+      expect(htmlFooter).toContain(fragment);
+    }
+  });
+
+  it('a hostile URL cannot break out of the anchor', () => {
+    const r = engine.render(
+      input({
+        ctx: { compliance: { ...compliance, unsubscribeUrl: 'https://x.test/u/"><script>bad' } },
+      }),
+    );
+    expect(r.bodyHtml).not.toContain('<script>');
+    expect(r.bodyHtml).toContain('&quot;&gt;&lt;script&gt;');
+  });
+
+  it('the footer URL does NOT trip the step-1 fatal URL check', () => {
+    const r = withLink();
+    expect(r.checks.fatal.map((f) => f.id)).not.toContain('url_in_step1');
   });
 });
 

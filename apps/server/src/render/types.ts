@@ -2,6 +2,7 @@
 // Renderer seam; scheduler/types re-exports them once the engine is wired
 // (B4.8) so downstream imports keep working.
 import type { PersonalizationMode } from '@coldemail/shared';
+import type { ComplianceInfo } from './footer';
 
 /** What the renderer needs to know about the recipient (subset of leads row). */
 export interface LeadLite {
@@ -29,7 +30,8 @@ export interface RenderContext {
   customFields: Record<string, string>;
   /** campaigns.tier_effort_config.auto_observations — market-keyed segment rule (docs/08 §3). */
   autoObservations: Record<string, string> | null;
-  compliance: { physicalAddress: string; optoutText: string };
+  /** Footer ingredients; `unsubscribeUrl` is per-send and absent when dormant. */
+  compliance: ComplianceInfo;
   /**
    * The rendered step-1 subject: in-thread steps 2+ send `Re: {threadSubject}`
    * (docs/08 §6). Absent → the step renders its own subject (still Re:-prefixed

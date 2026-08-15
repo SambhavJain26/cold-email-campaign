@@ -488,6 +488,8 @@ function build(): MockDb {
     compliance: {
       physical_address: '4517 Congress Ave, Suite 210, Austin, TX 78745',
       optout_text: 'If you would rather not hear from me, just reply "stop".',
+      // Dormant by default — mirrors an install with no sending domain yet.
+      unsubscribe_base_url: '',
     },
     nextId: 1000,
   };

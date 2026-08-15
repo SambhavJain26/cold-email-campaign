@@ -15,6 +15,13 @@ export interface OutboundMessage {
     messageId: string; // app-generated BEFORE send — the threading anchor
     inReplyTo?: string;
     references?: string[];
+    /**
+     * Public unsubscribe URL for this send. Transports emit BOTH
+     * `List-Unsubscribe: <url>` and `List-Unsubscribe-Post:
+     * List-Unsubscribe=One-Click` from it, so the pair can never disagree.
+     * Absent = the feature is dormant and neither header is sent.
+     */
+    listUnsubscribeUrl?: string;
   };
 }
 

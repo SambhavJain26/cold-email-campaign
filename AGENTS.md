@@ -65,6 +65,23 @@ sudo docker compose -f docker-compose.prod.yml --env-file .env.prod up -d --buil
 After an authorized deploy, verify container health, `https://localhost/health`, and a zero-drift
 projection dry run inside the app container. Do not expose credentials or `.env.prod` contents.
 
+## Unsubscribe endpoint (0010) — built dormant
+
+- **Dormant unless `compliance_settings.unsubscribe_base_url` is set.** Empty (the default, and
+  the only correct value until a real sending domain exists) means no body link, no
+  `List-Unsubscribe` headers, and a reply-`STOP` footer. Do not set it without approval.
+- `GET|POST /u/:token` register **outside `/api/v1`**, so they inherit neither the session plugin
+  nor the CSRF check — Gmail's one-click POST carries neither, and its
+  `application/x-www-form-urlencoded` body needs the scoped content-type parser or the button
+  500s invisibly at Google.
+- **The token is a capability and the token is the URL.** `config/logger.ts` redacts `/u/<token>`
+  in its `req` serializer; that serializer must emit the default field set and never spread the
+  raw request (which carries parsed bodies — B7.1's grep catches it). Only the sha256 is stored.
+- `GET` must never unsubscribe (scanners prefetch links). An unknown token renders the same page
+  as a valid one. Tokens are minted per send attempt and are NOT derived from `SECRET_KEY`.
+- Gmail actually rendering its native button is **unproven and unprovable here** — it needs a
+  publicly reachable HTTPS URL. Do not record the one-click flow as verified.
+
 ## Implementation and data safety
 
 - Preserve the append-only event ledger; never delete or rewrite sent/event history.

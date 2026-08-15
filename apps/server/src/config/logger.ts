@@ -28,6 +28,19 @@ const REDACT_PATHS = [
   'res.headers["set-cookie"]',
 ];
 
+/**
+ * Unsubscribe tokens are capabilities carried in the URL path, and Fastify's
+ * default request logger writes the full URL on EVERY request — so without
+ * this the token lands in plaintext logs the moment a recipient clicks. Path
+ * redaction has to happen in a serializer rather than `redact` paths, because
+ * the secret is inside a string value, not at a key.
+ */
+const UNSUBSCRIBE_PATH = /^(\/u\/)[^/?#]+/;
+
+function redactUrl(url: string): string {
+  return url.replace(UNSUBSCRIBE_PATH, '$1[REDACTED]');
+}
+
 export function createLogger(
   config: Pick<Config, 'LOG_LEVEL' | 'NODE_ENV'>,
   destination?: DestinationStream,
@@ -35,6 +48,26 @@ export function createLogger(
   const options = {
     level: config.LOG_LEVEL,
     redact: { paths: REDACT_PATHS, censor: '[REDACTED]' },
+    serializers: {
+      // Mirrors pino-http's default req shape EXACTLY — never spread the raw
+      // request, which carries the parsed body (and therefore every password
+      // ever POSTed) into the log line. B7.1's sentinel grep catches that.
+      req(req: {
+        method?: string;
+        url?: string;
+        ip?: string;
+        headers?: Record<string, unknown>;
+        socket?: { remotePort?: number };
+      }) {
+        return {
+          method: req.method,
+          url: typeof req.url === 'string' ? redactUrl(req.url) : req.url,
+          host: req.headers?.host,
+          remoteAddress: req.ip,
+          remotePort: req.socket?.remotePort,
+        };
+      },
+    },
     // pretty-print in dev only; prod and tests stay machine-readable JSON
     ...(config.NODE_ENV === 'development' && !destination
       ? { transport: { target: 'pino-pretty' } }

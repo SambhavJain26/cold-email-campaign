@@ -18,6 +18,7 @@ import { campaignsRoutes } from './campaigns';
 import { uniboxRoutes } from './unibox';
 import { analyticsRoutes } from './analytics';
 import { systemRoutes } from './system';
+import { publicUnsubscribeRoutes } from './publicUnsubscribe';
 
 const pkg = createRequire(import.meta.url)('../../package.json') as { version: string };
 
@@ -44,6 +45,13 @@ export function buildServer({ logger, services }: ServerDeps): FastifyInstance {
       app.log.warn({ err }, 'health: db unreachable');
     }
     return { ok: db, db, version: pkg.version };
+  });
+
+  // Public unsubscribe (docs/16 §8) — deliberately OUTSIDE /api/v1 so it
+  // inherits neither the session plugin nor the CSRF header check: Gmail's
+  // one-click POST carries neither. See the route file for the full rules.
+  void app.register(async (pub) => {
+    await publicUnsubscribeRoutes(pub, services);
   });
 
   // The /api/v1 scope (docs/10): zod compilers → session → CSRF header →

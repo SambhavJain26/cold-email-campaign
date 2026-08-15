@@ -98,6 +98,34 @@ describe('SmtpImapTransport over a real server (B8.1)', () => {
     expect(stored!.source).toContain('font-size:11px');
   });
 
+  it('send: List-Unsubscribe and the one-click Post header reach the wire together', async () => {
+    const url = 'https://unsubscribe.coldemail.test/u/tok-abc123';
+    await transport.send({
+      mailboxId: CANARY_ID,
+      to: LEAD.address,
+      subject: 'A safe subject',
+      bodyText: `Hi Sarah\n\n---\nUnsubscribe: ${url} or reply STOP | 123 Main St`,
+      headers: { messageId: '<ce-unsub-1@coldemail.test>', listUnsubscribeUrl: url },
+    });
+    const [stored] = await readInbox(LEAD);
+    // RFC 8058: Gmail shows its native button only when BOTH are present, and
+    // the URL must be angle-bracketed.
+    expect(stored!.source).toContain(`List-Unsubscribe: <${url}>`);
+    expect(stored!.source).toContain('List-Unsubscribe-Post: List-Unsubscribe=One-Click');
+  });
+
+  it('send: neither unsubscribe header appears when the feature is dormant', async () => {
+    await transport.send({
+      mailboxId: CANARY_ID,
+      to: LEAD.address,
+      subject: 'A safe subject',
+      bodyText: 'Hi Sarah\n\n---\nReply STOP to unsubscribe | 123 Main St',
+      headers: { messageId: '<ce-unsub-2@coldemail.test>' },
+    });
+    const [stored] = await readInbox(LEAD);
+    expect(stored!.source).not.toMatch(/List-Unsubscribe/i);
+  });
+
   it('send: In-Reply-To and References survive the wire for in-thread follow-ups', async () => {
     const step1 = '<ce-101-1-1750000000000@coldemail.test>';
     const step2 = '<ce-101-2-1750259200000@coldemail.test>';

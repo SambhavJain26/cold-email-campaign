@@ -10,7 +10,12 @@ import type { AlertSink } from '../alerts/types';
 import type { EventStore } from '../services/eventStore';
 import type { JobPort, LeadLite, RenderContext, Renderer, SequenceProvider } from './types';
 import type { SendWindow } from '../db/schema/transport';
-import { getComplianceSettings, getSettings, type SettingsRow } from '../db/repos/settingsRepo';
+import {
+  getComplianceSettings,
+  getSettings,
+  type ComplianceRow,
+  type SettingsRow,
+} from '../db/repos/settingsRepo';
 import { listMailboxesByStatus, patchMailbox } from '../db/repos/mailboxesRepo';
 import {
   countSentForStep,
@@ -28,6 +33,7 @@ import {
   type DueEnrollment,
 } from '../db/repos/enrollmentsRepo';
 import { insertSentMessage } from '../db/repos/sentMessagesRepo';
+import { issueToken } from '../db/repos/unsubscribeTokensRepo';
 import { autoObservationsOf, getCampaign } from '../db/repos/campaignsRepo';
 import { getVariantById } from '../db/repos/sequencesRepo';
 import { buildEvent } from '../domain/events';
@@ -100,7 +106,7 @@ export class Scheduler {
   private renderFailAlerted = new Set<number>();
   /** Per-tick caches: compliance row, per-campaign auto_observations, round-robin counters. */
   private tickCtx: {
-    compliance: { physicalAddress: string; optoutText: string };
+    compliance: ComplianceRow;
     autoObs: Map<number, Record<string, string> | null>;
     roundRobin: Map<string, number>;
   } | null = null;
@@ -172,7 +178,7 @@ export class Scheduler {
   private async tickInner(
     now: Date,
     settings: SettingsRow,
-    compliance: { physicalAddress: string; optoutText: string },
+    compliance: ComplianceRow,
   ): Promise<TickResult> {
     const { db, rng, alerts } = this.deps;
 
@@ -455,12 +461,17 @@ export class Scheduler {
       variant = await this.pickVariant(e.campaignId, step);
     }
 
+    // Issued BEFORE render: the URL goes in the body, so it must exist first.
+    // A send that then fails leaves an unused token row, which is harmless.
+    const compliance = this.tickCtx?.compliance ?? (await getComplianceSettings(db));
+    const unsubscribeUrl = await this.unsubscribeUrlFor(e, stepNo, compliance.unsubscribeBaseUrl);
+
     const rendered = renderer.render({
       variant,
       step,
       lead: this.leadLiteOf(e),
       enrollmentId: e.id,
-      ctx: await this.renderContextFor(e, seq, step, { literal }),
+      ctx: await this.renderContextFor(e, seq, step, { literal, unsubscribeUrl }),
     });
 
     // Fatal pre-send checks block the send (docs/08 §5); the enrollment stays
@@ -485,7 +496,7 @@ export class Scheduler {
       subject: rendered.subject,
       bodyText: rendered.bodyText,
       bodyHtml: rendered.bodyHtml,
-      headers: { messageId, inReplyTo, references },
+      headers: { messageId, inReplyTo, references, listUnsubscribeUrl: unsubscribeUrl },
     };
 
     // `listDue` is a snapshot.  Re-read and send while holding the same
@@ -647,18 +658,38 @@ export class Scheduler {
   }
 
   /** The caller-loaded RenderContext (docs/08: the engine itself is pure). */
+  /**
+   * Mint this send's unsubscribe URL, or undefined when the feature is dormant
+   * (no `unsubscribe_base_url`). One token per send attempt — the raw value is
+   * unrecoverable after issue, so a retry mints another and both stay valid.
+   */
+  private async unsubscribeUrlFor(
+    e: DueEnrollment,
+    stepNo: number,
+    baseUrl: string,
+  ): Promise<string | undefined> {
+    if (baseUrl.trim() === '') return undefined;
+    const { raw } = await issueToken(this.deps.db, {
+      enrollmentId: e.id,
+      leadId: e.leadId,
+      campaignId: e.campaignId,
+      stepNo,
+    });
+    return `${baseUrl.trim()}/u/${raw}`;
+  }
+
   private async renderContextFor(
     e: DueEnrollment,
     seq: SequenceDef,
     step: SequenceStepDef,
-    opts: { literal: boolean },
+    opts: { literal: boolean; unsubscribeUrl?: string },
   ): Promise<RenderContext> {
     const compliance = this.tickCtx?.compliance ?? (await getComplianceSettings(this.deps.db));
     const base: RenderContext = {
       mode: e.personalizationMode,
       customFields: e.leadCustomFields,
       autoObservations: await this.autoObsFor(e.campaignId),
-      compliance,
+      compliance: { ...compliance, unsubscribeUrl: opts.unsubscribeUrl },
       literal: opts.literal,
     };
     if (step.inThread && step.stepNo > 1) {
