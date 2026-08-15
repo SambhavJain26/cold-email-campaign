@@ -51,6 +51,8 @@ interface Args {
   uid?: number;
   name?: string;
   list: boolean;
+  /** List IMAP folders — provider spam-folder names differ and cannot be guessed. */
+  folders: boolean;
   dryRun: boolean;
 }
 
@@ -68,6 +70,7 @@ function parseArgs(argv: string[]): Args | null {
     ...(uid !== undefined && { uid: Number(uid) }),
     ...(name !== undefined && { name }),
     list: argv.includes('--list'),
+    folders: argv.includes('--folders'),
     dryRun: argv.includes('--dry-run'),
   };
 }
@@ -75,6 +78,7 @@ function parseArgs(argv: string[]): Args | null {
 function usage(): void {
   console.error(
     'Usage:\n' +
+      '  capture-fixture --mailbox <id> --folders\n' +
       '  capture-fixture --mailbox <id> --list\n' +
       '  capture-fixture --mailbox <id> --uid <uid> --name <fixture-name> [--dry-run]',
   );
@@ -120,6 +124,26 @@ function scrub(raw: string, ownAddress: string): { text: string; map: Map<string
 
   const text = raw.replace(ADDRESS_RE, (match) => placeholderFor(match));
   return { text, map };
+}
+
+/**
+ * List the mailbox's IMAP folders. Needed because `poll_folders` (0012) takes
+ * literal provider names and they differ — Gmail exposes `[Gmail]/Spam`,
+ * Outlook `Junk`, others `Junk E-Mail`. A wrong name is silently skipped by the
+ * poller rather than erroring, so guessing produces a mailbox that looks
+ * configured and quietly is not.
+ */
+async function listFolders(conn: MailboxConnection): Promise<void> {
+  const client = imapClient(conn);
+  await client.connect();
+  try {
+    for (const box of await client.list()) {
+      const flags = [...box.flags].join(' ');
+      console.log(`  ${box.path.padEnd(28)} ${flags}`);
+    }
+  } finally {
+    await client.logout().catch(() => client.close());
+  }
 }
 
 async function listRecent(conn: MailboxConnection): Promise<void> {
@@ -193,6 +217,11 @@ export async function main(argv: string[] = process.argv.slice(2)): Promise<numb
     if (!conn) {
       console.error(`mailbox ${args.mailboxId} not found, or has no stored credentials`);
       return 1;
+    }
+
+    if (args.folders) {
+      await listFolders(conn);
+      return 0;
     }
 
     if (args.list) {
