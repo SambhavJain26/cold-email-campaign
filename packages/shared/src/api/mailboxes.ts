@@ -27,6 +27,13 @@ export const mailboxSchema = z
     effective_cap: z.number().int(),
     send_window: sendWindowSchema,
     timezone: z.string().min(1),
+    /**
+     * Folders polled for replies (finding 13). INBOX-only by default; add the
+     * provider's spam folder ("[Gmail]/Spam", "Junk", "Junk E-Mail") to stop a
+     * spam-filed reply from being invisible. Each folder keeps its OWN UID
+     * cursor, seeded from UIDNEXT when first added.
+     */
+    poll_folders: z.array(z.string().min(1)).min(1),
     status: z.enum(MAILBOX_STATUSES),
     status_reason: z.string().nullable(),
     sent_today: z.number().int(),
@@ -52,6 +59,7 @@ export const createMailboxBodySchema = z
     daily_cap: z.number().int().min(1).optional(),
     send_window: sendWindowSchema.optional(),
     timezone: z.string().min(1).optional(),
+    poll_folders: z.array(z.string().min(1)).min(1).optional(),
   })
   .strict();
 export type CreateMailboxBody = z.infer<typeof createMailboxBodySchema>;

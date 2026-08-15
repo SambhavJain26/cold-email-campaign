@@ -20,6 +20,7 @@ import {
   connectionFor,
   deliver,
   dsnMessage,
+  fileIntoFolder,
   readInbox,
   resetGreenMail,
 } from './helpers/greenmail';
@@ -203,6 +204,61 @@ describe('SmtpImapTransport over a real server (B8.1)', () => {
     const third = await transport.fetchNew(CANARY_ID);
     expect(third.map((m) => m.subject)).toEqual(['third']);
     expect(third[0]!.uid).toBeGreaterThan(first.at(-1)!.uid);
+  });
+
+  // Finding 13: the poller read INBOX only, so a reply the provider spam-filed
+  // was invisible — and indistinguishable from a broken poller.
+  describe('fetchNew across folders (finding 13)', () => {
+    it('does NOT see a spam-filed reply when only INBOX is polled', async () => {
+      await deliver({ as: LEAD, to: CANARY.address, subject: 'filed away', text: 'hi' });
+      const [inInbox] = await readInbox(CANARY);
+      await fileIntoFolder(CANARY, inInbox!.uid, 'Junk');
+
+      // This is the bug, reproduced: INBOX-only polling loses the reply.
+      expect(await transport.fetchNew(CANARY_ID)).toEqual([]);
+    });
+
+    it('finds it once the folder is configured, and tags it with its folder', async () => {
+      await deliver({ as: LEAD, to: CANARY.address, subject: 'filed away', text: 'hi' });
+      const [inInbox] = await readInbox(CANARY);
+      await fileIntoFolder(CANARY, inInbox!.uid, 'Junk');
+
+      connections.set(CANARY_ID, connectionFor(CANARY, 0, ['INBOX', 'Junk']));
+      const found = await transport.fetchNew(CANARY_ID);
+
+      expect(found.map((m) => m.subject)).toEqual(['filed away']);
+      expect(found[0]!.folder).toBe('Junk');
+    });
+
+    it('keeps per-folder high-water marks independent', async () => {
+      // The load-bearing property: UID 1 in Junk and UID 1 in INBOX are
+      // different messages, so advancing one must not skip the other.
+      await deliver({ as: LEAD, to: CANARY.address, subject: 'to junk', text: 'a' });
+      const [first] = await readInbox(CANARY);
+      await fileIntoFolder(CANARY, first!.uid, 'Junk');
+      await deliver({ as: LEAD, to: CANARY.address, subject: 'to inbox', text: 'b' });
+
+      connections.set(CANARY_ID, connectionFor(CANARY, 0, ['INBOX', 'Junk']));
+      const all = await transport.fetchNew(CANARY_ID);
+      expect(all.map((m) => m.subject).sort()).toEqual(['to inbox', 'to junk']);
+
+      // Advance ONLY Junk: the INBOX message must still be returned.
+      const junk = all.find((m) => m.folder === 'Junk')!;
+      connections.advanceUid(CANARY_ID, junk.uid, 'Junk');
+      const remaining = await transport.fetchNew(CANARY_ID);
+      expect(remaining.map((m) => m.subject)).toEqual(['to inbox']);
+      expect(remaining[0]!.folder).toBe('INBOX');
+    });
+
+    it('a folder that does not exist is skipped, not fatal — INBOX still polls', async () => {
+      // Provider folder names differ ("[Gmail]/Spam" vs "Junk"), so a
+      // misconfigured name must not blind the mailbox entirely.
+      await deliver({ as: LEAD, to: CANARY.address, subject: 'still arrives', text: 'x' });
+      connections.set(CANARY_ID, connectionFor(CANARY, 0, ['INBOX', 'NoSuchFolder']));
+
+      const found = await transport.fetchNew(CANARY_ID);
+      expect(found.map((m) => m.subject)).toEqual(['still arrives']);
+    });
   });
 
   it('fetchNew: reads are non-destructive — nothing is deleted, \\Seen is not set', async () => {

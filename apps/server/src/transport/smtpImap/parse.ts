@@ -15,6 +15,8 @@ import type { IncomingMessage } from '../types';
 export interface ParseContext {
   uid: number;
   mailboxId: number;
+  /** Source folder (0012) — the UID is only meaningful alongside it. */
+  folder?: string;
   /** IMAP INTERNALDATE — more truthful than the sender's Date header. */
   internalDate?: Date;
 }
@@ -44,6 +46,7 @@ export async function toIncomingMessage(
   const msg: IncomingMessage = {
     uid: ctx.uid,
     mailboxId: ctx.mailboxId,
+    folder: ctx.folder ?? 'INBOX',
     from: addressOf(parsed),
     subject: parsed.subject ?? '',
     headers,

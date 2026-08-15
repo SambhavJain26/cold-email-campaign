@@ -40,7 +40,15 @@ export const LEAD: Account = { address: 'seed@lead.test', password: 'seedpw' };
 /** A reporting MTA — used to deliver real DSNs into a canary inbox. */
 export const DAEMON: Account = { address: 'mailer-daemon@mx.coldemail.test', password: 'daemonpw' };
 
-export function connectionFor(account: Account, lastPollUid = 0): MailboxConnection {
+/**
+ * `folders` defaults to INBOX-only, matching a real mailbox's default (0012).
+ * Pass extra names to exercise multi-folder polling (finding 13).
+ */
+export function connectionFor(
+  account: Account,
+  lastPollUid = 0,
+  folders: string[] = ['INBOX'],
+): MailboxConnection {
   return {
     smtpHost: GREENMAIL.host,
     smtpPort: GREENMAIL.smtpPort,
@@ -48,7 +56,7 @@ export function connectionFor(account: Account, lastPollUid = 0): MailboxConnect
     imapPort: GREENMAIL.imapPort,
     fromAddress: account.address,
     password: account.password,
-    lastPollUid,
+    folders: folders.map((name) => ({ name, lastPollUid })),
     ...(account.displayName !== undefined && { displayName: account.displayName }),
   };
 }
@@ -62,10 +70,17 @@ export class StaticConnections implements MailboxConnectionProvider {
     else this.rows.set(mailboxId, conn);
   }
 
-  /** Move the UID high-water mark the way the poller does after each message. */
-  advanceUid(mailboxId: number, uid: number): void {
+  /**
+   * Move one folder's high-water mark the way the poller does after each
+   * message. Per-folder on purpose (0012): advancing INBOX must not move Spam.
+   */
+  advanceUid(mailboxId: number, uid: number, folder = 'INBOX'): void {
     const row = this.rows.get(mailboxId);
-    if (row) this.rows.set(mailboxId, { ...row, lastPollUid: uid });
+    if (!row) return;
+    this.rows.set(mailboxId, {
+      ...row,
+      folders: row.folders.map((f) => (f.name === folder ? { ...f, lastPollUid: uid } : f)),
+    });
   }
 
   load(mailboxId: number): Promise<MailboxConnection | null> {
@@ -142,6 +157,34 @@ export async function deliver(input: DeliverInput): Promise<void> {
 export interface StoredMessage {
   uid: number;
   source: string;
+}
+
+/**
+ * Move a message from INBOX into another folder, creating it if needed — the
+ * test stand-in for a provider spam-filing a reply (finding 13). GreenMail has
+ * no spam filter, so the only way to reproduce that failure mode is to do the
+ * filing ourselves.
+ */
+export async function fileIntoFolder(account: Account, uid: number, folder: string): Promise<void> {
+  const client = new ImapFlow({
+    host: GREENMAIL.host,
+    port: GREENMAIL.imapPort,
+    secure: false,
+    auth: { user: account.address, pass: account.password },
+    logger: false,
+  });
+  await client.connect();
+  try {
+    await client.mailboxCreate(folder).catch(() => undefined); // already exists
+    const lock = await client.getMailboxLock('INBOX');
+    try {
+      await client.messageMove({ uid: String(uid) }, folder, { uid: true });
+    } finally {
+      lock.release();
+    }
+  } finally {
+    await client.logout().catch(() => client.close());
+  }
 }
 
 /** Read an account's INBOX directly — used to assert what we actually SENT. */

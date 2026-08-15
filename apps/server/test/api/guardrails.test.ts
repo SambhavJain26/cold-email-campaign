@@ -42,6 +42,16 @@ afterAll(async () => {
 });
 beforeEach(async () => {
   await h.reset();
+  // resetCoreTables does NOT truncate the seeded settings row, so a suite that
+  // edits settings leaks into every later test — the documented trap. Restore
+  // the three guardrail columns this file owns to their 0011 defaults.
+  await h.pool.query(
+    `UPDATE settings
+        SET max_mailbox_daily_cap = 50,
+            max_ramp_daily_enroll_cap = 25,
+            min_ramp_days = 0
+      WHERE id = 1`,
+  );
   seqId = (
     await h.inject({
       method: 'POST',

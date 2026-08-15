@@ -191,9 +191,14 @@ describe('live pipeline over SmtpImapTransport (B8.1)', () => {
       events: 1,
     });
 
-    // The UID high-water mark advanced — this is what makes the next poll cheap.
-    const mb = await pool.query(`SELECT last_poll_uid FROM mailboxes WHERE id = $1`, [MAILBOX_ID]);
-    expect(Number(mb.rows[0].last_poll_uid)).toBeGreaterThan(0);
+    // The UID high-water mark advanced — this is what makes the next poll
+    // cheap. Since 0012 it is per (mailbox, folder), because IMAP UIDs are
+    // folder-scoped and one mailbox-wide number cannot span them.
+    const cursor = await pool.query(
+      `SELECT last_poll_uid FROM mailbox_poll_cursors WHERE mailbox_id = $1 AND folder = 'INBOX'`,
+      [MAILBOX_ID],
+    );
+    expect(Number(cursor.rows[0].last_poll_uid)).toBeGreaterThan(0);
   });
 
   it('a real STOP reply auto-suppresses the lead (decision F)', async () => {

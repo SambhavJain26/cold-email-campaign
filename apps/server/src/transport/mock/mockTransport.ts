@@ -58,11 +58,17 @@ export class MockTransport implements MailTransport, ScriptableTransport {
    */
   queueInbound(
     mailboxId: number,
-    msg: Omit<IncomingMessage, 'uid' | 'mailboxId'> & { uid?: number },
+    // `folder` is assigned here alongside uid/mailboxId (0012) so the message
+    // builders stay focused on message shape. Defaults to INBOX; pass it
+    // explicitly to simulate a provider spam-filing a reply (finding 13).
+    msg: Omit<IncomingMessage, 'uid' | 'mailboxId' | 'folder'> & {
+      uid?: number;
+      folder?: string;
+    },
   ): number {
     const uid = msg.uid ?? this.takeUid(mailboxId);
     const q = this.inbound.get(mailboxId) ?? [];
-    q.push({ ...msg, uid, mailboxId });
+    q.push({ ...msg, uid, mailboxId, folder: msg.folder ?? 'INBOX' });
     this.inbound.set(mailboxId, q);
     return uid;
   }

@@ -130,29 +130,44 @@ export class SmtpImapTransport implements MailTransport {
     }
 
     const messages: IncomingMessage[] = [];
+    // One pass per configured folder, each against ITS OWN high-water mark —
+    // IMAP UIDs are per-folder, so a shared mark would skip or re-deliver.
+    const folders = conn.folders.length > 0 ? conn.folders : [{ name: 'INBOX', lastPollUid: 0 }];
     try {
-      const lock = await client.getMailboxLock(this.opts.mailbox ?? 'INBOX');
-      try {
-        const highWater = conn.lastPollUid;
-        for await (const m of client.fetch(
-          { uid: `${highWater + 1}:*` },
-          { uid: true, source: true, internalDate: true },
-          { uid: true },
-        )) {
-          // The `n:*` range returns the LAST message when n > highest UID —
-          // this filter is what makes fetchNew idempotent.
-          if (m.uid <= highWater || !m.source) continue;
-          messages.push(
-            await toIncomingMessage(m.source, {
-              uid: m.uid,
-              mailboxId,
-              // imapflow types INTERNALDATE loosely (string | Date).
-              ...(m.internalDate && { internalDate: new Date(m.internalDate) }),
-            }),
-          );
+      for (const folder of folders) {
+        let lock;
+        try {
+          lock = await client.getMailboxLock(folder.name);
+        } catch (err) {
+          // A folder that does not exist on this provider (names differ:
+          // "[Gmail]/Spam" vs "Junk") must not take down the whole poll —
+          // INBOX still has to be read. Auth failures still propagate.
+          if (err instanceof Error && /auth/i.test(err.message)) throw err;
+          continue;
         }
-      } finally {
-        lock.release();
+        try {
+          const highWater = folder.lastPollUid;
+          for await (const m of client.fetch(
+            { uid: `${highWater + 1}:*` },
+            { uid: true, source: true, internalDate: true },
+            { uid: true },
+          )) {
+            // The `n:*` range returns the LAST message when n > highest UID —
+            // this filter is what makes fetchNew idempotent.
+            if (m.uid <= highWater || !m.source) continue;
+            messages.push(
+              await toIncomingMessage(m.source, {
+                uid: m.uid,
+                mailboxId,
+                folder: folder.name,
+                // imapflow types INTERNALDATE loosely (string | Date).
+                ...(m.internalDate && { internalDate: new Date(m.internalDate) }),
+              }),
+            );
+          }
+        } finally {
+          lock.release();
+        }
       }
     } catch (err) {
       throw this.imapError(err);
@@ -160,14 +175,15 @@ export class SmtpImapTransport implements MailTransport {
       await client.logout().catch(() => client.close());
     }
 
-    return messages.sort((a, b) => a.uid - b.uid);
+    // Sort within folder; the poller advances each folder's cursor separately.
+    return messages.sort((a, b) => a.folder.localeCompare(b.folder) || a.uid - b.uid);
   }
 
-  async initialPollUid(config: MailboxVerifyConfig): Promise<number> {
+  async initialPollUid(config: MailboxVerifyConfig, folder?: string): Promise<number> {
     const client = this.imapClient(config);
     try {
       await client.connect();
-      const lock = await client.getMailboxLock(this.opts.mailbox ?? 'INBOX');
+      const lock = await client.getMailboxLock(folder ?? this.opts.mailbox ?? 'INBOX');
       try {
         const mailbox = client.mailbox;
         return Math.max(0, (mailbox && mailbox.uidNext ? mailbox.uidNext : 1) - 1);

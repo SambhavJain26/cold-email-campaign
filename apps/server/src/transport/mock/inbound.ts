@@ -3,7 +3,7 @@
 // exercised on the exact code paths reality will use. The raw-MIME fixture
 // corpus lives in test/fixtures/headers/; these builders are the scenario
 // runner's programmatic equivalent.
-import type { IncomingMessage } from '../types';
+import type { SynthesizedMessage } from '../types';
 
 let extSeq = 0;
 /** Deterministic external Message-ID for synthetic inbound mail. */
@@ -31,7 +31,7 @@ export interface ReplyInput {
 }
 
 /** A human reply threading back to one of our sent Message-IDs (docs/07 §4). */
-export function threadedReply(r: ReplyInput): Omit<IncomingMessage, 'uid' | 'mailboxId'> {
+export function threadedReply(r: ReplyInput): SynthesizedMessage {
   const messageId = r.messageId ?? nextExternalMessageId();
   const references = r.references ?? [r.inReplyTo];
   const headers: Record<string, string> = {
@@ -64,7 +64,7 @@ export interface DsnInput {
 }
 
 /** A delivery-status notification with the multipart/report shape (docs/07 §2.1). */
-export function dsnBounce(d: DsnInput): Omit<IncomingMessage, 'uid' | 'mailboxId'> {
+export function dsnBounce(d: DsnInput): SynthesizedMessage {
   const messageId = nextExternalMessageId('mx.example.com');
   const diagnostic =
     d.diagnostic ??
@@ -101,7 +101,7 @@ export interface OooInput {
 }
 
 /** An out-of-office auto-reply (`Auto-Submitted: auto-replied`, docs/07 §2.2). */
-export function oooReply(o: OooInput): Omit<IncomingMessage, 'uid' | 'mailboxId'> {
+export function oooReply(o: OooInput): SynthesizedMessage {
   const messageId = nextExternalMessageId();
   return {
     from: o.from,
@@ -127,7 +127,7 @@ export function unrelatedSpam(input: {
   receivedAt: Date;
   subject?: string;
   bodyText?: string;
-}): Omit<IncomingMessage, 'uid' | 'mailboxId'> {
+}): SynthesizedMessage {
   const messageId = nextExternalMessageId('spam.example.net');
   return {
     from: input.from,

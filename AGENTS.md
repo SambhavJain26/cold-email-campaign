@@ -82,6 +82,23 @@ projection dry run inside the app container. Do not expose credentials or `.env.
 - Gmail actually rendering its native button is **unproven and unprovable here** — it needs a
   publicly reachable HTTPS URL. Do not record the one-click flow as verified.
 
+## Launch guardrails, preflight, folder polling (0011–0012)
+
+- **Guardrails bound CONFIGURATION, not behaviour.** `max_mailbox_daily_cap` (50) is enforced on
+  mailbox create and patch; `max_ramp_daily_enroll_cap` (25) on campaign create. `min_ramp_days`
+  ships at **0 = not enforced** so the migration cannot invalidate existing campaigns — set it
+  before a real launch. A value inside these ceilings is permitted, never safe.
+- **The preflight is read-only and honest about its limits.** `ready` means nothing FAILED; it
+  cannot see warming, list quality or consent. **DKIM reports `unknown`, never `fail`** — DNS
+  cannot enumerate selectors, so a miss is not evidence of absence.
+- **IMAP UIDs are folder-scoped.** Cursors live in `mailbox_poll_cursors` keyed
+  `(mailbox_id, folder)`; a mailbox-wide high-water mark is a bug. Each folder seeds from its own
+  UIDNEXT — adding a folder must never back-fill that folder's history (finding 16, per folder).
+- `poll_folders` defaults to `INBOX` only. Adding the provider's spam folder is an explicit
+  operator action, and the name differs per provider (`[Gmail]/Spam` vs `Junk`).
+- `POST /leads` runs the **same** ingest preview+commit as a CSV upload. Never reimplement
+  hygiene, dedup or the suppression re-check there.
+
 ## Implementation and data safety
 
 - Preserve the append-only event ledger; never delete or rewrite sent/event history.

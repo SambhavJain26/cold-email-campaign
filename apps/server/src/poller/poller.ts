@@ -9,6 +9,7 @@ import type { EventStore } from '../services/eventStore';
 import { evaluateAutoPause } from '../services/autoPause';
 import { getSettings } from '../db/repos/settingsRepo';
 import { getMailbox, patchMailbox } from '../db/repos/mailboxesRepo';
+import { setCursor } from '../db/repos/pollCursorsRepo';
 import { redistributeUnstarted } from '../db/repos/enrollmentsRepo';
 import {
   existsByUid,
@@ -132,7 +133,7 @@ export class Poller {
               id: rowId,
               resultingEventIds: eventIds,
             });
-            await patchMailbox(tx, mailboxId, { lastPollUid: m.uid });
+            await setCursor(tx, mailboxId, m.folder, m.uid);
           },
         });
       } else {
@@ -170,7 +171,7 @@ export class Poller {
   ): Promise<void> {
     await this.deps.db.transaction(async (tx) => {
       await insertIncomingMessage(tx, { ...this.rowFor(m, now, c), id });
-      await patchMailbox(tx, m.mailboxId, { lastPollUid: m.uid });
+      await setCursor(tx, m.mailboxId, m.folder, m.uid);
     });
   }
 

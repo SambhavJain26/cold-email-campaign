@@ -28,6 +28,7 @@ import {
 } from '../db/repos/mailboxesRepo';
 import { mailboxVolume } from '../db/repos/metricsRepo';
 import { getSettings } from '../db/repos/settingsRepo';
+import { getCursor, seedCursorIfAbsent } from '../db/repos/pollCursorsRepo';
 import { checkMailboxDailyCap } from '../services/guardrails';
 import type { Db } from '../db/client';
 import { mailboxStatsFor, type MailboxStats } from '../services/mailboxStats';
@@ -50,6 +51,7 @@ function toMailboxDto(row: MailboxRow, stats: MailboxStats): MailboxDto {
     effective_cap: row.resumeCap ?? row.dailyCap,
     send_window: row.sendWindow,
     timezone: row.timezone,
+    poll_folders: row.pollFolders,
     status: row.status,
     status_reason: row.statusReason,
     sent_today: stats.sentToday,
@@ -71,7 +73,49 @@ function patchColumns(body: PatchMailboxBody) {
     ...(body.daily_cap !== undefined && { dailyCap: body.daily_cap }),
     ...(body.send_window !== undefined && { sendWindow: body.send_window }),
     ...(body.timezone !== undefined && { timezone: body.timezone }),
+    ...(body.poll_folders !== undefined && { pollFolders: body.poll_folders }),
   };
+}
+
+/**
+ * Seed each polled folder's cursor from its UIDNEXT (finding 16, per folder
+ * since 0012). Without this, connecting a mailbox — or merely ADDING a folder
+ * to an existing one — ingests that folder's entire history: 12,581 messages
+ * back to 2022 on the real canary. Idempotent: an already-seeded folder keeps
+ * its position.
+ */
+async function seedPollCursorsFor(
+  services: AppServices,
+  row: {
+    id: number;
+    smtpHost: string;
+    smtpPort: number;
+    imapHost: string;
+    imapPort: number;
+    fromAddress: string;
+    pollFolders: string[];
+  },
+  password: string,
+): Promise<void> {
+  const { db, transport } = services;
+  if (!transport.initialPollUid) return;
+  const config = {
+    smtpHost: row.smtpHost,
+    smtpPort: row.smtpPort,
+    imapHost: row.imapHost,
+    imapPort: row.imapPort,
+    fromAddress: row.fromAddress,
+    password,
+  };
+  for (const folder of row.pollFolders) {
+    if ((await getCursor(db, row.id, folder)) !== null) continue;
+    try {
+      await seedCursorIfAbsent(db, row.id, folder, await transport.initialPollUid(config, folder));
+    } catch {
+      // A folder that does not exist yet on the provider must not fail the
+      // whole save; the poller skips it until it appears.
+    }
+  }
 }
 
 /** Launch guardrail (0011): refuse a cap above the configured ceiling. */
@@ -195,20 +239,11 @@ export async function mailboxesRoutes(app: FastifyInstance, services: AppService
         dailyCap: b.daily_cap,
         sendWindow: b.send_window,
         timezone: b.timezone,
+        pollFolders: b.poll_folders,
       });
       const sealed = await sealSecret(b.password, config.SECRET_KEY);
       await upsertMailboxSecret(db, row.id, sealed, clock.now());
-      if (transport.initialPollUid) {
-        const cursor = await transport.initialPollUid({
-          smtpHost: row.smtpHost,
-          smtpPort: row.smtpPort,
-          imapHost: row.imapHost,
-          imapPort: row.imapPort,
-          fromAddress: row.fromAddress,
-          password: b.password,
-        });
-        await patchMailbox(db, row.id, { lastPollUid: cursor });
-      }
+      await seedPollCursorsFor(services, row, b.password);
       // Start polling THIS mailbox now: boot only registered the mailboxes that
       // existed then, so without this a mailbox added through the UI would go
       // unpolled until the next restart (no-op when workers aren't running).
@@ -323,16 +358,12 @@ export async function mailboxesRoutes(app: FastifyInstance, services: AppService
         // one needs its poll queue (re-)registered to resume reply detection.
         await jobs.registerMailboxPoll(row.id);
       }
-      if (result.smtpOk && result.imapOk && row.lastPollUid === 0 && transport.initialPollUid) {
-        const cursor = await transport.initialPollUid({
-          smtpHost: row.smtpHost,
-          smtpPort: row.smtpPort,
-          imapHost: row.imapHost,
-          imapPort: row.imapPort,
-          fromAddress: row.fromAddress,
-          password: req.body.password,
-        });
-        await patchMailbox(db, row.id, { lastPollUid: cursor });
+      // Seed any folder that has no cursor yet — a legacy mailbox from before
+      // 0012, or a folder the operator just added. seedPollCursorsFor skips
+      // folders that already have one, so a reconnect can never discard
+      // messages that arrived while the mailbox was unavailable.
+      if (result.smtpOk && result.imapOk) {
+        await seedPollCursorsFor(services, row, req.body.password);
       }
       return dtoOf(await requireMailbox(req.params.id));
     },

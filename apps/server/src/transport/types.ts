@@ -39,8 +39,14 @@ export interface SendResult {
 }
 
 export interface IncomingMessage {
-  uid: number; // IMAP UID — idempotency key with mailboxId
+  /**
+   * IMAP UID. Scoped to a FOLDER, not a mailbox — so the idempotency key is
+   * (mailboxId, folder, uid), and a cursor is meaningless without its folder.
+   */
+  uid: number;
   mailboxId: number;
+  /** Which folder it was fetched from (0012). 'INBOX' unless configured. */
+  folder: string;
   from: string;
   subject: string;
   headers: Record<string, string>; // lowercased header names
@@ -53,6 +59,13 @@ export interface IncomingMessage {
   dsnRecipient?: string;
   receivedAt: Date;
 }
+
+/**
+ * What a message BUILDER produces: everything except the fields the delivery
+ * context owns. `folder` is one of those (0012) — a builder describes the
+ * message, not where a provider happened to file it.
+ */
+export type SynthesizedMessage = Omit<IncomingMessage, 'uid' | 'mailboxId' | 'folder'>;
 
 export interface MailboxVerifyConfig {
   smtpHost: string;
@@ -92,10 +105,11 @@ export interface MailboxConnection extends MailboxVerifyConfig {
   /** From-header display name (`"Sarah Chen" <sarah@…>`). */
   displayName?: string;
   /**
-   * IMAP UID high-water mark (`mailboxes.last_poll_uid`): fetchNew returns
-   * messages with UID **strictly greater** than this.
+   * One high-water mark per polled folder (0012). fetchNew returns messages
+   * with UID **strictly greater** than the mark FOR THAT FOLDER; a single
+   * mailbox-wide number cannot express this, because IMAP UIDs are per-folder.
    */
-  lastPollUid: number;
+  folders: { name: string; lastPollUid: number }[];
 }
 
 export interface MailboxConnectionProvider {
@@ -108,8 +122,12 @@ export interface MailTransport {
   send(msg: OutboundMessage): Promise<SendResult>;
   /** Receiving side — used by the poller; returns messages with UID > high-water mark (docs/07 §1). */
   fetchNew(mailboxId: number): Promise<IncomingMessage[]>;
-  /** Highest UID already present in INBOX (UIDNEXT - 1), for first-poll seeding. */
-  initialPollUid?(config: MailboxVerifyConfig): Promise<number>;
+  /**
+   * Highest UID already present in `folder` (UIDNEXT - 1), for first-poll
+   * seeding. Applies per FOLDER: adding Spam later seeds that folder the same
+   * way, or connecting it re-ingests its whole history (finding 16).
+   */
+  initialPollUid?(config: MailboxVerifyConfig, folder?: string): Promise<number>;
   /** "Test Connection" + health monitoring. */
   verify(config: MailboxVerifyConfig): Promise<VerifyResult>;
   /** Release pooled connections on shutdown. Optional — the mock has none. */

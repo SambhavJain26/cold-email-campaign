@@ -7,6 +7,7 @@ import {
   integer,
   jsonb,
   pgTable,
+  primaryKey,
   text,
   timestamp,
   unique,
@@ -48,9 +49,29 @@ export const mailboxes = pgTable('mailboxes', {
   pausedAt: tz('paused_at'),
   lastSendAt: tz('last_send_at'),
   lastSuccessfulPollAt: tz('last_successful_poll_at'),
+  /** Superseded by mailboxPollCursors (0012); retained so 0012 is reversible. */
   lastPollUid: bigint('last_poll_uid', { mode: 'number' }).notNull().default(0),
+  /** Folders this mailbox polls. INBOX-only by default (finding 13). */
+  pollFolders: text('poll_folders').array().notNull().default(['INBOX']),
   createdAt: tz('created_at').notNull().defaultNow(),
 });
+
+/**
+ * Per-(mailbox, folder) UID high-water mark (0012). IMAP UIDs are scoped to a
+ * folder, so INBOX and Spam cursors are unrelated numbers and cannot share one
+ * column.
+ */
+export const mailboxPollCursors = pgTable(
+  'mailbox_poll_cursors',
+  {
+    mailboxId: bigint('mailbox_id', { mode: 'number' })
+      .notNull()
+      .references(() => mailboxes.id, { onDelete: 'cascade' }),
+    folder: text('folder').notNull(),
+    lastPollUid: bigint('last_poll_uid', { mode: 'number' }).notNull().default(0),
+  },
+  (t) => [primaryKey({ columns: [t.mailboxId, t.folder] })],
+);
 
 export const mailboxSecrets = pgTable('mailbox_secrets', {
   mailboxId: bigint('mailbox_id', { mode: 'number' })

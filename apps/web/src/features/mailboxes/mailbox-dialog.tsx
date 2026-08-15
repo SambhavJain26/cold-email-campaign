@@ -22,14 +22,19 @@ import { useSettings } from '@/api/queries/settings';
 /** The shared create schema, narrowed to the form's shape: ports/cap always
  *  present here (prefilled defaults), password validated per-mode at submit —
  *  blank in edit mode means "keep the sealed one" (never re-displayed, B6.2). */
-const formSchema = createMailboxBodySchema.omit({ auth_type: true, send_window: true }).extend({
-  smtp_port: z.number().int().min(1).max(65535),
-  imap_port: z.number().int().min(1).max(65535),
-  daily_cap: z.number().int().min(1),
-  password: z.string(),
-  timezone: z.string().min(1),
-  send_window: sendWindowSchema,
-});
+const formSchema = createMailboxBodySchema
+  .omit({ auth_type: true, send_window: true, poll_folders: true })
+  .extend({
+    smtp_port: z.number().int().min(1).max(65535),
+    imap_port: z.number().int().min(1).max(65535),
+    daily_cap: z.number().int().min(1),
+    password: z.string(),
+    timezone: z.string().min(1),
+    send_window: sendWindowSchema,
+    // Edited as free text, split to the array at submit — a comma-separated
+    // field is far easier to type than a list editor for two or three values.
+    poll_folders_text: z.string().min(1, 'At least one folder — INBOX at minimum'),
+  });
 type FormValues = z.infer<typeof formSchema>;
 
 /** F2.2 — Add/Edit mailbox dialog (walkthrough Stage-0 form). */
@@ -83,6 +88,7 @@ export function MailboxDialog({
             daily_cap: mailbox.daily_cap,
             timezone: mailbox.timezone,
             send_window: mailbox.send_window,
+            poll_folders_text: mailbox.poll_folders.join(', '),
             password: '',
           }
         : {
@@ -95,6 +101,7 @@ export function MailboxDialog({
             daily_cap: 30,
             timezone: settings.data?.default_timezone ?? 'UTC',
             send_window: { days: [1, 2, 3, 4, 5], start: '08:00', end: '17:00' },
+            poll_folders_text: 'INBOX',
             password: '',
           },
     );
@@ -110,8 +117,18 @@ export function MailboxDialog({
       setError('password', { message: 'App password is required' });
       return;
     }
+    // Free-text field → the contract's array. Blank entries are dropped so a
+    // trailing comma cannot produce an empty folder name.
+    const { poll_folders_text, ...values_ } = values;
+    const body = {
+      ...values_,
+      poll_folders: poll_folders_text
+        .split(',')
+        .map((f) => f.trim())
+        .filter((f) => f !== ''),
+    };
     if (editing) {
-      const { password, ...rest } = values;
+      const { password, ...rest } = body;
       patch.mutate(
         { id: mailbox.id, body: password ? { ...rest, password } : rest },
         {
@@ -122,7 +139,7 @@ export function MailboxDialog({
         },
       );
     } else {
-      create.mutate(values, {
+      create.mutate(body, {
         onSuccess: () => {
           toast.success('Mailbox added');
           handleOpenChange(false);
@@ -173,6 +190,20 @@ export function MailboxDialog({
               'password',
             )}
             {field('daily_cap', 'Daily cap', 'number')}
+            <div className="space-y-1">
+              <Label htmlFor="mb-poll-folders">Polled folders</Label>
+              <Input
+                id="mb-poll-folders"
+                placeholder="INBOX, [Gmail]/Spam"
+                {...register('poll_folders_text')}
+              />
+              <p className="text-xs text-muted-foreground">
+                Comma-separated. Add the provider&rsquo;s spam folder ({''}
+                <code>[Gmail]/Spam</code>, <code>Junk</code>) so a spam-filed reply is not
+                invisible. Each folder starts from its current position — history is never
+                back-filled.
+              </p>
+            </div>
             <div className="space-y-1">
               <Label htmlFor="mb-timezone">Fallback timezone</Label>
               <Input

@@ -4,6 +4,7 @@ import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 import { MockTransport } from '../../src/transport/mock/mockTransport';
 import { VirtualClock } from '../../src/clock/virtual';
 import { getMailbox, getMailboxSecret, patchMailbox } from '../../src/db/repos/mailboxesRepo';
+import { getCursor, setCursor } from '../../src/db/repos/pollCursorsRepo';
 import { unsealSecret } from '../../src/secrets/seal';
 import { createApiHarness, type ApiHarness } from './helpers/app';
 import { eventWatermark, expectNoNewEvents } from './helpers/events';
@@ -182,27 +183,30 @@ describe('B6.2 mailboxes', () => {
       url: '/api/v1/mailboxes',
       payload: { ...CREATE_BODY, from_address: 'cursor@agency.dev' },
     });
-    const cursorMailbox = await getMailbox(h.services.db, created.json().id);
-    expect(cursorMailbox!.lastPollUid).toBe(55);
+    // Since 0012 the cursor lives per (mailbox, folder) — IMAP UIDs are
+    // folder-scoped, so there is no single mailbox-wide mark to assert on.
+    const cursorId = created.json().id as number;
+    expect(await getCursor(h.services.db, cursorId, 'INBOX')).toBe(55);
 
-    // A reconnect repairs only old zero-cursor mailboxes. It must not discard
+    // A reconnect seeds only folders with NO cursor yet. It must not discard
     // messages that arrived while a real mailbox was temporarily unavailable.
-    await patchMailbox(h.services.db, 1, { lastPollUid: 0 });
+    await h.pool.query(`DELETE FROM mailbox_poll_cursors WHERE mailbox_id = 1`);
     transport.setInitialPollUid('sarah@agency.dev', 72);
     await h.inject({
       method: 'POST',
       url: '/api/v1/mailboxes/1/reconnect',
       payload: { password: 'fresh-password' },
     });
-    expect((await getMailbox(h.services.db, 1))!.lastPollUid).toBe(72);
-    await patchMailbox(h.services.db, 1, { lastPollUid: 73 });
+    expect(await getCursor(h.services.db, 1, 'INBOX')).toBe(72);
+    await setCursor(h.services.db, 1, 'INBOX', 73);
     transport.setInitialPollUid('sarah@agency.dev', 99);
     await h.inject({
       method: 'POST',
       url: '/api/v1/mailboxes/1/reconnect',
       payload: { password: 'fresh-password' },
     });
-    expect((await getMailbox(h.services.db, 1))!.lastPollUid).toBe(73);
+    // Unchanged: a nonzero cursor is never overwritten by a reconnect.
+    expect(await getCursor(h.services.db, 1, 'INBOX')).toBe(73);
   });
 
   it('volume returns per-mailbox series + imbalance boolean', async () => {

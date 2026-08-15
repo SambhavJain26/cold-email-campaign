@@ -5,6 +5,7 @@
 import type { Db } from '../db/client';
 import type { MailboxConnection, MailboxConnectionProvider } from '../transport/types';
 import { getMailbox, getMailboxSecret } from '../db/repos/mailboxesRepo';
+import { listCursors } from '../db/repos/pollCursorsRepo';
 import { unsealSecret } from '../secrets/seal';
 
 export interface MailboxConnectionDeps {
@@ -31,7 +32,24 @@ export class DbMailboxConnectionProvider implements MailboxConnectionProvider {
       imapHost: row.imapHost,
       imapPort: row.imapPort,
       password: await unsealSecret(sealed, secretKey),
-      lastPollUid: row.lastPollUid,
+      folders: await this.foldersFor(mailboxId, row.pollFolders),
     };
+  }
+
+  /**
+   * Pair each configured folder with its own cursor (0012). A folder with no
+   * cursor row yet reports 0, which the poller seeds from UIDNEXT before
+   * fetching — otherwise adding Spam would ingest that folder's entire history
+   * (finding 16 applies per folder, not per mailbox).
+   */
+  private async foldersFor(
+    mailboxId: number,
+    configured: string[],
+  ): Promise<{ name: string; lastPollUid: number }[]> {
+    const cursors = new Map(
+      (await listCursors(this.deps.db, mailboxId)).map((c) => [c.folder, c.lastPollUid]),
+    );
+    const names = configured.length > 0 ? configured : ['INBOX'];
+    return names.map((name) => ({ name, lastPollUid: cursors.get(name) ?? 0 }));
   }
 }

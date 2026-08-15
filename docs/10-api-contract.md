@@ -22,7 +22,7 @@ Shapes below in TS notation. `Metric = { numerator: number, denominator: number 
 | | |
 |---|---|
 | GET `/mailboxes` | → `{items: Mailbox[]}` — `Mailbox = {id, display_name, from_address, smtp_host, smtp_port, imap_host, imap_port, daily_cap, effective_cap, send_window, status, status_reason, sent_today, hard_bounce_pct, seven_day_avg, last_successful_poll_at}` (no secrets, ever) |
-| POST `/mailboxes` | `{display_name, from_address, smtp_host, smtp_port, imap_host, imap_port, auth_type, password, daily_cap, send_window}` → `Mailbox` — password sealed into `mailbox_secrets`, absent from response |
+| POST `/mailboxes` | `{display_name, from_address, smtp_host, smtp_port, imap_host, imap_port, auth_type, password, daily_cap, send_window, timezone, poll_folders}` → `Mailbox` — password sealed into `mailbox_secrets`, absent from response. `daily_cap` above `settings.max_mailbox_daily_cap` → 422 (launch guardrail, 0011). `poll_folders` defaults to `['INBOX']`; each folder gets its OWN UID cursor seeded from that folder's UIDNEXT, so adding one never back-fills history (finding 16 applies per folder) |
 | PATCH `/mailboxes/:id` | any subset of the above (password optional) → `Mailbox` |
 | POST `/mailboxes/:id/test-connection` | → `{smtp_ok, imap_ok, round_trip_ms?}` — calls `transport.verify` (mock: scripted; real: send+read-back) |
 | POST `/mailboxes/:id/pause` / `/resume` | resume body `{cap_pct?: 50\|100}` → `Mailbox` — resume from `auto_paused` defaults 50 (walkthrough Stage 7) |

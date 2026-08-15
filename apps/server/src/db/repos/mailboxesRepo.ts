@@ -16,6 +16,8 @@ export interface NewMailbox {
   dailyCap?: number;
   sendWindow?: MailboxRow['sendWindow'];
   timezone?: string;
+  /** Folders to poll (0012). Omitted → the column default, INBOX only. */
+  pollFolders?: string[];
   status?: MailboxStatus;
 }
 

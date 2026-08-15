@@ -280,12 +280,13 @@ export const handlers: RequestHandler[] = [
         effective_cap: body.daily_cap ?? 30,
         send_window: body.send_window ?? { days: [1, 2, 3, 4, 5], start: '08:00', end: '17:00' },
         timezone: body.timezone ?? 'America/New_York',
+        poll_folders: body.poll_folders ?? ['INBOX'],
         status: 'ok' as const,
         status_reason: null,
         sent_today: 0,
         hard_bounce_pct: 0,
         seven_day_avg: 0,
-        last_successful_poll_at: null,
+        last_successful_poll_at: null as string | null,
       };
       db.mailboxes.push(mailbox);
       return HttpResponse.json(mailbox, { status: 201 });

@@ -5,7 +5,7 @@
 import { readFileSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import type { IncomingMessage } from '../../src/transport/types';
+import type { SynthesizedMessage } from '../../src/transport/types';
 
 const FIXTURES_DIR = path.join(path.dirname(fileURLToPath(import.meta.url)), '../fixtures/headers');
 
@@ -62,7 +62,7 @@ function splitReferences(refs: string | undefined): string[] | undefined {
   return ids ?? undefined;
 }
 
-export function loadHeaderFixture(name: FixtureName): Omit<IncomingMessage, 'uid' | 'mailboxId'> {
+export function loadHeaderFixture(name: FixtureName): SynthesizedMessage {
   const raw = readFileSync(path.join(FIXTURES_DIR, `${name}.eml`), 'utf8');
   const splitAt = raw.indexOf('\n\n');
   const headerBlock = splitAt === -1 ? raw : raw.slice(0, splitAt);
