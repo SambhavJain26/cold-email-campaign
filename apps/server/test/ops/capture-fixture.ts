@@ -41,10 +41,30 @@ const PRESERVE = [
   /^postmaster@/i,
   /^no-?reply@/i,
   /@mx\.google\.com>?$/i, // Message-ID host, not a mailbox
+  /@mail\.gmail\.com>?$/i, // ditto — Gmail mints Message-IDs on this host
+  // OUR generated Message-ID (scheduler/mime.ts: ce-{enrollment}-{step}-{ts}@…).
+  // Rewriting it to an address shape would destroy the exact string the
+  // In-Reply-To → stored-Message-ID matcher keys on, which is the one thing
+  // this fixture exists to prove.
+  /^ce-\d+-\d+-\d+@/i,
 ];
 
 /** Matches bare addresses and the inside of <…> (Message-ID, From, Final-Recipient). */
 const ADDRESS_RE = /[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}/g;
+
+/**
+ * Display names for the placeholder addresses, matching the existing corpus's
+ * cast. Any `Real Name <placeholder>` is rewritten to these — an address swap
+ * alone still leaves a person named in a committed fixture.
+ */
+const DISPLAY_NAMES: Record<string, string> = {
+  'arjun@ourdomain.com': 'Arjun Mehta',
+  'lead01@acmerealty.com': 'Sarah Chen',
+  'lead02@acmerealty.com': 'Daniel Okafor',
+  'lead03@acmerealty.com': 'Priya Nair',
+  'lead04@acmerealty.com': 'Marcus Webb',
+  'lead05@acmerealty.com': 'Elena Rossi',
+};
 
 interface Args {
   mailboxId: number;
@@ -103,9 +123,16 @@ function imapClient(conn: MailboxConnection): ImapFlow {
  * existing corpus. Deterministic per run and order-independent: the same real
  * address always maps to the same placeholder within one capture.
  */
-function scrub(raw: string, ownAddress: string): { text: string; map: Map<string, string> } {
+function scrub(rawInput: string, ownAddress: string): { text: string; map: Map<string, string> } {
   const map = new Map<string, string>();
   let leadCount = 0;
+
+  // Quoted-printable soft line breaks split addresses across lines
+  // (`worksambhav26@gm=\r\nail.com`), so ADDRESS_RE never matches them and
+  // neither does the leak check — the scrub silently fails on any QP body,
+  // which is most real mail. Soft breaks are semantically nothing, so joining
+  // them first is a lossless QP transformation and makes the scrub sound.
+  const raw = rawInput.replace(/=\r?\n/g, '');
 
   const placeholderFor = (address: string): string => {
     const lower = address.toLowerCase();
@@ -122,9 +149,55 @@ function scrub(raw: string, ownAddress: string): { text: string; map: Map<string
     return placeholder;
   };
 
-  const text = raw.replace(ADDRESS_RE, (match) => placeholderFor(match));
+  const scrubbed = raw.replace(ADDRESS_RE, (match) => placeholderFor(match));
+
+  // Addresses are not the only PII in a real message. `From: Sambhav Jain
+  // <lead01@acmerealty.com>` still names a person, and this corpus is
+  // committed — so rewrite the display name attached to any address we just
+  // replaced. Provider identities keep theirs (they name a system, not a
+  // human, and the classifier may match on them).
+  const realNames = new Set<string>();
+  const withNames = scrubbed.replace(
+    /(^|[\s:;,<])"?([^"<>\n]{1,80}?)"?\s*<([A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,})>/g,
+    (whole, lead: string, name: string, address: string) => {
+      const display = DISPLAY_NAMES[address.toLowerCase()];
+      if (display === undefined) return whole;
+      const trimmed = name.trim();
+      if (trimmed.length > 2 && !trimmed.includes('@')) realNames.add(trimmed);
+      return `${lead}${display} <${address}>`;
+    },
+  );
+
+  // A name found in a header almost always recurs in the quoted body and the
+  // signature ("Hi Sambhav," / "Sambhav Jain"). Replacing the literal string
+  // everywhere is a blunt instrument, but leaving a real person named in a
+  // committed corpus is worse, and a header-only scrub reads as complete when
+  // it is not.
+  // Also derive tokens from the real ADDRESSES. A signature says "Sambhav
+  // Jain" while the address is jainsambhav2605@ — the shared token is what
+  // links them, and harvesting display names alone misses prose the header
+  // never contained.
+  for (const real of map.keys()) {
+    const local = real.split('@')[0] ?? '';
+    for (const token of local.split(/[^a-z]+/i)) {
+      if (token.length >= 5) realNames.add(token);
+    }
+  }
+
+  let text = withNames;
+  // Longest first: replacing "Sambhav" before "Sambhav Jain" would leave a
+  // dangling surname.
+  for (const name of [...realNames].sort((a, b) => b.length - a.length)) {
+    text = text.replace(new RegExp(escapeRegExp(name), 'gi'), '[scrubbed]');
+    const first = name.split(/\s+/)[0];
+    if (first && first.length >= 5 && first !== name) {
+      text = text.replace(new RegExp(escapeRegExp(first), 'gi'), '[scrubbed]');
+    }
+  }
   return { text, map };
 }
+
+const escapeRegExp = (s: string): string => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 
 /**
  * List the mailbox's IMAP folders. Needed because `poll_folders` (0012) takes
@@ -250,8 +323,15 @@ export async function main(argv: string[] = process.argv.slice(2)): Promise<numb
     if (map.size === 0) console.log('  (none — only provider identities present)');
     for (const [real, placeholder] of map) console.log(`  ${real}  →  ${placeholder}`);
 
+    // The scrubbed text still contains addresses — the PLACEHOLDERS we just
+    // wrote. Excluding them is what makes this check answer the question it is
+    // actually asking ("did any REAL address survive?"). Without it the guard
+    // fires on its own output and the tool can never write a fixture.
+    const placeholders = new Set([...map.values()].map((v) => v.toLowerCase()));
     const remaining = text.match(ADDRESS_RE) ?? [];
-    const leaked = remaining.filter((a) => !PRESERVE.some((re) => re.test(a.toLowerCase())));
+    const leaked = remaining.filter(
+      (a) => !PRESERVE.some((re) => re.test(a.toLowerCase())) && !placeholders.has(a.toLowerCase()),
+    );
     if (leaked.length > 0) {
       console.error(`\nREFUSING TO WRITE — unscrubbed addresses remain: ${leaked.join(', ')}`);
       return 1;
