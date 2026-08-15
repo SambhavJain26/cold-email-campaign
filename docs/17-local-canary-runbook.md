@@ -145,6 +145,34 @@ correct two terminal outcomes and two 1/1 manual variant rows, and the final pro
 check returned `checked 6 enrollments — 0 diff(s)`. The completed test campaign is paused to prevent
 accidental future enrollment. No prospect, external-domain, DNS, or real-domain work was performed.
 
+### ⚠️ Compressed canary settings — MUST be reverted before real domains (2026-08-16)
+
+The accelerated §§3–7 run deliberately traded safety margin for speed, on the operator's explicit
+instruction ("change whatever setting you want; we revert before the real campaign"). **Every row
+below is currently unsafe for a real campaign.** A pre-change snapshot is on the VM at
+`~/canary-settings-snapshot-2026-08-15.sql` (`pg_dump --data-only` of `settings` + `mailboxes`).
+
+| Setting | Safe value | Canary value | Why it is unsafe |
+|---|---|---|---|
+| `settings.enforce_send_window` | `true` | **`false`** | Sends at any hour, any day — including weekends |
+| `settings.max_mailbox_daily_cap` | 50 | **200** | Raises the ceiling the guardrail exists to hold |
+| `settings.pause_min_sends` | 25 | **5** | Auto-pause engages on a tiny, noisy sample |
+| `mailboxes.daily_cap` (both) | 5 | **100** | 20× the warmed-mailbox volume |
+| `mailboxes.poll_folders` | — | `{INBOX,[Gmail]/Spam}` | **Keep this** — it is finding 13's fix, not a compression |
+
+`min_ramp_days` remains 0 (its shipped default), so staged enrollment is still unenforced.
+
+The domain-readiness preflight reports the raised caps and `min_ramp_days: 0` as **not
+launch-ready**, so this table is belt-and-braces rather than the only guard.
+
+> **Trap hit while doing this, worth not repeating.** `poll_folders` was first set with plain SQL,
+> which skips the UIDNEXT seeding the API route performs — so the next poll would have ingested
+> both accounts' entire Spam folders (144 and 13 messages) as third-party PII. Caught and reverted
+> before the 5-minute cron fired. **Changing `poll_folders` outside the API means seeding
+> `mailbox_poll_cursors` for the new folder in the same transaction**; `capture-fixture --folders`
+> now prints each folder's UIDNEXT for exactly this purpose. Finding 16 applies per folder, and it
+> is easy to forget that a manual edit bypasses the guard that normally handles it.
+
 ### Post-canary real-domain implementation backlog — approved, not started (2026-08-13)
 
 After the controlled ten-day Gmail learning canary is complete, and before any real-domain

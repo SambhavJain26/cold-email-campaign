@@ -139,7 +139,16 @@ async function listFolders(conn: MailboxConnection): Promise<void> {
   try {
     for (const box of await client.list()) {
       const flags = [...box.flags].join(' ');
-      console.log(`  ${box.path.padEnd(28)} ${flags}`);
+      if (flags.includes('\\Noselect')) {
+        console.log(`  ${box.path.padEnd(28)} uidNext=-       ${flags}`);
+        continue;
+      }
+      // uidNext is what a new folder's cursor MUST be seeded to (finding 16,
+      // per folder since 0012) — a cursor of 0 re-ingests the whole folder.
+      const status = await client.status(box.path, { uidNext: true });
+      console.log(
+        `  ${box.path.padEnd(28)} uidNext=${String(status.uidNext ?? '?').padEnd(8)}${flags}`,
+      );
     }
   } finally {
     await client.logout().catch(() => client.close());
@@ -204,7 +213,12 @@ export async function main(argv: string[] = process.argv.slice(2)): Promise<numb
     usage();
     return 1;
   }
-  if (!args.list && (args.uid === undefined || Number.isNaN(args.uid) || !args.name)) {
+  // --list and --folders are inspection modes: neither needs --uid/--name.
+  if (
+    !args.list &&
+    !args.folders &&
+    (args.uid === undefined || Number.isNaN(args.uid) || !args.name)
+  ) {
     usage();
     return 1;
   }
