@@ -1,5 +1,5 @@
 import { useDeferredValue, useState } from 'react';
-import { Upload } from 'lucide-react';
+import { Plus, Upload } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { ENROLLMENT_STATES, type LeadDto, type LeadTier } from '@coldemail/shared';
 import { Button } from '@/components/ui/button';
@@ -21,6 +21,7 @@ import { TierBadge } from '@/components/shared/tier-badge';
 import { useCampaignParam } from '@/components/layout/campaign-selector';
 import { useLeads, type LeadsQuery } from '@/api/queries/leads';
 import { BulkTierBar } from './bulk-tier-bar';
+import { AddLeadDialog } from './add-lead-dialog';
 import { ImportWizard } from './import-wizard';
 import { TierHeader } from './tier-header';
 
@@ -40,6 +41,7 @@ export default function LeadsPage() {
   const [selected, setSelected] = useState<Set<number>>(new Set());
   const [allMatching, setAllMatching] = useState(false);
   const [importOpen, setImportOpen] = useState(false);
+  const [addOpen, setAddOpen] = useState(false);
 
   const query: LeadsQuery = {
     page,
@@ -151,10 +153,16 @@ export default function LeadsPage() {
     <div className="space-y-4 p-6">
       <div className="flex items-center justify-between">
         <h1 className="text-lg font-semibold">Leads</h1>
-        <Button size="sm" onClick={() => setImportOpen(true)}>
-          <Upload className="size-4" /> Import CSV
-        </Button>
+        <div className="flex items-center gap-2">
+          <Button size="sm" variant="outline" onClick={() => setAddOpen(true)}>
+            <Plus className="size-4" /> Add lead
+          </Button>
+          <Button size="sm" onClick={() => setImportOpen(true)}>
+            <Upload className="size-4" /> Import CSV
+          </Button>
+        </div>
       </div>
+      <AddLeadDialog open={addOpen} onOpenChange={setAddOpen} />
 
       <TierHeader total={data.total} untiered={data.untiered_count} />
 

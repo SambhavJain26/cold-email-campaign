@@ -6,6 +6,7 @@
 import { http, HttpResponse, type RequestHandler } from 'msw';
 import {
   bulkTierBodySchema,
+  createLeadBodySchema,
   changePasswordBodySchema,
   commitImportBodySchema,
   complianceSchema,
@@ -408,6 +409,36 @@ export const handlers: RequestHandler[] = [
       if (body.custom_fields !== undefined) lead.custom_fields = body.custom_fields;
       if (body.notes !== undefined) db.leadNotes.set(lead.id, body.notes);
       return HttpResponse.json(lead);
+    }),
+  ),
+  // Finding 10. Mirrors the refusal shape of the real ingest path so the
+  // dialog's error rendering is exercised in mock mode too.
+  http.post(
+    `${BASE}/leads`,
+    authed(async ({ request }) => {
+      const body = await parseBody(request, createLeadBodySchema);
+      if (body instanceof Response) return body;
+      const email = body.email.trim().toLowerCase();
+      const local = email.split('@')[0] ?? '';
+      if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email))
+        return HttpResponse.json({ created: false, reason: 'invalid' });
+      if (db.leads.some((l) => l.email.toLowerCase() === email))
+        return HttpResponse.json({ created: false, reason: 'duplicate' });
+      if (['info', 'sales', 'support', 'admin', 'hello', 'contact'].includes(local))
+        return HttpResponse.json({ created: false, reason: 'role_based' });
+      db.leads.unshift({
+        id: db.nextId++,
+        email,
+        first_name: body.first_name ?? null,
+        last_name: body.last_name ?? null,
+        company: body.company ?? null,
+        city: body.city ?? null,
+        state: body.state ?? null,
+        tier: null, // decision R — imported leads start untiered
+        is_suppressed: false,
+        custom_fields: {},
+      });
+      return HttpResponse.json({ created: true });
     }),
   ),
   http.post(

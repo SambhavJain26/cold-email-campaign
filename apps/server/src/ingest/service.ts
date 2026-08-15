@@ -160,3 +160,68 @@ export async function commitImport(
 
 /** Re-export the parse contract for API-layer use (B6.4). */
 export type { ParsedRow };
+
+// ── single-lead creation (finding 10) ────────────────────────────────────────
+
+/**
+ * Adding one lead used to mean hand-writing a CSV. That was deliberate — the
+ * ingest path owns normalization, dedup, hygiene flags and the commit-time
+ * suppression re-check — but it made a routine action absurd.
+ *
+ * So this does NOT reimplement any of that. It builds a one-row CSV and runs
+ * the SAME preview + commit the upload path runs, which is the only way to be
+ * certain the two cannot diverge. The cost is one `imports` row per lead,
+ * which is honest: it really is an import, and it keeps the audit trail whole.
+ */
+export interface SingleLeadInput {
+  email: string;
+  first_name?: string;
+  last_name?: string;
+  company?: string;
+  website?: string;
+  city?: string;
+  state?: string;
+  phone?: string;
+  notes?: string;
+}
+
+export interface SingleLeadResult {
+  created: boolean;
+  /** Populated when created is false — the hygiene flag that refused the row. */
+  reason?: ImportRowFlag;
+}
+
+/** RFC 4180: wrap in quotes and double any embedded quote. */
+function csvCell(value: string): string {
+  return `"${value.replaceAll('"', '""')}"`;
+}
+
+export async function createSingleLead(
+  deps: IngestDeps,
+  input: SingleLeadInput,
+): Promise<SingleLeadResult> {
+  const columns = Object.keys(input) as (keyof SingleLeadInput)[];
+  const header = columns.join(',');
+  const row = columns.map((c) => csvCell(input[c] ?? '')).join(',');
+  const content = Buffer.from(`${header}\n${row}\n`, 'utf8');
+
+  const preview = await createImportPreview(deps, {
+    filename: `single-lead:${input.email}`,
+    content,
+  });
+
+  // drop_flagged is the strict mode: role-based addresses are refused too, so
+  // a single add can never be laxer than the bulk path's safe default.
+  const result = await commitImport(deps, { importId: preview.importId, mode: 'drop_flagged' });
+  if (result.inserted === 1) return { created: true };
+
+  const rows = await listRowsByFlags(deps.db, preview.importId, [
+    'invalid',
+    'duplicate',
+    'suppressed',
+    'role_based',
+    'ok',
+    'missing_first_name',
+  ]);
+  return { created: false, reason: rows[0]?.flag ?? 'invalid' };
+}

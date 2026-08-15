@@ -1,13 +1,29 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import {
   bulkTierResponseSchema,
+  createLeadResponseSchema,
   leadSchema,
   okResponseSchema,
   type BulkTierBody,
+  type CreateLeadBody,
   type PatchLeadBody,
 } from '@coldemail/shared';
 import { apiFetch } from '../client';
 import { invalidateOperational } from '../operational-cache';
+
+/**
+ * Finding 10. A refusal is a 200 with `created:false`, not an error — the row
+ * being rejected by hygiene is a normal outcome the caller must render, so
+ * the global mutation error toast must NOT fire for it.
+ */
+export function useCreateLead() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (body: CreateLeadBody) =>
+      apiFetch('/leads', createLeadResponseSchema, { method: 'POST', body }),
+    onSuccess: () => invalidateOperational(qc),
+  });
+}
 
 export function usePatchLead() {
   const qc = useQueryClient();

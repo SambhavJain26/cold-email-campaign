@@ -73,6 +73,7 @@ const CONTRACT_ROUTES = [
   'PUT /api/v1/compliance',
   'GET /api/v1/alerts',
   'POST /api/v1/alerts/:id/ack',
+  'POST /api/v1/leads',
   'GET /api/v1/system/preflight',
   'GET /api/v1/system/status',
   'POST /api/v1/system/rebuild-projections',

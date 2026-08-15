@@ -77,6 +77,36 @@ export const leadDetailResponseSchema = leadSchema
   })
   .strict();
 
+/**
+ * Single-lead creation (finding 10). Deliberately routed through the SAME
+ * ingest path as a CSV upload, so normalization, dedup, hygiene and the
+ * commit-time suppression re-check cannot diverge between the two.
+ */
+export const createLeadBodySchema = z
+  .object({
+    email: z.string().min(1),
+    first_name: z.string().optional(),
+    last_name: z.string().optional(),
+    company: z.string().optional(),
+    website: z.string().optional(),
+    city: z.string().optional(),
+    state: z.string().optional(),
+    phone: z.string().optional(),
+    notes: z.string().optional(),
+  })
+  .strict();
+export type CreateLeadBody = z.infer<typeof createLeadBodySchema>;
+
+/** `created:false` carries the hygiene flag that refused the row. */
+export const createLeadResponseSchema = z
+  .object({
+    created: z.boolean(),
+    reason: z
+      .enum(['invalid', 'duplicate', 'suppressed', 'role_based', 'ok', 'missing_first_name'])
+      .optional(),
+  })
+  .strict();
+
 export const patchLeadBodySchema = z
   .object({
     tier: z.enum(LEAD_TIERS).nullable().optional(),

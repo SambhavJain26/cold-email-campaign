@@ -11,6 +11,8 @@ import {
   leadDetailResponseSchema,
   leadSchema,
   leadsListResponseSchema,
+  createLeadBodySchema,
+  createLeadResponseSchema,
   leadsQuerySchema,
   okResponseSchema,
   patchLeadBodySchema,
@@ -38,6 +40,7 @@ import { getCampaign } from '../db/repos/campaignsRepo';
 import { buildEvent } from '../domain/events';
 import { insertAlert } from '../db/repos/alertsRepo';
 import { bulkTier } from '../services/tiering';
+import { createSingleLead } from '../ingest/service';
 import { AppError } from './errors';
 import type { ZodTypeProvider } from './plugins/zodCompilers';
 
@@ -102,6 +105,15 @@ export async function leadsRoutes(app: FastifyInstance, services: AppServices): 
         untiered_count: await untieredCount(db),
       };
     },
+  );
+
+  // Finding 10. Runs the SAME preview+commit as a CSV upload rather than
+  // inserting directly, so hygiene, dedup and the commit-time suppression
+  // re-check are provably identical to the bulk path. Costs one imports row.
+  r.post(
+    '/leads',
+    { schema: { body: createLeadBodySchema, response: { 200: createLeadResponseSchema } } },
+    async (req) => createSingleLead({ db }, req.body),
   );
 
   r.get(
