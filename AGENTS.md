@@ -9,6 +9,9 @@ The project is in **pre-real-domain testing**. Until the operator explicitly cha
   production mailbox configuration, Caddy/domain changes, or other deployment features.
 - Do not start a real cohort or send new external campaign mail without explicit approval for that
   specific send.
+- The approved, controlled Gmail acceptance batch is complete. The test campaign is paused; do
+  not resume it or create additional test sends without new, per-send operator approval. Read the
+  runbook for the authoritative recipient, outcome, and verification record.
 - The unsubscribe URL design in `docs/16-deployment-ops.md` is a future deployment plan, not
   implemented functionality.
 
