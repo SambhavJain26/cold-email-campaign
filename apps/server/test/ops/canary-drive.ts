@@ -19,6 +19,8 @@
 import { loadConfig } from '../../src/config/env';
 import { compose } from '../../src/composition';
 import { listMailboxes } from '../../src/db/repos/mailboxesRepo';
+import { runSelfCheckJob } from '../../src/jobs/integrity';
+import { DbAlertSink } from '../../src/alerts/emitter';
 
 /**
  * pg-boss holds delayed jobs with `startafter` in the future. Pulling that
@@ -71,6 +73,25 @@ async function main(): Promise<void> {
         await new Promise((r) => setTimeout(r, 8_000));
         break;
       }
+      case 'self-check': {
+        // The DAILY job, not the shape-independent CLI: only this path runs
+        // the backup-freshness probe alongside the invariants (docs/16 §4).
+        const result = await runSelfCheckJob({
+          db: services.db,
+          // Alerts are not on AppServices, so build the same sink composition
+          // builds — without the webhook, which a manual run should not fire.
+          alerts: new DbAlertSink(services.db),
+          ...(config.BACKUP_DIR !== undefined && { backupDir: config.BACKUP_DIR }),
+          now: () => services.clock.now(),
+        });
+        console.log(
+          JSON.stringify({
+            violations: result.violations.length,
+            backupStale: result.backupStale,
+          }),
+        );
+        break;
+      }
       case 'status': {
         const boxes = await listMailboxes(services.db);
         for (const m of boxes) {
@@ -82,7 +103,9 @@ async function main(): Promise<void> {
         break;
       }
       default:
-        console.error('usage: canary-drive.ts tick | poll [mailboxId] | confirm-now | status');
+        console.error(
+          'usage: canary-drive.ts tick | poll [mailboxId] | confirm-now | self-check | status',
+        );
         process.exitCode = 1;
     }
   } finally {
