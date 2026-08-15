@@ -99,6 +99,7 @@ Shapes below in TS notation. `Metric = { numerator: number, denominator: number 
 | GET `/u/:token` | **Not under `/api/v1`.** Unauthenticated, no CSRF. Returns an HTML confirmation page and **never unsubscribes** — scanners and privacy proxies prefetch links. An unknown token renders the same generic page as a valid one (no enumeration oracle) |
 | POST `/u/:token` | **Not under `/api/v1`.** Unauthenticated, no CSRF — Gmail's RFC 8058 one-click POST carries neither cookie nor custom header. Appends `unsubscribe` with `source: 'link'` and creates the global suppression; idempotent when the enrollment is already `UNSUBSCRIBED`. Returns HTML, not JSON. Never logs the token, email or lead id |
 | GET `/system/status` | → `{scheduler_last_tick_at, transport_mode, pollers: {mailbox_id, last_successful_poll_at}[], pending_jobs}` |
+| GET `/system/preflight` | → `{ready, checks: {id, label, status, detail}[]}` where `status` is `pass\|warn\|fail\|unknown`. Read-only domain-readiness report (docs/16 §8 item 3): SPF/DMARC/DKIM/MX per distinct sending domain plus compliance address, mailbox health, caps and staged enrollment. `ready` means nothing **failed** — it is not a deliverability promise, and DKIM reports `unknown` rather than `fail` because selectors cannot be enumerated over DNS |
 | POST `/system/rebuild-projections` | `{dry_run: boolean}` → `{diffs: number, details?}` |
 
 ## Pre-canary contract additions

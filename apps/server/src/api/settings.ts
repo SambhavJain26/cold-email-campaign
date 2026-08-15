@@ -52,6 +52,9 @@ function toSettingsDto(row: SettingsRow): SettingsDto {
     send_jitter_pct: row.sendJitterPct,
     default_timezone: row.defaultTimezone,
     cold_storage_rest_days: row.coldStorageRestDays,
+    max_mailbox_daily_cap: row.maxMailboxDailyCap,
+    max_ramp_daily_enroll_cap: row.maxRampDailyEnrollCap,
+    min_ramp_days: row.minRampDays,
     updated_at: row.updatedAt.toISOString(),
   };
 }
@@ -75,6 +78,9 @@ function toSettingsColumns(body: PutSettingsBody) {
     sendJitterPct: body.send_jitter_pct,
     defaultTimezone: body.default_timezone,
     coldStorageRestDays: body.cold_storage_rest_days,
+    maxMailboxDailyCap: body.max_mailbox_daily_cap,
+    maxRampDailyEnrollCap: body.max_ramp_daily_enroll_cap,
+    minRampDays: body.min_ramp_days,
   };
 }
 

@@ -43,6 +43,8 @@ import {
   recycle,
   type EnrollResult,
 } from '../services/enrollment';
+import { getSettings } from '../db/repos/settingsRepo';
+import { checkRamp } from '../services/guardrails';
 import { AppError } from './errors';
 import type { ZodTypeProvider } from './plugins/zodCompilers';
 
@@ -98,6 +100,16 @@ export async function campaignsRoutes(app: FastifyInstance, services: AppService
       if (!(await getSequenceNested(db, req.body.sequence_id))) {
         throw AppError.notFound('sequence');
       }
+      // Launch guardrail (0011). Ramp is create-only (docs/12 §6(d)), so this
+      // is the single point where an unsafe ramp could enter the system.
+      const s = await getSettings(db);
+      const violation = checkRamp(req.body.ramp_config, {
+        maxMailboxDailyCap: s.maxMailboxDailyCap,
+        maxRampDailyEnrollCap: s.maxRampDailyEnrollCap,
+        minRampDays: s.minRampDays,
+      });
+      if (violation) throw new AppError('validation', 422, violation);
+
       const row = await createCampaign(db, {
         name: req.body.name,
         sequenceId: req.body.sequence_id,

@@ -175,6 +175,36 @@ export function RulesTab({
         </CardContent>
       </Card>
 
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-sm">Launch guardrails</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-3">
+          <p className="text-xs text-muted-foreground">
+            Ceilings on what can be <em>configured</em>, so a mistyped cap cannot create an unsafe
+            first-day volume. A configuration inside these limits is permitted, not safe — warming
+            and authentication are still separate work.
+          </p>
+          <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
+            {num(
+              'max_mailbox_daily_cap',
+              'Max mailbox daily cap',
+              'A mailbox cannot be saved with a higher daily cap.',
+            )}
+            {num(
+              'max_ramp_daily_enroll_cap',
+              'Max ramp enroll/day',
+              'A campaign cannot be created with a higher ramp cap.',
+            )}
+            {num(
+              'min_ramp_days',
+              'Min ramp days',
+              '0 = staged enrollment not enforced. Set this before a real launch.',
+            )}
+          </div>
+        </CardContent>
+      </Card>
+
       <div className="flex items-center gap-3">
         <Button type="submit" disabled={put.isPending || !isDirty}>
           Save rules

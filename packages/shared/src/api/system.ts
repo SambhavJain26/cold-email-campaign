@@ -37,6 +37,25 @@ export const systemStatusResponseSchema = z
 
 export const rebuildBodySchema = z.object({ dry_run: z.boolean() }).strict();
 
+/**
+ * Domain-readiness preflight (docs/16 §8 item 3). `ready` means no check
+ * FAILED — it is not a deliverability promise; warming, list quality and
+ * consent are outside anything the app can inspect.
+ */
+export const preflightCheckSchema = z
+  .object({
+    id: z.string(),
+    label: z.string(),
+    status: z.enum(['pass', 'warn', 'fail', 'unknown']),
+    detail: z.string(),
+  })
+  .strict();
+
+export const preflightResponseSchema = z
+  .object({ ready: z.boolean(), checks: z.array(preflightCheckSchema) })
+  .strict();
+export type PreflightReportDto = z.infer<typeof preflightResponseSchema>;
+
 export const rebuildResponseSchema = z
   .object({
     diffs: z.number().int(),

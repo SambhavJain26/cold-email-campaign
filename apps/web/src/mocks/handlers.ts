@@ -1053,6 +1053,58 @@ export const handlers: RequestHandler[] = [
   ),
 
   // ── system ────────────────────────────────────────────────────────────────
+  // Preflight against the mock's own state: no domains are configured in the
+  // fixture, so it reports the honest not-launch-ready shape an operator sees
+  // before buying anything.
+  http.get(
+    `${BASE}/system/preflight`,
+    authed(() =>
+      HttpResponse.json({
+        ready: false,
+        checks: [
+          {
+            id: 'compliance_address',
+            label: 'Compliance postal address',
+            status: 'pass',
+            detail: 'Set. It is published in every email, so confirm it is not a home address.',
+          },
+          {
+            id: 'unsubscribe_endpoint',
+            label: 'Unsubscribe endpoint',
+            status: db.compliance.unsubscribe_base_url.trim() === '' ? 'warn' : 'pass',
+            detail:
+              db.compliance.unsubscribe_base_url.trim() === ''
+                ? 'Not configured — opt-out is reply-STOP only. Legal, but weak at volume.'
+                : 'Configured. Gmail one-click is only proven once a real recipient uses it.',
+          },
+          {
+            id: 'mailbox_health',
+            label: 'Mailbox health',
+            status: db.mailboxes.every((m) => m.status === 'ok') ? 'pass' : 'fail',
+            detail: `${db.mailboxes.length} mailbox(es) configured.`,
+          },
+          {
+            id: 'staged_enrollment',
+            label: 'Staged enrollment enforced',
+            status: 'warn',
+            detail: 'min_ramp_days is 0. Set it before a real launch.',
+          },
+          {
+            id: 'spf:agency.dev',
+            label: 'SPF — agency.dev',
+            status: 'fail',
+            detail: 'No v=spf1 TXT record.',
+          },
+          {
+            id: 'dkim:agency.dev',
+            label: 'DKIM — agency.dev',
+            status: 'unknown',
+            detail: 'No key found at any common selector — this is not proof DKIM is missing.',
+          },
+        ],
+      }),
+    ),
+  ),
   http.get(
     `${BASE}/system/status`,
     authed(() =>

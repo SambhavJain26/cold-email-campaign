@@ -59,10 +59,15 @@ export function createLogger(
         headers?: Record<string, unknown>;
         socket?: { remotePort?: number };
       }) {
+        // Pick fields explicitly. NEVER spread the raw request: it carries the
+        // parsed body, so `{...req}` puts every POSTed password in the log
+        // line (B7.1's sentinel grep catches that). `headers` is safe and is
+        // kept deliberately — REDACT_PATHS scrubs cookie/authorization, and
+        // dropping it would blind the request log for debugging.
         return {
           method: req.method,
           url: typeof req.url === 'string' ? redactUrl(req.url) : req.url,
-          host: req.headers?.host,
+          headers: req.headers,
           remoteAddress: req.ip,
           remotePort: req.socket?.remotePort,
         };

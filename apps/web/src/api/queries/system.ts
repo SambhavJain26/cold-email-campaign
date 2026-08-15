@@ -1,7 +1,23 @@
 import { useQuery } from '@tanstack/react-query';
-import { incomingMessagesResponseSchema, systemStatusResponseSchema } from '@coldemail/shared';
+import {
+  incomingMessagesResponseSchema,
+  preflightResponseSchema,
+  systemStatusResponseSchema,
+} from '@coldemail/shared';
 import { apiFetch } from '../client';
 import { POLL } from '../queryClient';
+
+/**
+ * Domain-readiness preflight. Not polled — it does live DNS lookups, and the
+ * answer only changes when the operator changes DNS or settings.
+ */
+export function usePreflight() {
+  return useQuery({
+    queryKey: ['system', 'preflight'],
+    queryFn: () => apiFetch('/system/preflight', preflightResponseSchema),
+    staleTime: Infinity,
+  });
+}
 
 export function useSystemStatus() {
   return useQuery({

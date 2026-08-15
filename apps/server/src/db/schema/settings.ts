@@ -24,6 +24,11 @@ export const settings = pgTable('settings', {
   sendJitterPct: integer('send_jitter_pct').notNull().default(20),
   defaultTimezone: text('default_timezone').notNull().default('America/New_York'),
   coldStorageRestDays: integer('cold_storage_rest_days').notNull().default(60),
+  // Launch guardrails (0011): ceilings on what may be CONFIGURED, so a typo
+  // cannot create an unsafe first-day volume. minRampDays 0 = not enforced.
+  maxMailboxDailyCap: integer('max_mailbox_daily_cap').notNull().default(50),
+  maxRampDailyEnrollCap: integer('max_ramp_daily_enroll_cap').notNull().default(25),
+  minRampDays: integer('min_ramp_days').notNull().default(0),
   updatedAt: tz('updated_at').notNull().defaultNow(),
 });
 

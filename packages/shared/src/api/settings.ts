@@ -27,6 +27,16 @@ export const settingsSchema = z
     send_jitter_pct: pct,
     default_timezone: z.string().min(1),
     cold_storage_rest_days: z.number().int().min(0),
+    /**
+     * Launch guardrails (docs/16 §8 item 2) — ceilings on what may be
+     * CONFIGURED, checked at mailbox/campaign write time. They bound a
+     * configuration mistake, not reputation: warming stays operator work.
+     * `min_ramp_days` 0 means staged enrollment is not enforced, which the
+     * domain-readiness preflight reports as not-launch-ready.
+     */
+    max_mailbox_daily_cap: z.number().int().min(1).max(500),
+    max_ramp_daily_enroll_cap: z.number().int().min(1).max(500),
+    min_ramp_days: z.number().int().min(0).max(90),
   })
   .strict();
 

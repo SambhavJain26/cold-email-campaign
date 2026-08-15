@@ -483,6 +483,12 @@ function build(): MockDb {
       send_jitter_pct: 20,
       default_timezone: 'America/New_York',
       cold_storage_rest_days: 30,
+      // Launch guardrails (0011). NOTE: `settings` is typed Record<string,
+      // unknown> here, so TypeScript will NOT catch a field missing from this
+      // fixture — the client's zod parse fails at runtime instead.
+      max_mailbox_daily_cap: 50,
+      max_ramp_daily_enroll_cap: 25,
+      min_ramp_days: 0,
       updated_at: '2026-01-04T12:00:00.000Z',
     },
     compliance: {

@@ -23,6 +23,8 @@ import { DbAlertSink } from './alerts/emitter';
 import { HttpAlertWebhook } from './alerts/webhook';
 import { systemRng, type Rng } from './util/rng';
 import { MetricsEngine } from './services/metrics';
+import { createDnsResolver } from './services/dnsResolver';
+import type { DnsResolver } from './services/preflight';
 import { InlineJobQueue, SimulationDriver } from './services/simulation';
 import { isSteppable } from './clock';
 import { VirtualClock } from './clock/virtual';
@@ -45,6 +47,8 @@ export interface AppServices {
   metrics: MetricsEngine;
   /** Present ONLY when config.SIMULATED_CLOCK (B6.12 advance-clock). */
   simulation?: SimulationDriver;
+  /** Domain-readiness preflight's DNS port — injected so it is testable offline. */
+  dns: DnsResolver;
 }
 
 export interface ComposeOverrides {
@@ -57,6 +61,8 @@ export interface ComposeOverrides {
   jobPort?: JobPort;
   /** Tests inject a StaticSequenceProvider instead of the DB-backed one. */
   sequences?: SequenceProvider;
+  /** Tests inject a fake resolver so preflight needs no network. */
+  dns?: DnsResolver;
 }
 
 export function compose(config: Config, overrides: ComposeOverrides = {}): AppServices {
@@ -167,6 +173,7 @@ export function compose(config: Config, overrides: ComposeOverrides = {}): AppSe
     sequences,
     renderer,
     metrics: new MetricsEngine(db),
+    dns: overrides.dns ?? createDnsResolver(),
     ...(simulation && { simulation }),
   };
 }

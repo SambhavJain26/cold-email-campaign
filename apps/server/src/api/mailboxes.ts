@@ -27,6 +27,9 @@ import {
   type MailboxRow,
 } from '../db/repos/mailboxesRepo';
 import { mailboxVolume } from '../db/repos/metricsRepo';
+import { getSettings } from '../db/repos/settingsRepo';
+import { checkMailboxDailyCap } from '../services/guardrails';
+import type { Db } from '../db/client';
 import { mailboxStatsFor, type MailboxStats } from '../services/mailboxStats';
 import { resumeMailbox } from '../services/autoPause';
 import { mailboxImbalance } from '../services/metrics/watchRules';
@@ -69,6 +72,18 @@ function patchColumns(body: PatchMailboxBody) {
     ...(body.send_window !== undefined && { sendWindow: body.send_window }),
     ...(body.timezone !== undefined && { timezone: body.timezone }),
   };
+}
+
+/** Launch guardrail (0011): refuse a cap above the configured ceiling. */
+async function assertDailyCapWithinGuardrail(db: Db, dailyCap: number | undefined): Promise<void> {
+  if (dailyCap === undefined) return;
+  const s = await getSettings(db);
+  const violation = checkMailboxDailyCap(dailyCap, {
+    maxMailboxDailyCap: s.maxMailboxDailyCap,
+    maxRampDailyEnrollCap: s.maxRampDailyEnrollCap,
+    minRampDays: s.minRampDays,
+  });
+  if (violation) throw new AppError('validation', 422, violation);
 }
 
 function assertIanaTimezone(timezone: string): void {
@@ -168,6 +183,7 @@ export async function mailboxesRoutes(app: FastifyInstance, services: AppService
     async (req) => {
       const b = req.body;
       if (b.timezone !== undefined) assertIanaTimezone(b.timezone);
+      await assertDailyCapWithinGuardrail(db, b.daily_cap);
       const row = await createMailbox(db, {
         displayName: b.display_name,
         fromAddress: b.from_address,
@@ -213,6 +229,7 @@ export async function mailboxesRoutes(app: FastifyInstance, services: AppService
     async (req) => {
       await requireMailbox(req.params.id);
       if (req.body.timezone !== undefined) assertIanaTimezone(req.body.timezone);
+      await assertDailyCapWithinGuardrail(db, req.body.daily_cap);
       const cols = patchColumns(req.body);
       if (Object.keys(cols).length > 0) await patchMailbox(db, req.params.id, cols);
       if (req.body.password !== undefined) {

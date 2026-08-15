@@ -7,6 +7,7 @@ import {
   advanceClockResponseSchema,
   incomingMessagesQuerySchema,
   incomingMessagesResponseSchema,
+  preflightResponseSchema,
   rebuildBodySchema,
   rebuildResponseSchema,
   systemStatusResponseSchema,
@@ -16,7 +17,8 @@ import type { AppServices } from '../composition';
 import { listIncoming, type IncomingMessageRow } from '../db/repos/incomingMessagesRepo';
 import { listMailboxes } from '../db/repos/mailboxesRepo';
 import { getById as getEnrollmentById } from '../db/repos/enrollmentsRepo';
-import { getSettings } from '../db/repos/settingsRepo';
+import { getComplianceSettings, getSettings } from '../db/repos/settingsRepo';
+import { runPreflight } from '../services/preflight';
 import { rebuildProjections } from '../services/rebuildProjections';
 import { loadCampaignShapes } from '../services/campaignShapes';
 import { AppError } from './errors';
@@ -143,6 +145,35 @@ export async function systemRoutes(app: FastifyInstance, services: AppServices):
         page,
         per_page,
       };
+    },
+  );
+
+  // Domain-readiness preflight (docs/16 §8 item 3). Read-only: it inspects
+  // DNS and configuration and changes nothing. `ready` means nothing FAILED,
+  // not that sending is safe — warming and consent are outside its reach.
+  r.get(
+    '/system/preflight',
+    { schema: { response: { 200: preflightResponseSchema } } },
+    async () => {
+      const [settings, compliance, mailboxes] = await Promise.all([
+        getSettings(db),
+        getComplianceSettings(db),
+        listMailboxes(db),
+      ]);
+      return runPreflight(
+        {
+          physicalAddress: compliance.physicalAddress,
+          unsubscribeBaseUrl: compliance.unsubscribeBaseUrl,
+          minRampDays: settings.minRampDays,
+          maxMailboxDailyCap: settings.maxMailboxDailyCap,
+          mailboxes: mailboxes.map((m) => ({
+            fromAddress: m.fromAddress,
+            status: m.status,
+            dailyCap: m.dailyCap,
+          })),
+        },
+        services.dns,
+      );
     },
   );
 
