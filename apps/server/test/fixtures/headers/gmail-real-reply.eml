@@ -1,0 +1,123 @@
+Delivered-To: arjun@ourdomain.com
+Received: by 2002:a05:612c:6f0b:b0:5cb:3ce1:8ae3 with SMTP id b11csp1016211vqa;
+        Thu, 13 Aug 2026 11:04:44 -0700 (PDT)
+X-Received: by 2002:a05:6402:2488:b0:6a1:23a4:737a with SMTP id 4fb4d7f45d1cf-6a38a8f529cmr192656a12.7.1786644284298;
+        Thu, 13 Aug 2026 11:04:44 -0700 (PDT)
+ARC-Seal: i=2; a=rsa-sha256; t=1786644284; cv=pass;
+        d=google.com; s=arc-20260327;
+        b=JgV+CsMaIORL1qnVzn8dyNXqsnaHhWz7lE/9v+gJf/DDd3CQ6YNoNvNvixiLOyZw3F
+         qogY4/8BbaK72WWTYGLqv9AdvCmb/ro4ydptQKwhqKz5ByxlA3vJ1F9TPHU22fHzq7NA
+         jNcEcgcw/qPIuHgLNsCGAbhYa0uNwzMqEYuggQGV2dZka/sMO0mKH+sk+1r5HLzK/clU
+         Fw5vgDUBWNtAKb0EZn/0DOBxFO43SmCB73ohLsBNvrEd3n5Tk1qwAJKW/uCStqNfVsEc
+         f0xofG7zy7Xrp1r6NwVq3Syjp5n7qpO2adViyIY3zWEa9dGvDNCCLsGWYRFiKzFsx9yB
+         Peuw=ARC-Message-Signature: i=2; a=rsa-sha256; c=relaxed/relaxed; d=google.com; s=arc-20260327;
+        h=cc:to:subject:message-id:date:from:in-reply-to:references
+         :mime-version:dkim-signature;
+        bh=kD+ovbrgY8R4bTQX5+DDye11gw2QJs4kmR6U56Gtkto=;
+        fh=aOW2ULdrS55NaP6fmlWhY5EkmfIgem1K6ZA4L7AJ6ZE=;
+        b=kmDbSGcCTgL+/j0V8KKS8yyXB+PdLGetPD/PvBZVj/BeMUbt9muBolkSmxHkE+KuQt
+         QgQ5GCbcD84C9Se4voi1TwqrulhYnpkxE21MGQMvSHOenGhYy7ZvqEtUimYN0MmtadAe
+         ShZmXUmoWb6qubHSwCCRdhPtc+3Kzjz8E0z/HufjKeluOySKxmqOkPKJx39+WibKnbgo
+         fa8ZIcszsy7yijSc4spff7bJx8WjOVQXmTdm9LBhIx1U1DYRPGoMqJlksmBX0Rn536xc
+         kN1alM34jW1nvhNUHLJyjUZdZrwPy+WiOEOpTUUb4/Kkzozuu5VdNhWhs4SAcTzXTEli
+         Ue1A==;
+        dara=google.com
+ARC-Authentication-Results: i=2; mx.google.com;
+       dkim=pass header.i=@gmail.com header.s=20251104 header.b=EbxxDt9o;
+       arc=pass (i=1);
+       spf=pass (google.com: domain of lead01@acmerealty.com designates 209.85.220.41 as permitted sender) smtp.mailfrom=lead01@acmerealty.com;
+       dmarc=pass (p=NONE sp=QUARANTINE dis=NONE) header.from=gmail.com;
+       dara=pass header.i=@gmail.com
+Return-Path: <lead01@acmerealty.com>
+Received: from mail-sor-f41.google.com (mail-sor-f41.google.com. [209.85.220.41])
+        by mx.google.com with SMTPS id 4fb4d7f45d1cf-6a37f7f94a8sor792303a12.1.2026.08.13.11.04.44
+Arjun Mehta <arjun@ourdomain.com>
+        (Google Transport Security);
+        Thu, 13 Aug 2026 11:04:44 -0700 (PDT)
+Received-SPF: pass (google.com: domain of lead01@acmerealty.com designates 209.85.220.41 as permitted sender) client-ip=209.85.220.41;
+Authentication-Results: mx.google.com;
+       dkim=pass header.i=@gmail.com header.s=20251104 header.b=EbxxDt9o;
+       arc=pass (i=1);
+       spf=pass (google.com: domain of lead01@acmerealty.com designates 209.85.220.41 as permitted sender) smtp.mailfrom=lead01@acmerealty.com;
+       dmarc=pass (p=NONE sp=QUARANTINE dis=NONE) header.from=gmail.com;
+       dara=pass header.i=@gmail.com
+ARC-Seal: i=1; a=rsa-sha256; t=1786644284; cv=none;
+        d=google.com; s=arc-20260327;
+        b=swlUppU2kef+hIEOtauRYw7scGsG2ZNwiQ8afuv/7UwzIhu7k5fQbt7O/vnooRA7sq
+         L84Lc7y0mKb5/gUA4KUJe7FmYQO9QezKCn5XIHLMGvOiKG/vbnGu3c7lnUacAan64rdI
+         KyTLRbGyQvBKuMIfZG5+nC+hriHv0ULOXM0uDVk2yRVp/3a2Ow5J5HjYPOp2WTrpNuSN
+         H/FUBQQULBkWpGdJfGIbaaJ58fF70mPSCvv2KL7flkrEbo8mRCCR0lgVnrWxB9drF/PD
+         /Z5aJOUINDzkY2IX+vJNqm5Gw9+Z1BFG48/OrYBXpRFknbzRCL/KLUmQO7XD/qp3X24K
+         swMg=ARC-Message-Signature: i=1; a=rsa-sha256; c=relaxed/relaxed; d=google.com; s=arc-20260327;
+        h=cc:to:subject:message-id:date:from:in-reply-to:references
+         :mime-version:dkim-signature;
+        bh=kD+ovbrgY8R4bTQX5+DDye11gw2QJs4kmR6U56Gtkto=;
+        fh=aOW2ULdrS55NaP6fmlWhY5EkmfIgem1K6ZA4L7AJ6ZE=;
+        b=ZkA1kI6JF0aMDkttp6PLXYCLV1kLgDs0EcEIexKQ2Sd1pJr4WSLIkuWM1/VXEU4Y0i
+         dyRojzDkc45/8Sp3j3CifkigySzzsHfHkod0bhj0cOzTIBwJBs5yjfLC3lkU+QSE5nhP
+         hynlpTbOfILQ7JK6qVyLzI4yx2fxSKYt+0/czUF2eUZ0wOPqWl1hN94WtxwqQ1S1vXZa
+         zq7JnzghlYwfSFArNhxF4Hztp1gcf4YRxwT7HowcrECXvAkTJz8CoWTIyFvOpY3jz8gP
+         rz3PM1bbTU8kAv6yGDEiX8r/rejJZVt6LWYzEX5Z+Ci++LAqd3l70QaVutn+DvazaHBV
+         Pu1A==;
+        dara=google.com
+ARC-Authentication-Results: i=1; mx.google.com; arc=none
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
+        d=gmail.com; s=20251104; t=1786644284; x=1787249084; dara=google.com;
+        h=content-type:cc:to:subject:message-id:date:from:in-reply-to
+         :references:mime-version:from:to:cc:subject:date:message-id:reply-to
+         :content-type;
+        bh=kD+ovbrgY8R4bTQX5+DDye11gw2QJs4kmR6U56Gtkto=;
+        b=EbxxDt9oxFbCb2rheBkcLgJnEaZAVzQPu9Rcf7UB4y+8bcOlYTne2oPPEqmmExFP+9
+         98q1e7z+4z5Vqo8hz0sVtBITVtZg0GtTwBMOc2rUdxGg/AeMh8nCBN3i67Wyq5Ox/DAG
+         qcI7tZYqkOXTdjfMWcIXIP3K8ZuvIfQYWcTr0DHlQEFEt7Knxa/l4eRjLXSOct4HQwlV
+         9J9r3yqL8qpKK6NpHcbY/sTv23LdlF49W8dGNzkYH0ScHE8pL0sk5O4Rp1i7GaLxcSM+
+         dTElvKtNE6yEpfJW6VI6A6+/zLtkLggklIW/KJMSk1dExDve6XxMdftxWmytm5x56btr
+         kxRw=X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
+        d=1e100.net; s=20251104; t=1786644284; x=1787249084;
+        h=content-type:cc:to:subject:message-id:date:from:in-reply-to
+         :references:mime-version:x-gm-gg:x-gm-message-state:from:to:cc
+         :subject:date:message-id:reply-to:content-type;
+        bh=kD+ovbrgY8R4bTQX5+DDye11gw2QJs4kmR6U56Gtkto=;
+        b=bC7x1/nVnakf4udM+ESdyU1y5xKEBewLJtVRFQaH+G7ZCK+kMZUp03/lb+uEVJ7NsV
+         duhWg1YFlbBiXoLvNkgR9TgQWNPy+LuLuvZ2/nWzVSPHT1/84HIVuCGXOxFOsriMQGj2
+         VRAdTzCTskxWx8oWYYED9YoeEgBAELJNEO+NgsSePl3ImmfFFG8c+lRXnESYmJUPy3Mv
+         6ZCyIPGVXY5gFsdruzwY3G6AHYBeTFLn8VIbdFHa362GjjV8TATxWdV1vCogUzu0ry7s
+         jOUHNwGtAvgg1RK6ktH6AmRS0nRwZT9RLN79wTPKVTCZh1VHPiCdXXAbulxVfoEn73lE
+         165A=X-Gm-Message-State: AOJu0Yx+p+YmKOc9jN+mRFE5rrnFJyxqEd0syOGjbzC7BkZd9zWkWyZq
+	VmksDIdL3tezHMS+mVGBBcUcxs6X+ThZ5ajeEmuNNvF1M8R/ITaMyUmMJLTWf2DwMFmGxsuT6FV
+	KI6m73ZFyCvlaCl+xiWw89taIJDJ6xV1uUw=X-Gm-Gg: AR+sD12BWUUlVngmshGSDZKmzsz+qNLmL55TIuON/OkKzILm5jlprDNiMPUFfjhak46
+	WZOUrsIav5ILSX6KtVOiWrZtBuJtnwXyVeU6knyb3NgcGmf5oO9UJI9nZcjAuthwfBawqp6+blw
+	bfyCg21Ps89biC06UnQEIao/EmedJYvr5fvp0Q08rvxVTREjY9nrwS8UIXwY9pyRkMxOQx7hAur
+	LD9e08DS/Xx+Zo+Y6ZUfL3/I3Oc8wA6ZkXgTIjk2Xw32UQ8j2HW0pbcX7jBBYfXvjfRJOBnSky6
+	LJwIkhyB4jY+O6NO7e+MhMMAe2/sUEhzMJkvYRzACFXiX5Ehe8T+s4oXLh6fE/2U4btDhEYoSp6
+	FFA0ged/L3lD42pCBSdPxRPTUISZzTiSEBSwlEN2UCfwX-Received: by 2002:a05:6402:4515:b0:6a2:77f:b857 with SMTP id
+ 4fb4d7f45d1cf-6a38a9c062dmr103636a12.21.1786644283398; Thu, 13 Aug 2026
+ 11:04:43 -0700 (PDT)
+MIME-Version: 1.0
+References: <ce-5-1-1786643649013@gmail.com>
+In-Reply-To: <ce-5-1-1786643649013@gmail.com>
+From: Sarah Chen <lead01@acmerealty.com>
+Date: Thu, 13 Aug 2026 23:34:31 +0530
+X-Gm-Features: AUfX_myK6Kq1XtKPn7ltRJQ-qqo1Yk7StrGY7Jx1mWa4LAKyzabMz_lv6jgxxH8
+Message-ID: <CAHV47ngSeY4Vd_v+YdTb5eEFGxv-4ng2L6x3-9b2B+nfO38sbQ@mail.gmail.com>
+Subject: Re: Controlled QA check A
+To: Arjun Mehta <arjun@ourdomain.com>
+Cc: lead02@acmerealty.com
+Content-Type: multipart/alternative; boundary="000000000000da21480658f1893b"
+
+--000000000000da21480658f1893b
+Content-Type: text/plain; charset="UTF-8"
+Content-Transfer-Encoding: quoted-printable
+
+received
+
+On Thu, Aug 13, 2026 at 11:24=E2=80=AFPM Arjun Mehta <arjun@ourdomain.com>
+wrote:
+
+[quoted original removed]
+--000000000000da21480658f1893b
+Content-Type: text/html; charset="UTF-8"
+Content-Transfer-Encoding: quoted-printable
+
+<div dir=3D"ltr">received<br></div><br><div class=3D"[quoted original removed]
+--000000000000da21480658f1893b--

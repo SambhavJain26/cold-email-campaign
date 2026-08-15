@@ -73,6 +73,8 @@ interface Args {
   list: boolean;
   /** List IMAP folders — provider spam-folder names differ and cannot be guessed. */
   folders: boolean;
+  /** Keep the quoted original. Off by default — see stripQuoted. */
+  keepQuoted: boolean;
   dryRun: boolean;
 }
 
@@ -91,6 +93,7 @@ function parseArgs(argv: string[]): Args | null {
     ...(name !== undefined && { name }),
     list: argv.includes('--list'),
     folders: argv.includes('--folders'),
+    keepQuoted: argv.includes('--keep-quoted'),
     dryRun: argv.includes('--dry-run'),
   };
 }
@@ -119,11 +122,78 @@ function imapClient(conn: MailboxConnection): ImapFlow {
 }
 
 /**
+ * Drop the quoted original from a reply.
+ *
+ * Address and display-name scrubbing is reliable; scrubbing free PROSE is not,
+ * and a reply quotes the whole message it answers — signature, greeting and
+ * all. Rather than escalate the heuristics, remove the region outright: this
+ * corpus lives in `fixtures/headers/` because what it exists to prove is
+ * headers (threading, Auto-Submitted, DSN status), and no classifier reads the
+ * quoted block.
+ *
+ * On by default. A privacy guard that depends on remembering a flag is not a
+ * guard — `--keep-quoted` opts out when a fixture genuinely needs the body.
+ *
+ * Safe for DSNs: their payload is `message/delivery-status` and a
+ * `message/rfc822` attachment, neither of which is `>`-quoted or a gmail_quote
+ * block, and MIME boundaries end a quoted region.
+ */
+/**
+ * Join quoted-printable soft line breaks. Must run BEFORE both stripQuoted and
+ * scrub: a soft break splits an address (`someone@perso=\r\nnal.test`) so the
+ * scrub misses it, and splits the `On … wrote:` attribution so the stripper
+ * misses that. Soft breaks carry no meaning, so joining is lossless.
+ */
+export function joinSoftBreaks(raw: string): string {
+  return raw.replace(/=\r?\n/g, '');
+}
+
+export function stripQuoted(raw: string): { text: string; removed: number } {
+  const isBoundary = (line: string): boolean => line.startsWith('--') && line.trim().length > 2;
+  const out: string[] = [];
+  let inQuote = false;
+  let removed = 0;
+
+  for (const line of raw.split(/\r?\n/)) {
+    if (isBoundary(line)) {
+      inQuote = false;
+      out.push(line);
+      continue;
+    }
+    if (inQuote) {
+      removed += 1;
+      continue;
+    }
+    // Gmail's HTML part is one long line once soft breaks are joined, so the
+    // marker sits mid-line — truncate there rather than dropping the reply
+    // text that precedes it.
+    const marker = line.search(/gmail_quote|<blockquote/);
+    if (marker > 0) {
+      out.push(`${line.slice(0, marker)}[quoted original removed]`);
+      inQuote = true;
+      removed += 1;
+      continue;
+    }
+    if (marker === 0 || /^>/.test(line) || /^On\b.{0,200}\bwrote:\s*$/.test(line)) {
+      out.push('[quoted original removed]');
+      inQuote = true;
+      removed += 1;
+      continue;
+    }
+    out.push(line);
+  }
+  return { text: out.join('\n'), removed };
+}
+
+/**
  * Rewrite every personal address to a stable placeholder consistent with the
  * existing corpus. Deterministic per run and order-independent: the same real
  * address always maps to the same placeholder within one capture.
  */
-function scrub(rawInput: string, ownAddress: string): { text: string; map: Map<string, string> } {
+export function scrub(
+  rawInput: string,
+  ownAddress: string,
+): { text: string; map: Map<string, string> } {
   const map = new Map<string, string>();
   let leadCount = 0;
 
@@ -157,8 +227,12 @@ function scrub(rawInput: string, ownAddress: string): { text: string; map: Map<s
   // replaced. Provider identities keep theirs (they name a system, not a
   // human, and the classifier may match on them).
   const realNames = new Set<string>();
+  // `:` is excluded from the name class deliberately. Allowing it lets the
+  // lazy capture swallow the header LABEL — `From: Real Name <addr>` collapses
+  // to `Placeholder <addr>` and the fixture loses the From header entirely,
+  // which is the one field the classifier reads to identify a sender.
   const withNames = scrubbed.replace(
-    /(^|[\s:;,<])"?([^"<>\n]{1,80}?)"?\s*<([A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,})>/g,
+    /(^|[\s;,<])"?([^"<>:\n]{1,80}?)"?\s*<([A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,})>/g,
     (whole, lead: string, name: string, address: string) => {
       const display = DISPLAY_NAMES[address.toLowerCase()];
       if (display === undefined) return whole;
@@ -317,9 +391,18 @@ export async function main(argv: string[] = process.argv.slice(2)): Promise<numb
     }
 
     const raw = await fetchRaw(conn, args.uid!);
-    const { text, map } = scrub(raw, conn.fromAddress);
+    // Order matters: soft breaks first, or the stripper cannot see a wrapped
+    // `On … wrote:` attribution and the scrub cannot see a wrapped address.
+    const joined = joinSoftBreaks(raw);
+    const quoted = args.keepQuoted ? { text: joined, removed: 0 } : stripQuoted(joined);
+    const { text, map } = scrub(quoted.text, conn.fromAddress);
 
     console.log(`Captured uid ${args.uid} (${raw.length} bytes). Address rewrites:`);
+    console.log(
+      quoted.removed > 0
+        ? `  quoted original: ${quoted.removed} line(s) removed (--keep-quoted to retain)`
+        : '  quoted original: none found',
+    );
     if (map.size === 0) console.log('  (none — only provider identities present)');
     for (const [real, placeholder] of map) console.log(`  ${real}  →  ${placeholder}`);
 

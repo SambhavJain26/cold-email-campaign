@@ -72,4 +72,40 @@ describe('headers/ fixture corpus', () => {
     const m = loadHeaderFixture('gmail-dsn-5xx');
     expect(m.headers['content-type']).toMatch(/boundary="000000000000ab12cd"/);
   });
+
+  // Captured from a REAL Gmail reply on 2026-08-16 (docs/17 §4). Every other
+  // reply fixture here is our GUESS at what Gmail sends; this one is what it
+  // actually sent, so these assertions are the ones that would catch our guess
+  // being wrong.
+  describe('gmail-real-reply (real provider capture)', () => {
+    const m = loadHeaderFixture('gmail-real-reply');
+
+    it('threads to OUR Message-ID via both In-Reply-To and References', () => {
+      // The load-bearing fact: Gmail echoes our id verbatim, which is what
+      // makes header-based reply matching work at all (docs/07 §4).
+      expect(m.inReplyTo).toBe('<ce-5-1-1786643649013@gmail.com>');
+      expect(m.references).toContain('<ce-5-1-1786643649013@gmail.com>');
+    });
+
+    it('mints its own Message-ID on Gmail’s host', () => {
+      expect(m.messageId).toMatch(/@mail\.gmail\.com>?$/);
+    });
+
+    it('is a human reply: Re: subject, no Auto-Submitted, not a DSN', () => {
+      expect(m.subject).toMatch(/^Re: /);
+      expect(m.headers['auto-submitted']).toBeUndefined();
+      expect(m.isDSN).toBe(false);
+    });
+
+    it('keeps a usable From address after scrubbing', () => {
+      // The scrubber once swallowed the `From: ` label itself, leaving a
+      // fixture with no sender at all.
+      expect(m.from).toBe('lead01@acmerealty.com');
+    });
+
+    it('carries the reply text with the quoted original removed', () => {
+      expect(m.bodyText).toContain('received');
+      expect(m.bodyText).toContain('[quoted original removed]');
+    });
+  });
 });

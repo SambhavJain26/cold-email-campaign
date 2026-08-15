@@ -18,7 +18,8 @@ export type FixtureName =
   | 'reply-in-reply-to'
   | 'reply-references-only'
   | 'reply-forwarded-subject-changed'
-  | 'spam-unrelated';
+  | 'spam-unrelated'
+  | 'gmail-real-reply';
 
 export const ALL_FIXTURES: FixtureName[] = [
   'gmail-dsn-5xx',
@@ -30,6 +31,9 @@ export const ALL_FIXTURES: FixtureName[] = [
   'reply-references-only',
   'reply-forwarded-subject-changed',
   'spam-unrelated',
+  // Captured from a REAL Gmail reply (2026-08-16) -- wording and header shapes
+  // are Google's, not our guess at them.
+  'gmail-real-reply',
 ];
 
 /** Parse RFC822-style headers with continuation-line unfolding. */
