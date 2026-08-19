@@ -71,8 +71,9 @@ The project is in **pre-real-domain testing**. Until the operator explicitly cha
 - The only correct projection drift command is
   `npx tsx apps/server/src/services/rebuildCli.ts --dry-run`. Require zero diffs after changes to
   events or projections; `checked 0 enrollments` proves only that the CLI ran.
-- A complete serial local gate has not run since the real Gmail fixture landed. Do not describe
-  that gate as current until it has actually passed.
+- Complete serial local gate passed 2026-08-20: type/lint/format; unit 331; web 52;
+  integration 158; API 112; GreenMail 29; golden exactly 47; mock E2E 51; real-backend E2E 1;
+  populated test DB `checked 5 enrollments — 0 diff(s)`; self-check clean.
 
 ## Oracle canary procedure
 

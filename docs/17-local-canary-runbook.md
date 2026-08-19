@@ -1,5 +1,20 @@
 # Local canary runbook (B8.3-local) — two-week validation on throwaway Gmail
 
+## 2026-08-20 local pre-domain completion gate
+
+Reply recontact safety and findings 20–25 are implemented on `b8.3-local-canary`. Migration 0013
+passed its apply/down/apply drill. The complete serial local gate passed: typecheck, lint and format;
+unit **331**; web **52**; integration **158**; API **112**; GreenMail SMTP/IMAP **29**; locked
+golden **47**; mock-browser E2E **51**; real-backend E2E **1**. The exact projection command against
+the populated test database returned `checked 5 enrollments — 0 diff(s)` and self-check reported no
+invariant violations. The real-backend fixture was corrected to obey the existing launch guardrails
+(`ramp_days=7`, cap 25).
+
+This is local evidence only. The §6 catch-up/never-burst live scenario, Oracle unsafe-setting
+restoration, fresh-backup confirmation, final production reconciliation, and canary wrap have not
+been executed; they remain gated by the bounded approval plan in §6a. No external mail or Oracle
+state changed during this gate.
+
 ## UI data-consistency remediation (2026-08-10)
 
 The UI consistency implementation is deployed to Oracle and its database-backed verification gate

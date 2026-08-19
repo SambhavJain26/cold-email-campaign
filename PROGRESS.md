@@ -10,6 +10,8 @@
 
 **Where it stands:** **M3 ✅ closed.** **B8.1–B8.2 ✅** — the live `SmtpImapTransport` is proven against a real SMTP+IMAP server (GreenMail container), and `MAIL_TRANSPORT=smtp_imap` swaps in with the whole offline suite green. **Post-M3 sweep ✅ (2026-07-25)** — every stage audited against docs/14/15 + the decision register; the four specified-but-unbuilt items are closed. **Pre-canary remediation ✅** — findings 3–9, 14–16 and 19 implemented, locally verified and deployed. **Controlled live-provider gate ✅ (2026-08-14)** — two approved owner-operated Gmail sends reconciled end to end (reply → `REPLIED`; `STOP` → `unsubscribe` + `UNSUBSCRIBED` + global suppression), UI/analytics/projections verified, production drift check `checked 6 enrollments — 0 diff(s)`. **That campaign is paused** and must not be resumed without new per-send approval.
 
+**2026-08-20 local gate:** reply/recontact safety plus findings 20–25 implemented; migration drill green; unit 331, web 52, integration 158, API 112, GreenMail 29, golden exactly 47, mock E2E 51, real-backend E2E 1; populated test DB `checked 5 enrollments — 0 diff(s)` and self-check clean. No Oracle state or external mail changed.
+
 **Still open:** docs/17 §6 catch-up/never-burst needs a separately approved live-state/send plan; unsafe-setting restoration and final canary wrap follow it. Real Gmail DSN/OOO fixtures are formally deferred unless matching existing messages can be captured read-only. Finding 12 remains for warmed real domains; finding 11 is closed as unanswerable with this rig. Findings 20–25 are closed locally. Real-domain work remains gated on docs/16 §6a.
 
 ---

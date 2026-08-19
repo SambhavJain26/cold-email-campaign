@@ -107,7 +107,7 @@ test('real backend: import → enroll → advance → reply/STOP → tag → met
     name: 'Real Replay Campaign',
     sequence_id: seq.id,
     tier_effort_config: { A: 'template_auto', B: 'template_auto', C: 'template_auto' },
-    ramp_config: { ramp_days: 0, ramp_daily_enroll_cap: 100 },
+    ramp_config: { ramp_days: 7, ramp_daily_enroll_cap: 25 },
   });
   await api(page, 'patch', `/api/v1/campaigns/${camp.id}`, { status: 'active' });
 
