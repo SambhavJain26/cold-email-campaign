@@ -99,6 +99,22 @@ projection dry run inside the app container. Do not expose credentials or `.env.
 - `POST /leads` runs the **same** ingest preview+commit as a CSV upload. Never reimplement
   hygiene, dedup or the suppression re-check there.
 
+## Canary operation (2026-08-16)
+
+- **`enroll(campaign, count)` chooses leads by its own ordering** (tier A→B→C→untiered, oldest first), not by your
+  intended set. A cohort built by count silently enrols the wrong leads — use `enrollByIds` when the set matters.
+- **One send per mailbox per tick.** The pace gap is `send_window_minutes ÷ daily_cap`; drive a cohort faster by
+  raising the cap, not by ticking harder.
+- **`wait_days: 0` makes step 2 due the instant step 1 lands.** Pause the campaign after step 1, or the follow-up
+  outruns any human reply and the reply-stops-sequence behaviour cannot be observed.
+- **Changing `poll_folders` outside the API skips UIDNEXT seeding** — seed `mailbox_poll_cursors` for the new folder
+  in the same transaction or the next poll ingests that folder's entire history. `capture-fixture --folders` prints
+  each folder's UIDNEXT for exactly this.
+- **Changing `delivery_confirm_hours` after completions have folded causes projection drift** until the new window
+  elapses (finding 24). Run drift checks with the same value that was in force at fold time.
+- Ops scripts live in `apps/server/test/ops/`: `canary-drive.ts` (tick/poll/confirm-now/self-check/status — starts
+  `Jobs` for every command) and `canary-cohort.ts` (cohort setup through the real services). **Both write real state.**
+
 ## Implementation and data safety
 
 - Preserve the append-only event ledger; never delete or rewrite sent/event history.

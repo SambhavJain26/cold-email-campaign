@@ -17,6 +17,11 @@ import { loadConfig } from '../../src/config/env';
 import { compose } from '../../src/composition';
 import { createSingleLead, createImportPreview, commitImport } from '../../src/ingest/service';
 import { capacityToday, enroll, recycle } from '../../src/services/enrollment';
+import { createSequence } from '../../src/db/repos/sequencesRepo';
+import { redistributeUnstarted } from '../../src/db/repos/enrollmentsRepo';
+import { resumeMailbox } from '../../src/services/autoPause';
+import { createCampaign, patchCampaign } from '../../src/db/repos/campaignsRepo';
+import { contentHashOf } from '../../src/render/hash';
 
 async function main(): Promise<void> {
   const [command, a, b] = process.argv.slice(2);
@@ -44,6 +49,73 @@ async function main(): Promise<void> {
           { importId: preview.importId, mode: 'drop_flagged' },
         );
         console.log('commit', JSON.stringify(result));
+        break;
+      }
+      case 'create-sequence': {
+        // Two steps with waitDays 0: step 2 is due immediately, which is what
+        // proves the distinction §3 exists to test — a human reply stops the
+        // sequence, an auto-reply does not. contentHash is computed here
+        // because the CALLER owns it (decision Q) and the recycle guard
+        // compares against exactly this value.
+        const step = (n: number, subject: string, body: string) => ({
+          stepNo: n,
+          waitDays: 0,
+          inThread: n > 1,
+          variants: [
+            {
+              label: 'A',
+              subjectTemplate: subject,
+              bodyTemplate: body,
+              contentHash: contentHashOf(subject, body),
+              active: true,
+            },
+          ],
+        });
+        const id = await createSequence(db, {
+          name: a ?? 'Canary Cohort Sequence',
+          stopOnReply: true,
+          steps: [
+            step(
+              1,
+              'Quick note for {{company|your team}}',
+              'Hi {{first_name|there}}, I work with property teams in {{city|your area}} on outreach that does not read like a template. We keep it to plain text, one idea per message, and we stop the moment someone replies. If that is useful I can share what the sequence looks like. If not, no hard feelings at all.',
+            ),
+            step(
+              2,
+              'Following on for {{company|your team}}',
+              'Hi {{first_name|there}}, adding one concrete detail to my last note. The part teams tell us matters most is that replies stop the sequence immediately, so nobody gets chased after they have answered. Happy to send the outline over if it is worth a look, and equally happy to leave it here if the timing is wrong.',
+            ),
+          ],
+        });
+        console.log(JSON.stringify({ sequenceId: id }));
+        break;
+      }
+      case 'create-campaign': {
+        const row = await createCampaign(db, {
+          name: a ?? 'Canary Cohort',
+          sequenceId: Number(b),
+          // Untiered leads map to template_auto regardless, but set every tier
+          // explicitly so nothing lands in Tier-A manual mode by default and
+          // silently never sends (finding 9).
+          tierEffortConfig: { A: 'template_auto', B: 'template_auto', C: 'template_auto' },
+          rampConfig: { ramp_days: 0, ramp_daily_enroll_cap: 0 },
+        });
+        await patchCampaign(db, row.id, { status: 'active' });
+        console.log(JSON.stringify({ campaignId: row.id, status: 'active' }));
+        break;
+      }
+      case 'resume': {
+        // Operator resume (docs/06 §6): back to ok at capPct% of the daily cap.
+        await resumeMailbox({ db }, Number(a), Number(b ?? 100), clock.now());
+        console.log(JSON.stringify({ mailboxId: Number(a), capPct: Number(b ?? 100) }));
+        break;
+      }
+      case 'redistribute': {
+        // Only ACTIVE enrollments with NO sent event move. Anything already
+        // sent stays pinned to its mailbox, because rerouting an in-thread
+        // follow-up would break threading (spec Part 9).
+        const moved = await redistributeUnstarted(db, Number(a));
+        console.log(JSON.stringify({ mailboxId: Number(a), unassigned: moved }));
         break;
       }
       case 'capacity': {
