@@ -62,6 +62,16 @@ Escape hatches built in: `settings.optout_detection = 'auto' | 'tag_only'` (the 
 | Y | **Process model: one Node process** runs Fastify + pg-boss workers (scheduler tick, per-mailbox polls, confirm-delivery, self-check). Env `ROLE=all\|api\|worker` exists from day 1 so the same image can split into two processes later without code change. | One thing to run, one thing to monitor, on one VPS. | Low — the seam is pre-built. |
 | Z | **API conventions:** REST under `/api/v1`; error envelope `{ "error": { "code", "message", "details?" } }` with a closed set of codes; offset pagination `?page=&per_page=` (default 50, max 200); all list endpoints return `{ items, total, page, per_page }`. | Boring and sufficient at this scale. | — |
 
+## Pre-real-domain safety decisions (2026-08-20)
+
+| ID | Decision | Rationale | Swap cost |
+|---|---|---|---|
+| AA | **Every sequence stops on every human reply.** `stop_on_reply=false` is removed from the writable contract and rejected at the database boundary. | A reply followed by an automated follow-up is the highest-cost outreach failure. Metrics-only reply continuation is not worth that risk. | Low |
+| AB | **Every human reply receives an append-only operator disposition.** `not_interested`, `wrong_person`, and `explicit_unsubscribe` append `unsubscribe` in the same transaction and therefore suppress globally. `not_now` requires a future recontact date. | Sentiment describes tone; it is not permission. A separate audited fact makes recontact intent explicit. | Medium |
+| AC | **A prior human reply blocks automatic cross-campaign enrollment.** Deliberate recontact uses explicit lead IDs plus an explicit override; `not_now` remains blocked until its date, and suppressed dispositions cannot be overridden. | Stopping one enrollment must not silently make the same person eligible for another campaign. | Medium |
+| AD | **`delivery_confirm_hours` becomes immutable after the first `sent` event.** | Completion replay currently depends on the active setting. Freezing it once history exists prevents finding #24 without rewriting append-only history. | Low |
+| AE | **Remove `redistributeUnstarted` and claims of pre-send redistribution.** Unassigned work already rotates across healthy mailboxes; started threads remain pinned. | Finding #25 proves the old predicate describes an impossible production state. Honest rotation is safer than inventing premature assignment. | Low |
+
 ---
 
 ## Deliberately still open (kept as configuration, per plan §8)

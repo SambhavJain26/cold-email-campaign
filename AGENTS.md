@@ -21,11 +21,12 @@ call planned work implemented.
 
 The project is in **pre-real-domain testing**. Until the operator explicitly changes that scope:
 
-- **The only authorized feature scope** is the operator-approved 2026-08-15 list: the dormant
-  public opaque-token unsubscribe endpoint, `List-Unsubscribe`/one-click headers and footer link;
-  hard launch guardrails; domain-readiness preflight; per-folder IMAP polling; and single-lead
-  creation. Those items are built. Outside that list, work is limited to testing, verification,
-  diagnosis, and documentation.
+- **The only authorized feature scope** is the completed operator-approved 2026-08-15 list plus
+  the 2026-08-20 pre-domain safety backlog: mandatory reply stopping; reply dispositions and
+  conservative suppression; guarded cross-campaign recontact; broader opt-out phrases; findings
+  20–25; alert history and mailbox filters; arbitrary custom-field editing; copy-risk rubric
+  improvements; local verification; and runbook/documentation reconciliation. Outside that list,
+  work is limited to testing, verification, diagnosis, and documentation.
 - Do not implement or perform domain/DNS work, production mailbox configuration, public
   Caddy/domain changes, other deployment features, or Google Workspace OAuth. OAuth is deferred
   until a real domain and inbox exist.
