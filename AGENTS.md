@@ -1,124 +1,148 @@
 # Cold Email Campaign — Agent Instructions
 
+## Authority and reading order
+
+This file is the canonical operating boundary and wins over `CLAUDE.md` on any disagreement.
+Keep the two aligned when durable instructions change. `CLAUDE.md` is the detailed engineering
+memory; do not copy its build history or finished-stage notes here.
+
+Before operational or testing work, read in order:
+
+1. `CLAUDE.md`
+2. `docs/17-local-canary-runbook.md` — the durable, authoritative status and findings record
+3. `docs/16-deployment-ops.md`
+4. `PROGRESS.md` and `docs/00-INDEX.md` when selecting or locating work
+5. `git status` and recent `git log`
+
+Update the runbook only after an outcome is verified. Never leave completed work marked open or
+call planned work implemented.
+
 ## Current operating boundary
 
 The project is in **pre-real-domain testing**. Until the operator explicitly changes that scope:
 
-- **Approved build scope (operator-approved plan, 2026-08-15) — the only feature work
-  authorized:** the public unsubscribe endpoint with opaque tokens, `List-Unsubscribe` /
-  one-click headers and the footer link; hard launch guardrails; the domain-readiness preflight;
-  per-folder IMAP polling (finding 13); and single-lead creation (finding 10). Outside that list,
-  the rule is unchanged: testing, verification, diagnosis, and documentation only.
-- Do not implement domain/DNS work, production mailbox configuration, Caddy/domain changes, or
-  other deployment features. Google Workspace OAuth is explicitly deferred until a real domain and
-  inbox exist.
-- The unsubscribe endpoint is being built **dormant**: with no `unsubscribe_base_url` configured
-  it emits no link and no header, and the footer falls back to reply-`STOP` only. Do not point it
-  at a real hostname, open a public port, or treat Gmail one-click as proven — that needs a
-  publicly reachable URL and its own approval.
-- Do not start a real cohort or send new external campaign mail without explicit approval for that
-  specific send.
-- The approved, controlled Gmail acceptance batch is complete. The test campaign is paused; do
-  not resume it or create additional test sends without new, per-send operator approval. Read the
-  runbook for the authoritative recipient, outcome, and verification record.
-- The unsubscribe URL design in `docs/16-deployment-ops.md` §8 is the specification the approved
-  build follows. The rest of that section — hard launch guardrails beyond the approved scope,
-  Workspace OAuth, and every real-domain deployment step — remains a plan, not functionality.
+- **The only authorized feature scope** is the operator-approved 2026-08-15 list: the dormant
+  public opaque-token unsubscribe endpoint, `List-Unsubscribe`/one-click headers and footer link;
+  hard launch guardrails; domain-readiness preflight; per-folder IMAP polling; and single-lead
+  creation. Those items are built. Outside that list, work is limited to testing, verification,
+  diagnosis, and documentation.
+- Do not implement or perform domain/DNS work, production mailbox configuration, public
+  Caddy/domain changes, other deployment features, or Google Workspace OAuth. OAuth is deferred
+  until a real domain and inbox exist.
+- Deploy only with explicit operator authorization for that deploy. Do not treat approval to edit,
+  test, commit, or push as approval to deploy.
+- Every outbound batch needs specific approval. Sending mail, activating or resuming a campaign,
+  enrolling leads, altering live campaign state, starting a cohort, or contacting prospects are
+  separately gated actions. Only send to operator-controlled addresses. Never create sends merely
+  to test behavior.
+- The controlled Gmail acceptance batch is complete and the test campaign is **paused**. Do not
+  resume it or create another test send without new per-send approval.
+- The unsubscribe endpoint must remain **dormant**: empty `unsubscribe_base_url` means no body
+  link or headers and a reply-`STOP` footer. Do not configure a hostname, expose a public port, or
+  claim Gmail one-click is verified; that needs a publicly reachable HTTPS URL and separate
+  approval.
+- Work on the current `b8.3-local-canary` branch. Do not branch off, push to `main`, or merge to
+  `main` without explicit authorization. Make surgical edits, preserve unrelated dirty-worktree
+  changes, and commit each completed task on the current branch.
 
-## Read first
+## Secrets, data, and messaging safety
 
-For operational or testing work, read:
-
-1. `docs/17-local-canary-runbook.md`
-2. `docs/16-deployment-ops.md`
-3. `git status` and recent `git log`
-
-Treat the runbook as the durable status record. Update it when a finding is actually completed or
-verified; never leave a completed task labelled open, and do not call a planned item implemented.
+- Never ask the operator to paste passwords, app passwords, `SECRET_KEY`, `SESSION_KEY`, or
+  `.env`/`.env.prod` contents. App passwords are entered in the Mailboxes UI and sealed with
+  libsodium. Secrets never belong in chat, logs, command output, fixtures, or the repository.
+- Preserve the append-only `events` ledger. Never update/delete past events, rewrite sent history,
+  or route around its trigger and `app_rw` grants. Do not erase user data or alter live state for a
+  test.
+- Keep mail simple, compliant, and untracked: no pixels, click tracking, or tracking redirects.
+  A recorded `STOP`/unsubscribe is permanently and globally suppressive.
+- Use `apply_patch` for repository edits and preserve unrelated work. Reconcile code and docs
+  rather than silently diverging.
 
 ## Test discipline
 
 - Local Postgres and GreenMail: `docker compose up -d`.
-- Run DB-backed Vitest projects serially. Never run two DB-backed Vitest invocations concurrently;
-  they share `coldemail_test` and can corrupt/flap each other.
+- Run DB-backed Vitest projects **serially**. They share `coldemail_test`; parallel invocations can
+  truncate each other's data and produce corrupt or misleading results.
 - Fast iteration: `npx vitest run --project unit`.
 - Important gates: `npm run typecheck`, `npm run lint`, `npm run format:check`,
-  `npm run test:golden`, `npm run test:mail`, and the relevant API/integration/web suites.
-- Use the correct projection command: `npx tsx apps/server/src/services/rebuildCli.ts --dry-run`.
-  Verify zero diffs after changes that affect events or projections.
+  `npm run test:golden`, `npm run test:mail`, and relevant API/integration/web suites. The locked
+  golden suite is **47 tests**; never skip or casually regenerate it.
+- The only correct projection drift command is
+  `npx tsx apps/server/src/services/rebuildCli.ts --dry-run`. Require zero diffs after changes to
+  events or projections; `checked 0 enrollments` proves only that the CLI ran.
+- A complete serial local gate has not run since the real Gmail fixture landed. Do not describe
+  that gate as current until it has actually passed.
 
-## Oracle canary VM
+## Oracle canary procedure
+
+The Oracle VM is the only live deployment.
 
 - SSH: `ssh -i ~/.ssh/oracle_canary ubuntu@92.4.79.54`
-- App directory: `~/app`
-- Stack: `docker-compose.prod.yml` with `.env.prod`
-- UI tunnel: `ssh -L 8443:localhost:443 -i ~/.ssh/oracle_canary ubuntu@92.4.79.54`
-- The current deployed branch is `b8.3-local-canary`.
+- App: `~/app`; stack: `docker-compose.prod.yml` with `.env.prod`
+- UI tunnel: `ssh -L 8443:localhost:443 -i ~/.ssh/oracle_canary ubuntu@92.4.79.54`, then
+  `https://localhost:8443`
+- Deployed branch: `b8.3-local-canary`
 
-Deploy only when the operator explicitly authorizes it. The standard deploy command is:
+After explicit deploy authorization, use:
 
 ```sh
 cd ~/app && git pull --ff-only
 sudo docker compose -f docker-compose.prod.yml --env-file .env.prod up -d --build
 ```
 
-After an authorized deploy, verify container health, `https://localhost/health`, and a zero-drift
-projection dry run inside the app container. Do not expose credentials or `.env.prod` contents.
+Then verify container health, `https://localhost/health`, and a zero-drift projection dry run in
+the app container.
 
-## Unsubscribe endpoint (0010) — built dormant
+**Never print resolved production environment output.** `crontab -l` in the backup sidecar embeds
+the full `DATABASE_URL`, including its password; print only the schedule. `docker inspect` and
+`docker compose config` also render secrets. This warning follows an actual credential exposure
+and password rotation.
 
-- **Dormant unless `compliance_settings.unsubscribe_base_url` is set.** Empty (the default, and
-  the only correct value until a real sending domain exists) means no body link, no
-  `List-Unsubscribe` headers, and a reply-`STOP` footer. Do not set it without approval.
-- `GET|POST /u/:token` register **outside `/api/v1`**, so they inherit neither the session plugin
-  nor the CSRF check — Gmail's one-click POST carries neither, and its
-  `application/x-www-form-urlencoded` body needs the scoped content-type parser or the button
-  500s invisibly at Google.
-- **The token is a capability and the token is the URL.** `config/logger.ts` redacts `/u/<token>`
-  in its `req` serializer; that serializer must emit the default field set and never spread the
-  raw request (which carries parsed bodies — B7.1's grep catches it). Only the sha256 is stored.
-- `GET` must never unsubscribe (scanners prefetch links). An unknown token renders the same page
-  as a valid one. Tokens are minted per send attempt and are NOT derived from `SECRET_KEY`.
-- Gmail actually rendering its native button is **unproven and unprovable here** — it needs a
-  publicly reachable HTTPS URL. Do not record the one-click flow as verified.
+## Live canary state — unsafe for real domains
 
-## Launch guardrails, preflight, folder polling (0011–0012)
+The accelerated canary settings deliberately trade safety margin for speed and **must be reverted
+before any real-domain work**. The pre-change DB snapshot is
+`~/canary-settings-snapshot-2026-08-15.sql` on the VM.
 
-- **Guardrails bound CONFIGURATION, not behaviour.** `max_mailbox_daily_cap` (50) is enforced on
-  mailbox create and patch; `max_ramp_daily_enroll_cap` (25) on campaign create. `min_ramp_days`
-  ships at **0 = not enforced** so the migration cannot invalidate existing campaigns — set it
-  before a real launch. A value inside these ceilings is permitted, never safe.
-- **The preflight is read-only and honest about its limits.** `ready` means nothing FAILED; it
-  cannot see warming, list quality or consent. **DKIM reports `unknown`, never `fail`** — DNS
-  cannot enumerate selectors, so a miss is not evidence of absence.
-- **IMAP UIDs are folder-scoped.** Cursors live in `mailbox_poll_cursors` keyed
-  `(mailbox_id, folder)`; a mailbox-wide high-water mark is a bug. Each folder seeds from its own
-  UIDNEXT — adding a folder must never back-fill that folder's history (finding 16, per folder).
-- `poll_folders` defaults to `INBOX` only. Adding the provider's spam folder is an explicit
-  operator action, and the name differs per provider (`[Gmail]/Spam` vs `Junk`).
-- `POST /leads` runs the **same** ingest preview+commit as a CSV upload. Never reimplement
-  hygiene, dedup or the suppression re-check there.
+- `enforce_send_window=false`
+- `max_mailbox_daily_cap=3000`; both mailboxes have `daily_cap=3000`
+- `pause_min_sends=5`; `send_jitter_pct=0`; `min_ramp_days=0` remains unenforced
+- Both mailboxes poll `{INBOX,[Gmail]/Spam}`; keep that folder configuration
+- Mailbox 1 is `auto_paused`; mailbox 2 is `ok` with `resume_cap=1500`
+- The test campaign is paused
 
-## Canary operation (2026-08-16)
+These values are never evidence that a volume is safe. The last unrun canary scenario is docs/17
+§6 catch-up/never-burst. Finding 12's warmed-domain `List-Unsubscribe` question remains unanswered;
+finding 24 (settings-dependent completion drift) and finding 25 (unsatisfiable redistribution)
+remain open. Finding 11 is closed as unanswerable with this rig; do not re-litigate it.
 
-- **`enroll(campaign, count)` chooses leads by its own ordering** (tier A→B→C→untiered, oldest first), not by your
-  intended set. A cohort built by count silently enrols the wrong leads — use `enrollByIds` when the set matters.
-- **One send per mailbox per tick.** The pace gap is `send_window_minutes ÷ daily_cap`; drive a cohort faster by
-  raising the cap, not by ticking harder.
-- **`wait_days: 0` makes step 2 due the instant step 1 lands.** Pause the campaign after step 1, or the follow-up
-  outruns any human reply and the reply-stops-sequence behaviour cannot be observed.
-- **Changing `poll_folders` outside the API skips UIDNEXT seeding** — seed `mailbox_poll_cursors` for the new folder
-  in the same transaction or the next poll ingests that folder's entire history. `capture-fixture --folders` prints
-  each folder's UIDNEXT for exactly this.
-- **Changing `delivery_confirm_hours` after completions have folded causes projection drift** until the new window
-  elapses (finding 24). Run drift checks with the same value that was in force at fold time.
-- Ops scripts live in `apps/server/test/ops/`: `canary-drive.ts` (tick/poll/confirm-now/self-check/status — starts
-  `Jobs` for every command) and `canary-cohort.ts` (cohort setup through the real services). **Both write real state.**
+## Damage-prone operational traps
 
-## Implementation and data safety
+- IMAP UIDs are folder-scoped. Cursors are keyed `(mailbox_id, folder)`. Changing `poll_folders`
+  outside the API skips UIDNEXT seeding; seed `mailbox_poll_cursors` for every added folder in the
+  same transaction or the next poll ingests that folder's entire history. Provider folder names
+  differ (`[Gmail]/Spam` vs `Junk`).
+- `enroll(campaign, count)` chooses tier A→B→C→untiered, oldest first; it does not preserve an
+  intended set. Use `enrollByIds` when identities matter.
+- The scheduler sends at most one message per mailbox per tick. Pace is
+  `send_window_minutes / daily_cap`; ticking faster does not accelerate the cohort.
+- `wait_days: 0` makes step 2 due as soon as step 1 lands. Pause after step 1 or the follow-up can
+  outrun a human reply.
+- A process that appends a send must start `Jobs`, or the delayed confirmation job is lost.
+  `apps/server/test/ops/canary-drive.ts` and `canary-cohort.ts` write real state even when invoked
+  as scripts.
+- Changing `delivery_confirm_hours` after completions folded can cause temporary projection drift;
+  run comparisons with the value in force at fold time (finding 24).
+- `redistributeUnstarted` currently cannot move a production row because its predicate is
+  unsatisfiable. Do not claim redistribution occurred merely because that path ran (finding 25).
+- Public `/u/:token` routes stay outside session/CSRF. `GET` must never unsubscribe, one-click
+  POST needs the scoped form parser, only token hashes are stored, and request logging must redact
+  the URL without spreading the raw request or body. The token is a capability.
+- Guardrails limit **configuration**, not behavior: values under a ceiling are permitted, not
+  proven safe. Preflight is read-only and cannot establish warming, consent, or list quality;
+  `ready` means only that nothing failed, and DKIM absence is `unknown`, never `fail`.
+- `POST /leads` must continue through the same ingest preview/commit path as CSV so hygiene,
+  deduplication, and the suppression re-check cannot diverge.
 
-- Preserve the append-only event ledger; never delete or rewrite sent/event history.
-- Do not erase user data, change live campaign state, or create sends merely to test behavior.
-- Use `apply_patch` for repository edits. Preserve unrelated changes in a dirty working tree.
-- Keep outbound email simple, compliant, and untracked. `STOP`/unsubscribe remains globally
-  suppressive once a valid unsubscribe fact is recorded.
+See `CLAUDE.md` for architecture and subsystem-specific engineering traps, and docs/17 for full
+evidence, live outcomes, and the findings log.
