@@ -3,6 +3,7 @@ import { AlertTriangle, CheckCircle2, XCircle } from 'lucide-react';
 import { toast } from 'sonner';
 import type { CampaignDto, LeadDto, RenderChecks } from '@coldemail/shared';
 import { Button } from '@/components/ui/button';
+import { Checkbox } from '@/components/ui/checkbox';
 import {
   Dialog,
   DialogContent,
@@ -167,6 +168,7 @@ function ComposerForm({
   const [body, setBody] = useState(initialBody);
   const [checks, setChecks] = useState<RenderChecks | null>(initialChecks);
   const [blockedReason, setBlockedReason] = useState<string | null>(null);
+  const [allowRecontact, setAllowRecontact] = useState(false);
 
   const healthyMailboxes = (mailboxes.data?.items ?? []).filter(
     (mailbox) => mailbox.status === 'ok',
@@ -182,6 +184,7 @@ function ComposerForm({
         ...(mailboxId === AUTO_ROTATE ? {} : { mailbox_id: Number(mailboxId) }),
         subject,
         body,
+        ...(allowRecontact ? { allow_recontact: true } : {}),
       },
       {
         onSuccess: (result) => {
@@ -291,6 +294,18 @@ function ComposerForm({
           {blockedReason}
         </p>
       )}
+
+      <div className="flex items-start gap-2 rounded-md border border-border p-3">
+        <Checkbox
+          id="allow-recontact"
+          checked={allowRecontact}
+          onCheckedChange={(checked) => setAllowRecontact(checked === true)}
+        />
+        <Label htmlFor="allow-recontact" className="text-xs font-normal leading-5">
+          I reviewed this lead&apos;s prior replies and intentionally approve recontact. This never
+          overrides suppression or a future “not now” date.
+        </Label>
+      </div>
 
       <DialogFooter>
         <Button variant="ghost" onClick={onDone}>

@@ -1,6 +1,6 @@
 // Unibox + enrollment actions + manual-sends (docs/10 §Unibox).
 import { z } from 'zod';
-import { SENTIMENTS } from '../domain/index';
+import { REPLY_DISPOSITIONS, SENTIMENTS } from '../domain/index';
 import { isoDateTime, listOf, pageQuerySchema } from './common';
 import { renderChecksSchema } from './sequences';
 
@@ -20,7 +20,10 @@ export const uniboxItemSchema = z
     snippet: z.string().nullable(),
     effective_sentiment: z.enum(SENTIMENTS).nullable(),
     suggested_sentiment: z.enum(SENTIMENTS).nullable(),
+    disposition: z.enum(REPLY_DISPOSITIONS).nullable(),
+    recontact_after: isoDateTime.nullable(),
     auto_unsubscribed: z.boolean(),
+    lead_suppressed: z.boolean(),
     sequence_continues: z.boolean(),
     meeting_booked: z.boolean(),
     enrollment_id: z.number().int(),
@@ -57,6 +60,29 @@ export const uniboxDetailResponseSchema = uniboxItemSchema
 
 export const tagSentimentBodySchema = z.object({ sentiment: z.enum(SENTIMENTS) }).strict();
 
+export const dispositionReplyBodySchema = z
+  .object({
+    disposition: z.enum(REPLY_DISPOSITIONS),
+    recontact_after: isoDateTime.nullable().optional(),
+  })
+  .strict()
+  .superRefine((value, ctx) => {
+    if (value.disposition === 'not_now' && value.recontact_after == null) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['recontact_after'],
+        message: 'A future recontact date is required for not_now',
+      });
+    }
+    if (value.disposition !== 'not_now' && value.recontact_after != null) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['recontact_after'],
+        message: 'Only not_now accepts a recontact date',
+      });
+    }
+  });
+
 export const snoozeBodySchema = z.object({ until: isoDateTime }).strict();
 
 export const manualSendBodySchema = z
@@ -66,6 +92,7 @@ export const manualSendBodySchema = z
     mailbox_id: z.number().int().positive().optional(),
     subject: z.string().min(1),
     body: z.string().min(1),
+    allow_recontact: z.boolean().optional(),
   })
   .strict();
 export type ManualSendBody = z.infer<typeof manualSendBodySchema>;

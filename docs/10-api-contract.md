@@ -59,7 +59,7 @@ Shapes below in TS notation. `Metric = { numerator: number, denominator: number 
 |---|---|
 | GET `/campaigns` · POST `/campaigns` `{name, sequence_id, tier_effort_config?, ramp_config?}` · PATCH `/campaigns/:id` (status: active/paused/archived) | `Campaign = {id, name, status, sequence_id, tier_effort_config, ramp_config, recycled_from_campaign_id, enrolled_count, contacted_count}` |
 | GET `/campaigns/:id/capacity` | → `{total_daily_capacity, followups_due_today, sent_so_far_today, room_for_new, ramp_cap_remaining, suggested}` (docs/06 §7 — the capacity meter) |
-| POST `/campaigns/:id/enroll` | `{count} \| {lead_ids, force?}` → `{enrolled, skipped: {reason, count}[]}` — 409 `capacity_exceeded` if count > suggested & !force; 409 `recycle_sequence_conflict` on hash guard |
+| POST `/campaigns/:id/enroll` | `{count} \| {lead_ids, force?, allow_recontact?}` → `{enrolled, skipped: {reason, count}[]}`. Count enrollment excludes prior human repliers. Explicit recontact requires `allow_recontact:true`, completed reply disposition, and an elapsed `not_now` date; suppression is never overrideable. |
 | GET `/campaigns/:id/outcomes` | → `{UNSUBSCRIBED, BOUNCED, REPLIED: {positive, neutral}, COMPLETED, ACTIVE, NEW, total}` (Stage-9 completion panel) |
 | POST `/campaigns/:id/recycle` | `{source_campaign_id}` → same shape as enroll |
 | GET `/cold-storage?source_campaign_id=` | → `{items: {lead, completed_at, earliest_recycle_at, eligible: boolean}[]}` |
@@ -67,13 +67,14 @@ Shapes below in TS notation. `Metric = { numerator: number, denominator: number 
 ## Unibox
 | | |
 |---|---|
-| GET `/unibox?bucket=human\|auto_reply&sentiment=&mailbox_id=&unhandled=&page=` | → `UniboxItem[] = {incoming_message_id, received_at, lead: {id, name, company}, campaign_id, step_no, snippet, effective_sentiment, suggested_sentiment, auto_unsubscribed: boolean, meeting_booked: boolean, enrollment_id}` — bucket `human` default; `auto_reply` is the OOO tab |
+| GET `/unibox?bucket=human\|auto_reply&sentiment=&mailbox_id=&unhandled=&page=` | → `UniboxItem[]` including `disposition`, `recontact_after`, and `lead_suppressed`. `unhandled=true` means a human reply still lacks an operator disposition. |
 | GET `/unibox/:incoming_message_id` | → `UniboxItem & {body_text, thread: {message_id, step_no, sent_at}[]}` — full reply text from `incoming_messages.body_text` (0007) |
 | POST `/unibox/:incoming_message_id/sentiment` | `{sentiment}` → item — appends `sentiment_tagged` (decision M) |
+| POST `/unibox/:incoming_message_id/disposition` | `{disposition, recontact_after?}` → item — appends `reply_dispositioned`. `not_now` requires a future date; `not_interested`, `wrong_person`, and `explicit_unsubscribe` append global unsubscribe suppression atomically. |
 | POST `/enrollments/:id/meeting-booked` | → `{ok}` — appends `meeting_booked` (state unchanged) |
 | POST `/enrollments/:id/snooze` | `{until}` → `{ok}` |
 | POST `/enrollments/:id/unsubscribe` | → `{ok}` — manual unsubscribe (source `manual`), used with tag_only mode or by choice |
-| POST `/manual-sends` | `{lead_id, campaign_id, mailbox_id?, subject, body}` → `{enrollment_id, message_id, checks}` — Mode-1 composer: enrolls if needed, renders (footer+checks), sends via transport, logs `sent`. 409 `mailbox_unhealthy` / fatal checks → 422 |
+| POST `/manual-sends` | `{lead_id, campaign_id, mailbox_id?, subject, body, allow_recontact?}` → `{enrollment_id, message_id, checks}`. Prior human replies require explicit acknowledgement plus completed disposition review; suppression and future `not_now` dates always block. |
 
 ## Reply-detection debug (Stage-7 pending screen)
 | | |
@@ -93,7 +94,7 @@ Shapes below in TS notation. `Metric = { numerator: number, denominator: number 
 ## Settings, compliance, alerts, system
 | | |
 |---|---|
-| GET/PUT `/settings` | full `settings` row (docs/03) — PUT validates ranges (e.g. `pause_hard_pct` 1–20) |
+| GET/PUT `/settings` | full `settings` row. PUT validates ranges; `delivery_confirm_hours` is immutable after the first `sent` event so replay cannot drift (finding 24). |
 | GET/PUT `/compliance` | `{physical_address, optout_text, unsubscribe_base_url}` — PUT with empty address → 422 (sends would halt). `unsubscribe_base_url` is `''` (dormant, no link and no `List-Unsubscribe` header) or an `https://` origin with no trailing slash, query or fragment; tokens are appended as `/u/<token>` |
 | GET `/alerts?unacked=true` · POST `/alerts/:id/ack` | `Alert = {id, kind, severity, payload, created_at, acknowledged_at}` — feeds banners: `catchup_backlog` → downtime panel; `mailbox_*` → failure panels |
 | GET `/health` | → `{ok, db, version}` (unauthenticated) |

@@ -2,9 +2,9 @@
 // deterministic local rubric — no external calls, snapshot-tested. The send
 // path asserts `fatal` is empty; previews display everything.
 //
-// Score: start 10.0; −2.0 per fatal; −0.4 per warning hit for checks #6–#10
-// capped at −0.8 per check; spam (#9) hits beyond the first cost −0.3 each
-// (the spam-specific clause replaces the generic cap for hits ≥2). Warnings
+// Score: start 10.0; −2.0 per fatal; −0.5 per warning hit for checks #6–#10
+// capped at −1.0 per check. Spam starts at −0.8 and costs −0.5 per
+// additional weighted hit; a subject-line phrase counts as two hits. Warnings
 // outside #6–#10 (step-2+ URLs, observation fallback) are reported but do
 // not affect the score. Clamp [0, 10], one decimal.
 import { ALL_CAPS_MAX, ALL_CAPS_PATTERN, EXCLAMATION_MAX, SPAM_PHRASES } from './spamwords';
@@ -99,17 +99,23 @@ export function runChecks(inp: CheckInputs): RenderChecks {
   }
 
   // #9 spam lexicon + structural rules.
-  let spamHits = 0;
-  const contentLower = content.toLowerCase();
+  let spamWeight = 0;
+  const subjectLower = inp.renderedSubject.toLowerCase();
+  const bodyContentLower = inp.renderedBodyPreFooter.toLowerCase();
   for (const phrase of SPAM_PHRASES) {
-    if (contentLower.includes(phrase)) {
-      spamHits += 1;
-      warnings.push({ id: `spam:${phrase}`, message: `spam trigger: "${phrase}"` });
+    const inSubject = subjectLower.includes(phrase);
+    const inBody = bodyContentLower.includes(phrase);
+    if (inSubject || inBody) {
+      spamWeight += inSubject ? 2 : 1;
+      warnings.push({
+        id: `spam:${phrase}`,
+        message: `${inSubject ? 'subject-line ' : ''}copy-risk phrase: "${phrase}"`,
+      });
     }
   }
   const caps = content.match(ALL_CAPS_PATTERN) ?? [];
   if (caps.length > ALL_CAPS_MAX) {
-    spamHits += 1;
+    spamWeight += 1;
     warnings.push({
       id: 'spam:all_caps',
       message: `${caps.length} ALL-CAPS words (max ${ALL_CAPS_MAX})`,
@@ -117,7 +123,7 @@ export function runChecks(inp: CheckInputs): RenderChecks {
   }
   const exclamations = (content.match(/!/g) ?? []).length;
   if (exclamations > EXCLAMATION_MAX) {
-    spamHits += 1;
+    spamWeight += 1;
     warnings.push({
       id: 'spam:exclamations',
       message: `${exclamations} exclamation marks (max ${EXCLAMATION_MAX})`,
@@ -140,12 +146,12 @@ export function runChecks(inp: CheckInputs): RenderChecks {
   // ── Score ────────────────────────────────────────────────────────────────
   let penalty = 2.0 * fatal.length;
   const singleHit = (id: string): number =>
-    Math.min(0.4 * warnings.filter((w) => w.id === id).length, 0.8);
+    Math.min(0.5 * warnings.filter((w) => w.id === id).length, 1.0);
   penalty += singleHit('footer_duplicate');
   penalty += singleHit('subject_length');
   penalty += singleHit('body_length');
   penalty += singleHit('no_personalization');
-  if (spamHits > 0) penalty += 0.4 + 0.3 * (spamHits - 1);
+  if (spamWeight > 0) penalty += 0.8 + 0.5 * (spamWeight - 1);
 
   const score = Math.round(Math.max(0, Math.min(10, 10 - penalty)) * 10) / 10;
   return { fatal, warnings, score, variations: inp.variations };

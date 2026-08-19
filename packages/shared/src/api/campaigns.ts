@@ -89,6 +89,7 @@ export const enrollBodySchema = z.union([
     .object({
       lead_ids: z.array(z.number().int().positive()).min(1),
       force: z.boolean().optional(),
+      allow_recontact: z.boolean().optional(),
     })
     .strict(),
 ]);

@@ -21,6 +21,7 @@ import {
   type SettingsRow,
 } from '../db/repos/settingsRepo';
 import { AppError } from './errors';
+import { hasAnySentEvent } from '../db/repos/eventsRepo';
 import type { ZodTypeProvider } from './plugins/zodCompilers';
 
 function toComplianceDto(row: ComplianceRow): ComplianceDto {
@@ -96,8 +97,30 @@ export async function settingsRoutes(app: FastifyInstance, services: AppServices
     '/settings',
     { schema: { body: putSettingsBodySchema, response: { 200: settingsResponseSchema } } },
     async (req) => {
-      const row = await updateSettings(db, toSettingsColumns(req.body), clock.now());
-      return toSettingsDto(row);
+      const current = await getSettings(db);
+      if (
+        req.body.delivery_confirm_hours !== current.deliveryConfirmHours &&
+        (await hasAnySentEvent(db))
+      ) {
+        throw new AppError(
+          'conflict',
+          409,
+          'delivery_confirm_hours cannot change after the first send; it would make projection replay unstable',
+        );
+      }
+      try {
+        const row = await updateSettings(db, toSettingsColumns(req.body), clock.now());
+        return toSettingsDto(row);
+      } catch (error) {
+        if ((error as { code?: string }).code === '23514') {
+          throw new AppError(
+            'conflict',
+            409,
+            'delivery_confirm_hours cannot change after the first send; it would make projection replay unstable',
+          );
+        }
+        throw error;
+      }
     },
   );
 

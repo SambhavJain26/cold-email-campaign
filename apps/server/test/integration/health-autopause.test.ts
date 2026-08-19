@@ -1,5 +1,5 @@
 // B3.13–B3.15: alert emitter, auto-pause engine (Part-11 verbatim example),
-// resume + auto-clear, redistribution, IMAP failure states.
+// resume + auto-clear and IMAP failure states.
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import type { Pool } from 'pg';
 import { createDb, type Db } from '../../src/db/client';
@@ -9,7 +9,6 @@ import { DbAlertSink } from '../../src/alerts/emitter';
 import { CapturingAlerts } from '../../src/alerts/types';
 import { acknowledgeAlert, listUnacked } from '../../src/db/repos/alertsRepo';
 import { evaluateAutoPause, resumeMailbox } from '../../src/services/autoPause';
-import { redistributeUnstarted } from '../../src/db/repos/enrollmentsRepo';
 import { TransportAuthError } from '../../src/transport/types';
 import { TEST_DATABASE_URL, resetCoreTables, seedMailboxes } from '../helpers/db';
 import { scenario, type Scenario } from '../helpers/scenario';
@@ -168,40 +167,10 @@ describe('auto-pause engine (B3.13, spec Part 11)', () => {
   });
 });
 
-describe('health machine + redistribution (B3.14)', () => {
+describe('health machine (B3.14)', () => {
   let s: Scenario;
   afterEach(async () => {
     await s.close();
-  });
-
-  it('redistribution: assigned-but-unstarted loses the mailbox; mid-thread keeps it', async () => {
-    s = await scenario({ mailboxes: 2, sequence: oneStep });
-    await s.importLeads(2);
-    await s.enroll({ count: 2 });
-    // L0001 mid-thread on mb1 (has a sent event); L0002 assigned mb1 but never sent
-    await s.pool.query(`UPDATE enrollments SET assigned_mailbox_id = 1`);
-    await s.store.append([
-      buildEvent.sent({
-        leadId: 1,
-        enrollmentId: 1,
-        campaignId: 1,
-        occurredAt: s.clock.now(),
-        stepNo: 1,
-        mailboxId: 1,
-        messageId: '<started@scenario.dev>',
-        attributes: { content_hash: 'h1' },
-      }),
-    ]);
-
-    const moved = await redistributeUnstarted(s.db, 1);
-    expect(moved).toBe(1);
-    const rows = await s.pool.query(
-      `SELECT lead_id, assigned_mailbox_id FROM enrollments ORDER BY lead_id`,
-    );
-    expect(rows.rows).toEqual([
-      { lead_id: 1, assigned_mailbox_id: 1 }, // mid-thread: kept
-      { lead_id: 2, assigned_mailbox_id: null }, // unstarted: back to rotation
-    ]);
   });
 
   it('permanent IMAP auth failure on poll: auth_failed + alert + no polls afterwards', async () => {

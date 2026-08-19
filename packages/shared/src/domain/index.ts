@@ -14,6 +14,7 @@ export const EVENT_TYPES = [
   'deal_won',
   'deal_lost',
   'sentiment_tagged',
+  'reply_dispositioned',
 ] as const;
 export type EventType = (typeof EVENT_TYPES)[number];
 
@@ -44,6 +45,17 @@ export function isTerminal(state: EnrollmentState): state is TerminalState {
 
 export const SENTIMENTS = ['positive', 'neutral', 'negative'] as const;
 export type Sentiment = (typeof SENTIMENTS)[number];
+
+export const REPLY_DISPOSITIONS = [
+  'interested',
+  'not_interested',
+  'not_now',
+  'wrong_person',
+  'referred',
+  'explicit_unsubscribe',
+  'other',
+] as const;
+export type ReplyDisposition = (typeof REPLY_DISPOSITIONS)[number];
 
 /** "Best" sentiment ordering for best_reply_sentiment: positive > neutral > negative. */
 export const SENTIMENT_RANK: Record<Sentiment, number> = { positive: 3, neutral: 2, negative: 1 };

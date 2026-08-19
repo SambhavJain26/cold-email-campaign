@@ -29,7 +29,7 @@ export interface DraftStep {
 
 export interface SequenceDraft {
   name: string;
-  stop_on_reply: boolean;
+  stop_on_reply: true;
   steps: DraftStep[];
 }
 
@@ -42,7 +42,7 @@ export function draftUid(prefix = 'd'): string {
 export function draftFromSequence(sequence: SequenceDto): SequenceDraft {
   return {
     name: sequence.name,
-    stop_on_reply: sequence.stop_on_reply,
+    stop_on_reply: true,
     steps: [...sequence.steps]
       .sort((a, b) => a.step_no - b.step_no)
       .map((step) => ({
@@ -97,7 +97,7 @@ export function nextVariantLabel(variants: DraftVariant[]): string {
 export function toWriteBody(draft: SequenceDraft): SequenceWriteBody {
   return {
     name: draft.name.trim(),
-    stop_on_reply: draft.stop_on_reply,
+    stop_on_reply: true,
     steps: draft.steps.map((step, index) => ({
       ...(step.id === undefined ? {} : { id: step.id }),
       step_no: index + 1,

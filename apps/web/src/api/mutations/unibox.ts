@@ -4,6 +4,7 @@ import {
   okResponseSchema,
   uniboxItemSchema,
   type ManualSendBody,
+  type ReplyDisposition,
   type Sentiment,
   type UniboxItemDto,
 } from '@coldemail/shared';
@@ -106,6 +107,54 @@ export function useMeetingBooked() {
         qc,
         (item) => item.enrollment_id === enrollmentId,
         (item) => ({ ...item, meeting_booked: true }),
+      );
+      return { snapshot };
+    },
+    onError: (_error, _variables, context) => restore(qc, context?.snapshot),
+    onSettled: invalidate,
+  });
+}
+
+export function useDispositionReply() {
+  const qc = useQueryClient();
+  const invalidate = useInvalidateUniboxMetrics();
+  return useMutation({
+    mutationFn: ({
+      incomingMessageId,
+      disposition,
+      recontactAfter,
+    }: {
+      incomingMessageId: number;
+      disposition: ReplyDisposition;
+      recontactAfter?: string;
+    }) =>
+      apiFetch(`/unibox/${incomingMessageId}/disposition`, uniboxItemSchema, {
+        method: 'POST',
+        body: {
+          disposition,
+          ...(recontactAfter === undefined ? {} : { recontact_after: recontactAfter }),
+        },
+      }),
+    onMutate: async ({ incomingMessageId, disposition, recontactAfter }) => {
+      await qc.cancelQueries({ queryKey: ['unibox'] });
+      const snapshot = patchUniboxCaches(
+        qc,
+        (item) => item.incoming_message_id === incomingMessageId,
+        (item) => ({
+          ...item,
+          disposition,
+          recontact_after: recontactAfter ?? null,
+          auto_unsubscribed:
+            item.auto_unsubscribed ||
+            disposition === 'not_interested' ||
+            disposition === 'wrong_person' ||
+            disposition === 'explicit_unsubscribe',
+          lead_suppressed:
+            item.lead_suppressed ||
+            disposition === 'not_interested' ||
+            disposition === 'wrong_person' ||
+            disposition === 'explicit_unsubscribe',
+        }),
       );
       return { snapshot };
     },

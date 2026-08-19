@@ -39,6 +39,10 @@ Systemd alternative ([`deploy/systemd/`](../deploy/systemd)): OS Postgres + OS C
 
 ## 3. Runbook (operations, in order of likely need)
 
+Incident procedures are centralized in [docs/18](18-incident-response-runbook.md): mailbox
+failure, bounce triage, spam complaints, emergency campaign pause, unsubscribe endpoint outage,
+and restore after personal-data erasure.
+
 - **First deploy:** `cp .env.prod.example .env.prod`, generate `SECRET_KEY`/`SESSION_KEY`, set `POSTGRES_PASSWORD`/`OPERATOR_*`/`DOMAIN`, then `docker compose -f docker-compose.prod.yml --env-file .env.prod up -d --build`.
 - **Deploy/update:** `git pull && docker compose -f docker-compose.prod.yml --env-file .env.prod up -d --build` — the app entrypoint applies migrations before it listens; scheduler catch-up handles the downtime window (never-burst; expect a `catchup_backlog` alert if > a few hours).
 - **Backup now:** `docker compose exec backup /backup.sh` (or `BACKUP_DIR=./backups sh scripts/backup.sh`). **Restore drill (quarterly + the automated B7.2 gate in CI):** `DATABASE_URL=… BACKUP_DIR=… sh scripts/restore-drill.sh` — dumps, restores into a scratch DB, runs `rebuild-projections` then `--dry-run` (expect 0 diffs = the fold is deterministic), then `self-check` (expect 0 invariant violations). Data proven intact, not just present. Uses `pg_dump`/`pg_restore`/`psql` from PATH.

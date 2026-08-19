@@ -68,7 +68,7 @@ describe('classifySmtpError (B8.1)', () => {
     ).toBe('permanent');
   });
 
-  it('bad credentials are a permanent MAILBOX failure → auth_failed + redistribution', () => {
+  it('bad credentials are a permanent MAILBOX failure → auth_failed', () => {
     // The exact shape GreenMail/Gmail return (asserted live in the mail suite).
     expect(
       classifySmtpError(

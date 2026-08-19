@@ -156,7 +156,7 @@ CREATE INDEX enr_mailbox ON enrollments (assigned_mailbox_id) WHERE current_stat
 CREATE TABLE sequences (
   id                    bigint GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
   name                  text NOT NULL,
-  stop_on_reply         bool NOT NULL DEFAULT true,
+  stop_on_reply         bool NOT NULL DEFAULT true, -- constrained true since 0013
   stop_on_hard_bounce   bool NOT NULL DEFAULT true,
   stop_on_unsubscribe   bool NOT NULL DEFAULT true,
   archived              bool NOT NULL DEFAULT false,
@@ -300,7 +300,7 @@ CREATE TABLE settings (
   scheduler_tick_minutes int NOT NULL DEFAULT 5,
   poll_interval_minutes int NOT NULL DEFAULT 5,
   stale_poll_hours int NOT NULL DEFAULT 6,
-  delivery_confirm_hours int NOT NULL DEFAULT 6,
+  delivery_confirm_hours int NOT NULL DEFAULT 6, -- immutable after first sent event (0013)
   send_jitter_pct int NOT NULL DEFAULT 20,
   default_timezone text NOT NULL DEFAULT 'America/New_York',
   cold_storage_rest_days int NOT NULL DEFAULT 60,
@@ -361,5 +361,5 @@ GRANT  INSERT, SELECT ON events TO app_rw;
 ## 6. Migration policy
 
 - Migrations are **hand-authored paired SQL files** (`NNNN_name.up.sql` / `NNNN_name.down.sql`) in `apps/server/src/db/migrations/`, executed by the in-repo runner (`src/db/migrate.ts`, tracked in `schema_migrations`), committed to git, applied on boot (prod) and by `npm run db:migrate` / `db:rollback` / `db:status`. drizzle-kit is generation-assist only (diff SQL from schema defs into gitignored `drizzle-kit-out/`, hand-copied in) — it cannot execute or roll back migrations. *(Changed at B0.4: drizzle-kit has no down-migration support, and this doc requires tested downs; hand-written DDL also fits the trigger/grant-heavy schema.)*
-- Numbered plan: `0001_core` (enums + events + leads + campaigns + enrollments + trigger/roles) → `0002_seed` → `0003_sequences` → `0004_transport_tables` (mailboxes, secrets, sent_messages, incoming_messages) → `0005_ingest` (imports, suppressions) → `0006_ops` (alerts) → `0007_operator` (operator + incoming_messages.body_text) → `0008_precanary` (mailbox timezone, lead erasure markers) → `0009_ui_consistency` (durable scheduler-blocker episodes). Later stages add columns only via new migrations — never edit an applied migration.
+- Numbered plan continues through `0010_unsubscribe`, `0011_guardrails`, `0012_poll_folders`, and `0013_reply_safety` (reply dispositions, mandatory stop-on-reply, replay-stable completion setting). Later stages add columns only via new migrations — never edit an applied migration.
 - Rollback: every migration ships a `down`; tested in CI (apply → down → apply).

@@ -15,6 +15,7 @@ const ICON: Record<EventViewDto['type'], string> = {
   deal_won: '🏆',
   deal_lost: '📉',
   sentiment_tagged: '🏷️',
+  reply_dispositioned: '📋',
 };
 
 export function Timeline({ events }: { events: EventViewDto[] }) {

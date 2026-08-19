@@ -104,6 +104,11 @@ export function applyEvent(
       // Retag: latest tag wins for that reply. Never changes enrollment state.
       return bumpSentiment(s, e.attributes.reply_event_id, e.sentiment);
 
+    case 'reply_dispositioned':
+      // Permission/recontact fact queried from the ledger; state changes only
+      // through the accompanying unsubscribe event where applicable.
+      return s;
+
     case 'auto_reply': // OOO is not engagement — sequence continues (spec Part 6)
     case 'deal_won':
     case 'deal_lost':

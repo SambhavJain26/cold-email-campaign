@@ -113,9 +113,9 @@ before any real-domain work**. The pre-change DB snapshot is
 - The test campaign is paused
 
 These values are never evidence that a volume is safe. The last unrun canary scenario is docs/17
-§6 catch-up/never-burst. Finding 12's warmed-domain `List-Unsubscribe` question remains unanswered;
-finding 24 (settings-dependent completion drift) and finding 25 (unsatisfiable redistribution)
-remain open. Finding 11 is closed as unanswerable with this rig; do not re-litigate it.
+§6 catch-up/never-burst. Finding 12's warmed-domain `List-Unsubscribe` question remains unanswered.
+Findings 20–25 are closed locally; the live scenario, setting restoration, and final wrap remain.
+Finding 11 is closed as unanswerable with this rig; do not re-litigate it.
 
 ## Damage-prone operational traps
 
@@ -132,10 +132,9 @@ remain open. Finding 11 is closed as unanswerable with this rig; do not re-litig
 - A process that appends a send must start `Jobs`, or the delayed confirmation job is lost.
   `apps/server/test/ops/canary-drive.ts` and `canary-cohort.ts` write real state even when invoked
   as scripts.
-- Changing `delivery_confirm_hours` after completions folded can cause temporary projection drift;
-  run comparisons with the value in force at fold time (finding 24).
-- `redistributeUnstarted` currently cannot move a production row because its predicate is
-  unsatisfiable. Do not claim redistribution occurred merely because that path ran (finding 25).
+- `delivery_confirm_hours` is immutable after the first `sent` event (API guard plus DB trigger).
+- Unstarted work has no mailbox assignment and rotates normally. Started threads remain pinned;
+  there is no redistribution function or pre-send redistribution claim.
 - Public `/u/:token` routes stay outside session/CSRF. `GET` must never unsubscribe, one-click
   POST needs the scoped form parser, only token hashes are stored, and request logging must redact
   the URL without spreading the raw request or body. The token is a capability.

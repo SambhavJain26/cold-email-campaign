@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { ArrowLeft, PenLine } from 'lucide-react';
+import { ArrowLeft, PenLine, Plus, Trash2 } from 'lucide-react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { toast } from 'sonner';
 import type { LeadDto, LeadTier } from '@coldemail/shared';
@@ -189,12 +189,33 @@ function EditCard({ lead }: { lead: LeadDto & { notes: string | null } }) {
   const [tier, setTier] = useState<string>(lead.tier ?? UNTIERED);
   const [notes, setNotes] = useState(lead.notes ?? '');
   const [observation, setObservation] = useState(lead.custom_fields.custom_observation ?? '');
+  const [customFields, setCustomFields] = useState(() =>
+    Object.entries(lead.custom_fields)
+      .filter(([key]) => key !== 'custom_observation')
+      .map(([key, value], index) => ({ id: index + 1, key, value })),
+  );
+  const [nextFieldId, setNextFieldId] = useState(customFields.length + 1);
   const [composerOpen, setComposerOpen] = useState(false);
 
+  const customFieldsObject = Object.fromEntries(
+    customFields
+      .filter((field) => field.key.trim() !== '')
+      .map((field) => [field.key.trim(), field.value]),
+  );
+  const duplicateKeys =
+    new Set(customFields.map((field) => field.key.trim()).filter(Boolean)).size !==
+    customFields.filter((field) => field.key.trim() !== '').length;
+  const invalidFields = customFields.some((field) => field.key.trim() === '') || duplicateKeys;
   const dirty =
     (lead.tier ?? UNTIERED) !== tier ||
     (lead.notes ?? '') !== notes ||
-    (lead.custom_fields.custom_observation ?? '') !== observation;
+    (lead.custom_fields.custom_observation ?? '') !== observation ||
+    JSON.stringify(customFieldsObject) !==
+      JSON.stringify(
+        Object.fromEntries(
+          Object.entries(lead.custom_fields).filter(([key]) => key !== 'custom_observation'),
+        ),
+      );
 
   const save = () =>
     patch.mutate(
@@ -204,7 +225,7 @@ function EditCard({ lead }: { lead: LeadDto & { notes: string | null } }) {
           tier: tier === UNTIERED ? null : (tier as LeadTier),
           notes: notes === '' ? null : notes,
           custom_fields: (() => {
-            const fields = { ...lead.custom_fields };
+            const fields = { ...customFieldsObject };
             if (observation === '') delete fields.custom_observation;
             else fields.custom_observation = observation;
             return fields;
@@ -235,6 +256,62 @@ function EditCard({ lead }: { lead: LeadDto & { notes: string | null } }) {
             </SelectContent>
           </Select>
         </div>
+        <div className="space-y-2">
+          <div className="flex items-center justify-between gap-2">
+            <Label>Custom fields</Label>
+            <Button
+              type="button"
+              size="xs"
+              variant="outline"
+              onClick={() => {
+                setCustomFields([...customFields, { id: nextFieldId, key: '', value: '' }]);
+                setNextFieldId(nextFieldId + 1);
+              }}
+            >
+              <Plus className="size-3.5" /> Add field
+            </Button>
+          </div>
+          {customFields.map((field) => (
+            <div key={field.id} className="grid grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto] gap-2">
+              <Input
+                aria-label="Custom field name"
+                placeholder="field_name"
+                value={field.key}
+                onChange={(event) =>
+                  setCustomFields(
+                    customFields.map((item) =>
+                      item.id === field.id ? { ...item, key: event.target.value } : item,
+                    ),
+                  )
+                }
+              />
+              <Input
+                aria-label={`${field.key || 'Custom field'} value`}
+                placeholder="Value"
+                value={field.value}
+                onChange={(event) =>
+                  setCustomFields(
+                    customFields.map((item) =>
+                      item.id === field.id ? { ...item, value: event.target.value } : item,
+                    ),
+                  )
+                }
+              />
+              <Button
+                type="button"
+                size="icon-sm"
+                variant="ghost"
+                aria-label={`Remove ${field.key || 'custom field'}`}
+                onClick={() => setCustomFields(customFields.filter((item) => item.id !== field.id))}
+              >
+                <Trash2 className="size-4" />
+              </Button>
+            </div>
+          ))}
+          {invalidFields && (
+            <p className="text-xs text-destructive">Field names must be non-empty and unique.</p>
+          )}
+        </div>
         <div className="space-y-1">
           <Label htmlFor="lead-observation">Custom observation (researched-mode slot)</Label>
           <Input
@@ -253,7 +330,7 @@ function EditCard({ lead }: { lead: LeadDto & { notes: string | null } }) {
           />
         </div>
         <div className="flex items-center gap-2">
-          <Button size="sm" disabled={!dirty || patch.isPending} onClick={save}>
+          <Button size="sm" disabled={!dirty || invalidFields || patch.isPending} onClick={save}>
             Save
           </Button>
           <Button

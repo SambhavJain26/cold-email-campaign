@@ -3,8 +3,8 @@
 // Transient SMTP failures are normal and are retried (4b). What distinguishes a
 // BLOCK from ordinary flakiness is that the provider keeps answering with a
 // rate-limit/throttle code: the mailbox isn't broken, the provider is refusing
-// it for now — which is a different operator action (wait + resume) and, like
-// auth_failed, warrants redistributing unstarted enrollments to other mailboxes.
+// it for now — which is a different operator action (wait + resume). Unassigned
+// work already rotates away; started threads remain pinned for threading.
 //
 // Pure so the pattern list is unit-testable against real provider strings.
 

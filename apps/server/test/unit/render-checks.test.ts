@@ -22,7 +22,7 @@ const compliance = {
 
 // Baseline passes every check: personalization tag, no URLs/HTML/spam,
 // in-range body (~55 words), short subject.
-const SUBJECT = 'Quick question about {{company|your listings}}';
+const SUBJECT = 'A note about {{company|your listings}}';
 const BODY =
   'Hi {{first_name|there}},\n\n' +
   'I noticed {{company|your team}} has been growing quickly this quarter and wanted to reach out. ' +
@@ -142,10 +142,10 @@ describe('#5 plain text only (fatal)', () => {
 });
 
 describe('#6 duplicated footer text (warning)', () => {
-  it('body containing the opt-out text warns and costs 0.4', () => {
+  it('body containing the opt-out text warns and costs 0.5', () => {
     const r = render({ body: BODY + ' ' + compliance.optoutText });
     expect(r.checks.warnings.some((w) => w.id === 'footer_duplicate')).toBe(true);
-    expect(r.checks.score).toBe(9.6);
+    expect(r.checks.score).toBe(9.5);
   });
 });
 
@@ -174,20 +174,29 @@ describe('#8 body word count (warning)', () => {
 });
 
 describe('#9 spam lexicon', () => {
-  it('one phrase: −0.4', () => {
+  it('one body phrase: −0.8', () => {
     const r = render({ body: BODY + ' Just following up on this.' });
     expect(r.checks.warnings.map((w) => w.id)).toEqual(['spam:just following up']);
-    expect(r.checks.score).toBe(9.6);
+    expect(r.checks.score).toBe(9.2);
   });
 
-  it('three hits: −0.4 −0.3 −0.3 = 9.0', () => {
+  it('three body hits cost 1.8', () => {
     const r = render({ body: BODY + ' Just following up: act now, click here.' });
     expect(r.checks.warnings.map((w) => w.id).sort()).toEqual([
       'spam:act now',
       'spam:click here',
       'spam:just following up',
     ]);
-    expect(r.checks.score).toBe(9);
+    expect(r.checks.score).toBe(8.2);
+  });
+
+  it('flags quick question and weights subject-line phrases twice', () => {
+    const r = render({ subject: 'Quick question for {{company|your team}}' });
+    expect(r.checks.warnings).toContainEqual({
+      id: 'spam:quick question',
+      message: 'subject-line copy-risk phrase: "quick question"',
+    });
+    expect(r.checks.score).toBe(8.7);
   });
 
   it('more than 2 ALL-CAPS words is a hit; 2-letter acronyms are not counted', () => {
@@ -214,7 +223,7 @@ describe('#10 personalization present (warning)', () => {
     expect(r.checks.warnings).toEqual([
       { id: 'no_personalization', message: 'no lead-specific merge tag in subject or body' },
     ]);
-    expect(r.checks.score).toBe(9.6);
+    expect(r.checks.score).toBe(9.5);
   });
 });
 
@@ -224,7 +233,7 @@ describe('score rubric composition', () => {
     const r = render({ body: 'See https://x.dev {{first_name|there}}' });
     expect(r.checks.fatal).toHaveLength(1);
     expect(r.checks.warnings.some((w) => w.id === 'body_length')).toBe(true);
-    expect(r.checks.score).toBe(7.6); // 10 − 2.0 − 0.4
+    expect(r.checks.score).toBe(7.5); // 10 − 2.0 − 0.5
   });
 
   it('clamps at 0 and keeps one decimal', () => {

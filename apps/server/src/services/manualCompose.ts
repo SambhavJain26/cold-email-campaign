@@ -12,7 +12,7 @@ import type { Renderer, SequenceProvider } from '../scheduler/types';
 import type { RenderChecks } from '../render/types';
 import type { DueEnrollment } from '../db/repos/enrollmentsRepo';
 import { findByLeadAndCampaign, getById, insertEnrollments } from '../db/repos/enrollmentsRepo';
-import { getLeadById } from '../db/repos/leadsRepo';
+import { getLeadById, recontactStatusByLeadIds } from '../db/repos/leadsRepo';
 import { getComplianceSettings, getSettings } from '../db/repos/settingsRepo';
 import { listMailboxesByStatus } from '../db/repos/mailboxesRepo';
 import { leadReceivedContentHash } from '../db/repos/eventsRepo';
@@ -214,6 +214,7 @@ export interface ManualSendInput {
   mailboxId?: number;
   subject: string;
   bodyText: string;
+  allowRecontact?: boolean;
 }
 
 /**
@@ -233,10 +234,21 @@ export async function manualSend(
   if (campaign.status !== 'active') throw new Error(`campaign ${input.campaignId} is not active`);
   const lead = await getLeadById(db, input.leadId);
   if (!lead) throw new Error(`lead ${input.leadId} not found`);
+  if (lead.isSuppressed) throw new Error(`lead ${lead.email} is suppressed`);
+
+  const replyStatus = (await recontactStatusByLeadIds(db, [lead.id])).get(lead.id);
+  if (replyStatus?.hasReply && !input.allowRecontact) {
+    throw new Error('lead has replied before; explicit recontact acknowledgement is required');
+  }
+  if (replyStatus?.hasUndispositionedReply) {
+    throw new Error('lead has a reply that still needs an operator disposition');
+  }
+  if ((replyStatus?.blockedUntil?.getTime() ?? 0) > now.getTime()) {
+    throw new Error(`lead is marked not now until ${replyStatus!.blockedUntil!.toISOString()}`);
+  }
 
   let enrollment = await findByLeadAndCampaign(db, input.leadId, input.campaignId);
   if (!enrollment) {
-    if (lead.isSuppressed) throw new Error(`lead ${lead.email} is suppressed`);
     const [enrollmentId] = await insertEnrollments(db, [
       {
         leadId: lead.id,

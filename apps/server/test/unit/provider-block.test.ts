@@ -1,5 +1,5 @@
 // docs/06 §6: telling "the provider is throttling us" apart from "SMTP is
-// flaky". The first is provider_blocked (+ redistribution), the second is a
+// flaky". The first is provider_blocked, the second is a
 // plain pause — so the matcher has to be right about real provider strings.
 import { describe, expect, it } from 'vitest';
 import {

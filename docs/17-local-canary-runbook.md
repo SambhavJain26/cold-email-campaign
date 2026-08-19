@@ -260,12 +260,12 @@ as work closes.
 | 18 | **Sentiment tagging reported failure on every success, and the retries wrote junk into an append-only log.** `POST /unibox/:id/sentiment` returns the updated **item** (contract docs/10; route declares `response: { 200: uniboxItemSchema }`), but the client parsed it with `okResponseSchema`. Server returned 200 and appended the event; the client's zod parse rejected the body and the global mutation handler toasted "request failed". The operator clicked seven times, producing **seven duplicate `sentiment_tagged` events** that can never be deleted. Note the client-side decision-H tripwire worked exactly as designed — it caught a genuine client/server disagreement; the client was simply the wrong side. Fixed: parse `uniboxItemSchema`. | **correctness (schema mismatch)** | ✅ fixed |
 | 19 | **Every email is 100% plain text, so the footer/signature cannot be visually de-emphasized — and it reads worse than comparable real cold emails as a result.** Confirmed end to end: `render/footer.ts` appends the compliance footer as plain text (`\n\n---\n{address}\n{optout}`), and the scheduler's `sendMail` call passes only `text: msg.bodyText` to nodemailer — there is no `html:` field anywhere in the send path. In plain text every character renders identically, so the unsubscribe line and address are exactly as visually prominent as the message body; a human reader clocks it immediately as automated. **This is very likely a deliberate deliverability choice** (plain text avoids images, tracking pixels, embedded fonts, and hidden-text tricks that spam filters key on) — but it is a false tradeoff. Commercial cold-email tools (Smartlead, Instantly, Apollo, lemlist) send **multipart** email: the same message carries a plain-text part *and* a minimal HTML part side by side (nodemailer supports this natively — passing both `text` and `html` produces `multipart/alternative`); the client renders whichever it prefers, almost always the HTML one. The HTML stays deliberately plain — no images, no tracking, no complex layout — just enough CSS (e.g. `font-size:11px;color:#888`) to de-emphasize the footer the way a real signature block does. What spam filters actually penalize is image-heavy HTML, tracking pixels, excessive links and hidden-text tricks, not the mere presence of minimal inline CSS. **Legal constraint to design around:** CAN-SPAM requires the opt-out and sender identification to be "clear and conspicuous" — de-emphasized-but-legible is standard practice and compliant; genuinely hidden (1px, white-on-white) would not be. | product / deliverability | ✅ completed locally — matching text + minimal escaped HTML, verified by GreenMail |
 | 14 | **The deliverability score's spam lexicon models the wrong era.** `render/spamwords.ts` is the entire vocabulary behind check #9 and decision W's rubric: `['free!!!', 'guarantee', 'act now', 'risk-free', '100% free', 'click here']`. That is a 1990s bulk-mail word list. It contains **zero** burned cold-email phrases — `quick question`, `just following up`, `circling back`, `touching base`, `hope this finds you well`, `reaching out`, `pick your brain`, `15 minutes`, `per my last email`. An operator can therefore write the most template-smelling subject in the industry and the checker will score it clean, which is worse than having no checker: it manufactures false confidence. **Note carefully — this stands on its own as a fact about the code, and is NOT evidence-backed by finding 11**, which turned out to be unmeasurable. The justification is that the lexicon is self-evidently stale, not that any particular phrase was proven to cause filtering. Structurally cheap: decision W says the rubric is DATA and the file header says to tune the lexicon, not `checks.ts`. Worth considering separately whether the subject deserves its own weighting — check #9 currently flattens subject and body into one string (`content = subject + "\n" + body`) and scores a hit identically wherever it appears — but that change should be justified on its own merits, not on this canary's contaminated data. | product gap | ✅ completed locally — transparent cliché rubric in subject/body; warning only |
-| 20 | **Alert history is unreachable once acknowledged.** `GET /alerts` accepts `unacked=false` and `alertsRepo` returns acknowledged rows, but every call site in the web app hardcodes `useAlerts(true)` — `components/layout/alerts-bell.tsx:65`, `components/shared/catchup-banner.tsx:8`, `features/mailboxes/failure-panels.tsx:149` — and no screen lists alert history. Acknowledging an alert therefore removes it from the operator's view permanently. A past auto-pause, `imap_stale`, `selfcheck_drift` or `catchup_backlog` cannot be reviewed after the fact: the audit trail exists in the database and is served by the API, and is invisible in the product. Directly the same shape as finding 3, and it matters more once real campaigns run, because the alert feed is the only operator-facing record of why sending stopped. | **observability** | 🟡 open — found by the 2026-08-15 UI-coverage audit |
-| 21 | **Two `mailbox_id` filters are exposed by the API and absent from the UI.** `uniboxQuerySchema.mailbox_id` and `incomingMessagesQuerySchema.mailbox_id` both filter server-side, but the Unibox screen wires only bucket/sentiment/unhandled and the System reply-detection table wires only `classification` — the latter even renders `mailbox_id` as a column while offering no way to filter on it. With more than one sender, isolating a single mailbox's replies or ingested messages is impossible from the product, which is exactly what a per-mailbox deliverability or threading problem would require. | UI gap | 🟡 open — found by the 2026-08-15 UI-coverage audit |
-| 25 | **`redistributeUnstarted` can never move a row in production — its predicate is unsatisfiable.** It updates enrollments where `assigned_mailbox_id = X AND current_state = 'ACTIVE' AND NOT EXISTS (a sent event)`. But `assigned_mailbox_id` is written in exactly ONE place — `scheduler.ts:534`, inside the same transaction that appends the `sent` event (`manualCompose` only reads it), and `enrollmentsRepo.ts:169` carries the codebase's own comment `// assigned at first send ⇒ ≥1 sent`. So clause one implies a `sent` event exists and clause three requires none. Confirmed three ways on 2026-08-16: statically (single writer), empirically (`assigned_but_never_sent = 0` on live production data), and behaviourally (run against a genuinely auto-paused mailbox mid-campaign → `{"unassigned": 0}`). **The offline test passes because it hand-seeds an impossible state** — `health-autopause.test.ts:182` does `UPDATE enrollments SET assigned_mailbox_id = 1` and only then appends a `sent` event for one of two rows, manufacturing "assigned but never sent", which production cannot produce. Third instance this session of a green test freezing a false belief, and the sharpest: findings 17 and 18 froze a wrong *reading*; this freezes an impossible *state*. **Why it matters:** docs/06 §6 specifies redistribution as the response to `provider_blocked`, the poller calls it on `auth_failed`, and the 2026-07-25 post-M3 sweep built `provider_blocked` specifically to make redistribution reachable — that whole chain terminates in a no-op. Real-world harm is mild (unassigned enrollments already route to any healthy mailbox by rotation, so nothing gets stuck); the harm is the belief that work is being moved off a dead mailbox when nothing is. **Fix is a design decision, not a patch:** either assign a mailbox at ENROLMENT time (making redistribution meaningful, at the cost of a pre-send assignment concept), or delete the function and every claim that depends on it, since rotation already covers the case. | **correctness (dead code behind a documented guarantee)** | 🟡 open — found by the 2026-08-16 §5 pass |
-| 24 | **Lowering `delivery_confirm_hours` after enrollments have completed produces projection drift until the new window elapses.** Completion is DERIVED, not just stored: a lead past its last step folds to `COMPLETED` with `terminal_at = last sent + delivery_confirm_hours`, and `rebuild-projections` recomputes that eligibility using the setting in force **at rebuild time**, not the one in force when the fold happened. Change the setting in between and the stored projection and the replayed log legitimately disagree. Reproduced exactly on 2026-08-16: five enrollments folded to `COMPLETED` with the window compressed to 0, the window was restored to 1h, and the dry-run reported all five as `stored=COMPLETED derived=ACTIVE, terminal_at stored=… derived=null`. Setting the window back to 0 returned `checked 16 enrollments — 0 diff(s)`, confirming the cause. **This is not corruption and it self-heals** once the new window elapses — but the weekly `rebuild-compare` job would emit a `selfcheck_drift` alert in the meantime, and an operator seeing that after tuning a timing setting would reasonably conclude the ledger was broken. The offline suites cannot catch this: they hold settings fixed for the life of a scenario. Worth deciding deliberately whether completion should replay against the STORED `terminal_at` rather than recomputing from current settings — that would make the fold's result immutable, which is closer to what an append-only design implies. | **correctness (settings-dependent projection)** | 🟡 open — found by the 2026-08-16 §3 cohort |
+| 20 | Acknowledged alert history was inaccessible in the UI. | **observability** | ✅ fixed 2026-08-20 — System now shows all/open alert history with acknowledgement state and action. |
+| 21 | Unibox and incoming-message `mailbox_id` filters existed only in the API. | UI gap | ✅ fixed 2026-08-20 — both screens now provide a mailbox selector. |
+| 25 | `redistributeUnstarted` searched for an impossible assigned-without-send state. | **correctness** | ✅ fixed 2026-08-20 — function, calls, impossible-state test, canary command, and redistribution claims removed. Unassigned work rotates normally; started threads remain pinned. |
+| 24 | Changing `delivery_confirm_hours` after sends could make completion replay disagree temporarily. | **correctness** | ✅ fixed 2026-08-20 — API guard plus database trigger make the setting immutable after the first `sent` event, including concurrent-write races. |
 | 23 | **A red browser test was recorded as a green gate, twice.** The mock Playwright suite contains **51** tests, but the 2026-08-10 and 2026-08-13 gate records both say "mock UI E2E 50" — the missing one, `unibox.spec.ts` "manual composer prefills from step 1", has been failing since commit `95de5a3`. Cause: that commit added an **Open campaign leads** link to the campaign detail page, and the test navigates away with `getByRole('link', { name: 'Leads' })`. Playwright matches accessible names by substring, so the selector resolves to two elements and trips strict mode. The failure is a selector collision, not a product defect — but it went unnoticed because "50 passed" was transcribed as the whole result rather than 50 **of 51**. Fixed with `exact: true` at the one call site that navigates from a campaign detail page; the other sixteen nav clicks in the suite start from pages that do not render the second link. **The lesson is about the record, not the selector: a suite total must be written down as passed/total, or a red test hides inside a green-looking number.** | **test integrity** | ✅ fixed — found by the 2026-08-15 audit pass |
-| 22 | **Arbitrary `custom_fields` are display-only.** `PATCH /leads/:id` accepts any `custom_fields` map, and `render/merge.ts` resolves arbitrary keys as merge tags after the reserved names — so an import can define custom fields that templates then merge. Lead detail renders every key (`features/leads/detail-page.tsx:117`) but the edit card writes back only `custom_observation`. A custom field imported with a wrong value can only be corrected by re-importing the lead. | UI gap | 🟡 open — found by the 2026-08-15 UI-coverage audit |
+| 22 | Arbitrary imported `custom_fields` were display-only. | UI gap | ✅ fixed 2026-08-20 — lead detail can add, rename, edit, and remove arbitrary fields with unique-name validation. |
 
 **The pattern worth naming:** findings 4, 5, 6 and 9 are all the same shape — *the backend
 implements it, the API exposes it, the UI never surfaces it, and the operator gets no feedback.*
@@ -524,6 +524,8 @@ recipient addresses. The cohort shrinks; nothing else changes.
 
 ## 3. Core walkthrough cohort (days 3–4)
 
+**Status:** ✅ completed through the controlled Gmail cohorts and reconciliation recorded above.
+
 ~20 plus-addressed leads + 2 dead addresses. CSV import → bulk-tier → campaign → activate →
 enroll. Then **four manual actions**; everything else is automatic.
 
@@ -536,11 +538,11 @@ enroll. Then **four manual actions**; everything else is automatic.
 
 Verify:
 
-- [ ] Unibox buckets each message correctly; tag sentiments
-- [ ] After the 1-hour confirm window: reply rate and positive rate (÷ **contacted**), bounce
+- [x] Unibox buckets each message correctly; tag sentiments
+- [x] After the confirm window: reply rate and positive rate (÷ **contacted**), bounce
       rate (÷ **distinct leads sent-to**)
-- [ ] Terminal outcomes sum to the cohort (REPLIED + BOUNCED + UNSUBSCRIBED + COMPLETED)
-- [ ] `npm run rebuild-projections -- --dry-run` → **0 drift**
+- [x] Terminal outcomes sum to the cohort (REPLIED + BOUNCED + UNSUBSCRIBED + COMPLETED)
+- [x] `npm run rebuild-projections -- --dry-run` → **0 drift**
 
 Note each inbound message's UID as it arrives — that is §4's input.
 
@@ -566,12 +568,18 @@ and eyeball the mapping before committing.
 
 Capture at minimum: `gmail-real-dsn-5xx`, `gmail-real-vacation`, `gmail-real-reply`.
 
+**2026-08-20 disposition:** the real Gmail reply fixture is captured and locked. A real Gmail
+hard-bounce DSN and vacation/OOO fixture are formally deferred because no matching existing
+message has been identified for read-only capture. Do not create a bounce or enable/send to an
+autoresponder merely to obtain a fixture; capture them later only from pre-existing mail or under
+a separately approved owner-address test.
+
 Then wire them in:
 
-- [ ] `test/helpers/emlFixtures.ts` — add names to `FixtureName` and `ALL_FIXTURES`
-- [ ] `test/unit/header-fixtures.test.ts` — assert load-bearing fields (DSN status, final
+- [~] `test/helpers/emlFixtures.ts` — real reply present; DSN/OOO deferred as above
+- [~] `test/unit/header-fixtures.test.ts` — reply assertions present; DSN/OOO deferred
       recipient, `Auto-Submitted`, threading headers), mirroring the existing `it.each` blocks
-- [ ] Diff real wording against the hand-written fixtures; patch classifier patterns in
+- [~] Diff real wording against the hand-written fixtures; no DSN/OOO source message yet
       `poller/` wherever Google's actual text differs from the guess
 
 **Gate:** `npm test` fully green with the new fixtures and any pattern changes in, and
@@ -583,12 +591,15 @@ Then wire them in:
 
 Each needs its own cohort — they cannot share one with §3. Reset with `test/ops/e2e-reset.ts`.
 
-- [ ] **Auto-pause on bounce rate** — cohort weighted toward dead addresses to cross the threshold
-- [ ] **Mailbox rotation** across both senders
-- [ ] **Redistribution** — pause one mailbox mid-run, confirm unstarted work moves
-- [ ] **Suppression enforcement** at all four layers (ingest, selection, send, append)
-- [ ] **Recycle hash guard** — re-enroll a completed cohort, confirm it blocks and names the steps
-- [ ] `--dry-run` → 0 drift after each
+**Status:** ✅ completed or superseded by the findings log. The old redistribution scenario was
+invalid: unstarted work is never assigned, so rotation already selects a healthy mailbox.
+
+- [x] **Auto-pause on bounce rate**
+- [x] **Mailbox rotation** across both senders
+- [x] **Failed-mailbox behavior** — unassigned work rotates; started threads remain pinned
+- [x] **Suppression enforcement** at all four layers (ingest, selection, send, append)
+- [x] **Recycle hash guard** blocks repeated content and names the steps
+- [x] `--dry-run` → 0 drift
 
 ---
 
@@ -596,12 +607,34 @@ Each needs its own cohort — they cannot share one with §3. Reset with `test/o
 
 These need the host up, which is why this is not on a laptop.
 
-- [ ] **Stale-poll** — break IMAP credentials, leave past `stale_poll_hours` (6) → `imap_stale`
+- [x] **Stale-poll** — break IMAP credentials, leave past `stale_poll_hours` (6) → `imap_stale`
       + pause + alert; reconnect → polling resumes **without a restart**
 - [ ] **Catch-up / never-burst** — stop the app several hours, restart, confirm the backlog is
       paced not dumped (expect a `catchup_backlog` alert)
-- [ ] **Backup freshness** — daily self-check alerts on a dump older than 26h
-- [ ] **`auth_failed` → reconnect** registers the mailbox poll at runtime
+- [x] **Backup freshness** — daily self-check alerts on a dump older than 26h
+- [x] **`auth_failed` → reconnect** registers the mailbox poll at runtime
+
+### §6a Catch-up/never-burst approval plan (prepared, not executed)
+
+This is the only unrun live scenario. It changes live campaign state and can send mail, so execution
+requires one approval naming the campaign, owner-controlled recipient addresses, maximum accepted
+sends, and test window. Proposed bound: one dedicated campaign, at most four owner-address sends,
+no prospect addresses, and an immediate pause at the bound.
+
+1. Record a database snapshot plus current settings, mailbox states/caps, campaign state, event
+   watermark, and projection dry-run (must be zero diffs).
+2. With workers stopped, create or prepare only the approved owner-address cohort so its sends are
+   overdue by several hours. Keep the API/public service state unchanged unless included in approval.
+3. Restart workers once. Record every scheduler tick and accepted-send timestamp; stop/pause at the
+   approved maximum even if backlog remains.
+4. Prove: a `catchup_backlog` alert exists; no mailbox emits more than one message per tick; every
+   same-mailbox gap respects `minGap × (1 - jitter)`; daily/resume caps are not exceeded; timestamps
+   span paced ticks rather than one restart burst.
+5. Pause the campaign, reconcile enrollment/mailbox/alert/event state, and run self-check plus the
+   projection dry-run (both clean/zero-diff required).
+6. Only after the evidence is saved, restore the pre-canary safety settings from the recorded
+   snapshot and verify them read-only. `delivery_confirm_hours` must be restored before deploying
+   migration 0013, because it becomes immutable after sends exist.
 
 ---
 

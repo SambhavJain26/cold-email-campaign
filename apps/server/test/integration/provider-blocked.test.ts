@@ -1,7 +1,6 @@
 // docs/06 §6: the provider_blocked transition. Until now the state existed in
 // the enum, the alert kinds and the UI but nothing could reach it — a mailbox
-// being throttled just paused as `smtp_failing` and, crucially, did NOT
-// redistribute its unstarted enrollments.
+// being throttled just paused as `smtp_failing`.
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import type { Pool } from 'pg';
 import { createDb, type Db } from '../../src/db/client';
@@ -56,15 +55,14 @@ describe('provider_blocked (docs/06 §6)', () => {
     });
 
     await resetCoreTables(pool);
-    // Two mailboxes: one gets throttled, the other is where its unstarted
-    // enrollments must land.
+    // Two mailboxes: keep sends on mailbox 1 while exercising the transition.
     await seedMailboxes(pool, 2);
     await pool.query(`UPDATE mailboxes SET status = 'paused' WHERE id = 2`); // keep sends on mb1
     await pool.query(`INSERT INTO campaigns (name, status) VALUES ('throttled', 'active')`);
     await pool.query(`INSERT INTO leads (email) VALUES ($1)`, [LEAD_EMAIL]);
     await pool.query(
-      `INSERT INTO enrollments (lead_id, campaign_id, current_state, personalization_mode, enrolled_at, next_send_at, assigned_mailbox_id)
-       VALUES (1, 1, 'ACTIVE', 'template_auto', $1, $1, 1)`,
+      `INSERT INTO enrollments (lead_id, campaign_id, current_state, personalization_mode, enrolled_at, next_send_at)
+       VALUES (1, 1, 'ACTIVE', 'template_auto', $1, $1)`,
       [clock.now()],
     );
     await pool.query(`UPDATE settings SET send_jitter_pct = 0 WHERE id = 1`);
@@ -83,14 +81,14 @@ describe('provider_blocked (docs/06 §6)', () => {
     (await pool.query(`SELECT status, status_reason FROM mailboxes WHERE id = $1`, [id]))
       .rows[0] as { status: string; status_reason: string | null };
 
-  it('a persistent provider rate limit blocks the mailbox and redistributes', async () => {
+  it('a persistent provider rate limit blocks the mailbox; unstarted work stays unassigned', async () => {
     await failTimes(TRANSIENT_FAILURE_LIMIT, '421 4.7.0 Try again later, closing connection');
 
     expect(await mailbox(1)).toMatchObject({ status: 'provider_blocked' });
     expect(alerts.emitted.map((a) => a.kind)).toContain('provider_blocked');
 
-    // Redistribution (same rule as auth_failed): an enrollment with no `sent`
-    // event yet goes back into rotation instead of waiting on a dead mailbox.
+    // Failed attempts never assign a mailbox. The next healthy scheduler
+    // choice can therefore rotate this work without a redistribution update.
     const enrollment = (
       await pool.query(`SELECT assigned_mailbox_id FROM enrollments WHERE id = 1`)
     ).rows[0] as { assigned_mailbox_id: number | null };

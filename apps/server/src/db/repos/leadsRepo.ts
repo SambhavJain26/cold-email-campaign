@@ -357,6 +357,69 @@ export interface EligibleLead {
   tier: LeadTier | null;
 }
 
+export interface RecontactStatus {
+  hasReply: boolean;
+  hasUndispositionedReply: boolean;
+  blockedUntil: Date | null;
+}
+
+/**
+ * Cross-campaign reply safety status. A human reply is review-gated until its
+ * own append-only disposition exists. The latest disposition for each reply
+ * controls a not-now hold; suppression remains a separate, stronger guard.
+ */
+export async function recontactStatusByLeadIds(
+  db: DbLike,
+  leadIds: readonly number[],
+): Promise<Map<number, RecontactStatus>> {
+  if (leadIds.length === 0) return new Map();
+  const result = await db.execute(sql`
+    SELECT l.id AS lead_id,
+      EXISTS (
+        SELECT 1 FROM events hr
+        WHERE hr.lead_id = l.id AND hr.type = 'human_reply'
+      ) AS has_reply,
+      EXISTS (
+        SELECT 1 FROM events hr
+        WHERE hr.lead_id = l.id AND hr.type = 'human_reply'
+          AND NOT EXISTS (
+            SELECT 1 FROM events rd
+            WHERE rd.type = 'reply_dispositioned'
+              AND (rd.attributes->>'reply_event_id')::bigint = hr.id
+          )
+      ) AS has_undispositioned_reply,
+      (
+        SELECT max((latest.attributes->>'recontact_after')::timestamptz)
+        FROM events hr
+        CROSS JOIN LATERAL (
+          SELECT rd.attributes
+          FROM events rd
+          WHERE rd.type = 'reply_dispositioned'
+            AND (rd.attributes->>'reply_event_id')::bigint = hr.id
+          ORDER BY rd.id DESC LIMIT 1
+        ) latest
+        WHERE hr.lead_id = l.id AND hr.type = 'human_reply'
+          AND latest.attributes->>'disposition' = 'not_now'
+      ) AS blocked_until
+    FROM leads l
+    WHERE l.id = ANY(${sql.param([...leadIds])}::bigint[])
+  `);
+  const statuses = new Map<number, RecontactStatus>();
+  for (const raw of result.rows as unknown as Array<{
+    lead_id: number | string;
+    has_reply: boolean;
+    has_undispositioned_reply: boolean;
+    blocked_until: Date | string | null;
+  }>) {
+    statuses.set(Number(raw.lead_id), {
+      hasReply: raw.has_reply,
+      hasUndispositionedReply: raw.has_undispositioned_reply,
+      blockedUntil: raw.blocked_until === null ? null : new Date(raw.blocked_until),
+    });
+  }
+  return statuses;
+}
+
 /**
  * Enrollment selection (docs/06 §7): not suppressed, not already enrolled in
  * this campaign, recycle guard passes (decision Q — no prior `sent` whose
@@ -390,6 +453,9 @@ export async function selectEligibleLeads(
         AND NOT EXISTS (
           SELECT 1 FROM enrollments e
           WHERE e.lead_id = ${leads.id} AND e.campaign_id = ${campaignId})
+        AND NOT EXISTS (
+          SELECT 1 FROM events hr
+          WHERE hr.lead_id = ${leads.id} AND hr.type = 'human_reply')
         AND ${hashGuard}`,
     )
     .orderBy(

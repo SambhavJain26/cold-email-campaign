@@ -194,6 +194,7 @@ export async function campaignsRoutes(app: FastifyInstance, services: AppService
           ? await enroll(enrollDeps, req.params.id, req.body.count)
           : await enrollByIds(enrollDeps, req.params.id, req.body.lead_ids, {
               force: req.body.force,
+              allowRecontact: req.body.allow_recontact,
             });
       return toEnrollResponse(result);
     },

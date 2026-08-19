@@ -10,7 +10,7 @@
 
 **Where it stands:** **M3 ✅ closed.** **B8.1–B8.2 ✅** — the live `SmtpImapTransport` is proven against a real SMTP+IMAP server (GreenMail container), and `MAIL_TRANSPORT=smtp_imap` swaps in with the whole offline suite green. **Post-M3 sweep ✅ (2026-07-25)** — every stage audited against docs/14/15 + the decision register; the four specified-but-unbuilt items are closed. **Pre-canary remediation ✅** — findings 3–9, 14–16 and 19 implemented, locally verified and deployed. **Controlled live-provider gate ✅ (2026-08-14)** — two approved owner-operated Gmail sends reconciled end to end (reply → `REPLIED`; `STOP` → `unsubscribe` + `UNSUBSCRIBED` + global suppression), UI/analytics/projections verified, production drift check `checked 6 enrollments — 0 diff(s)`. **That campaign is paused** and must not be resumed without new per-send approval.
 
-**Still open, deliberately:** the docs/17 §3 cohort, §5 failure cohorts and §6 time-based live scenarios — each needs new external mail or a new active cohort and explicit authorization. Finding 12 (`List-Unsubscribe`) is deferred to the real canary; finding 11 (spam placement) is closed as not answerable with this instrument; finding 13 (poller reads `INBOX` only) is knowingly bypassed for the controlled test. Findings 20–22 were opened by the 2026-08-15 UI-coverage audit. Real-domain work (domains, DNS/SPF/DKIM/DMARC, warming, production mailboxes, VPS) remains genuine *operations* and is gated on the docs/16 §6a prerequisites.
+**Still open:** docs/17 §6 catch-up/never-burst needs a separately approved live-state/send plan; unsafe-setting restoration and final canary wrap follow it. Real Gmail DSN/OOO fixtures are formally deferred unless matching existing messages can be captured read-only. Finding 12 remains for warmed real domains; finding 11 is closed as unanswerable with this rig. Findings 20–25 are closed locally. Real-domain work remains gated on docs/16 §6a.
 
 ---
 
@@ -41,7 +41,7 @@
 - **Gate:** ✅ 2026-07-22 — golden L2 green (every Part-10/§13 number through SQL); edge suite green; contract-shaped fixtures exported to apps/web/src/mocks/fixtures/golden/ (F0 unblocked)
 
 ### B3 — Mock transport + scheduler + poller ← core complete
-- [x] B3.1 transport migration · [x] B3.2 MockTransport · [x] B3.3 synthetic inbound · [x] B3.4 scenario runner · [x] B3.5 tz/windows · [x] B3.6 pacing+rotation · [x] B3.7 tick · [x] B3.8 sendOne+confirm-delivery · [x] B3.9 capacity+enroll · [x] B3.10 poll cycle+ledger · [x] B3.11 classifier · [x] B3.12 STOP detection · [x] B3.13 auto-pause · [x] B3.14 health machine+redistribution · [x] B3.15 alerts · [x] B3.16 pg-boss wiring · [x] B3.17 **golden L3 (flagship)** · [x] B3.18 edge suite · [x] B3.19 transport-swap test
+- [x] B3.1 transport migration · [x] B3.2 MockTransport · [x] B3.3 synthetic inbound · [x] B3.4 scenario runner · [x] B3.5 tz/windows · [x] B3.6 pacing+rotation · [x] B3.7 tick · [x] B3.8 sendOne+confirm-delivery · [x] B3.9 capacity+enroll · [x] B3.10 poll cycle+ledger · [x] B3.11 classifier · [x] B3.12 STOP detection · [x] B3.13 auto-pause · [x] B3.14 health machine · [x] B3.15 alerts · [x] B3.16 pg-boss wiring · [x] B3.17 **golden L3 (flagship)** · [x] B3.18 edge suite · [x] B3.19 transport-swap test
 - **Gate:** ✅ 2026-07-22 — B3.17–19 green → **M1** (golden suite 47 tests: L1 + L2 + L3 full-pipeline replay)
 
 ### B4 — Render engine
@@ -78,15 +78,15 @@ Branch `b8.3-local-canary`. Runbook: **[docs/17-local-canary-runbook.md](docs/17
 - [x] **Launch guardrails + domain-readiness preflight (2026-08-15)** — migration `0011`. Ceilings on what may be *configured* (`max_mailbox_daily_cap` 50, `max_ramp_daily_enroll_cap` 25, `min_ramp_days` 0 = off by default so nothing is retroactively invalidated), enforced at mailbox and campaign write time. Preflight resolves SPF/DMARC/DKIM/MX per distinct sending domain through an injected resolver port; DKIM reports `unknown` rather than `fail` because selectors cannot be enumerated over DNS.
 - [x] **Per-folder IMAP polling — finding 13 fixed (2026-08-15)** — migration `0012`. IMAP UIDs are folder-scoped, so this is a cursor per `(mailbox, folder)`, not a second folder name against one mark. `poll_folders` defaults to INBOX-only; each folder seeds from its own UIDNEXT (finding 16 applies per folder); an unknown folder name is skipped rather than failing the poll. GreenMail proves both the bug and the fix.
 - [x] **Single-lead creation — finding 10 fixed (2026-08-15)** — `POST /leads` runs the same ingest preview+commit as a CSV upload rather than reimplementing hygiene.
-- [ ] §3 core walkthrough cohort — all 4 classifier buckets, metrics, 0-drift rebuild
-- [ ] §4 fixtures captured + classifier patterns patched + offline suite green ← **most of B8.4**
-- [ ] §5 failure cohorts (auto-pause, rotation, redistribution, suppression, recycle guard)
-- [ ] §6 time-based (stale-poll, catch-up, backup freshness, runtime poll registration)
+- [x] §3 core walkthrough cohort — classifier/reply-stop/metrics/rebuild evidence recorded in docs/17
+- [~] §4 real Gmail reply fixture locked; hard-bounce DSN and vacation/OOO formally deferred pending existing read-only source messages
+- [x] §5 failure cohorts — auto-pause, rotation, suppression and recycle guard; impossible redistribution claim removed by finding 25
+- [~] §6 time-based — stale-poll, backup freshness and runtime registration proven; catch-up/never-burst remains the final live scenario
 - [ ] §7 wrap — docs/16 §5 evidence, merge fixtures + patches to `main`
 
 ### Post-M3 sweep *(not a docs/14 stage — gaps found by auditing the finished stages)*
 - [x] decision E — AI sentiment pre-suggestion (`SentimentSuggester` + Anthropic adapter; had no task ID anywhere)
-- [x] `provider_blocked` transition + redistribution (docs/06 §6 state was unreachable)
+- [x] `provider_blocked` transition (unassigned work already uses normal healthy-mailbox rotation)
 - [x] mailbox poll registration at runtime (a UI-added mailbox was never polled until restart)
 - [x] `operator:set-password` CLI (documented in the runbook, did not exist)
 - [x] minors: `transport.close()` on shutdown · `ROLE=worker` no longer listens · dead `page-stub.tsx` · docs/16 §6 ticked with evidence · **new docs/16 §6a pre-canary prerequisites**

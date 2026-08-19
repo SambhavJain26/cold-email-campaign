@@ -66,6 +66,29 @@ describe('B6.10 settings + compliance', () => {
     expect(res.json().error.code).toBe('validation');
   });
 
+  it('freezes delivery_confirm_hours after the first sent event', async () => {
+    const current = (await h.inject({ method: 'GET', url: '/api/v1/settings' })).json();
+    delete current.updated_at;
+    await h.pool.query(`INSERT INTO campaigns (name, status) VALUES ('freeze-window', 'active')`);
+    await h.pool.query(`INSERT INTO leads (email) VALUES ('freeze-window@test.dev')`);
+    await h.pool.query(`
+      INSERT INTO enrollments (lead_id, campaign_id, current_state, personalization_mode, enrolled_at)
+      VALUES (1, 1, 'ACTIVE', 'template_auto', now())`);
+    await h.pool.query(`
+      INSERT INTO events (type, occurred_at, lead_id, enrollment_id, campaign_id, step_no,
+                          message_id, attributes)
+      VALUES ('sent', now(), 1, 1, 1, 1, '<freeze-window@test.dev>',
+              '{"content_hash":"freeze-window"}')`);
+
+    const res = await h.inject({
+      method: 'PUT',
+      url: '/api/v1/settings',
+      payload: { ...current, delivery_confirm_hours: current.delivery_confirm_hours + 1 },
+    });
+    expect(res.statusCode).toBe(409);
+    expect(res.json().error.message).toContain('cannot change after the first send');
+  });
+
   it('GET/PUT /compliance roundtrip; empty address → 422', async () => {
     const before = (await h.inject({ method: 'GET', url: '/api/v1/compliance' })).json();
     expect(before.physical_address).toBe('100 Test Street, Austin TX 78701');

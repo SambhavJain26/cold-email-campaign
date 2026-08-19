@@ -4,10 +4,18 @@ import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { EmptyState } from '@/components/shared/empty-state';
 import { useUnibox } from '@/api/queries/unibox';
 import { useSettings } from '@/api/queries/settings';
+import { useMailboxes } from '@/api/queries/mailboxes';
 import { ReplyCard } from './reply-card';
 import { ThreadView } from './thread-view';
 
@@ -19,8 +27,10 @@ export default function UniboxPage() {
   const [sentiment, setSentiment] = useState<Sentiment | undefined>(undefined);
   const [unhandledOnly, setUnhandledOnly] = useState(false);
   const [threadId, setThreadId] = useState<number | null>(null);
+  const [mailboxId, setMailboxId] = useState<string>('all');
 
   const settings = useSettings();
+  const mailboxes = useMailboxes();
   const tagOnlyMode = settings.data?.optout_detection === 'tag_only';
 
   const { data, isPending, isError, refetch } = useUnibox({
@@ -28,6 +38,7 @@ export default function UniboxPage() {
     per_page: 50,
     sentiment: bucket === 'human' ? sentiment : undefined,
     unhandled: bucket === 'human' && unhandledOnly ? true : undefined,
+    mailbox_id: mailboxId === 'all' ? undefined : Number(mailboxId),
   });
 
   const switchBucket = (next: string) => {
@@ -59,6 +70,20 @@ export default function UniboxPage() {
           </TabsList>
         </Tabs>
 
+        <Select value={mailboxId} onValueChange={setMailboxId}>
+          <SelectTrigger size="sm" className="w-60" aria-label="Filter by mailbox">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">All mailboxes</SelectItem>
+            {(mailboxes.data?.items ?? []).map((mailbox) => (
+              <SelectItem key={mailbox.id} value={String(mailbox.id)}>
+                {mailbox.from_address}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+
         {bucket === 'human' && (
           <>
             <div className="flex gap-1" role="group" aria-label="Filter by sentiment">
@@ -81,7 +106,7 @@ export default function UniboxPage() {
                 onCheckedChange={setUnhandledOnly}
               />
               <Label htmlFor="unhandled-only" className="text-xs">
-                Untagged only
+                Needs outcome
               </Label>
             </div>
           </>

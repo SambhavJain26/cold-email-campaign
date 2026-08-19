@@ -50,7 +50,10 @@ export interface UniboxRow {
   meetingBooked: boolean;
   enrollmentState: string;
   effectiveSentiment: string | null;
+  disposition: string | null;
+  recontactAfter: string | null;
   autoUnsubscribed: boolean;
+  leadSuppressed: boolean;
   replyEventId: number | null;
 }
 
@@ -65,6 +68,7 @@ const uniboxSelect = sql`
          e.id AS enrollment_id, e.campaign_id, e.lead_id, e.meeting_booked, e.current_state AS enrollment_state,
          l.first_name AS lead_first_name, l.last_name AS lead_last_name,
          l.company AS lead_company, l.email AS lead_email,
+         l.is_suppressed AS lead_suppressed,
          hr.id AS reply_event_id, hr.step_no,
          COALESCE(
            (SELECT st.sentiment::text FROM events st
@@ -72,6 +76,14 @@ const uniboxSelect = sql`
                AND (st.attributes->>'reply_event_id')::bigint = hr.id
              ORDER BY st.id DESC LIMIT 1),
            hr.sentiment::text) AS effective_sentiment,
+         (SELECT rd.attributes->>'disposition' FROM events rd
+            WHERE rd.type = 'reply_dispositioned'
+              AND (rd.attributes->>'reply_event_id')::bigint = hr.id
+            ORDER BY rd.id DESC LIMIT 1) AS disposition,
+         (SELECT rd.attributes->>'recontact_after' FROM events rd
+            WHERE rd.type = 'reply_dispositioned'
+              AND (rd.attributes->>'reply_event_id')::bigint = hr.id
+            ORDER BY rd.id DESC LIMIT 1) AS recontact_after,
          EXISTS (SELECT 1 FROM events u
                   WHERE u.type = 'unsubscribe' AND u.id = ANY(im.resulting_event_ids))
            AS auto_unsubscribed
@@ -100,7 +112,10 @@ interface RawUniboxRow {
   reply_event_id: number | null;
   step_no: number | null;
   effective_sentiment: string | null;
+  disposition: string | null;
+  recontact_after: string | null;
   auto_unsubscribed: boolean;
+  lead_suppressed: boolean;
   total?: number;
 }
 
@@ -122,7 +137,10 @@ function toUniboxRow(r: RawUniboxRow): UniboxRow {
     meetingBooked: r.meeting_booked,
     enrollmentState: r.enrollment_state,
     effectiveSentiment: r.effective_sentiment,
+    disposition: r.disposition,
+    recontactAfter: r.recontact_after,
     autoUnsubscribed: r.auto_unsubscribed,
+    leadSuppressed: r.lead_suppressed,
     replyEventId: r.reply_event_id,
   };
 }
@@ -141,7 +159,7 @@ export async function listUnibox(
   const classification = opts.bucket === 'human' ? 'human_reply' : 'auto_reply';
   const filters = [sql`im.classification = ${classification}`];
   if (opts.mailboxId !== undefined) filters.push(sql`im.mailbox_id = ${opts.mailboxId}`);
-  // sentiment/unhandled filter on the COMPUTED effective sentiment → wrap
+  // Sentiment/disposition filters are computed from append-only events, so wrap.
   const wrapped = sql`
     WITH u AS (${uniboxSelect} WHERE ${sql.join(filters, sql` AND `)})
     SELECT *, count(*) over()::int AS total FROM u
@@ -149,7 +167,7 @@ export async function listUnibox(
       opts.sentiment !== undefined
         ? sql`WHERE u.effective_sentiment = ${opts.sentiment}`
         : opts.unhandled === true
-          ? sql`WHERE u.effective_sentiment IS NULL`
+          ? sql`WHERE u.disposition IS NULL`
           : sql``
     }
     ORDER BY u.received_at DESC NULLS LAST, u.incoming_message_id DESC

@@ -18,7 +18,6 @@ import { compose } from '../../src/composition';
 import { createSingleLead, createImportPreview, commitImport } from '../../src/ingest/service';
 import { capacityToday, enroll, recycle } from '../../src/services/enrollment';
 import { createSequence } from '../../src/db/repos/sequencesRepo';
-import { redistributeUnstarted } from '../../src/db/repos/enrollmentsRepo';
 import { resumeMailbox } from '../../src/services/autoPause';
 import { createCampaign, patchCampaign } from '../../src/db/repos/campaignsRepo';
 import { contentHashOf } from '../../src/render/hash';
@@ -108,14 +107,6 @@ async function main(): Promise<void> {
         // Operator resume (docs/06 §6): back to ok at capPct% of the daily cap.
         await resumeMailbox({ db }, Number(a), Number(b ?? 100), clock.now());
         console.log(JSON.stringify({ mailboxId: Number(a), capPct: Number(b ?? 100) }));
-        break;
-      }
-      case 'redistribute': {
-        // Only ACTIVE enrollments with NO sent event move. Anything already
-        // sent stays pinned to its mailbox, because rerouting an in-thread
-        // follow-up would break threading (spec Part 9).
-        const moved = await redistributeUnstarted(db, Number(a));
-        console.log(JSON.stringify({ mailboxId: Number(a), unassigned: moved }));
         break;
       }
       case 'capacity': {

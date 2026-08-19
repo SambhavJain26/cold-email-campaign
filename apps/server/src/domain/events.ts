@@ -3,7 +3,7 @@
 // Per-type attribute requirements mirror docs/03 §2.
 // PURE MODULE: no I/O, no clock reads — occurredAt always arrives as an argument.
 import { z } from 'zod';
-import { SENTIMENTS, UNSUBSCRIBE_SOURCES, LEAD_TIERS } from '@coldemail/shared';
+import { LEAD_TIERS, REPLY_DISPOSITIONS, SENTIMENTS, UNSUBSCRIBE_SOURCES } from '@coldemail/shared';
 
 const id = z.number().int().positive();
 const base = z.object({
@@ -102,6 +102,18 @@ const sentimentTagged_ = base.extend({
     tagged_by: z.literal('human'),
   }),
 });
+const replyDispositioned_ = base.extend({
+  type: z.literal('reply_dispositioned'),
+  enrollmentId: id,
+  campaignId: id,
+  attributes: z.object({
+    reply_event_id: id,
+    incoming_message_id: id,
+    disposition: z.enum(REPLY_DISPOSITIONS),
+    recontact_after: z.string().datetime().optional(),
+    dispositioned_by: z.enum(['human', 'auto']),
+  }),
+});
 
 export const domainEventSchema = z.discriminatedUnion('type', [
   enrolled_,
@@ -116,6 +128,7 @@ export const domainEventSchema = z.discriminatedUnion('type', [
   dealWon_,
   dealLost_,
   sentimentTagged_,
+  replyDispositioned_,
 ]);
 
 export type DomainEvent = z.infer<typeof domainEventSchema>;
@@ -123,6 +136,7 @@ export type EnrolledEvent = z.infer<typeof enrolled_>;
 export type SentEvent = z.infer<typeof sent_>;
 export type HumanReplyEvent = z.infer<typeof humanReply_>;
 export type SentimentTaggedEvent = z.infer<typeof sentimentTagged_>;
+export type ReplyDispositionedEvent = z.infer<typeof replyDispositioned_>;
 
 type Input<S extends z.ZodType> = z.input<S>;
 
@@ -150,6 +164,8 @@ export const buildEvent = {
     dealLost_.parse({ ...a, type: 'deal_lost' }),
   sentimentTagged: (a: Omit<Input<typeof sentimentTagged_>, 'type'>) =>
     sentimentTagged_.parse({ ...a, type: 'sentiment_tagged' }),
+  replyDispositioned: (a: Omit<Input<typeof replyDispositioned_>, 'type'>) =>
+    replyDispositioned_.parse({ ...a, type: 'reply_dispositioned' }),
 };
 
 /** Validate an untrusted raw object (fixture line, DB row) into a DomainEvent. */

@@ -15,6 +15,7 @@ export const eventTypeEnum = pgEnum('event_type', [
   'deal_won',
   'deal_lost',
   'sentiment_tagged',
+  'reply_dispositioned',
 ]);
 export const enrollmentStateEnum = pgEnum('enrollment_state', [
   'NEW',

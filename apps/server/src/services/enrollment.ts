@@ -15,7 +15,12 @@ import {
   insertEnrollments,
 } from '../db/repos/enrollmentsRepo';
 import { getCampaign, rampOf, setRecycledFrom, tierEffortOf } from '../db/repos/campaignsRepo';
-import { leadsByIds, selectEligibleLeads, type EligibleLead } from '../db/repos/leadsRepo';
+import {
+  leadsByIds,
+  recontactStatusByLeadIds,
+  selectEligibleLeads,
+  type EligibleLead,
+} from '../db/repos/leadsRepo';
 import { hashesReceivedByLeads, leadsWithHashConflict } from '../db/repos/sentMessagesRepo';
 import { allContentHashes, type SequenceDef } from '../domain/sequence';
 import { startOfLocalDay } from '../scheduler/window';
@@ -157,7 +162,7 @@ export async function enrollByIds(
   deps: EnrollmentDeps,
   campaignId: number,
   leadIds: number[],
-  opts: { force?: boolean } = {},
+  opts: { force?: boolean; allowRecontact?: boolean } = {},
 ): Promise<EnrollResult> {
   const { db, clock, sequences } = deps;
   const now = clock.now();
@@ -178,6 +183,7 @@ export async function enrollByIds(
   const byId = new Map(rows.map((r) => [r.id, r]));
   const already = await enrolledLeadIdsIn(db, campaignId, unique);
   const conflicted = await leadsWithHashConflict(db, unique, allContentHashes(seq));
+  const recontact = await recontactStatusByLeadIds(db, unique);
 
   const skippedCounts = new Map<string, number>();
   const skip = (reason: string) => skippedCounts.set(reason, (skippedCounts.get(reason) ?? 0) + 1);
@@ -189,6 +195,10 @@ export async function enrollByIds(
     else if (lead.isSuppressed) skip('suppressed');
     else if (already.has(id)) skip('already_enrolled');
     else if (conflicted.has(id)) skip('content_hash_conflict');
+    else if (recontact.get(id)?.hasReply && !opts.allowRecontact) skip('prior_human_reply');
+    else if (recontact.get(id)?.hasUndispositionedReply) skip('reply_needs_disposition');
+    else if ((recontact.get(id)?.blockedUntil?.getTime() ?? 0) > now.getTime())
+      skip('recontact_not_due');
     else eligible.push({ id: lead.id, tier: lead.tier });
   }
 

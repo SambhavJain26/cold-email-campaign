@@ -15,6 +15,14 @@ import {
 import { EmptyState } from '@/components/shared/empty-state';
 import { formatDateTime } from '@/lib/format';
 import { useIncomingMessages } from '@/api/queries/system';
+import { useMailboxes } from '@/api/queries/mailboxes';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 
 const CLASS_LABEL: Record<IncomingClass, { label: string; className: string }> = {
   bounce: { label: 'bounce', className: 'bg-destructive/15 text-destructive' },
@@ -27,9 +35,12 @@ const CLASS_LABEL: Record<IncomingClass, { label: string; className: string }> =
  *  inspectable, straight off /incoming-messages. */
 export function ReplyDetectionTable() {
   const [classification, setClassification] = useState<IncomingClass | undefined>(undefined);
+  const [mailboxId, setMailboxId] = useState<string>('all');
+  const mailboxes = useMailboxes();
   const { data, isPending, isError, refetch } = useIncomingMessages({
     per_page: 100,
     classification,
+    mailbox_id: mailboxId === 'all' ? undefined : Number(mailboxId),
   });
 
   return (
@@ -42,7 +53,24 @@ export function ReplyDetectionTable() {
         </p>
       </div>
 
-      <div className="flex flex-wrap gap-1" role="group" aria-label="Filter by classification">
+      <div
+        className="flex flex-wrap items-center gap-2"
+        role="group"
+        aria-label="Reply detection filters"
+      >
+        <Select value={mailboxId} onValueChange={setMailboxId}>
+          <SelectTrigger size="sm" className="w-60" aria-label="Filter by mailbox">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">All mailboxes</SelectItem>
+            {(mailboxes.data?.items ?? []).map((mailbox) => (
+              <SelectItem key={mailbox.id} value={String(mailbox.id)}>
+                {mailbox.from_address}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
         <Button
           variant={classification === undefined ? 'default' : 'outline'}
           size="xs"

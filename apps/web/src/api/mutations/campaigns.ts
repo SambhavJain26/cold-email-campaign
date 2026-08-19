@@ -3,7 +3,8 @@ import { campaignSchema, enrollResponseSchema, okResponseSchema } from '@coldema
 import { apiFetch } from '../client';
 import { invalidateOperational } from '../operational-cache';
 
-type EnrollBody = { count: number } | { lead_ids: number[]; force?: boolean };
+type EnrollBody =
+  { count: number } | { lead_ids: number[]; force?: boolean; allow_recontact?: boolean };
 
 export function useCreateCampaign() {
   const qc = useQueryClient();

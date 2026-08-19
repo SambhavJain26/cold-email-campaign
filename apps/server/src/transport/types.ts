@@ -33,7 +33,7 @@ export interface SendResult {
   /**
    * Which thing failed permanently (docs/06 §5 4c): 'recipient' = RCPT-time
    * 5xx → append hard_bounce; 'mailbox' = auth/connection-level permanent
-   * → mailbox status auth_failed + redistribution.
+   * → mailbox status auth_failed; unassigned work rotates elsewhere.
    */
   errorScope?: 'recipient' | 'mailbox';
 }
@@ -85,7 +85,7 @@ export interface VerifyResult {
 
 /**
  * Thrown by fetchNew on a PERMANENT auth/credential failure (docs/07 §5):
- * the poller flips the mailbox to auth_failed + redistributes. Transient
+ * the poller flips the mailbox to auth_failed. Transient
  * fetch errors are plain Errors — job retry/backoff handles those.
  */
 export class TransportAuthError extends Error {

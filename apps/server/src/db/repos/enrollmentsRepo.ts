@@ -137,26 +137,6 @@ export async function activeCampaignIds(db: DbLike): Promise<number[]> {
   return rows.map((r) => r.campaignId);
 }
 
-/**
- * Redistribution on a dead mailbox (docs/06 §6): enrollments that have NOT
- * yet received step 1 lose their assignment → next tick's rotation reassigns.
- * Mid-thread enrollments keep theirs (rerouting breaks threading).
- */
-export async function redistributeUnstarted(db: DbLike, mailboxId: number): Promise<number> {
-  const rows = await db
-    .update(enrollments)
-    .set({ assignedMailboxId: null })
-    .where(
-      and(
-        eq(enrollments.assignedMailboxId, mailboxId),
-        eq(enrollments.currentState, 'ACTIVE'),
-        sql`NOT EXISTS (SELECT 1 FROM events ev WHERE ev.enrollment_id = ${enrollments.id} AND ev.type = 'sent')`,
-      ),
-    )
-    .returning({ id: enrollments.id });
-  return rows.length;
-}
-
 /** Follow-ups still owed before `before` (capacity formula, docs/06 §7). */
 export async function countFollowupsDue(db: DbLike, before: Date): Promise<number> {
   const rows = await db

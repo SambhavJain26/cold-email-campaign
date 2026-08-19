@@ -19,6 +19,7 @@ Implements spec Parts 2–4. This layer (`apps/server/src/domain/`) is **pure**:
 | `meeting_booked` | API (Unibox click) | Operator marks meeting | milestone flag only |
 | `deal_won` / `deal_lost` | API (optional) | Deal outcome | none |
 | `sentiment_tagged` | API (Unibox tag click) | Operator confirms/changes sentiment | updates `best_reply_sentiment` projection only |
+| `reply_dispositioned` | API (Unibox outcome) | Operator records the reviewed outcome for one human reply | permission/audit fact; suppressive outcomes append `unsubscribe` in the same transaction |
 
 **Event constructors** (`domain/events.ts`) validate per-type required fields (see docs/03 §2 attributes table) and are the only way the rest of the app creates event objects — malformed events are unrepresentable.
 

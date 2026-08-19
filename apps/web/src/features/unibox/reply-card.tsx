@@ -1,22 +1,45 @@
 import { useState } from 'react';
 import { CalendarCheck, Clock } from 'lucide-react';
 import { toast } from 'sonner';
-import { SENTIMENTS, type Sentiment, type UniboxItemDto } from '@coldemail/shared';
+import {
+  REPLY_DISPOSITIONS,
+  SENTIMENTS,
+  type ReplyDisposition,
+  type Sentiment,
+  type UniboxItemDto,
+} from '@coldemail/shared';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 import { SentimentTag } from '@/components/shared/sentiment-tag';
 import { formatRelativeTime } from '@/lib/format';
 import { cn } from '@/lib/utils';
 import {
   useMeetingBooked,
+  useDispositionReply,
   useSnooze,
   useTagSentiment,
   useUnsubscribe,
 } from '@/api/mutations/unibox';
 
 const GLYPH: Record<Sentiment, string> = { positive: '🟢', neutral: '⚪', negative: '🔴' };
+const DISPOSITION_LABEL: Record<ReplyDisposition, string> = {
+  interested: 'Interested',
+  not_interested: 'Not interested — suppress',
+  not_now: 'Not now — hold until date',
+  wrong_person: 'Wrong person — suppress',
+  referred: 'Referred me',
+  explicit_unsubscribe: 'Explicit opt-out — suppress',
+  other: 'Other',
+};
 
 /** F6.2/F6.5 — one reply card, the walkthrough's Stage-6 layout. */
 export function ReplyCard({
@@ -33,10 +56,16 @@ export function ReplyCard({
 }) {
   const tag = useTagSentiment();
   const meeting = useMeetingBooked();
+  const dispositionReply = useDispositionReply();
   const snooze = useSnooze();
   const unsubscribe = useUnsubscribe();
   const [snoozeUntil, setSnoozeUntil] = useState('');
   const [snoozeOpen, setSnoozeOpen] = useState(false);
+  const [disposition, setDisposition] = useState<ReplyDisposition | ''>(item.disposition ?? '');
+  const [recontactDate, setRecontactDate] = useState(item.recontact_after?.slice(0, 10) ?? '');
+  const [minimumRecontactDate] = useState(() =>
+    new Date(Date.now() + 86_400_000).toISOString().slice(0, 10),
+  );
 
   const isAutoReply = bucket === 'auto_reply';
 
@@ -78,11 +107,7 @@ export function ReplyCard({
           Auto-reply — NOT counted as a reply. Sequence continues normally.
         </p>
       ) : (
-        <p className="text-xs text-muted-foreground">
-          {item.sequence_continues
-            ? '↳ this sequence continues: stop on reply is disabled'
-            : '↳ sequence stopped after this reply'}
-        </p>
+        <p className="text-xs text-muted-foreground">↳ sequence stopped after this reply</p>
       )}
 
       {item.auto_unsubscribed && (
@@ -92,110 +117,181 @@ export function ReplyCard({
       )}
 
       {!isAutoReply && (
-        <div className="flex flex-wrap items-center gap-2">
-          <div className="flex gap-1" role="group" aria-label="Tag sentiment">
-            {SENTIMENTS.map((sentiment) => (
-              <Button
-                key={sentiment}
-                variant="outline"
-                size="xs"
-                aria-label={`Tag ${sentiment}`}
-                aria-pressed={item.effective_sentiment === sentiment}
-                disabled={tag.isPending || item.effective_sentiment === sentiment}
-                className={cn(
-                  'px-2',
-                  item.effective_sentiment === sentiment && 'border-primary bg-accent',
-                )}
-                onClick={() =>
-                  tag.mutate({ incomingMessageId: item.incoming_message_id, sentiment })
-                }
+        <div className="space-y-3">
+          <div className="flex flex-wrap items-end gap-2 rounded-md border border-border p-3">
+            <div className="min-w-52 flex-1 space-y-1">
+              <label
+                className="text-xs font-medium"
+                htmlFor={`disposition-${item.incoming_message_id}`}
               >
-                {GLYPH[sentiment]}
-              </Button>
-            ))}
+                Reply outcome
+              </label>
+              <Select
+                value={disposition}
+                onValueChange={(value) => setDisposition(value as ReplyDisposition)}
+              >
+                <SelectTrigger id={`disposition-${item.incoming_message_id}`} size="sm">
+                  <SelectValue placeholder="Review and choose…" />
+                </SelectTrigger>
+                <SelectContent>
+                  {REPLY_DISPOSITIONS.map((value) => (
+                    <SelectItem key={value} value={value}>
+                      {DISPOSITION_LABEL[value]}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            {disposition === 'not_now' && (
+              <div className="space-y-1">
+                <label
+                  className="text-xs font-medium"
+                  htmlFor={`recontact-${item.incoming_message_id}`}
+                >
+                  Do not contact before
+                </label>
+                <Input
+                  id={`recontact-${item.incoming_message_id}`}
+                  type="date"
+                  className="h-8"
+                  min={minimumRecontactDate}
+                  value={recontactDate}
+                  onChange={(event) => setRecontactDate(event.target.value)}
+                />
+              </div>
+            )}
+            <Button
+              size="sm"
+              disabled={
+                disposition === '' ||
+                (disposition === 'not_now' && recontactDate === '') ||
+                dispositionReply.isPending
+              }
+              onClick={() => {
+                if (disposition === '') return;
+                dispositionReply.mutate(
+                  {
+                    incomingMessageId: item.incoming_message_id,
+                    disposition,
+                    ...(disposition === 'not_now'
+                      ? { recontactAfter: new Date(`${recontactDate}T00:00:00Z`).toISOString() }
+                      : {}),
+                  },
+                  {
+                    onSuccess: () => toast.success('Reply outcome recorded'),
+                  },
+                );
+              }}
+            >
+              Save outcome
+            </Button>
           </div>
 
-          {item.effective_sentiment !== null && (
-            <SentimentTag sentiment={item.effective_sentiment} />
-          )}
-          {item.effective_sentiment === null && item.suggested_sentiment !== null && (
-            <SentimentTag sentiment={item.suggested_sentiment} suggested />
-          )}
+          <div className="flex flex-wrap items-center gap-2">
+            <div className="flex gap-1" role="group" aria-label="Tag sentiment">
+              {SENTIMENTS.map((sentiment) => (
+                <Button
+                  key={sentiment}
+                  variant="outline"
+                  size="xs"
+                  aria-label={`Tag ${sentiment}`}
+                  aria-pressed={item.effective_sentiment === sentiment}
+                  disabled={tag.isPending || item.effective_sentiment === sentiment}
+                  className={cn(
+                    'px-2',
+                    item.effective_sentiment === sentiment && 'border-primary bg-accent',
+                  )}
+                  onClick={() =>
+                    tag.mutate({ incomingMessageId: item.incoming_message_id, sentiment })
+                  }
+                >
+                  {GLYPH[sentiment]}
+                </Button>
+              ))}
+            </div>
 
-          {!item.meeting_booked && (
-            <Button
-              variant="outline"
-              size="xs"
-              disabled={meeting.isPending}
-              onClick={() =>
-                meeting.mutate(item.enrollment_id, {
-                  onSuccess: () => toast.success('Meeting booked'),
-                })
-              }
-            >
-              <CalendarCheck className="size-3.5" /> Mark meeting booked
-            </Button>
-          )}
+            {item.effective_sentiment !== null && (
+              <SentimentTag sentiment={item.effective_sentiment} />
+            )}
+            {item.effective_sentiment === null && item.suggested_sentiment !== null && (
+              <SentimentTag sentiment={item.suggested_sentiment} suggested />
+            )}
 
-          <Popover open={snoozeOpen} onOpenChange={setSnoozeOpen}>
-            <PopoverTrigger asChild>
-              <Button variant="ghost" size="xs">
-                <Clock className="size-3.5" /> Snooze…
-              </Button>
-            </PopoverTrigger>
-            <PopoverContent className="w-56 space-y-2">
-              <p className="text-xs text-muted-foreground">
-                Hold the next step until this date — scheduling only, no event.
-              </p>
-              <Input
-                type="date"
-                aria-label="Snooze until"
-                className="h-8"
-                value={snoozeUntil}
-                onChange={(event) => setSnoozeUntil(event.target.value)}
-              />
+            {!item.meeting_booked && (
               <Button
+                variant="outline"
                 size="xs"
-                className="w-full"
-                disabled={snoozeUntil === '' || snooze.isPending}
+                disabled={meeting.isPending}
                 onClick={() =>
-                  snooze.mutate(
-                    {
-                      enrollmentId: item.enrollment_id,
-                      until: new Date(`${snoozeUntil}T00:00:00Z`).toISOString(),
-                    },
-                    {
-                      onSuccess: () => {
-                        toast.success(`Snoozed until ${snoozeUntil}`);
-                        setSnoozeOpen(false);
-                      },
-                    },
-                  )
+                  meeting.mutate(item.enrollment_id, {
+                    onSuccess: () => toast.success('Meeting booked'),
+                  })
                 }
               >
-                Snooze
+                <CalendarCheck className="size-3.5" /> Mark meeting booked
               </Button>
-            </PopoverContent>
-          </Popover>
+            )}
 
-          {/* decision F escape hatch: with auto-STOP off, negative replies are
+            <Popover open={snoozeOpen} onOpenChange={setSnoozeOpen}>
+              <PopoverTrigger asChild>
+                <Button variant="ghost" size="xs">
+                  <Clock className="size-3.5" /> Snooze…
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent className="w-56 space-y-2">
+                <p className="text-xs text-muted-foreground">
+                  Hold the next step until this date — scheduling only, no event.
+                </p>
+                <Input
+                  type="date"
+                  aria-label="Snooze until"
+                  className="h-8"
+                  value={snoozeUntil}
+                  onChange={(event) => setSnoozeUntil(event.target.value)}
+                />
+                <Button
+                  size="xs"
+                  className="w-full"
+                  disabled={snoozeUntil === '' || snooze.isPending}
+                  onClick={() =>
+                    snooze.mutate(
+                      {
+                        enrollmentId: item.enrollment_id,
+                        until: new Date(`${snoozeUntil}T00:00:00Z`).toISOString(),
+                      },
+                      {
+                        onSuccess: () => {
+                          toast.success(`Snoozed until ${snoozeUntil}`);
+                          setSnoozeOpen(false);
+                        },
+                      },
+                    )
+                  }
+                >
+                  Snooze
+                </Button>
+              </PopoverContent>
+            </Popover>
+
+            {/* decision F escape hatch: with auto-STOP off, negative replies are
               unsubscribed by hand — the button only exists in tag_only mode. */}
-          {tagOnlyMode && item.effective_sentiment === 'negative' && !item.auto_unsubscribed && (
-            <Button
-              variant="outline"
-              size="xs"
-              className="text-destructive"
-              disabled={unsubscribe.isPending}
-              data-testid="manual-unsubscribe"
-              onClick={() =>
-                unsubscribe.mutate(item.enrollment_id, {
-                  onSuccess: () => toast.success('Lead unsubscribed and suppressed'),
-                })
-              }
-            >
-              Unsubscribe lead
-            </Button>
-          )}
+            {tagOnlyMode && item.effective_sentiment === 'negative' && !item.auto_unsubscribed && (
+              <Button
+                variant="outline"
+                size="xs"
+                className="text-destructive"
+                disabled={unsubscribe.isPending}
+                data-testid="manual-unsubscribe"
+                onClick={() =>
+                  unsubscribe.mutate(item.enrollment_id, {
+                    onSuccess: () => toast.success('Lead unsubscribed and suppressed'),
+                  })
+                }
+              >
+                Unsubscribe lead
+              </Button>
+            )}
+          </div>
         </div>
       )}
     </article>

@@ -83,7 +83,7 @@ Among mailboxes with `status='ok'` and `budget > 0`: pick lowest `sentToday / ca
     pg-boss send-attempt retries with backoff; after 5 failures → pause mailbox (status_reason='smtp_failing'), alert.
 4c. permanentError:
     - recipient-level 5xx (mailbox doesn't exist at RCPT time): append hard_bounce directly (reducer → BOUNCED, suppression)
-    - auth/connection-level permanent: mailbox.status = 'auth_failed', alert, §6 redistribution
+    - auth/connection-level permanent: mailbox.status = 'auth_failed', alert
 ```
 
 `confirm-delivery(enrollmentId, stepNo)` job: if no `hard_bounce`/`soft_bounce` event exists for that (enrollment, step) → append `delivered`.
@@ -109,9 +109,9 @@ on pause: status='auto_paused', alert with both window numbers (walkthrough Stag
 
 (Queries in docs/05 §5. The exact Part-11 example — 55 sends, 3-in-10 fires, 4-in-50 = 8% — is a locked test.)
 
-**`provider_blocked` trigger (implemented):** a run of `TRANSIENT_FAILURE_LIMIT` (5) consecutive transient send failures on one mailbox that ALL look like throttling (`scheduler/providerBlock.ts` — 421, 4.7.x, "rate", "throttl", "too many", "try again later", …) → `provider_blocked` + alert + redistribution. A single non-throttle failure in that run breaks the streak and the mailbox pauses as `smtp_failing` instead — the safer default, since only a real provider block warrants redistributing work away.
+**`provider_blocked` trigger (implemented):** a run of `TRANSIENT_FAILURE_LIMIT` (5) consecutive transient send failures on one mailbox that ALL look like throttling (`scheduler/providerBlock.ts` — 421, 4.7.x, "rate", "throttl", "too many", "try again later", …) → `provider_blocked` + alert. A single non-throttle failure in that run breaks the streak and pauses as `smtp_failing`.
 
-**Redistribution on `auth_failed` / `provider_blocked`:** enrollments assigned to the dead mailbox that have **not yet received step 1** (no `sent` events) get `assigned_mailbox_id = NULL` → next tick's rotation reassigns them. Enrollments mid-thread keep their assignment and simply wait (walkthrough Stage 7's explicit distinction).
+**Assignment rule (finding 25):** a mailbox is assigned atomically with the first successful `sent` event. Unstarted work is already unassigned and normal rotation selects another healthy mailbox. Started threads remain pinned and wait, preserving threading. The impossible `redistributeUnstarted` path was removed.
 
 **Resume:** operator action `POST /mailboxes/:id/resume { capPct }` sets `resume_cap = daily_cap × capPct / 100`, status `ok`. `resume_cap` clears back to null (full cap) automatically after 7 consecutive days with 0 hard bounces (checked in tick housekeeping).
 
@@ -128,8 +128,8 @@ capacityToday(campaign):
   suggested    = min(roomForNew, rampCap)
 ```
 
-`POST /campaigns/:id/enroll` (count-based) selects leads: not suppressed, not already enrolled in this campaign, **recycle guard passes (decision Q)**, tier ≠ nurture; ordered Tier A → B → C → untiered, oldest-imported first (walkthrough §11 priority list); appends `enrolled` per lead with `next_send_at = now` and `personalization_mode` from `tier_effort_config`. Rejects count > suggested unless `force: true`.
+`POST /campaigns/:id/enroll` (count-based) selects leads: not suppressed, no prior human reply, not already enrolled in this campaign, **recycle guard passes (decision Q)**, tier ≠ nurture; ordered Tier A → B → C → untiered, oldest-imported first. Explicit-ID recontact requires `allow_recontact:true`, a disposition for every reply, and an elapsed `not_now` date. Suppression is never overrideable.
 
 ## 8. Tests (B3 — via scenario runner, docs/13)
 
-Golden cohort full-pipeline (flagship); never-burst after a 14 h VirtualClock gap (assert ≤ cap/day after restart, oldest-first order, `catchup_backlog` alert emitted once); midnight cap reset across tz; window enforcement (unknown-tz lead never sent outside default window); soft-retry ≤2 then BOUNCED; Part-11 auto-pause example verbatim; auth-failed redistribution (unstarted moved, in-flight kept); pace gap statistics (no two sends from one mailbox closer than minGap×0.8); rotation balance (4 equal mailboxes end within ±1 send of each other).
+Golden cohort full-pipeline (flagship); never-burst after a 14 h VirtualClock gap; midnight cap reset; window enforcement; soft-retry ≤2 then BOUNCED; Part-11 auto-pause; failed-mailbox rotation for unassigned work with started threads pinned; pace-gap statistics; rotation balance.

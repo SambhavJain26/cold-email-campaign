@@ -10,7 +10,6 @@ import { evaluateAutoPause } from '../services/autoPause';
 import { getSettings } from '../db/repos/settingsRepo';
 import { getMailbox, patchMailbox } from '../db/repos/mailboxesRepo';
 import { setCursor } from '../db/repos/pollCursorsRepo';
-import { redistributeUnstarted } from '../db/repos/enrollmentsRepo';
 import {
   existsByUid,
   findByMessageId,
@@ -59,8 +58,8 @@ export class Poller {
       msgs = (await transport.fetchNew(mailboxId)).sort((a, b) => a.uid - b.uid);
     } catch (err) {
       if (err instanceof TransportAuthError) {
-        // Permanent IMAP auth failure (docs/07 §5): pause sends, alert,
-        // redistribute unstarted enrollments (docs/06 §6).
+        // Permanent IMAP auth failure: pause sends and alert. Unassigned work
+        // already rotates across healthy mailboxes; started threads stay pinned.
         await patchMailbox(db, mailboxId, {
           status: 'auth_failed',
           statusReason: err.message,
@@ -71,7 +70,6 @@ export class Poller {
           error: err.message,
           via: 'imap_poll',
         });
-        await redistributeUnstarted(db, mailboxId);
         return result;
       }
       // Transient failure: rethrow — job retry/backoff owns it; last_poll_uid

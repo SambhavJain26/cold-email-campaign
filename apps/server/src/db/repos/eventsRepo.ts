@@ -50,6 +50,15 @@ export async function insertEvents(db: DbLike, evs: readonly DomainEvent[]): Pro
   return rows.map((r) => r.id);
 }
 
+export async function hasAnySentEvent(db: DbLike): Promise<boolean> {
+  const rows = await db
+    .select({ id: events.id })
+    .from(events)
+    .where(eq(events.type, 'sent'))
+    .limit(1);
+  return rows.length > 0;
+}
+
 /** Sends from a mailbox since an instant — the cap counter (docs/06 §1 B). */
 export async function countSentSince(db: DbLike, mailboxId: number, since: Date): Promise<number> {
   const rows = await db

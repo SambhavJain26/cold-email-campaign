@@ -7,7 +7,6 @@ import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Switch } from '@/components/ui/switch';
 import { AppApiError } from '@/api/client';
 import { useCreateSequence, useUpdateSequence } from '@/api/mutations/sequences';
 import {
@@ -23,8 +22,6 @@ import {
 } from './draft';
 import { PreviewPanel, type PreviewTarget } from './preview-panel';
 import { StepCard } from './step-card';
-
-const STOP_CONDITIONS = [{ key: 'stop_on_reply', label: 'Stop on reply' }] as const;
 
 /** F4.2/F4.3/F4.4 — the sequence builder (docs/12 §5). Mounted with `key={sequence.id}`
  *  so a different sequence remounts with fresh state initializers (no setState-in-effect). */
@@ -159,22 +156,9 @@ export function SequenceBuilder({ sequence }: { sequence?: SequenceDto }) {
           <section className="space-y-2 rounded-lg border border-border p-4">
             <h2 className="text-sm font-semibold">Stop conditions</h2>
             <p className="text-xs text-muted-foreground">
-              When one of these fires, the enrollment leaves the sequence — no further steps send.
+              Every human reply permanently stops this sequence. This safety rule cannot be
+              disabled.
             </p>
-            <div className="flex flex-wrap gap-6 pt-1">
-              {STOP_CONDITIONS.map(({ key, label }) => (
-                <div key={key} className="flex items-center gap-2">
-                  <Switch
-                    id={key}
-                    checked={draft[key]}
-                    onCheckedChange={(checked) => edit({ ...draft, [key]: checked })}
-                  />
-                  <Label htmlFor={key} className="text-xs">
-                    {label}
-                  </Label>
-                </div>
-              ))}
-            </div>
           </section>
         </div>
 

@@ -29,7 +29,6 @@ import {
   activeCampaignIds,
   getById as getEnrollmentById,
   listDue,
-  redistributeUnstarted,
   type DueEnrollment,
 } from '../db/repos/enrollmentsRepo';
 import { insertSentMessage } from '../db/repos/sentMessagesRepo';
@@ -578,9 +577,8 @@ export class Scheduler {
         this.rateLimitFailures.delete(mb.id);
       }
       if (verdict === 'provider_blocked') {
-        // docs/06 §6: the provider keeps refusing us. Same shape as
-        // auth_failed — stop sending, alert, and hand unstarted enrollments
-        // back to rotation so the campaign keeps moving on other mailboxes.
+        // Stop selecting this mailbox. Unassigned work naturally rotates to
+        // another healthy mailbox; started threads stay pinned for threading.
         await patchMailbox(db, mb.id, {
           status: 'provider_blocked',
           statusReason: result.transientError,
@@ -591,7 +589,6 @@ export class Scheduler {
           failures,
           lastError: result.transientError,
         });
-        await redistributeUnstarted(db, mb.id);
       } else if (verdict === 'smtp_failing') {
         await patchMailbox(db, mb.id, {
           status: 'paused',
@@ -634,9 +631,8 @@ export class Scheduler {
       mailboxId: mb.id,
       error: result.permanentError,
     });
-    // Redistribution (docs/06 §6): unstarted enrollments re-enter rotation;
-    // mid-thread enrollments keep their assignment and wait.
-    await redistributeUnstarted(db, mb.id);
+    // Unassigned leads naturally rotate elsewhere. Started threads remain
+    // pinned and wait for this mailbox to recover, preserving threading.
     return 'auth_failed';
   }
 

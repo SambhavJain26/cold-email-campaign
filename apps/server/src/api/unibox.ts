@@ -6,6 +6,7 @@
 import type { FastifyInstance } from 'fastify';
 import {
   idParamSchema,
+  dispositionReplyBodySchema,
   manualSendBodySchema,
   manualSendResponseSchema,
   okResponseSchema,
@@ -23,6 +24,7 @@ import { getById, patchScheduling } from '../db/repos/enrollmentsRepo';
 import { listThreadMessageIds } from '../db/repos/sentMessagesRepo';
 import { FatalChecksError, MailboxUnhealthyError, manualSend } from '../services/manualCompose';
 import { buildEvent } from '../domain/events';
+import type { DomainEvent } from '../domain/events';
 import { AppError } from './errors';
 import type { ZodTypeProvider } from './plugins/zodCompilers';
 
@@ -37,7 +39,10 @@ function toUniboxItemDto(row: UniboxRow): UniboxItemDto {
     snippet: row.snippet,
     effective_sentiment: row.effectiveSentiment as UniboxItemDto['effective_sentiment'],
     suggested_sentiment: row.suggestedSentiment as UniboxItemDto['suggested_sentiment'],
+    disposition: row.disposition as UniboxItemDto['disposition'],
+    recontact_after: row.recontactAfter,
     auto_unsubscribed: row.autoUnsubscribed,
+    lead_suppressed: row.leadSuppressed,
     sequence_continues: row.enrollmentState === 'ACTIVE' || row.enrollmentState === 'NEW',
     meeting_booked: row.meetingBooked,
     enrollment_id: row.enrollmentId,
@@ -120,6 +125,63 @@ export async function uniboxRoutes(app: FastifyInstance, services: AppServices):
   );
 
   r.post(
+    '/unibox/:id/disposition',
+    {
+      schema: {
+        params: idParamSchema,
+        body: dispositionReplyBodySchema,
+        response: { 200: uniboxItemSchema },
+      },
+    },
+    async (req) => {
+      const row = await getUniboxRow(db, req.params.id);
+      if (!row) throw AppError.notFound('unibox item');
+      if (row.replyEventId === null) {
+        throw new AppError('conflict', 409, 'only human replies can be dispositioned');
+      }
+      const recontactAfter = req.body.recontact_after ?? null;
+      if (recontactAfter !== null && new Date(recontactAfter) <= clock.now()) {
+        throw new AppError('validation', 400, 'recontact_after must be in the future');
+      }
+      if (row.disposition === req.body.disposition && row.recontactAfter === recontactAfter) {
+        return toUniboxItemDto(row);
+      }
+
+      const events: DomainEvent[] = [
+        buildEvent.replyDispositioned({
+          leadId: row.leadId,
+          enrollmentId: row.enrollmentId,
+          campaignId: row.campaignId,
+          occurredAt: clock.now(),
+          attributes: {
+            reply_event_id: row.replyEventId,
+            incoming_message_id: row.incomingMessageId,
+            disposition: req.body.disposition,
+            ...(recontactAfter === null ? {} : { recontact_after: recontactAfter }),
+            dispositioned_by: 'human',
+          },
+        }),
+      ];
+      const suppressive = ['not_interested', 'wrong_person', 'explicit_unsubscribe'].includes(
+        req.body.disposition,
+      );
+      if (!row.leadSuppressed && suppressive) {
+        events.push(
+          buildEvent.unsubscribe({
+            leadId: row.leadId,
+            enrollmentId: row.enrollmentId,
+            campaignId: row.campaignId,
+            source: 'manual',
+            occurredAt: clock.now(),
+          }),
+        );
+      }
+      await store.append(events);
+      return toUniboxItemDto((await getUniboxRow(db, req.params.id))!);
+    },
+  );
+
+  r.post(
     '/enrollments/:id/meeting-booked',
     { schema: { params: idParamSchema, response: { 200: okResponseSchema } } },
     async (req) => {
@@ -187,6 +249,7 @@ export async function uniboxRoutes(app: FastifyInstance, services: AppServices):
             mailboxId: req.body.mailbox_id,
             subject: req.body.subject,
             bodyText: req.body.body,
+            allowRecontact: req.body.allow_recontact,
           },
         );
       } catch (err) {

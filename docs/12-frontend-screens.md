@@ -51,8 +51,8 @@ Three steps in a dialog: **Upload** (drag/drop CSV, client-side 10 MB check) →
 
 ## 7. 💬 Unibox `/unibox` (§Stage 6)
 
-**Data:** `GET /unibox` (poll 60 s), tabs `human` / `auto_reply`; sentiment filter chips.
-**Card per item** (walkthrough verbatim): lead name — company, relative time, snippet, "↳ sequence auto-stopped ✓", suggested tag (greyed, "AI-assisted") when present, **Tag row** `[🟢][⚪][🔴]` one-click (optimistic) → `POST sentiment`; **[📅 Mark meeting booked]** → `POST meeting-booked` (hidden once true → shows ✓ badge); **[Snooze…]** date picker → `POST snooze`; auto-unsubscribed items show "→ auto-unsubscribed ✓ · counts toward reply AND unsub rate" caption. Card click → thread view (sent steps + reply body).
+**Data:** `GET /unibox` (poll 60 s), tabs `human` / `auto_reply`; mailbox and sentiment filters; **Needs outcome** filters replies without a disposition.
+**Card per item:** every human reply shows the mandatory stopped-sequence caption and an outcome selector. `not_now` requires a future date; not-interested, wrong-person and explicit opt-out indicate global suppression. Sentiment remains a separate analytics tag. Meeting, snooze and thread actions remain available.
 **Auto-reply tab:** OOO items, caption "NOT counted as a reply. Sequence continues normally."
 **Edge:** `tag_only` mode (settings) adds an explicit **[Unsubscribe lead]** button on negative-tagged cards → `POST enrollments/:id/unsubscribe`. Empty state: "No replies yet — they'll appear here the moment the poller sees them."
 
@@ -75,7 +75,7 @@ All PUTs full-row with zod validation; dirty-state guard on tab switch.
 ## 11. 🖥 System `/system` (pending screens: reply-detection view + job status)
 
 **Reply-detection debug:** `GET /incoming-messages` table — time, mailbox, from, subject, classification chip (bounce/auto-reply/human/unrelated), DSN status, matched enrollment link, resulting events. Filter by classification/mailbox. This is the walkthrough's "How the IMAP Poller Classifies" made inspectable.
-**Job status:** `GET /system/status` — scheduler last tick, transport mode chip (`MOCK` amber / `LIVE` green — always visible here and in the top bar while mock), per-mailbox poller freshness, pending jobs; **[Rebuild projections (dry-run)]** → results dialog.
+**Job status:** `GET /system/status` — scheduler last tick, transport mode, poller freshness, pending jobs, and projection dry-run. **Alerts history** uses the all-alerts view so acknowledged operational alerts remain reviewable.
 
 ## 12. Catch-up notice (pending screen; global)
 

@@ -346,7 +346,7 @@ describe('SmtpImapTransport over a real server (B8.1)', () => {
     });
   });
 
-  it('fetchNew: bad credentials throw TransportAuthError (→ auth_failed + redistribution)', async () => {
+  it('fetchNew: bad credentials throw TransportAuthError (→ auth_failed)', async () => {
     connections.set(CANARY_ID, { ...connectionFor(CANARY), password: 'wrong-password' });
     await expect(transport.fetchNew(CANARY_ID)).rejects.toBeInstanceOf(TransportAuthError);
   });

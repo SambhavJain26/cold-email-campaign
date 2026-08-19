@@ -302,7 +302,7 @@ export class SmtpImapTransport implements MailTransport {
 
   /**
    * Permanent auth failure → TransportAuthError (the poller flips the mailbox to
-   * auth_failed and redistributes, docs/07 §5). Anything else stays a plain
+   * auth_failed (docs/07 §5). Anything else stays a plain
    * Error so pg-boss retries and last_poll_uid does not advance.
    */
   private imapError(err: unknown): Error {

@@ -178,10 +178,12 @@ describe('B6.7 unibox + B6.8 manual-sends', () => {
     });
     expect(retag.json().effective_sentiment).toBe('neutral');
 
-    const unhandledAfter = (
+    // Sentiment and outcome are separate operator facts. A sentiment tag does
+    // not clear the reply-review queue.
+    const unhandledAfterSentiment = (
       await h.inject({ method: 'GET', url: '/api/v1/unibox?unhandled=true' })
     ).json();
-    expect(unhandledAfter.total).toBe(0);
+    expect(unhandledAfterSentiment.total).toBe(1);
     const filtered = (
       await h.inject({ method: 'GET', url: '/api/v1/unibox?sentiment=neutral' })
     ).json();
@@ -197,6 +199,39 @@ describe('B6.7 unibox + B6.8 manual-sends', () => {
         })
       ).statusCode,
     ).toBe(409);
+  });
+
+  it('reply disposition is append-only, idempotent, and clears the review queue', async () => {
+    const wm = await eventWatermark(h.pool);
+    const res = await h.inject({
+      method: 'POST',
+      url: '/api/v1/unibox/1/disposition',
+      payload: { disposition: 'interested' },
+    });
+    expect(res.statusCode).toBe(200);
+    expect(res.json()).toMatchObject({ disposition: 'interested', recontact_after: null });
+    await expectAppended(h.pool, wm, { reply_dispositioned: 1 });
+
+    const retryWatermark = await eventWatermark(h.pool);
+    const retry = await h.inject({
+      method: 'POST',
+      url: '/api/v1/unibox/1/disposition',
+      payload: { disposition: 'interested' },
+    });
+    expect(retry.statusCode).toBe(200);
+    await expectNoNewEvents(h.pool, retryWatermark);
+
+    const unhandled = (
+      await h.inject({ method: 'GET', url: '/api/v1/unibox?unhandled=true' })
+    ).json();
+    expect(unhandled.total).toBe(0);
+
+    const pastNotNow = await h.inject({
+      method: 'POST',
+      url: '/api/v1/unibox/1/disposition',
+      payload: { disposition: 'not_now', recontact_after: '2020-01-01T00:00:00.000Z' },
+    });
+    expect(pastNotNow.statusCode).toBe(400);
   });
 
   it('meeting-booked appends its milestone event; state unchanged', async () => {

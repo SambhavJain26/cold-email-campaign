@@ -64,7 +64,7 @@ export const stepWriteSchema = z
 
 export const sequenceWriteBodySchema = z.object({
   name: z.string().min(1),
-  stop_on_reply: z.boolean().default(true),
+  stop_on_reply: z.literal(true).default(true),
   steps: z.array(stepWriteSchema).min(1),
 });
 export type SequenceWriteBody = z.infer<typeof sequenceWriteBodySchema>;

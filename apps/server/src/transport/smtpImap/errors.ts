@@ -4,7 +4,7 @@
 //
 //   4b transient          → nothing appended, retried next tick
 //   4c permanent recipient→ hard_bounce on the LEAD
-//   4c permanent mailbox  → mailbox auth_failed + redistribution
+//   4c permanent mailbox  → mailbox auth_failed; unassigned work rotates
 //
 // The default is TRANSIENT on purpose: an unrecognised failure must never
 // terminal a lead as hard-bounced — retrying a live address is cheap, wrongly
@@ -56,7 +56,7 @@ export function classifySmtpError(err: unknown): SmtpFailure {
       return { kind: 'permanent', scope: 'recipient', error };
     }
     // 5xx from AUTH, or any other 5xx we can't attribute to the address: the
-    // mailbox is the broken thing (auth_failed → redistribution).
+    // mailbox is the broken thing (auth_failed; do not reroute started threads).
     return { kind: 'permanent', scope: 'mailbox', error };
   }
 
