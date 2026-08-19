@@ -11,7 +11,13 @@ CREATE TYPE event_type AS ENUM (
   'human_reply','auto_reply','unsubscribe','meeting_booked',
   'deal_won','deal_lost','sentiment_tagged'
 );
+DROP INDEX ev_campaign;
+DROP INDEX ev_mailbox;
+DROP INDEX ev_sent_message_id;
 ALTER TABLE events
   ALTER COLUMN type TYPE event_type USING type::text::event_type;
+CREATE INDEX ev_campaign ON events (campaign_id, type);
+CREATE INDEX ev_mailbox ON events (mailbox_id, type, occurred_at);
+CREATE UNIQUE INDEX ev_sent_message_id ON events (message_id) WHERE type = 'sent';
 DROP TYPE event_type_with_reply_disposition;
 GRANT USAGE ON TYPE event_type TO app_rw;
