@@ -100,23 +100,25 @@ the full `DATABASE_URL`, including its password; print only the schedule. `docke
 `docker compose config` also render secrets. This warning follows an actual credential exposure
 and password rotation.
 
-## Live canary state — unsafe for real domains
+## Live canary state — final wrap complete
 
-The accelerated canary settings deliberately trade safety margin for speed and **must be reverted
-before any real-domain work**. The pre-change DB snapshot is
-`~/canary-settings-snapshot-2026-08-15.sql` on the VM.
+The bounded catch-up/never-burst canary passed on 2026-08-20 UTC and the accelerated settings were
+restored before the final deployment. Oracle is deployed on `b8.3-local-canary` at `4e9e125` plus
+the later documentation-only wrap commit.
 
-- `enforce_send_window=false`
-- `max_mailbox_daily_cap=3000`; both mailboxes have `daily_cap=3000`
-- `pause_min_sends=5`; `send_jitter_pct=0`; `min_ramp_days=0` remains unenforced
+- `enforce_send_window=true`; `max_mailbox_daily_cap=50`
+- `pause_min_sends=25`; `delivery_confirm_hours=1`; `send_jitter_pct=20`; `min_ramp_days=7`
+- Both mailboxes are `ok`, have `daily_cap=5`, no `resume_cap`, and send Mon–Fri 10:00–18:00
 - Both mailboxes poll `{INBOX,[Gmail]/Spam}`; keep that folder configuration
-- Mailbox 1 is `auto_paused`; mailbox 2 is `ok` with `resume_cap=1500`
-- The test campaign is paused
+- Both controlled Gmail campaigns are paused; the catch-up campaign has four completed sends and
+  four unsent enrollments that cannot run while it remains paused
 
-These values are never evidence that a volume is safe. The last unrun canary scenario is docs/17
-§6 catch-up/never-burst. Finding 12's warmed-domain `List-Unsubscribe` question remains unanswered.
-Findings 20–25 are closed locally; the live scenario, setting restoration, and final wrap remain.
-Finding 11 is closed as unanswerable with this rig; do not re-litigate it.
+The live catch-up evidence is four accepted owner-address sends in two paced waves, two per
+mailbox, with a 925-second same-mailbox gap and a `catchup_backlog` alert after 10,833 seconds of
+downtime. The post-deploy checks were clean: HTTPS/database health, self-check, `checked 24
+enrollments — 0 diff(s)`, and a fresh validated backup. These results prove restart pacing, not
+that any volume is safe. Finding 12's warmed-domain `List-Unsubscribe` question remains unanswered;
+finding 11 is closed as unanswerable with this rig and must not be re-litigated.
 
 ## Damage-prone operational traps
 

@@ -10,10 +10,10 @@ the populated test database returned `checked 5 enrollments — 0 diff(s)` and s
 invariant violations. The real-backend fixture was corrected to obey the existing launch guardrails
 (`ramp_days=7`, cap 25).
 
-This is local evidence only. The §6 catch-up/never-burst live scenario, Oracle unsafe-setting
-restoration, fresh-backup confirmation, final production reconciliation, and canary wrap have not
-been executed; they remain gated by the bounded approval plan in §6a. No external mail or Oracle
-state changed during this gate.
+The separately approved live wrap completed on 2026-08-20 UTC. The bounded catch-up scenario sent
+only four messages to owner-controlled addresses, paused at the bound, restored the safe settings,
+deployed `4e9e125`, and passed health, self-check, backup, reconciliation, and zero-drift checks.
+See §§6–7 for the exact evidence.
 
 ## UI data-consistency remediation (2026-08-10)
 
@@ -160,25 +160,24 @@ correct two terminal outcomes and two 1/1 manual variant rows, and the final pro
 check returned `checked 6 enrollments — 0 diff(s)`. The completed test campaign is paused to prevent
 accidental future enrollment. No prospect, external-domain, DNS, or real-domain work was performed.
 
-### ⚠️ Compressed canary settings — MUST be reverted before real domains (2026-08-16)
+### Compressed canary settings — restored after final scenario (2026-08-20 UTC)
 
-The accelerated §§3–7 run deliberately traded safety margin for speed, on the operator's explicit
-instruction ("change whatever setting you want; we revert before the real campaign"). **Every row
-below is currently unsafe for a real campaign.** A pre-change snapshot is on the VM at
-`~/canary-settings-snapshot-2026-08-15.sql` (`pg_dump --data-only` of `settings` + `mailboxes`).
+The accelerated §§3–7 run deliberately traded safety margin for speed under explicit approval.
+Those temporary values were restored after §6. The pre-change snapshot remains on the VM as a
+restricted recovery artifact.
 
-| Setting | Safe value | Canary value | Why it is unsafe |
-|---|---|---|---|
-| `settings.enforce_send_window` | `true` | **`false`** | Sends at any hour, any day — including weekends |
-| `settings.max_mailbox_daily_cap` | 50 | **200** | Raises the ceiling the guardrail exists to hold |
-| `settings.pause_min_sends` | 25 | **5** | Auto-pause engages on a tiny, noisy sample |
-| `mailboxes.daily_cap` (both) | 5 | **100** | 20× the warmed-mailbox volume |
-| `mailboxes.poll_folders` | — | `{INBOX,[Gmail]/Spam}` | **Keep this** — it is finding 13's fix, not a compression |
-
-`min_ramp_days` remains 0 (its shipped default), so staged enrollment is still unenforced.
-
-The domain-readiness preflight reports the raised caps and `min_ramp_days: 0` as **not
-launch-ready**, so this table is belt-and-braces rather than the only guard.
+| Setting | Accelerated value | Restored value |
+|---|---:|---:|
+| `settings.enforce_send_window` | `false` | **`true`** |
+| `settings.max_mailbox_daily_cap` | 3000 | **50** |
+| `settings.pause_min_sends` | 5 | **25** |
+| `settings.delivery_confirm_hours` | compressed | **1** |
+| `settings.send_jitter_pct` | 0 | **20** |
+| `settings.min_ramp_days` | 0 | **7** |
+| `mailboxes.daily_cap` (both) | 3000 | **5** |
+| mailbox state | mailbox 1 auto-paused; mailbox 2 resume cap 1500 | **both `ok`; no resume cap** |
+| send window | unenforced | **Mon–Fri 10:00–18:00** |
+| `mailboxes.poll_folders` | `{INBOX,[Gmail]/Spam}` | **unchanged; keep this finding 13 fix** |
 
 > **Trap hit while doing this, worth not repeating.** `poll_folders` was first set with plain SQL,
 > which skips the UIDNEXT seeding the API route performs — so the next poll would have ingested
@@ -250,7 +249,7 @@ as work closes.
 | #14 | ✅ implemented and locally verified | Transparent cold-email cliché rubric, including subject lines. |
 | #15–16 | ✅ implemented and locally verified | Reply-first lock regression and UIDNEXT cursor initialization coverage. |
 | #19 | ✅ implemented and locally verified | GreenMail verifies minimal `multipart/alternative` text + HTML. |
-| #13 | ⚠️ intentionally bypassed for this controlled test | Operator elected to proceed without Gmail’s “never send it to Spam” filters. Messages or replies placed in Spam may be invisible because monitoring reads `INBOX` only. |
+| #13 | ✅ fixed and live-configured | Per-folder polling is deployed; both live mailboxes poll `{INBOX,[Gmail]/Spam}` with folder-scoped cursors. |
 | Earlier pre-canary release | ✅ deployed to Oracle | Commit `95de5a3` deployed on 2026-08-10; containers healthy, HTTPS `/health` returned 200, and production `rebuild-projections --dry-run` returned 0 diffs. |
 | UI data-consistency release | ✅ deployed and live-verified | Commit `556c9b2` deployed on 2026-08-10; all containers are healthy, HTTPS `/health` returned 200, and production `rebuild-projections --dry-run` returned 0 diffs across 4 enrollments. The controlled Gmail campaign verified normal replies, reply-before-delivery accounting, and STOP suppression. |
 
@@ -624,17 +623,16 @@ These need the host up, which is why this is not on a laptop.
 
 - [x] **Stale-poll** — break IMAP credentials, leave past `stale_poll_hours` (6) → `imap_stale`
       + pause + alert; reconnect → polling resumes **without a restart**
-- [ ] **Catch-up / never-burst** — stop the app several hours, restart, confirm the backlog is
+- [x] **Catch-up / never-burst** — stop the app several hours, restart, confirm the backlog is
       paced not dumped (expect a `catchup_backlog` alert)
 - [x] **Backup freshness** — daily self-check alerts on a dump older than 26h
 - [x] **`auth_failed` → reconnect** registers the mailbox poll at runtime
 
-### §6a Catch-up/never-burst approval plan (prepared, not executed)
+### §6a Catch-up/never-burst result (completed 2026-08-20 UTC)
 
-This is the only unrun live scenario. It changes live campaign state and can send mail, so execution
-requires one approval naming the campaign, owner-controlled recipient addresses, maximum accepted
-sends, and test window. Proposed bound: one dedicated campaign, at most four owner-address sends,
-no prospect addresses, and an immediate pause at the bound.
+The operator approved one dedicated campaign, owner-controlled recipients only, at most four sends,
+and an immediate pause at the bound. The app was intentionally unavailable for **10,833 seconds**
+so overdue work existed at restart.
 
 1. Record a database snapshot plus current settings, mailbox states/caps, campaign state, event
    watermark, and projection dry-run (must be zero diffs).
@@ -651,17 +649,35 @@ no prospect addresses, and an immediate pause at the bound.
    snapshot and verify them read-only. `delivery_confirm_hours` must be restored before deploying
    migration 0013, because it becomes immutable after sends exist.
 
+**Verified result:** four sends were accepted in two waves, one per mailbox per scheduler tick.
+Each mailbox sent exactly twice; the same-mailbox gap was **925 seconds**, so there was no restart
+burst. One `catchup_backlog` alert was recorded. The campaign remained paused with four completed
+and four unsent enrollments. Before and after restoration/deployment, projection dry-runs returned
+`checked 24 enrollments — 0 diff(s)` and self-check found no violations. The final deployment was
+healthy at `4e9e125`; the safe values in the table above were verified read-only. A new custom-format
+backup (`coldemail-20260820-202421.dump`, 2,340,613 bytes) was created and its catalog passed
+`pg_restore --list`; there were no failed jobs created during the scenario.
+
+**Verifier corrections:** the first evidence query incorrectly grouped by
+`attributes.mailbox_id`; canonical mailbox identity is `events.mailbox_id`, which is why that query
+falsely reported four sends on one mailbox and a zero gap. The production backup script is installed
+at `/usr/local/bin/backup.sh`, not `/backup.sh`. Corrected evidence is preserved in the restricted
+Oracle log.
+
 ---
 
 ## 7. Wrap (days 12–14)
 
 Slack, deliberately — something will surprise us, and Gmail's IMAP is the likeliest source.
 
-- [ ] `PROGRESS.md`: tick B8.3-local, add a dated log entry
-- [ ] `docs/16` §5: mark which canary lines are now proven against real Google, and which still
+- [x] `PROGRESS.md`: tick B8.3-local, add a dated log entry
+- [x] `docs/16` §5: mark which canary lines are now proven against real Google, and which still
       require warmed domains
 - [ ] Merge to `main`: **fixtures, classifier patches, the capture script** — yes. Throwaway
       settings values and host-specific scratch — no.
+
+The branch is prepared and pushed for review. Merge to `main` remains deliberately unchecked
+because no merge approval was given.
 
 ---
 

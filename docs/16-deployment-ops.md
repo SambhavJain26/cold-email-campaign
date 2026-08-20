@@ -45,7 +45,7 @@ and restore after personal-data erasure.
 
 - **First deploy:** `cp .env.prod.example .env.prod`, generate `SECRET_KEY`/`SESSION_KEY`, set `POSTGRES_PASSWORD`/`OPERATOR_*`/`DOMAIN`, then `docker compose -f docker-compose.prod.yml --env-file .env.prod up -d --build`.
 - **Deploy/update:** `git pull && docker compose -f docker-compose.prod.yml --env-file .env.prod up -d --build` — the app entrypoint applies migrations before it listens; scheduler catch-up handles the downtime window (never-burst; expect a `catchup_backlog` alert if > a few hours).
-- **Backup now:** `docker compose exec backup /backup.sh` (or `BACKUP_DIR=./backups sh scripts/backup.sh`). **Restore drill (quarterly + the automated B7.2 gate in CI):** `DATABASE_URL=… BACKUP_DIR=… sh scripts/restore-drill.sh` — dumps, restores into a scratch DB, runs `rebuild-projections` then `--dry-run` (expect 0 diffs = the fold is deterministic), then `self-check` (expect 0 invariant violations). Data proven intact, not just present. Uses `pg_dump`/`pg_restore`/`psql` from PATH.
+- **Backup now:** `docker compose exec backup /usr/local/bin/backup.sh` (or `BACKUP_DIR=./backups sh scripts/backup.sh`). **Restore drill (quarterly + the automated B7.2 gate in CI):** `DATABASE_URL=… BACKUP_DIR=… sh scripts/restore-drill.sh` — dumps, restores into a scratch DB, runs `rebuild-projections` then `--dry-run` (expect 0 diffs = the fold is deterministic), then `self-check` (expect 0 invariant violations). Data proven intact, not just present. Uses `pg_dump`/`pg_restore`/`psql` from PATH.
 - **Ops CLIs need `-w @coldemail/server`** — they live in `apps/server/package.json` and there is no root proxy, so the bare root form fails (verified on the VM 2026-08-07). In the compose stack, prefix with `docker compose -f docker-compose.prod.yml --env-file .env.prod exec -T app`.
 - **Rotate `SECRET_KEY`:** run `npm run rotate-secrets -w @coldemail/server -- --new-key <hex>` (decrypts+re-seals all `mailbox_secrets` in one tx), then update env, restart.
 - **Password reset (locked out):** `NEW_PASSWORD='…' npm run operator:set-password -w @coldemail/server` on the VPS (or `-- --password '…'`; the env form keeps it out of shell history). `ensureOperator` seeds the row only at first boot, so editing `OPERATOR_INITIAL_PASSWORD` afterwards does nothing — this CLI is the recovery path.
@@ -67,19 +67,23 @@ Nothing fails silently: every pg-boss final failure emits `job_failed`.
 
 **Already proven offline (B8.1/B8.2, docs/13 §5a)** against a real SMTP+IMAP server in Docker, so the canary is about *providers*, not about the code: SMTP send with our Message-ID · In-Reply-To/References intact on the wire · IMAP fetch honouring the UID high-water mark (and re-polling appending nothing) · real DSN → hard/soft bounce · real OOO → auto_reply · real threaded reply → human_reply and STOP → suppression · bad credentials → `auth_failed` · the whole scheduler+poller pipeline over the live transport with a zero-drift rebuild. The two things a local server cannot give: a 5xx recipient rejection, and each provider's own DSN/OOO wording.
 
-**Current local-canary evidence (2026-08-14):** Oracle has proven, against real Google servers
+**Final local-canary evidence (2026-08-20 UTC):** Oracle has proven, against real Google servers
 with owner-operated accounts only, the lines of §5 step 2 that do not need a dead address or a
 provider DSN — Test-Connection round-trip, our Message-ID and threading intact in real headers,
 a threaded reply classified human with the sequence stopping, and a `STOP` reply suppressing
 immediately (`unsubscribe` with `matched_keyword: "stop"` → `UNSUBSCRIBED` + global suppression).
 `delivered` fired on its scheduled confirm job, a re-poll processed zero new messages, and the
-UI's analytics, outcomes and capacity agreed with the database. Containers are healthy, both
-mailbox poll timestamps advanced, the backup sidecar has current dumps, and the final production
-projection check returned `checked 6 enrollments — 0 diff(s)`. **The test campaign is paused**;
-resuming it or sending anything further needs new per-send operator approval.
+UI's analytics, outcomes and capacity agreed with the database. The final catch-up test then
+accepted four owner-address messages in two paced waves after 10,833 seconds of downtime: two per
+mailbox, 925 seconds apart per mailbox, with a `catchup_backlog` alert and no new failed jobs.
+Containers and HTTPS/database health are green, self-check is clean, a fresh custom-format backup
+passed `pg_restore --list`, and the final production projection check returned `checked 24
+enrollments — 0 diff(s)`. Accelerated settings were restored and verified; both mailboxes are `ok`
+at cap 5 with no resume cap. **Both test campaigns are paused**; resuming either or sending anything
+further needs new per-send operator approval.
 
-This does **not** prove real-domain deliverability, a 5xx recipient rejection, provider DSN/OOO
-wording, auto-pause or rotation behaviour under a failure cohort, or multi-day live timing. Those
+This does **not** prove real-domain deliverability, a 5xx recipient rejection, or provider DSN/OOO
+wording. Those
 remain gated on explicit authorization to send new external mail — see docs/17 §§3, 5 and 6.
 
 1. One real mailbox, `MAIL_TRANSPORT=smtp_imap`, caps=5/day, seed addresses only.
