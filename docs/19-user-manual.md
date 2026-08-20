@@ -10,6 +10,10 @@ This manual explains the complete operator-facing application: what every screen
 each action, what the system does automatically, and which safeguards or edge cases matter. It is a
 product-use guide, not legal advice and not a promise of email deliverability.
 
+The screenshots use the application's built-in representative dataset so every control can be
+shown without changing the live Oracle canary. Names, dates, addresses, counts, and `MOCK` status in
+the images are examples; follow the written rules and the values displayed in your live session.
+
 > **Current-environment warning:** the Oracle Free Tier VM is the present canary deployment. It is
 > not the future Spaceship production VPS. A green `LIVE` transport badge means the application is
 > connected to real SMTP/IMAP; it does **not** mean domains are warmed, DNS is ready, a list is
@@ -265,6 +269,8 @@ guidance, such as ramp-cap refusals, fatal render checks, or unhealthy mailbox e
 
 Overview is the campaign command summary.
 
+![Overview showing campaign progress, outcome metrics, today's capacity, and completion status](images/user-manual/01-overview.png)
+
 ### Header and campaign detail
 
 The heading shows the selected campaign. **Campaign detail** opens its full configuration,
@@ -326,6 +332,8 @@ campaign. A capacity refusal lowers the input to the number that currently fits.
 
 ## 8. Leads
 
+![Leads list showing tiers, filters, suppression status, and bulk-selection controls](images/user-manual/02-leads.png)
+
 ### 8.1 Leads list
 
 The table shows email, name, company, location, tier, latest enrollment state, and a suppression
@@ -361,6 +369,8 @@ This action is intentionally not a shortcut around list safety.
 ### 8.3 Import CSV
 
 Choose **Import CSV** and drop or select a file.
+
+![CSV import dialog and file requirements](images/user-manual/03-import-csv.png)
 
 Requirements:
 
@@ -414,6 +424,8 @@ campaign context. The edit card supports:
 Custom-field names must be non-empty and unique. Any custom field can be used as a sequence merge
 tag. Removing a field from the form removes it from the lead after save.
 
+![Lead detail showing profile, editable tier and custom fields, event timeline, and Manual compose](images/user-manual/17-lead-detail-manual-compose.png)
+
 ### 8.6 Event timeline
 
 The newest event appears first. Events include enrollment, send, inferred delivery, soft/hard
@@ -460,9 +472,13 @@ and threading, and creates an enrollment when needed.
 The recontact acknowledgement never overrides suppression, an undispositioned reply, or a future
 “not now” date.
 
+![Manual composer showing campaign, mailbox choice, editable content, checks, footer guidance, and recontact acknowledgement](images/user-manual/18-manual-composer.png)
+
 ## 9. Mailboxes
 
 Mailboxes are global across campaigns.
+
+![Mailbox fleet showing status, capacity, health measurements, actions, and volume chart](images/user-manual/07-mailboxes.png)
 
 ### 9.1 Mailbox table
 
@@ -475,6 +491,8 @@ The effective cap can be lower than the configured daily cap after a reduced-cap
 ### 9.2 Add a mailbox
 
 Choose **Add Mailbox** and configure:
+
+![Add mailbox dialog showing SMTP, IMAP, polling folders, timezone, cap, window, and weekdays](images/user-manual/08-add-mailbox.png)
 
 - **Display name:** sender identity shown to recipients.
 - **From address:** actual mailbox address.
@@ -537,6 +555,8 @@ status, and thread-pinning differences before increasing volume.
 A sequence defines what is sent, when it is sent, how variants rotate, and whether follow-ups stay
 in thread. Every human reply stops the sequence; this safety rule cannot be disabled.
 
+![Sequence library showing steps, variants, waits, stop conditions, and campaign usage](images/user-manual/04-sequences.png)
+
 ### 10.1 Sequence list
 
 The list shows name, number of steps, active variants, wait pattern, stop conditions, and campaigns
@@ -548,6 +568,8 @@ content references remain. A sequence with history is retained.
 ### 10.2 Create or edit a sequence
 
 Choose **New Sequence** or open an existing sequence.
+
+![Sequence builder showing multiple steps, variants, waits, threading, templates, and preview panel](images/user-manual/05-sequence-builder.png)
 
 For each step:
 
@@ -600,6 +622,25 @@ subject and body.
 | Mode 2 — researched slot | `custom_observation` comes from the lead; a missing value falls back with a warning. |
 | Mode 2 — auto slot | Campaign segment/default observation data supplies the slot. |
 
+#### Choosing the approach for different lead types
+
+The sequence contains the message structure; the campaign decides how much human effort each tier
+receives. You do not normally build one sequence per individual lead. Build a sequence around one
+audience, problem, offer, and angle, then use variants to test different wording within that same
+idea.
+
+| Lead group | Recommended approach | What to prepare |
+|---|---|---|
+| A — a small set of highest-value accounts | Mode 1, human-written opener | Research each lead, open Manual compose, write a genuinely specific first message, and let later sequence steps provide the follow-up structure |
+| B — strong-fit leads where one researched fact matters | Mode 2, researched slot | Add a useful `custom_observation` on each lead and reference it with a fallback in the template |
+| C — broader qualified segment | Mode 2, automatic slot | Use reliable common fields such as name, company, city/state, and a campaign-level observation that remains truthful for the whole segment |
+| A distinct industry, persona, pain, offer, or language | Separate sequence and usually a separate campaign | Write a message and follow-up cadence designed for that audience; do not force unrelated groups through generic variants |
+| A copy experiment for the same audience and offer | Another active variant in the same step | Change one meaningful idea at a time so Analytics can compare variants coherently |
+| Rested completed leads receiving a genuinely new angle | New sequence in a Pass-2 campaign | Change the proposition/content enough to pass the content-hash guard; do not resend the old sequence |
+
+The **New campaign** dialog is where Tier A/B/C are mapped to these modes. The mapping is fixed at
+campaign creation, so review it before creating the campaign.
+
 ### 10.5 Live validation and copy-risk score
 
 Template fields validate after a short pause and show token count, variation count, parse status,
@@ -633,6 +674,8 @@ The panel shows the exact saved-template render, locked compliance footer, score
 fatal errors. Unsaved edits are not included; save and render again. Test multiple leads, including
 missing-name and missing-custom-field cases.
 
+![Rendered sequence preview showing personalized subject/body, locked footer, score, variations, and warnings](images/user-manual/06-sequence-preview.png)
+
 ### 10.7 Editing a sequence with history
 
 Once sends exist:
@@ -645,6 +688,8 @@ Once sends exist:
 ## 11. Campaigns
 
 A campaign combines one sequence, tier-to-effort rules, a ramp policy, and enrolled leads.
+
+![Campaign list showing status, sequence, enrolled/contacted counts, progress, and controls](images/user-manual/09-campaigns.png)
 
 ### 11.1 Campaign list
 
@@ -663,6 +708,8 @@ the next scheduler tick.
 ### 11.2 Create a campaign
 
 Choose **New Campaign** and set:
+
+![New campaign dialog showing sequence selection, Tier A/B/C personalization modes, manual acknowledgement, and ramp](images/user-manual/10-new-campaign.png)
 
 - **Name**;
 - **Sequence**;
@@ -729,6 +776,8 @@ can overlap, and offers **Recycle cold storage** or **Import fresh leads**.
 ## 12. Unibox
 
 Unibox is the operator's reply work queue across campaigns.
+
+![Unibox showing reply filters, stopped sequences, outcomes, sentiment, meeting, and snooze controls](images/user-manual/11-unibox.png)
 
 ### 12.1 Filters and tabs
 
@@ -807,6 +856,8 @@ compliance responsibility on the operator.
 
 Analytics is scoped to the selected campaign and contains four tabs.
 
+![Analytics variant comparison showing sends, reply and positive rates, meetings, and winner guidance](images/user-manual/12-analytics.png)
+
 ### 13.1 Variants
 
 Compares step-1 opener variants by sent count, reply rate, positive rate, and meetings. The winner
@@ -858,6 +909,8 @@ unsubscribe trend. Pause and investigate trends; do not “solve” them by incr
 
 Cold Storage lists unsuppressed leads whose enrollment completed without reply.
 
+![Cold Storage showing rest-period eligibility and the second-pass recycle action](images/user-manual/13-cold-storage.png)
+
 Each row shows completion time, earliest recycle date, and eligibility. The wait is
 `cold_storage_rest_days` from terminal time and is enforced server-side.
 
@@ -880,6 +933,8 @@ Prior human repliers and suppressed leads are not ordinary cold-storage candidat
 ## 15. Settings
 
 Switching tabs with unsaved changes prompts before discarding them.
+
+![Rules settings showing deliverability, opt-out, bounce, timing, and launch guardrails](images/user-manual/14-settings-rules.png)
 
 ### 15.1 Rules → deliverability rules
 
@@ -944,6 +999,8 @@ that protection and is reported as not launch-ready.
 
 ### 15.6 Compliance
 
+![Compliance settings showing postal address, opt-out wording, unsubscribe URL, and live footer preview](images/user-manual/15-settings-compliance.png)
+
 - **Physical address:** legally valid business postal address appended to every send. Empty blocks
   all sending. Use a registered office, PO box, coworking address, or legitimate commercial mailbox
   if you do not want to publish a home address.
@@ -964,6 +1021,8 @@ and a new password of at least eight characters. Use a unique strong password an
 password manager.
 
 ## 16. System
+
+![System page showing job and poller status, projection check, domain readiness, alert history, and reply detection](images/user-manual/16-system.png)
 
 ### 16.1 Job status
 
