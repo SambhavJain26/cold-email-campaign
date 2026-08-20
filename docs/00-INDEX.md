@@ -29,6 +29,7 @@ Progress is tracked in [PROGRESS.md](../PROGRESS.md) at the repo root.
 | 16 | [16-deployment-ops.md](16-deployment-ops.md) | Env vars, Docker Compose, backups, runbook, canary checklist | B7–B8 |
 | 17 | [17-local-canary-runbook.md](17-local-canary-runbook.md) | **B8.3-local**: two-week validation on throwaway Gmail, before real infrastructure | B8.3 |
 | 18 | [18-incident-response-runbook.md](18-incident-response-runbook.md) | Mailbox, bounce, complaint, pause, unsubscribe-outage, and erasure-restore response | Operations |
+| 19 | [19-user-manual.md](19-user-manual.md) | Complete operator guide to every screen, workflow, automatic behavior, safety rule, and edge case | First use + daily operations |
 
 ## Reading order
 
