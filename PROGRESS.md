@@ -28,12 +28,13 @@ are clean; a custom dump and scratch restore drill passed; Spaceship AutoBackup 
 with five restore points. OAuth credentials, compliance settings, mailbox connection, and the
 owner-address canary remain. Oracle is unchanged and paused; `main` was not merged.
 
-**2026-08-22 footer refinement:** the visible `---` boundary was replaced with one blank paragraph;
+**2026-08-22 footer refinement:** production was advanced to `680f47e`. The visible `---` boundary was replaced with one blank paragraph;
 the minimal HTML footer now uses `10px`, `#767676`, `line-height:1.5`, and a 16px top gap. The
 plain-text alternative keeps the same content after a blank line, and Settings/sequence previews
 mirror the new boundary. Focused gates passed: typecheck, lint, format, unit 338, web 55,
-manual-compose integration 5, and GreenMail 29. This entry records repository verification only;
-production deployment still requires explicit approval.
+manual-compose integration 5, and GreenMail 29. Post-deploy containers and public HTTPS health are
+green, the live asset contains the updated preview copy, self-check is clean, and production remains
+at `checked 0 enrollments — 0 diff(s)`.
 
 ---
 

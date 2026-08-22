@@ -65,7 +65,7 @@ rollback/canary environment.
 - Stack: `docker-compose.spaceship.yml` with `.env.prod`
 - UI: `https://sambhavpmtech.com/email-campaign/`
 - Internal gateway: `127.0.0.1:18080`; host Caddy alone owns public 80/443
-- Deployed branch/commit: `b8.3-local-canary` at `de8d158`
+- Deployed branch/commit: `b8.3-local-canary` at `680f47e`
 
 The private repository currently has no GitHub deploy credential on the VPS. Until a read-only
 deploy key is deliberately installed, transfer a reviewed `git bundle`, fetch the pinned branch
@@ -118,7 +118,7 @@ After an authorized deploy, verify container health, `https://localhost/health`,
 - **Final canary wrap completed 2026-08-21:** the bounded owner-address catch-up scenario accepted four sends in two paced waves (two per mailbox, 925-second same-mailbox gap) after 10,833 seconds of app downtime and emitted `catchup_backlog`. The campaign was paused at the bound. Accelerated settings were restored, both mailboxes are healthy at cap 5 with no resume cap, and both Gmail test campaigns are paused.
 - **Oracle rollback canary:** `4e9e125` plus its documentation-only wrap; both campaigns remain
   paused. Health, self-check, backup, and `checked 24 enrollments — 0 diff(s)` are clean.
-- **Spaceship production:** deployed 2026-08-22 at `de8d158` with a clean database and zero
+- **Spaceship production:** deployed 2026-08-22 and advanced to `680f47e` with a clean database and zero
   mailboxes/campaigns/leads/enrollments. DNS, TLS, the `/email-campaign/` SPA/API subpath, outreach
   redirects, and the two isolated unsubscribe hosts are live. Containers and health are green;
   self-check and zero-drift pass; a custom-format dump passed listing and the scratch restore drill;

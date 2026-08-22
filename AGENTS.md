@@ -88,7 +88,7 @@ temporary rollback/canary environment.
 - App: `/opt/email-campaign`; stack: `docker-compose.spaceship.yml` with `.env.prod`
 - Public UI: `https://sambhavpmtech.com/email-campaign/`
 - Internal gateway: `127.0.0.1:18080`; host Caddy is the only public 80/443 listener
-- Deployed branch/commit: `b8.3-local-canary` at `de8d158`
+- Deployed branch/commit: `b8.3-local-canary` at `680f47e`
 
 The repository is private and the VPS currently has no GitHub deploy credential. Until a read-only
 deploy key is deliberately installed, transfer a reviewed `git bundle`, fetch the pinned branch
@@ -129,7 +129,7 @@ and password rotation.
 
 ## Live deployment state
 
-Spaceship production was deployed on 2026-08-22 at `de8d158` with a clean database. DNS and TLS
+Spaceship production was deployed on 2026-08-22 and advanced to `680f47e` with a clean database. DNS and TLS
 are live for the two outreach domains and their unsubscribe subdomains. The route matrix is
 verified: `/email-campaign/` and direct SPA routes return 200; the bare app path canonicalizes;
 normal outreach-domain traffic redirects 308 to `https://sambhavbuilds.com/`; unsubscribe hosts

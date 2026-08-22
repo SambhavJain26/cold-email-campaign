@@ -147,7 +147,7 @@ Remaining for a full **M3** close: the real-backend walkthrough replay (§5, `e2
 ## 8. Spaceship shared-VPS production — deployed 2026-08-22
 
 Production is live at `https://sambhavpmtech.com/email-campaign/` on the existing Spaceship VM.
-The portfolio at `sambhavbuilds.com` remained online throughout. Code is pinned to `de8d158` on
+The portfolio at `sambhavbuilds.com` remained online throughout. Code is pinned to `680f47e` on
 `b8.3-local-canary`; `main` was not merged. Oracle remains paused and unchanged as the temporary
 rollback environment.
 

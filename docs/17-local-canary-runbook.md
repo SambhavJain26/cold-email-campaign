@@ -3,7 +3,7 @@
 ## 2026-08-22 Spaceship production commissioning gate
 
 The operator-approved production build is deployed at
-`https://sambhavpmtech.com/email-campaign/` from `b8.3-local-canary` commit `de8d158`; `main` was
+`https://sambhavpmtech.com/email-campaign/` from `b8.3-local-canary` commit `680f47e`; `main` was
 not merged. Oracle was not changed and remains the paused rollback canary.
 
 Verified production evidence:
