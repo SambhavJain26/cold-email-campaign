@@ -4,15 +4,20 @@
 
 **Application model:** single-operator, self-hosted cold-email campaign console
 
-**Manual version:** 2026-08-22, for branch `b8.3-local-canary`
+**Manual version:** 2026-08-23, for branch `b8.3-local-canary`
+
+**Reconciled through:** deployed application commit `680f47e` and the verified production records
+through `4cd572b`
 
 This manual explains the complete operator-facing application: what every screen does, how to use
 each action, what the system does automatically, and which safeguards or edge cases matter. It is a
 product-use guide, not legal advice and not a promise of email deliverability.
 
-The screenshots use the application's built-in representative dataset so every control can be
-shown without changing production. Names, dates, addresses, counts, and `MOCK` status in
-the images are examples; follow the written rules and the values displayed in your live session.
+The screenshots use the application's built-in representative dataset so controls can be shown
+without changing production. Names, dates, addresses, counts, and `MOCK` status in the images are
+examples. Two screenshots predate the final OAuth/footer refinement; explicit callouts beside those
+images describe the current controls. Follow the written rules and the values displayed in your
+live session.
 
 > **Current-environment warning:** Spaceship is the production deployment at
 > `https://sambhavpmtech.com/email-campaign/`. Oracle remains a paused rollback canary. A green
@@ -124,6 +129,13 @@ teams, or additional user invitations.
 Never paste the operator password, mailbox app password, OAuth client secret/refresh token, `.env`
 values, `SECRET_KEY`, or `SESSION_KEY` into chat, tickets, screenshots, or documentation.
 
+### 3.2 If the operator password is forgotten
+
+There is no email-based **Forgot password** screen and the existing password cannot be displayed or
+recovered. A VPS administrator must set a new password with the password-reset command documented in
+[16-deployment-ops.md](16-deployment-ops.md). Editing `OPERATOR_INITIAL_PASSWORD` after first boot
+does not change the stored login, and `.env.prod.example` must never contain real credentials.
+
 ## 4. Essential concepts and statuses
 
 ### 4.1 Lead tiers
@@ -171,6 +183,7 @@ unsubscribe remains an unsubscribe even if the enrollment had previously complet
 | `ok` | Eligible to send and poll | Monitor normally |
 | `paused` | Manually paused | Resume only after confirming it is safe |
 | `auto_paused` | Bounce protection fired | Review recent leads; resume at reduced cap |
+| `setup_required` | OAuth mailbox exists but Google authorization is not connected | Choose Connect Google; the scheduler cannot select it |
 | `auth_failed` | Provider rejected credentials or OAuth authorization | Re-enter the app password or reconnect Google |
 | `imap_stale` | Replies/bounces may not be arriving | Fix IMAP/folder access before sending continues |
 | `provider_blocked` | Repeated provider throttling detected | Leave paused until the provider condition is understood |
@@ -225,6 +238,32 @@ Recommended order:
 9. Complete the human pre-launch checklist in section 21.
 10. Activate only when sending is approved, then enroll a small controlled batch. Enrollment into
     an active campaign can lead to sending on the next scheduler tick.
+
+### 5.1 Current Spaceship commissioning snapshot
+
+As of 2026-08-23, the production application, DNS/TLS routes, isolated unsubscribe hosts, logical
+backups, restore drill, Spaceship AutoBackup, Internal Google OAuth client credentials, business
+postal address, and `https://unsubscribe.{sender_domain}` template are configured. The production
+database still has no mailboxes, campaigns, leads, or enrollments, so it cannot send.
+
+Before prospect outreach, the remaining application commissioning sequence is:
+
+1. Add one Workspace outreach inbox as a Google OAuth mailbox.
+2. Choose **Connect Google** and authorize the exact Workspace account. A consumer `@gmail.com`
+   account cannot be the sender for the production Internal OAuth client; it can be the controlled
+   recipient.
+3. Run **Test Connection** and confirm both SMTP and IMAP pass, `INBOX` and `[Gmail]/Spam` are
+   configured, and a successful poll appears.
+4. Review the mailbox's conservative cap, recipient-local window, weekdays, and the global launch
+   guardrails. A value below a ceiling is permitted, not proven safe.
+5. After separate approval for that one send, complete the single owner-address
+   send/reply/unsubscribe canary. Verify received DKIM, reply stopping, the body link, supported
+   one-click POST, global suppression, clean self-check/projection drift, and a fresh backup.
+6. Finish inbox warming and every lead/legal/copy item in section 21 before importing or contacting
+   prospects.
+
+Oracle remains paused as the rollback canary. Do not use or delete it during ordinary production
+commissioning.
 
 ## 6. Global navigation and controls
 
@@ -476,6 +515,10 @@ Mailboxes are global across campaigns.
 
 ![Mailbox fleet showing status, capacity, health measurements, actions, and volume chart](images/user-manual/07-mailboxes.png)
 
+> **Current OAuth controls:** the fleet now shows `Google OAuth connected`, `Google OAuth`, or
+> `App password` under each address. OAuth rows expose **Connect Google**, **Reconnect Google**, or
+> **Disconnect** according to their state. The representative screenshot predates those labels.
+
 ### 9.1 Mailbox table
 
 Columns show sender address/name, health status, sent today versus effective cap, seven-day average,
@@ -490,6 +533,11 @@ Choose **Add Mailbox** and configure:
 
 ![Add mailbox dialog showing SMTP, IMAP, polling folders, timezone, cap, window, and weekdays](images/user-manual/08-add-mailbox.png)
 
+> **Current dialog:** an **Authentication** selector now appears first and defaults to **Google
+> OAuth (recommended)**. Selecting **App password** reveals the SMTP host/port, IMAP host/port, and
+> password fields shown in this representative screenshot. OAuth never asks for the Google account
+> password.
+
 - **Display name:** sender identity shown to recipients.
 - **From address:** actual mailbox address.
 - **Authentication:** choose **Google OAuth** for a Workspace Gmail inbox or **App password** for
@@ -503,10 +551,11 @@ Choose **Add Mailbox** and configure:
 - **Fallback timezone:** used when a lead's local timezone cannot be derived.
 - **Send-window start/end and weekdays:** mailbox hours evaluated in the recipient's timezone.
 
-The form defaults to SMTP port 465, IMAP port 993, a cap of 30, weekdays, 08:00–17:00, and the
-application's default timezone. These are conveniences, not provider-specific recommendations.
-Ports must be 1–65,535, at least one polling folder and one send weekday are required, and the cap
-must be at least 1 and no higher than the current global mailbox-cap guardrail.
+The Google OAuth form defaults to `smtp.gmail.com:587`, `imap.gmail.com:993`, `INBOX,
+[Gmail]/Spam`, a cap of 30, weekdays, 08:00–17:00, and the application's default timezone. These are
+conveniences, not volume recommendations. App-password mode exposes editable provider hosts and
+ports. Ports must be 1–65,535, at least one polling folder and one send weekday are required, and
+the cap must be at least 1 and no higher than the current global mailbox-cap guardrail.
 
 For Gmail, normally poll `INBOX, [Gmail]/Spam`. Other providers may call the folder `Junk` or
 `Junk E-Mail`. Folder names are provider-specific.
@@ -518,6 +567,27 @@ different Google account is rejected. The application stores only the encrypted 
 short-lived access tokens stay in memory. The production Google client must be configured by the
 Workspace administrator before the button can start authorization.
 
+```mermaid
+flowchart LR
+    A[Add mailbox<br/>Google OAuth] --> B[setup required<br/>cannot send]
+    B --> C[Connect Google]
+    C --> D{Exact Workspace<br/>account approved?}
+    D -->|No, denied, expired, or mismatch| B
+    D -->|Yes| E[OAuth connected]
+    E --> F[Test Connection<br/>SMTP + IMAP]
+    F -->|Pass| G[Mailbox eligible<br/>subject to all other safeguards]
+    F -->|Fail| H[Investigate connection<br/>keep sending paused]
+    E -->|Authorization later revoked| I[auth failed<br/>mailbox paused + alert]
+    I --> J[Reconnect Google]
+    J --> D
+    E -->|Disconnect| B
+```
+
+The authentication type is fixed after mailbox creation. If the wrong type was chosen before any
+real use, create the correct mailbox record rather than expecting **Edit** to convert its credential
+model. Do not use **Disconnect** as a routine pause; it removes authorization and returns the row to
+`setup_required`.
+
 When a folder is added through the UI/API, its cursor starts at the folder's current position. Old
 history is not ingested. Never edit folder arrays directly in the database because that bypasses
 cursor seeding and can ingest years of third-party mail.
@@ -526,9 +596,9 @@ cursor seeding and can ingest years of third-party mail.
 
 Choose **Edit**. For an app-password mailbox, leave the password blank to retain the sealed
 credential; entering one replaces it. OAuth mailboxes instead offer **Reconnect Google** and
-**Disconnect Google**. Disconnect revokes/removes authorization and returns the mailbox to
-`setup_required`; it cannot send until reconnected. **Test Connection** verifies SMTP and IMAP for
-either authentication type and reports round-trip time when available.
+**Disconnect** actions on the mailbox row. Disconnect revokes/removes authorization and returns the
+mailbox to `setup_required`; it cannot send until reconnected. **Test Connection** verifies SMTP and
+IMAP for either authentication type and reports round-trip time when available.
 
 Testing the connection confirms authentication/connectivity. It does not send a campaign email,
 prove inbox placement, or prove the account is warmed.
@@ -1011,6 +1081,10 @@ that protection and is reported as not launch-ready.
 
 ![Compliance settings showing postal address, opt-out wording, unsubscribe URL, and live footer preview](images/user-manual/15-settings-compliance.png)
 
+> **Current footer preview:** the visible em-dash divider shown in this representative screenshot
+> has been removed. The current screen states that delivery uses a blank line followed by 10px light
+> gray text with no visible divider.
+
 - **Physical address:** legally valid business postal address appended to every send. Empty blocks
   all sending. Use a registered office, PO box, coworking address, or legitimate commercial mailbox
   if you do not want to publish a home address.
@@ -1024,7 +1098,20 @@ When the base URL is blank, the app emits no unsubscribe link or `List-Unsubscri
 footer instructs the recipient to reply STOP. When configured, every send receives an opaque token,
 a body link, and the paired one-click headers while reply STOP remains available.
 
-The live preview shows the canonical footer. Templates cannot remove it.
+The live preview shows the canonical words but stays at an accessible interface size. The delivered
+message is `multipart/alternative`:
+
+- the HTML alternative places the footer after a 16px top gap, at `10px`, color `#767676`, and
+  `line-height: 1.5`;
+- the unsubscribe destination is linked behind the word **Unsubscribe**—normal HTML-capable email
+  clients do not display the full token URL;
+- the plain-text alternative shows the complete URL because plain text cannot hide a destination
+  behind linked words; and
+- both alternatives contain the same opt-out meaning and postal address after one blank line, with
+  no `---` or em-dash divider.
+
+Templates cannot remove or restyle this server-appended footer. It intentionally has no images,
+tracking pixels, click tracking, external fonts, or complex HTML.
 
 ### 15.7 Account
 
@@ -1100,9 +1187,18 @@ against stored outbound message IDs.
 
 ## 17. Public unsubscribe experience
 
-The public hosts are deployed, but link generation remains dormant while Compliance has no
-unsubscribe base URL. Saving `https://unsubscribe.{sender_domain}` activates per-sender-domain
-links and headers for future sends; it does not modify messages already sent.
+The two public hosts and the production `https://unsubscribe.{sender_domain}` template are active
+for future sends:
+
+```text
+https://unsubscribe.sambhavpmtech.com/u/⟨opaque-token⟩
+https://unsubscribe.sambhavpmops.com/u/⟨opaque-token⟩
+```
+
+Opening only `https://unsubscribe.sambhavpmtech.com/` or
+`https://unsubscribe.sambhavpmops.com/` intentionally returns 404. These are not websites with a
+homepage; the host gateway accepts only a valid `/u/...` application path. Configuration does not
+modify messages that were already sent.
 
 When active:
 
@@ -1113,6 +1209,10 @@ When active:
    unsubscribe and suppression.
 4. Repeating the action is idempotent and does not create duplicate facts.
 5. Unknown/expired tokens show the same generic success wording and reveal no recipient data.
+
+Offline and routing tests cover these mechanics, but the production Gmail body-link and RFC 8058
+one-click behavior are not considered live-verified until the separately approved owner-address
+canary is complete.
 
 Never paste or log a recipient unsubscribe URL. The token is a capability.
 
@@ -1299,23 +1399,25 @@ Do not send real prospect mail until every applicable item is complete.
 - [x] DKIM records are published for both Workspace domains; verify signing again with a received
   canary message before prospect mail.
 - [x] DMARC is published with reporting addresses for both domains.
+- [x] The production Internal Google OAuth client credentials are configured without exposing them.
 - [ ] Reply inboxes exist, are secured, and have provider app passwords/OAuth as applicable.
 - [ ] Mailboxes have completed a conservative warming period.
 - [x] The production VPS, nightly logical backup, scratch restore drill, and five-backup Spaceship
   AutoBackup plan are ready.
 - [x] Public HTTPS unsubscribe routing is configured and host-isolated; link/one-click behavior
-  still needs the separately approved owner-address canary after Compliance is configured.
+  still needs the separately approved owner-address canary.
 
 ### Application
 
-- [ ] Transport mode and deployment target are understood.
+- [x] Spaceship is the production target and its transport is `LIVE`; Oracle is the paused rollback
+  canary.
 - [ ] Every mailbox passes SMTP and IMAP connection tests.
 - [ ] `INBOX` and provider spam/junk folders are polled.
 - [ ] Mailbox timezone, weekdays, hours, and conservative caps are correct.
 - [ ] Send windows are enforced.
 - [ ] Global cap guardrails and minimum ramp days are conservative.
-- [ ] Compliance address and sender identity are accurate.
-- [ ] Opt-out wording is clear; unsubscribe base URL is intentionally blank or correctly public.
+- [x] The business postal address and sender-domain unsubscribe template are saved in production.
+- [ ] Reconfirm the sender display name/address and rendered footer for the first connected mailbox.
 - [ ] System domain readiness has no unexplained failures.
 - [ ] Projection dry-run is zero-diff; self-check and backup freshness are clean.
 - [ ] No unresolved auth, IMAP, backup, drift, or failed-job alerts exist.
