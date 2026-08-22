@@ -14,7 +14,7 @@ in B7 and cut over to Spaceship production on 2026-08-22.
 | `SESSION_KEY` | ✅ | — | secure-session cookie key |
 | `OPERATOR_EMAIL` / `OPERATOR_INITIAL_PASSWORD` | ✅ first boot | — | seeds `operator` row (password changeable in UI) |
 | `PUBLIC_APP_URL` | ✅ for OAuth | — | canonical public origin/path, currently `https://sambhavpmtech.com/email-campaign` |
-| `GOOGLE_OAUTH_CLIENT_ID` / `GOOGLE_OAUTH_CLIENT_SECRET` | for Google OAuth | unset | operator-owned Workspace Internal OAuth client; enter only on the VPS |
+| `GOOGLE_OAUTH_CLIENT_ID` / `GOOGLE_OAUTH_CLIENT_SECRET` | for Google OAuth | configured 2026-08-22 | operator-owned Workspace Internal OAuth client; values remain VPS-only |
 | `MAIL_TRANSPORT` | ✅ | `mock` | `mock` \| `smtp_imap` — **the one switch that goes live (B8)** |
 | `MAIL_TLS_INSECURE` | | `false` | accept self-signed certs / skip STARTTLS on the mail servers. **Local test rig only** (the GreenMail container); boot refuses it with `NODE_ENV=production` |
 | `ROLE` | | `all` | `all` \| `api` \| `worker` (decision Y). `api` = HTTP only (no pg-boss); `worker` = jobs only and **does not listen**, so a worker container needs no `/health` probe |
@@ -184,7 +184,6 @@ OAuth uses authorization code + PKCE, hashed one-time state, encrypted refresh t
 matching, XOAUTH2 SMTP/IMAP, reconnect/revoke, and `auth_failed` pausing; it does not use domain-wide
 delegation.
 
-Production OAuth is not configured yet. The operator must create the Internal Workspace client,
-enter its client ID/secret directly on the VPS, trust it if required, and approve each outreach
-mailbox. The compliance address/template, first mailbox Test Connection, and bounded owner-address
-send/reply/unsubscribe canary also remain. None of this authorizes prospect mail.
+Production OAuth credentials and the compliance address/template are configured. The operator must
+still approve each outreach mailbox, run the first mailbox Test Connection, and separately approve
+the bounded owner-address send/reply/unsubscribe canary. None of this authorizes prospect mail.

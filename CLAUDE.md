@@ -123,10 +123,10 @@ After an authorized deploy, verify container health, `https://localhost/health`,
   redirects, and the two isolated unsubscribe hosts are live. Containers and health are green;
   self-check and zero-drift pass; a custom-format dump passed listing and the scratch restore drill;
   Spaceship AutoBackup is active on trial with a five-backup limit. The portfolio remained online.
-- **Still open, deliberately:** enter the business postal address and sender-domain unsubscribe
-  template; configure the operator-owned Internal Google OAuth client; connect and test one
-  Workspace mailbox; then obtain separate authorization for the one-message owner-address
-  send/reply/unsubscribe canary. OAuth code is deployed, but production OAuth credentials are not.
+- **Still open, deliberately:** connect and test one Workspace mailbox, then obtain separate
+  authorization for the one-message owner-address send/reply/unsubscribe canary. The business
+  address, sender-domain unsubscribe template, and production Internal Google OAuth credentials
+  are configured; no mailbox exists yet.
   Finding #12 still needs warmed-domain evidence; provider DSN/OOO fixture capture remains deferred.
 
 **Build history:** M0 (docs), **B0–B7** (foundation → event log → metrics → mock transport/scheduler/poller → render → ingest → API layer → hardening/ops), **F0–F8** (full web track) and **B8.1–B8.2** (live `SmtpImapTransport` + the `MAIL_TRANSPORT` flag swap) are complete — **M1 proven core** ✅, **M2 operable workflow** ✅, **M3 full product (offline)** ✅. A post-M3 audit against docs/14/15 + the decision register (2026-07-25) closed the four specified-but-unbuilt items — decision E, `provider_blocked`, runtime mailbox poll registration, the password-reset CLI (sweep facts below). **Check [PROGRESS.md](PROGRESS.md) for the current task pointer before starting work** — but note its "no code work is outstanding" framing predates the 2026-08-09 correction.

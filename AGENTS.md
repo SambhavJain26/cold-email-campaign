@@ -140,9 +140,9 @@ serve only `/u/*` and return 404 elsewhere. The portfolio remains HTTP 200.
 - health and database checks pass; self-check is clean; projection dry-run is `0 diff(s)`
 - a fresh custom-format dump passed `pg_restore --list`; a scratch restore, rebuild, dry-run, and
   self-check all passed; Spaceship AutoBackup is active on trial with a five-backup limit
-- Google OAuth code is deployed but the production client ID/secret are not configured
-- business postal address, unsubscribe template, first OAuth mailbox connection, and the bounded
-  owner-address send/reply/unsubscribe canary remain operator-gated
+- production Google OAuth credentials are configured on the VPS; never print or copy them
+- the business postal address and unsubscribe template are configured; the first OAuth mailbox
+  connection and bounded owner-address send/reply/unsubscribe canary remain operator-gated
 
 The Oracle bounded catch-up/never-burst canary passed on 2026-08-20 UTC and remains paused. The
 accelerated settings were restored before the final deployment. Oracle is deployed on

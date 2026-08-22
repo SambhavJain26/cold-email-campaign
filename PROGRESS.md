@@ -5,10 +5,10 @@
 **Legend:** `[ ]` not started · `[~]` in progress · `[x]` done · `[!]` blocked (note why in the log)
 
 **Current focus:** → **Spaceship production commissioning.** The application, DNS/TLS routing,
-public unsubscribe hosts, and AutoBackup are live on the Spaceship VPS. Remaining before any real
-prospect mail: configure the Internal Workspace OAuth client, enter the business postal address and
-sender-domain unsubscribe template, connect/test one OAuth mailbox, and obtain separate approval
-for the bounded owner-address send/reply/unsubscribe canary.
+public unsubscribe hosts, AutoBackup, Internal Workspace OAuth credentials, business postal address,
+and sender-domain unsubscribe template are live on the Spaceship VPS. Remaining before any real
+prospect mail: connect/test one OAuth mailbox and obtain separate approval for the bounded
+owner-address send/reply/unsubscribe canary.
 
 > **⚠️ Superseded framing (corrected 2026-08-09).** This line previously read "No code work is outstanding" and "everything left in B8 … is *operations*, not code." **That was wrong.** Operating the canary against a real provider exposed genuine **code** defects — the reply/send race (finding 15), whole-mailbox history ingestion (16), plain-text-only mail (19), and a class of backend-implemented/UI-invisible gaps (3–9). All were fixed on `b8.3-local-canary`. Treat [docs/17](docs/17-local-canary-runbook.md) as the authoritative status record, not this header.
 
@@ -25,8 +25,9 @@ integration 159, API 116, GreenMail 29, golden 47, mock E2E 51, real-backend E2E
 DB zero drift). Production is deployed at `de8d158` with a clean database and zero sendable state.
 DNS/TLS and the redirect matrix pass; the portfolio stayed online; self-check and production drift
 are clean; a custom dump and scratch restore drill passed; Spaceship AutoBackup is active on trial
-with five restore points. OAuth credentials, compliance settings, mailbox connection, and the
-owner-address canary remain. Oracle is unchanged and paused; `main` was not merged.
+with five restore points. OAuth credentials and compliance settings are now configured; the first
+mailbox connection and owner-address canary remain. Oracle is unchanged and paused; `main` was not
+merged.
 
 **2026-08-22 footer refinement:** production was advanced to `680f47e`. The visible `---` boundary was replaced with one blank paragraph;
 the minimal HTML footer now uses `10px`, `#767676`, `line-height:1.5`, and a 16px top gap. The

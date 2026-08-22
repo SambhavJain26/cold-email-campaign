@@ -24,12 +24,12 @@ Verified production evidence:
   projection rebuild/dry-run and self-check passed there; the scratch database was removed;
 - Spaceship AutoBackup is active on its seven-day trial with a verified five-backup limit.
 
-The Google OAuth implementation is deployed but `GOOGLE_OAUTH_CLIENT_ID` and
-`GOOGLE_OAUTH_CLIENT_SECRET` were intentionally left unset. The operator still needs to create the
-Internal Workspace client and enter those values directly on the VPS. The valid business postal
-address, `https://unsubscribe.{sender_domain}` compliance template, first OAuth mailbox connection
-and Test Connection, and the separately approved one-message owner-address
-send/reply/unsubscribe canary remain. No outbound mail was sent during this deployment.
+The Google OAuth implementation and production client credentials are configured; the values were
+verified only for non-empty presence and were never printed. The valid business postal address and
+sender-domain unsubscribe template are also configured. The first OAuth mailbox connection and Test
+Connection, and the separately approved one-message owner-address send/reply/unsubscribe canary,
+remain. The credential restart passed health, self-check, and `checked 0 enrollments — 0 diff(s)`;
+no outbound mail was sent.
 
 ## 2026-08-22 local pre-production completion gate
 
