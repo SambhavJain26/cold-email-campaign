@@ -56,6 +56,10 @@ and restore after personal-data erasure.
   `docker compose -f docker-compose.spaceship.yml --env-file .env.prod up -d --build`; validate a
   candidate host Caddyfile before atomic reload. Never print `.env.prod`, resolved Compose output,
   container environment, or the backup sidecar crontab.
+- **Spaceship source update:** the GitHub repository is private and the VPS currently has no deploy
+  credential. Until a read-only deploy key is deliberately installed, transfer a reviewed
+  `git bundle`, fetch the pinned branch from it, and fast-forward locally. Do not pretend
+  `git pull` is available or paste a token into the shell/chat.
 - **Deploy/update:** `git pull && docker compose -f docker-compose.prod.yml --env-file .env.prod up -d --build` — the app entrypoint applies migrations before it listens; scheduler catch-up handles the downtime window (never-burst; expect a `catchup_backlog` alert if > a few hours).
 - **Backup now:** `docker compose exec backup /usr/local/bin/backup.sh` (or `BACKUP_DIR=./backups sh scripts/backup.sh`). **Restore drill (quarterly + the automated B7.2 gate in CI):** `DATABASE_URL=… BACKUP_DIR=… sh scripts/restore-drill.sh` — dumps, restores into a scratch DB, runs `rebuild-projections` then `--dry-run` (expect 0 diffs = the fold is deterministic), then `self-check` (expect 0 invariant violations). Data proven intact, not just present. Uses `pg_dump`/`pg_restore`/`psql` from PATH.
 - **Ops CLIs need `-w @coldemail/server`** — they live in `apps/server/package.json` and there is no root proxy, so the bare root form fails (verified on the VM 2026-08-07). In the compose stack, prefix with `docker compose -f docker-compose.prod.yml --env-file .env.prod exec -T app`.

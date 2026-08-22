@@ -90,7 +90,10 @@ temporary rollback/canary environment.
 - Internal gateway: `127.0.0.1:18080`; host Caddy is the only public 80/443 listener
 - Deployed branch/commit: `b8.3-local-canary` at `de8d158`
 
-After explicit deploy authorization, update to a reviewed pinned commit and run:
+The repository is private and the VPS currently has no GitHub deploy credential. Until a read-only
+deploy key is deliberately installed, transfer a reviewed `git bundle`, fetch the pinned branch
+from that bundle, and fast-forward locally; `git pull` from GitHub will fail non-interactively.
+After explicit deploy authorization and a verified fast-forward, run:
 
 ```sh
 cd /opt/email-campaign

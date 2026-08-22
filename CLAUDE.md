@@ -67,7 +67,10 @@ rollback/canary environment.
 - Internal gateway: `127.0.0.1:18080`; host Caddy alone owns public 80/443
 - Deployed branch/commit: `b8.3-local-canary` at `de8d158`
 
-Deploy only with explicit authorization:
+The private repository currently has no GitHub deploy credential on the VPS. Until a read-only
+deploy key is deliberately installed, transfer a reviewed `git bundle`, fetch the pinned branch
+from it, and fast-forward locally; a non-interactive GitHub pull will fail. Deploy only with
+explicit authorization:
 
 ```sh
 cd /opt/email-campaign
