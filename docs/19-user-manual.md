@@ -4,18 +4,19 @@
 
 **Application model:** single-operator, self-hosted cold-email campaign console
 
-**Manual version:** 2026-08-20, for branch `b8.3-local-canary`
+**Manual version:** 2026-08-22, for branch `b8.3-local-canary`
 
 This manual explains the complete operator-facing application: what every screen does, how to use
 each action, what the system does automatically, and which safeguards or edge cases matter. It is a
 product-use guide, not legal advice and not a promise of email deliverability.
 
 The screenshots use the application's built-in representative dataset so every control can be
-shown without changing the live Oracle canary. Names, dates, addresses, counts, and `MOCK` status in
+shown without changing production. Names, dates, addresses, counts, and `MOCK` status in
 the images are examples; follow the written rules and the values displayed in your live session.
 
-> **Current-environment warning:** the Oracle Free Tier VM is the present canary deployment. It is
-> not the future Spaceship production VPS. A green `LIVE` transport badge means the application is
+> **Current-environment warning:** Spaceship is the production deployment at
+> `https://sambhavpmtech.com/email-campaign/`. Oracle remains a paused rollback canary. A green
+> `LIVE` transport badge means the application is
 > connected to real SMTP/IMAP; it does **not** mean domains are warmed, DNS is ready, a list is
 > lawful, or a campaign is safe to launch. Complete the pre-launch checklist in this manual before
 > sending to prospects.
@@ -24,7 +25,7 @@ the images are examples; follow the written rules and the values displayed in yo
 
 1. [What the application does](#1-what-the-application-does)
 2. [How the parts fit together](#2-how-the-parts-fit-together)
-3. [Accessing the Oracle application](#3-accessing-the-oracle-application)
+3. [Accessing the application](#3-accessing-the-application)
 4. [Essential concepts and statuses](#4-essential-concepts-and-statuses)
 5. [Recommended first-time workflow](#5-recommended-first-time-workflow)
 6. [Global navigation and controls](#6-global-navigation-and-controls)
@@ -95,27 +96,22 @@ The event ledger is the source of truth. Screens such as campaign state, metrics
 projections derived from those immutable facts. Historical sends and events are not edited to make
 an outcome disappear.
 
-## 3. Accessing the Oracle application
+## 3. Accessing the application
 
-The Oracle UI is intentionally accessed through an SSH tunnel.
-
-### 3.1 Start the tunnel on Windows PowerShell
-
-```powershell
-ssh -L 8443:localhost:443 -i "$HOME\.ssh\oracle_canary" ubuntu@92.4.79.54
-```
-
-Keep that terminal open while using the UI, then open:
+Open the production URL in a modern browser:
 
 ```text
-https://localhost:8443
+https://sambhavpmtech.com/email-campaign/
 ```
 
-The browser may show a local-certificate warning. Confirm that the address is exactly
-`https://localhost:8443` before proceeding. Closing the SSH terminal closes only the tunnel; it
-does not stop Oracle or the application.
+The trailing slash is canonical. Direct links such as `/email-campaign/campaigns/12` and
+`/email-campaign/mailboxes` work after sign-in. Normal traffic elsewhere on the two outreach
+domains redirects to the portfolio; the application path is the intentional exception.
 
-### 3.2 Sign in
+Oracle is a paused rollback/canary environment and normally needs its SSH tunnel. Do not use it for
+production work unless the operator deliberately invokes the rollback runbook.
+
+### 3.1 Sign in
 
 Enter the operator email and password. The application has one operator account; it has no roles,
 teams, or additional user invitations.
@@ -125,8 +121,8 @@ teams, or additional user invitations.
 - After sign-in, the app returns to the originally requested protected page when possible.
 - Use the sign-out icon at the top right when finished.
 
-Never paste the operator password, mailbox app password, `.env` values, `SECRET_KEY`, or
-`SESSION_KEY` into chat, tickets, screenshots, or documentation.
+Never paste the operator password, mailbox app password, OAuth client secret/refresh token, `.env`
+values, `SECRET_KEY`, or `SESSION_KEY` into chat, tickets, screenshots, or documentation.
 
 ## 4. Essential concepts and statuses
 
@@ -175,7 +171,7 @@ unsubscribe remains an unsubscribe even if the enrollment had previously complet
 | `ok` | Eligible to send and poll | Monitor normally |
 | `paused` | Manually paused | Resume only after confirming it is safe |
 | `auto_paused` | Bounce protection fired | Review recent leads; resume at reduced cap |
-| `auth_failed` | Provider rejected credentials | Enter a new app password and reconnect |
+| `auth_failed` | Provider rejected credentials or OAuth authorization | Re-enter the app password or reconnect Google |
 | `imap_stale` | Replies/bounces may not be arriving | Fix IMAP/folder access before sending continues |
 | `provider_blocked` | Repeated provider throttling detected | Leave paused until the provider condition is understood |
 
@@ -496,9 +492,12 @@ Choose **Add Mailbox** and configure:
 
 - **Display name:** sender identity shown to recipients.
 - **From address:** actual mailbox address.
+- **Authentication:** choose **Google OAuth** for a Workspace Gmail inbox or **App password** for
+  the existing credential flow.
 - **SMTP host/port:** outbound server connection.
 - **IMAP host/port:** inbound reply/bounce connection.
-- **App password:** sealed at rest and never shown again.
+- **App password:** required only for app-password authentication; sealed at rest and never shown
+  again.
 - **Daily cap:** maximum accepted sends per mailbox-local day, subject to the global guardrail.
 - **Polled folders:** comma-separated folders, at minimum `INBOX`.
 - **Fallback timezone:** used when a lead's local timezone cannot be derived.
@@ -512,14 +511,24 @@ must be at least 1 and no higher than the current global mailbox-cap guardrail.
 For Gmail, normally poll `INBOX, [Gmail]/Spam`. Other providers may call the folder `Junk` or
 `Junk E-Mail`. Folder names are provider-specific.
 
+For Google OAuth, creating the mailbox requires no password and initially saves it as
+`setup_required`, which the scheduler cannot select. Choose **Connect Google**, complete consent
+with the exact Workspace account matching the mailbox address, and return to the application. A
+different Google account is rejected. The application stores only the encrypted refresh token;
+short-lived access tokens stay in memory. The production Google client must be configured by the
+Workspace administrator before the button can start authorization.
+
 When a folder is added through the UI/API, its cursor starts at the folder's current position. Old
 history is not ingested. Never edit folder arrays directly in the database because that bypasses
 cursor seeding and can ingest years of third-party mail.
 
 ### 9.3 Edit and test connection
 
-Choose **Edit**. Leave the password blank to retain the sealed credential. Entering a password
-replaces it. **Test Connection** verifies SMTP and IMAP and reports round-trip time when available.
+Choose **Edit**. For an app-password mailbox, leave the password blank to retain the sealed
+credential; entering one replaces it. OAuth mailboxes instead offer **Reconnect Google** and
+**Disconnect Google**. Disconnect revokes/removes authorization and returns the mailbox to
+`setup_required`; it cannot send until reconnected. **Test Connection** verifies SMTP and IMAP for
+either authentication type and reports round-trip time when available.
 
 Testing the connection confirms authentication/connectivity. It does not send a campaign email,
 prove inbox placement, or prove the account is warmed.
@@ -536,7 +545,8 @@ consecutive clean days with no hard bounces.
 
 ### 9.5 Failure panels
 
-- **Authentication failed:** enter a new app password and reconnect. Scheduled follow-ups remain
+- **Authentication failed:** enter a new app password or choose **Reconnect Google**. Revoked or
+  expired OAuth authorization pauses the mailbox and raises an alert. Scheduled follow-ups remain
   queued.
 - **IMAP stale:** replies and opt-outs may be invisible. Retry, verify folders, and do not resume
   risky sending until polling is current.
@@ -1005,8 +1015,10 @@ that protection and is reported as not launch-ready.
   all sending. Use a registered office, PO box, coworking address, or legitimate commercial mailbox
   if you do not want to publish a home address.
 - **Opt-out text:** used verbatim when the public unsubscribe URL is dormant.
-- **Unsubscribe base URL:** blank until a real public HTTPS endpoint exists; otherwise an HTTPS URL
-  with no trailing slash, query, or fragment.
+- **Unsubscribe base URL:** use `https://unsubscribe.{sender_domain}` in this deployment. The
+  placeholder is replaced from each sending mailbox's domain, so mail from `sambhavpmtech.com` and
+  `sambhavpmops.com` receives links on the corresponding unsubscribe host. A fixed HTTPS origin is
+  also accepted; no trailing slash, query, or fragment is allowed.
 
 When the base URL is blank, the app emits no unsubscribe link or `List-Unsubscribe` headers and the
 footer instructs the recipient to reply STOP. When configured, every send receives an opaque token,
@@ -1088,7 +1100,9 @@ against stored outbound message IDs.
 
 ## 17. Public unsubscribe experience
 
-This feature is dormant while Compliance has no unsubscribe base URL.
+The public hosts are deployed, but link generation remains dormant while Compliance has no
+unsubscribe base URL. Saving `https://unsubscribe.{sender_domain}` activates per-sender-domain
+links and headers for future sends; it does not modify messages already sent.
 
 When active:
 
@@ -1199,13 +1213,15 @@ The product intentionally has no tracking pixel, click tracking, or tracking red
 
 ## 20. Incident and troubleshooting guide
 
-### “The application is unavailable through the tunnel”
+### “The production application is unavailable”
 
-1. Confirm the SSH command is still running.
-2. Confirm the browser address is `https://localhost:8443`.
-3. If SSH connects but the page is down, the Oracle app may be restarting or unhealthy; do not
-   repeatedly activate/resume actions when it returns.
-4. Check System health after recovery.
+1. Confirm the browser address is exactly
+   `https://sambhavpmtech.com/email-campaign/`.
+2. Check whether the portfolio is also unavailable; this distinguishes host/proxy trouble from the
+   application stack.
+3. Do not repeatedly activate or resume actions when service returns.
+4. Check System health, recent alerts, and backup freshness after recovery. Use the Oracle tunnel
+   only if the operator deliberately invokes the rollback runbook.
 
 ### “Nothing is sending”
 
@@ -1238,8 +1254,8 @@ suppression. Tag sentiment separately. Do not rely on a negative sentiment tag a
 
 ### “Mailbox authentication failed”
 
-Pause affected campaigns if replies may be missed. Enter a new provider app password through the
-Mailbox failure panel, test the connection, observe a successful poll, then resume conservatively.
+Pause affected campaigns if replies may be missed. Enter a new provider app password or choose
+**Reconnect Google**, test the connection, observe a successful poll, then resume conservatively.
 
 ### “IMAP is stale”
 
@@ -1265,8 +1281,8 @@ Do not casually run a write rebuild or modify event history.
 
 ### Emergency campaign pause
 
-Use **Campaign → Pause**. Closing a browser tab or tunnel does not pause Oracle. Confirm no new
-`sent` events occur after the pause; messages already accepted cannot be recalled. Keep IMAP
+Use **Campaign → Pause**. Closing a browser tab does not pause production. Confirm no new `sent`
+events occur after the pause; messages already accepted cannot be recalled. Keep IMAP
 polling operational when safe so replies and opt-outs continue to arrive.
 
 For detailed incident records and recovery procedures, see
@@ -1278,14 +1294,17 @@ Do not send real prospect mail until every applicable item is complete.
 
 ### Infrastructure and authentication
 
-- [ ] Real sending domains are separate from the primary business domain where appropriate.
-- [ ] SPF is correct for each sending domain.
-- [ ] DKIM signing is enabled and verified with the actual selector.
-- [ ] DMARC is published with an intentional policy and reporting plan.
+- [x] Real sending domains are separate from the primary business domain.
+- [x] SPF is published for each sending domain.
+- [x] DKIM records are published for both Workspace domains; verify signing again with a received
+  canary message before prospect mail.
+- [x] DMARC is published with reporting addresses for both domains.
 - [ ] Reply inboxes exist, are secured, and have provider app passwords/OAuth as applicable.
 - [ ] Mailboxes have completed a conservative warming period.
-- [ ] The final production VPS, backup destination, and recovery access are ready.
-- [ ] Public HTTPS unsubscribe routing is configured and verified if link/one-click is enabled.
+- [x] The production VPS, nightly logical backup, scratch restore drill, and five-backup Spaceship
+  AutoBackup plan are ready.
+- [x] Public HTTPS unsubscribe routing is configured and host-isolated; link/one-click behavior
+  still needs the separately approved owner-address canary after Compliance is configured.
 
 ### Application
 

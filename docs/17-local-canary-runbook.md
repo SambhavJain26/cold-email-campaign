@@ -1,10 +1,41 @@
 # Local canary runbook (B8.3-local) — two-week validation on throwaway Gmail
 
-## 2026-08-20 local pre-domain completion gate
+## 2026-08-22 Spaceship production commissioning gate
+
+The operator-approved production build is deployed at
+`https://sambhavpmtech.com/email-campaign/` from `b8.3-local-canary` commit `de8d158`; `main` was
+not merged. Oracle was not changed and remains the paused rollback canary.
+
+Verified production evidence:
+
+- the existing portfolio and Caddyfile were backed up; a persistent 2 GiB swap file and Docker
+  Engine/Compose were installed; the app lives at `/opt/email-campaign`;
+- authoritative DNS returns `104.207.93.174` for the apex, `www`, and `unsubscribe` names on both
+  outreach domains; existing Google MX/SPF/DKIM/DMARC/site-verification records were untouched;
+- the db, app, internal gateway, and backup containers are healthy. Only
+  `127.0.0.1:18080` is published by the stack; host Caddy remains the only public 80/443 listener;
+- `/email-campaign` redirects 308 to its trailing-slash form; the SPA, login, direct campaign and
+  mailbox routes, and health path return 200. Other outreach-domain paths redirect 308 to the
+  portfolio homepage. Unsubscribe hosts return 404 outside `/u/*`; invalid-token GETs return the
+  generic non-enumerating confirmation page;
+- the clean production database contains zero mailboxes, campaigns, leads, and enrollments, so it
+  cannot send. HTTPS/database health, self-check, and `checked 0 enrollments — 0 diff(s)` pass;
+- `coldemail-20260822-132521.dump` passed `pg_restore --list`. It restored to a scratch database;
+  projection rebuild/dry-run and self-check passed there; the scratch database was removed;
+- Spaceship AutoBackup is active on its seven-day trial with a verified five-backup limit.
+
+The Google OAuth implementation is deployed but `GOOGLE_OAUTH_CLIENT_ID` and
+`GOOGLE_OAUTH_CLIENT_SECRET` were intentionally left unset. The operator still needs to create the
+Internal Workspace client and enter those values directly on the VPS. The valid business postal
+address, `https://unsubscribe.{sender_domain}` compliance template, first OAuth mailbox connection
+and Test Connection, and the separately approved one-message owner-address
+send/reply/unsubscribe canary remain. No outbound mail was sent during this deployment.
+
+## 2026-08-22 local pre-production completion gate
 
 Reply recontact safety and findings 20–25 are implemented on `b8.3-local-canary`. Migration 0013
 passed its apply/down/apply drill. The complete serial local gate passed: typecheck, lint and format;
-unit **331**; web **52**; integration **158**; API **112**; GreenMail SMTP/IMAP **29**; locked
+unit **338**; web **55**; integration **159**; API **116**; GreenMail SMTP/IMAP **29**; locked
 golden **47**; mock-browser E2E **51**; real-backend E2E **1**. The exact projection command against
 the populated test database returned `checked 5 enrollments — 0 diff(s)` and self-check reported no
 invariant violations. The real-backend fixture was corrected to obey the existing launch guardrails
@@ -187,7 +218,7 @@ restricted recovery artifact.
 > now prints each folder's UIDNEXT for exactly this purpose. Finding 16 applies per folder, and it
 > is easy to forget that a manual edit bypasses the guard that normally handles it.
 
-### Post-canary real-domain implementation backlog — approved, not started (2026-08-13)
+### Post-canary real-domain implementation backlog — completed 2026-08-22
 
 After the controlled ten-day Gmail learning canary is complete, and before any real-domain
 prospect send, the operator has approved this implementation sequence:
@@ -206,9 +237,10 @@ prospect send, the operator has approved this implementation sequence:
    provide controlled wording variation and review, not a promise to evade spam filters or make
    every message unique.
 
-These items are deferred implementation work, not completed functionality and not part of the
-current Gmail canary. No deployment, real-domain configuration, or prospect sending is authorized
-by this record alone.
+All five items are implemented and locally verified. The Spaceship deployment, DNS, routing, and
+public unsubscribe hosts are live as recorded above. Production OAuth client configuration,
+business postal address/template, one OAuth mailbox Test Connection, and the bounded owner-address
+canary remain operator handoffs. No prospect sending is authorized by this record alone.
 
 ## Pre-cohort readiness update (2026-08-09)
 
@@ -216,13 +248,11 @@ The 20-lead Gmail cohort remains paused until the pre-canary remediation gate is
 
 Before deployment, run the complete local verification gate, including the migration up/down drill and `rebuild-projections --dry-run` with zero diffs. After the Oracle rebuild, repeat the dry-run on the live container before any canary send.
 
-**Branch:** `b8.3-local-canary` · **Prereq:** none of the real infrastructure (no domain, no
-Workspace, no paid VPS).
-
-Every remaining task (B8.3–B8.6 → M4) is blocked on real infrastructure, but most of what they
-*prove* can be proven now against real Google servers using throwaway accounts. This runbook is
-that pass. It answers one question — **does the machine behave correctly against a real mail
-provider?** — and converts the answer into permanent offline coverage.
+**Branch:** `b8.3-local-canary`. This paragraph describes the historical Oracle phase; the real
+domains and Spaceship VPS now exist and the production deployment is recorded at the top of this
+runbook. The remaining commissioning work is the Workspace OAuth client, business address and
+unsubscribe template, one mailbox Test Connection, and the separately authorized owner-address
+canary.
 
 **Out of scope: deliverability.** Sending from `@gmail.com` inherits Google's reputation. Inbox
 placement here says nothing about how warmed domains will perform. This validates the machine,
@@ -300,8 +330,9 @@ checked and are **fully covered** — every writable field reachable from a scre
 
 - **Settings** — all 17 `PUT /settings` fields plus both compliance fields (`rules-tab.tsx`,
   `compliance-tab.tsx`). The class that produced findings 4 and 5 is closed.
-- **Mailboxes** — every `createMailboxBodySchema` field except `auth_type`, which docs/16 §6a
-  records as stored-but-unused (password auth only, no OAuth). Deliberate, not a gap.
+- **Mailboxes** — every connection/cap/window/folder field. The later production implementation
+  added the missing `auth_type` surface plus Google connect, reconnect, disconnect, failure, and
+  setup-required states; focused UI/API tests cover them.
 - **Campaigns** — create (name, sequence, `tier_effort_config`, `ramp_config`,
   `acknowledge_tier_a_manual`), patch (name/status), typed-confirm delete, enrol, recycle.
 - **Sequences** — write body, typed-confirm delete, preview, and live `validate-template`.

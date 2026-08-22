@@ -8,16 +8,24 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Current operating boundary
 
-The project is in **pre-real-domain testing**. Until the operator explicitly changes that scope:
+Spaceship production infrastructure is live, but the project remains in **pre-prospect-send
+commissioning**:
 
 - **Approved build scope — the only feature work authorized:** the completed 2026-08-15 list (public unsubscribe/one-click, launch guardrails, domain-readiness preflight, per-folder polling, and single-lead creation) plus the operator-approved 2026-08-20 pre-domain safety backlog: mandatory reply stopping; reply dispositions and conservative suppression; guarded cross-campaign recontact; broader opt-out phrases; findings #20–25; alert history and mailbox filters; arbitrary custom-field editing; copy-risk rubric improvements; local verification; and runbook/documentation reconciliation. Outside that list, the rule is unchanged: testing, verification, diagnosis, and documentation only.
-- Do not implement domain/DNS work, production mailbox configuration, Caddy/domain changes, or other deployment features. Google Workspace OAuth is explicitly deferred until a real domain and inbox exist.
-- The unsubscribe endpoint is being built **dormant**: with no `unsubscribe_base_url` configured it emits no link and no header, and the footer falls back to reply-`STOP` only. Do not point it at a real hostname, open a public port, or treat Gmail one-click as proven — that needs a publicly reachable URL and its own approval.
+- The operator-approved Spaceship deployment, subpath support, sender-domain unsubscribe routing,
+  and individual Google Workspace OAuth implementation are complete. Do not extend production
+  scope or change DNS/Caddy/mailboxes outside the approved commissioning steps without fresh
+  authorization.
+- The public unsubscribe hosts are live, but production remains **dormant** while
+  `unsubscribe_base_url` is empty: no link or header is emitted and the footer falls back to
+  reply-`STOP`. Gmail one-click still needs the separately approved owner-address canary.
 - Do not start a real cohort or send new external campaign mail without explicit approval for that specific send. This covers sending mail, activating or resuming a campaign, enrolling leads, altering live campaign state, and contacting prospects — each needs its own approval.
 - The approved, controlled Gmail acceptance batch is complete. The test campaign is paused; do not resume it or create additional test sends without new, per-send operator approval. Read the runbook for the authoritative recipient, outcome, and verification record.
-- The unsubscribe URL design in [docs/16-deployment-ops.md](docs/16-deployment-ops.md) §8 is the specification the approved build follows. The rest of that section — hard launch guardrails beyond the approved scope, Workspace OAuth, and every real-domain deployment step — remains a plan, not functionality.
+- The deployed production facts and remaining operator handoffs are recorded in
+  [docs/16-deployment-ops.md](docs/16-deployment-ops.md) §8 and docs/17. Do not call OAuth
+  configured, compliance complete, or one-click proven until those live checks actually pass.
 - **Never ask the operator to paste passwords, app passwords, `SECRET_KEY`/`SESSION_KEY`, or `.env`/`.env.prod` contents.** App passwords are typed into the Mailboxes screen and sealed with libsodium; secrets never belong in chat, logs, or the repo.
-- Do not deploy unless the operator explicitly authorizes it (see Oracle canary VM below).
+- Do not deploy unless the operator explicitly authorizes it (see Production deployments below).
 
 ## Read first
 
@@ -45,9 +53,31 @@ Treat the runbook as the **durable status record** — task chips and chat summa
 - Important gates: `npm run typecheck`, `npm run lint`, `npm run format:check`, `npm run test:golden`, `npm run test:mail`, and the relevant API/integration/web suites.
 - Projection drift check — use this exact command: `npx tsx apps/server/src/services/rebuildCli.ts --dry-run` (exit 1 on drift). Verify **zero diffs** after any change affecting events or projections.
 
-## Oracle canary VM
+## Production deployments
 
-The app runs **only** on Oracle. There is no other live deployment.
+Spaceship is the primary live deployment. Oracle remains paused and unchanged as the temporary
+rollback/canary environment.
+
+### Spaceship production
+
+- SSH alias: `sambhavbuilds-vps` (`root@104.207.93.174`, port 22022)
+- App directory: `/opt/email-campaign`
+- Stack: `docker-compose.spaceship.yml` with `.env.prod`
+- UI: `https://sambhavpmtech.com/email-campaign/`
+- Internal gateway: `127.0.0.1:18080`; host Caddy alone owns public 80/443
+- Deployed branch/commit: `b8.3-local-canary` at `de8d158`
+
+Deploy only with explicit authorization:
+
+```sh
+cd /opt/email-campaign
+sudo docker compose -f docker-compose.spaceship.yml --env-file .env.prod up -d --build
+```
+
+Verify containers, public health/routing, projection dry-run, self-check, and a validated backup.
+Never print `.env.prod`, resolved Compose output, container environment, or backup crontab.
+
+### Oracle rollback canary
 
 - SSH: `ssh -i ~/.ssh/oracle_canary ubuntu@92.4.79.54`
 - App directory: `~/app`
@@ -74,7 +104,7 @@ After an authorized deploy, verify container health, `https://localhost/health`,
 
 ---
 
-## Current state: pre-real-domain testing, live Gmail gate passed
+## Current state: Spaceship deployed, commissioning incomplete
 
 **2026-08-09 correction (still governing):** live canary operation exposed **code** remediation, not just operations. The earlier claim that all remaining work is "operations, not code" was wrong. Findings #3–9, #14–16, and #19 were completed on `b8.3-local-canary`.
 
@@ -83,8 +113,18 @@ After an authorized deploy, verify container health, `https://localhost/health`,
 - **Remediation closed and locally verified:** findings #3–9 (blocker visibility; mailbox send-window days/times + required IANA per-mailbox timezone; campaign archive/delete + safe sequence delete with typed confirmation; typed-email PII erasure; explicit Tier-A manual-mode acknowledgement), #14 (transparent cold-email cliché rubric over subject *and* body — a warning rubric, not a deliverability predictor), #15 (the reply/send race — enrollment lock + send-time projection re-read inside the append transaction, poll cron staggered off the tick), #16 (IMAP cursor initialized from UIDNEXT so connecting a mailbox no longer ingests years of history), #19 (matching plain-text + minimal escaped HTML parts, verified by GreenMail).
 - **Controlled live-provider gate completed 2026-08-14** on owner-operated Gmail only. Campaign *Gmail Learning Canary - Aug 2026* / sequence *Gmail Learning Canary - Gate 1*: two approved sends, one normal reply → `REPLIED`, one `STOP` → `human_reply` + `unsubscribe` (`matched_keyword: "stop"`) → `UNSUBSCRIBED` + global suppression. Delivery confirmation, UI analytics/outcomes, and DB projections all verified. **The campaign is paused** to prevent accidental enrollment. No prospects, real-domain mailboxes, DNS, or production-domain work.
 - **Final canary wrap completed 2026-08-21:** the bounded owner-address catch-up scenario accepted four sends in two paced waves (two per mailbox, 925-second same-mailbox gap) after 10,833 seconds of app downtime and emitted `catchup_backlog`. The campaign was paused at the bound. Accelerated settings were restored, both mailboxes are healthy at cap 5 with no resume cap, and both Gmail test campaigns are paused.
-- **Deployed:** `4e9e125` on `b8.3-local-canary`, followed by the documentation-only wrap commit. HTTPS/database health, self-check, a validated fresh backup, and the final production projection check (`checked 24 enrollments — 0 diff(s)`) are clean.
-- **Still open, deliberately:** live Gmail one-click proof and finding #12's warmed-domain effect require a public real domain. Finding #11 is closed as unanswerable with this rig. Real Gmail hard-bounce DSN and vacation/OOO fixtures are formally deferred until matching source messages can be captured read-only. Findings #20–25 are closed.
+- **Oracle rollback canary:** `4e9e125` plus its documentation-only wrap; both campaigns remain
+  paused. Health, self-check, backup, and `checked 24 enrollments — 0 diff(s)` are clean.
+- **Spaceship production:** deployed 2026-08-22 at `de8d158` with a clean database and zero
+  mailboxes/campaigns/leads/enrollments. DNS, TLS, the `/email-campaign/` SPA/API subpath, outreach
+  redirects, and the two isolated unsubscribe hosts are live. Containers and health are green;
+  self-check and zero-drift pass; a custom-format dump passed listing and the scratch restore drill;
+  Spaceship AutoBackup is active on trial with a five-backup limit. The portfolio remained online.
+- **Still open, deliberately:** enter the business postal address and sender-domain unsubscribe
+  template; configure the operator-owned Internal Google OAuth client; connect and test one
+  Workspace mailbox; then obtain separate authorization for the one-message owner-address
+  send/reply/unsubscribe canary. OAuth code is deployed, but production OAuth credentials are not.
+  Finding #12 still needs warmed-domain evidence; provider DSN/OOO fixture capture remains deferred.
 
 **Build history:** M0 (docs), **B0–B7** (foundation → event log → metrics → mock transport/scheduler/poller → render → ingest → API layer → hardening/ops), **F0–F8** (full web track) and **B8.1–B8.2** (live `SmtpImapTransport` + the `MAIL_TRANSPORT` flag swap) are complete — **M1 proven core** ✅, **M2 operable workflow** ✅, **M3 full product (offline)** ✅. A post-M3 audit against docs/14/15 + the decision register (2026-07-25) closed the four specified-but-unbuilt items — decision E, `provider_blocked`, runtime mailbox poll registration, the password-reset CLI (sweep facts below). **Check [PROGRESS.md](PROGRESS.md) for the current task pointer before starting work** — but note its "no code work is outstanding" framing predates the 2026-08-09 correction.
 

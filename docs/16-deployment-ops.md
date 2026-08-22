@@ -1,6 +1,7 @@
 # Deployment & Operations
 
-Single always-on VPS (finalized decision). Docker Compose primary; systemd alternative. Implemented in B7; live cutover in B8.
+Single always-on VPS (finalized decision). Docker Compose primary; systemd alternative. Implemented
+in B7 and cut over to Spaceship production on 2026-08-22.
 
 ---
 
@@ -12,6 +13,8 @@ Single always-on VPS (finalized decision). Docker Compose primary; systemd alter
 | `SECRET_KEY` | ✅ | — | 32-byte hex; libsodium sealing of mailbox secrets |
 | `SESSION_KEY` | ✅ | — | secure-session cookie key |
 | `OPERATOR_EMAIL` / `OPERATOR_INITIAL_PASSWORD` | ✅ first boot | — | seeds `operator` row (password changeable in UI) |
+| `PUBLIC_APP_URL` | ✅ for OAuth | — | canonical public origin/path, currently `https://sambhavpmtech.com/email-campaign` |
+| `GOOGLE_OAUTH_CLIENT_ID` / `GOOGLE_OAUTH_CLIENT_SECRET` | for Google OAuth | unset | operator-owned Workspace Internal OAuth client; enter only on the VPS |
 | `MAIL_TRANSPORT` | ✅ | `mock` | `mock` \| `smtp_imap` — **the one switch that goes live (B8)** |
 | `MAIL_TLS_INSECURE` | | `false` | accept self-signed certs / skip STARTTLS on the mail servers. **Local test rig only** (the GreenMail container); boot refuses it with `NODE_ENV=production` |
 | `ROLE` | | `all` | `all` \| `api` \| `worker` (decision Y). `api` = HTTP only (no pg-boss); `worker` = jobs only and **does not listen**, so a worker container needs no `/health` probe |
@@ -29,6 +32,11 @@ Everything operator-tunable at runtime lives in the `settings` row, not env (02 
 
 Concrete files: [`docker-compose.prod.yml`](../docker-compose.prod.yml) + the multi-stage [`Dockerfile`](../Dockerfile) (targets `app` and `caddy`) + [`docker/Caddyfile`](../docker/Caddyfile) + [`docker/backup/`](../docker/backup) + [`.env.prod.example`](../.env.prod.example).
 
+The live shared-VPS variant uses [`docker-compose.spaceship.yml`](../docker-compose.spaceship.yml),
+[`docker/Caddyfile.spaceship`](../docker/Caddyfile.spaceship), and the host-Caddy fragment under
+[`deploy/spaceship/`](../deploy/spaceship/). It builds the SPA at `/email-campaign/`, binds its
+internal gateway only to `127.0.0.1:18080`, and leaves host Caddy as the sole public listener.
+
 Services: **db** (postgres:16, volume `pgdata`, healthcheck) · **app** (multi-stage node:22 image; entrypoint applies `db:migrate` then boots via `tsx`; API + pg-boss workers; `depends_on: db healthy`; `restart: unless-stopped`; binds `0.0.0.0:3001` **inside its container** — `expose`d, never published, so only caddy reaches it) · **caddy** (:80/:443, auto-TLS for `$DOMAIN`; **serves the built SPA** baked into its image at `/srv` with history-API fallback, and reverse-proxies `/api/*` + `/health` to the app; basic-auth *not* used — app auth is the gate) · **backup** (alpine+pg_dump cron sidecar running [`scripts/backup.sh`](../scripts/backup.sh): nightly 02:30 `pg_dump -Fc` to `BACKUP_DIR`, prune > 14 days; weekly copy kept 8 weeks).
 
 > The SPA is served by Caddy (from the `web-build` stage), not Fastify — so the app image stays API/worker-only and there is no cross-container static volume. The bundle is built with `VITE_API_MODE=real` and calls same-origin `/api/v1`.
@@ -44,6 +52,10 @@ failure, bounce triage, spam complaints, emergency campaign pause, unsubscribe e
 and restore after personal-data erasure.
 
 - **First deploy:** `cp .env.prod.example .env.prod`, generate `SECRET_KEY`/`SESSION_KEY`, set `POSTGRES_PASSWORD`/`OPERATOR_*`/`DOMAIN`, then `docker compose -f docker-compose.prod.yml --env-file .env.prod up -d --build`.
+- **Spaceship deploy/update:** from `/opt/email-campaign`, run
+  `docker compose -f docker-compose.spaceship.yml --env-file .env.prod up -d --build`; validate a
+  candidate host Caddyfile before atomic reload. Never print `.env.prod`, resolved Compose output,
+  container environment, or the backup sidecar crontab.
 - **Deploy/update:** `git pull && docker compose -f docker-compose.prod.yml --env-file .env.prod up -d --build` — the app entrypoint applies migrations before it listens; scheduler catch-up handles the downtime window (never-burst; expect a `catchup_backlog` alert if > a few hours).
 - **Backup now:** `docker compose exec backup /usr/local/bin/backup.sh` (or `BACKUP_DIR=./backups sh scripts/backup.sh`). **Restore drill (quarterly + the automated B7.2 gate in CI):** `DATABASE_URL=… BACKUP_DIR=… sh scripts/restore-drill.sh` — dumps, restores into a scratch DB, runs `rebuild-projections` then `--dry-run` (expect 0 diffs = the fold is deterministic), then `self-check` (expect 0 invariant violations). Data proven intact, not just present. Uses `pg_dump`/`pg_restore`/`psql` from PATH.
 - **Ops CLIs need `-w @coldemail/server`** — they live in `apps/server/package.json` and there is no root proxy, so the bare root form fails (verified on the VM 2026-08-07). In the compose stack, prefix with `docker compose -f docker-compose.prod.yml --env-file .env.prod exec -T app`.
@@ -107,7 +119,11 @@ The canary in §5 assumes warmed mailboxes on authenticated domains — the walk
 - **Secondary sending domains** — never the primary business domain. A deliverability mistake burns the domain, not just the mailbox.
 - **SPF, DKIM, DMARC** published for each sending domain, and verified with a mail tester before the first send. Missing DKIM alone is enough to land in spam regardless of content.
 - **Warming** — each mailbox aged and ramped by a warming service or by hand over ~2–4 weeks before it carries campaign volume. The app's ramp (`ramp_days` / `ramp_daily_enroll_cap`) governs *enrollment*, not mailbox reputation.
-- **App passwords / provider auth** — the transport does password auth only (`auth_type` is stored but unused; no OAuth). Gmail/Outlook need an app password with IMAP enabled.
+- **Provider authentication** — each mailbox can use a sealed app password or individual Google
+  OAuth. Google OAuth needs the operator-owned Internal Workspace client, exact callback
+  `https://sambhavpmtech.com/email-campaign/oauth/google/callback`, and per-mailbox consent. No
+  domain-wide delegation is used. OAuth mailboxes stay `setup_required` and unsendable until the
+  account-matched authorization succeeds.
 - **Reverse DNS + a real reply-to inbox** the operator actually reads: replies are the product.
 - **A non-residential postal address** for `compliance_settings.physical_address`. It is legally required in commercial email (CAN-SPAM for US recipients; CASL and GDPR/ePrivacy impose comparable identification duties) and the renderer refuses ALL sends while it is empty — but it is published to every recipient, so **never use a home address**. Use a PO Box, a virtual-mailbox/CMRA address, a registered business address, or a coworking address. A missing or obviously fake footer address is also a negative deliverability signal. *(For the B8.3-local canary a placeholder is fine — the only recipients are addresses the operator owns.)*
 
@@ -124,81 +140,47 @@ Full stack built and brought up from a clean state (`docker compose -f docker-co
 
 Remaining for a full **M3** close: the real-backend walkthrough replay (§5, `e2e/walkthrough.spec.ts` — Playwright web ⇄ real server + MockTransport + `advance-clock`), which the frontend track deferred here from F8.
 
-## 8. Deferred shared-VPS deployment plan (recorded 2026-08-09)
+## 8. Spaceship shared-VPS production — deployed 2026-08-22
 
-Deployment is deliberately deferred until the B8.3-local Gmail validation is complete. The
-production VPS has already been purchased, unboxed, and is running Ubuntu. It also hosts the
-operator's other website, so this application will share the machine rather than receive a
-dedicated VM.
+Production is live at `https://sambhavpmtech.com/email-campaign/` on the existing Spaceship VM.
+The portfolio at `sambhavbuilds.com` remained online throughout. Code is pinned to `de8d158` on
+`b8.3-local-canary`; `main` was not merged. Oracle remains paused and unchanged as the temporary
+rollback environment.
 
-- **Reverse proxy:** the operator is replacing the existing Nginx setup with **Caddy**. Keep the
-  Compose/Caddy deployment design in this repository; Caddy will own public ports 80/443 and route
-  sites by hostname. Do not run Nginx and Caddy concurrently on those ports.
-- **Memory:** approximately **1.5 GiB RAM** is free after Ubuntu and the existing website. Create
-  a **2 GiB swap file** before building or starting the Docker stack. Swap is disk-backed virtual
-  memory: it reduces the risk of OOM kills during Node/Docker builds and under memory pressure, but
-  it is slower than RAM and is **not a backup**.
-- **Database backups:** retain the application's nightly `pg_dump` backup sidecar and its restore
-  drill. Those dumps are useful for database-level recovery but, while stored on the same VM, do
-  not protect against total VM loss.
-- **VPS backups:** Spaceship Starlight AutoBackup is a separate off-site VM-backup layer. It is
-  recommended before the app holds real campaign/business data (and would also protect the other
-  website), but it can be deferred during throwaway local/Gmail canary testing. It does not replace
-  database-level dumps or eventual independent off-VM archival copies.
-- **Before real launch:** enable an off-VM recovery layer (Spaceship AutoBackup or an equivalent),
-  verify a restore path, and arrange an independent copy of database backups. Do not treat a swap
-  file as relevant to recovery.
+- **Reverse proxy:** host Caddy is the only public 80/443 listener. The container gateway binds
+  only `127.0.0.1:18080`; Postgres and the app port are not published.
+- **Memory:** a persistent 2 GiB swap file was added before building. Swap reduces OOM risk but is
+  not a backup.
+- **Routing:** `/email-campaign` canonicalizes to `/email-campaign/`; direct SPA routes and the
+  subpath API work. Other outreach-domain paths redirect 308 to the portfolio homepage. Each
+  unsubscribe host proxies only `/u/*` and returns 404 elsewhere.
+- **DNS/TLS:** authoritative DNS returns `104.207.93.174` for the six approved A records. Existing
+  MX/SPF/DKIM/DMARC/site-verification records were not changed. Public TLS passed on every host.
+- **Database recovery:** the nightly logical-backup sidecar is active. A fresh custom-format dump
+  passed `pg_restore --list`; a scratch restore, projection rebuild/dry-run, and self-check passed,
+  and the scratch database was removed.
+- **VM recovery:** Spaceship AutoBackup is active on its seven-day trial with a five-backup limit.
+  It complements rather than replaces the logical PostgreSQL dumps and eventual independent copy.
 
-### Unsubscribe URL and Gmail one-click plan — before real domains
+### Unsubscribe URL and Gmail one-click — deployed, commissioning pending
 
-The current canary footer keeps a reply-based opt-out (`STOP`) because the application does not
-yet expose a public unsubscribe endpoint. Before sending from real domains, add this as a small,
-separate deployment feature:
+The hash-only token implementation and both public hosts are deployed. Production still has an
+empty `unsubscribe_base_url`, so no link or headers are emitted until the operator saves the valid
+business postal address and `https://unsubscribe.{sender_domain}`. After that, mail from each
+sender domain resolves to its matching unsubscribe host. `GET` confirms without unsubscribing;
+`POST` creates permanent global suppression; invalid/expired tokens reveal no recipient data.
+Reply `STOP` remains the fallback. The first owner-address link and RFC 8058 one-click proof needs
+separate send authorization.
 
-- **Host:** use a first-party HTTPS subdomain of the sending domain, such as
-  `https://unsubscribe.<sending-domain>/u/<opaque-token>`. Do not use an IP address, a URL
-  shortener, a third-party redirect, or an address/lead identifier in the URL.
-- **Token:** generate a high-entropy opaque token, store only its hash, and resolve it server-side
-  to the intended lead/enrollment. It must remain usable long enough to honour an opt-out and
-  must never expose the recipient's email address in a URL, page title, logs, or analytics.
-- **Browser flow:** `GET /u/<token>` renders a minimal confirmation page; `POST /u/<token>`
-  immediately appends the unsubscribe fact and creates the global suppression. The GET must not
-  unsubscribe by itself because security scanners and privacy tools may prefetch links.
-- **Gmail one-click flow:** send `List-Unsubscribe: <https://…/u/<token>>` and
-  `List-Unsubscribe-Post: List-Unsubscribe=One-Click`; the same endpoint accepts Gmail's POST and
-  suppresses immediately. This is the standards-based one-click mechanism for bulk promotional
-  Gmail traffic, not merely a body hyperlink.
-- **Footer:** retain “Reply STOP to unsubscribe” as the plaintext fallback, and add a clear,
-  untracked `Unsubscribe` body link in the HTML alternative. Do not require login, an email form,
-  a survey, or a preferences screen before honouring the request.
-- **Caddy/ops:** add the route under the existing HTTPS app host/subdomain, monitor endpoint
-  availability, and test normal browser POST, Gmail header POST, expired/invalid tokens, duplicate
-  requests, and no-PII logging before enabling real-domain traffic.
+### Post-canary build order — implemented, operator handoffs remain
 
-### Operator-confirmed post-canary build order — not started (2026-08-13)
+Public unsubscribe/one-click, hard launch guardrails, domain-readiness preflight, individual Google
+Workspace OAuth, controlled variants, and copy-risk checks are implemented and locally verified.
+OAuth uses authorization code + PKCE, hashed one-time state, encrypted refresh tokens, account
+matching, XOAUTH2 SMTP/IMAP, reconnect/revoke, and `auth_failed` pausing; it does not use domain-wide
+delegation.
 
-The controlled ten-day Gmail learning canary comes first. After it closes, the following is the
-approved implementation order before any real-domain prospect send:
-
-1. **Unsubscribe and one-click support** — implement and deploy the preceding plan, including the
-   public endpoint, opaque tokens, clear body link, `List-Unsubscribe` headers, Gmail one-click
-   POST handling, suppression, and endpoint/no-PII-log tests.
-2. **Hard launch guardrails** — make conservative mailbox and campaign ceilings plus staged
-   enrollment explicit and enforceable. The objective is to prevent an operator configuration error
-   from creating an unsafe initial volume; it does not replace domain warming or recipient consent.
-3. **Domain-readiness preflight** — provide an operator-facing readiness check for SPF, DKIM,
-   DMARC/alignment, reply inbox/MX, compliance address, mailbox health, conservative caps, warming
-   status, and unsubscribe deployment. The app may record/check readiness, but must not pretend it
-   can configure DNS or establish reputation itself.
-4. **Google Workspace OAuth** — replace the current app-password-only transport with individual
-   OAuth authorization for each outreach inbox, server-side encrypted refresh-token storage,
-   refresh/revocation handling, and a reconnect UI. Use the operator-owned internal Workspace OAuth
-   client; keep the main-domain super-admin inbox out of the sending set; do not introduce
-   domain-wide delegation initially.
-5. **Controlled copy variation** — deterministic spintax, step variants, and copy-risk checks are
-   already implemented. Audit and retain them; do not add artificial "unique every time" logic or
-   treat variation as an anti-spam bypass. Outbound mail remains untracked: no pixels, click
-   tracking, or tracking-domain redirect.
-
-This is a deferred roadmap, not a claim that these capabilities exist today. It does not authorize
-DNS changes, a deploy, or any real-domain sending.
+Production OAuth is not configured yet. The operator must create the Internal Workspace client,
+enter its client ID/secret directly on the VPS, trust it if required, and approve each outreach
+mailbox. The compliance address/template, first mailbox Test Connection, and bounded owner-address
+send/reply/unsubscribe canary also remain. None of this authorizes prospect mail.

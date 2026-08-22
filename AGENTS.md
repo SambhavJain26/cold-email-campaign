@@ -19,7 +19,8 @@ call planned work implemented.
 
 ## Current operating boundary
 
-The project is in **pre-real-domain testing**. Until the operator explicitly changes that scope:
+The Spaceship production infrastructure is live, but the project remains in **pre-prospect-send
+commissioning** until the operator completes the handoffs below:
 
 - **The only authorized feature scope** is the completed operator-approved 2026-08-15 list plus
   the 2026-08-20 pre-domain safety backlog: mandatory reply stopping; reply dispositions and
@@ -27,9 +28,10 @@ The project is in **pre-real-domain testing**. Until the operator explicitly cha
   20–25; alert history and mailbox filters; arbitrary custom-field editing; copy-risk rubric
   improvements; local verification; and runbook/documentation reconciliation. Outside that list,
   work is limited to testing, verification, diagnosis, and documentation.
-- Do not implement or perform domain/DNS work, production mailbox configuration, public
-  Caddy/domain changes, other deployment features, or Google Workspace OAuth. OAuth is deferred
-  until a real domain and inbox exist.
+- The approved Spaceship deployment, subpath support, sender-domain unsubscribe routing, and
+  per-mailbox Google Workspace OAuth implementation are complete on `b8.3-local-canary`. Do not
+  extend production scope, change DNS/Caddy, or configure a real mailbox beyond the approved
+  commissioning steps without fresh operator authorization.
 - Deploy only with explicit operator authorization for that deploy. Do not treat approval to edit,
   test, commit, or push as approval to deploy.
 - Every outbound batch needs specific approval. Sending mail, activating or resuming a campaign,
@@ -38,10 +40,10 @@ The project is in **pre-real-domain testing**. Until the operator explicitly cha
   to test behavior.
 - The controlled Gmail acceptance batch is complete and the test campaign is **paused**. Do not
   resume it or create another test send without new per-send approval.
-- The unsubscribe endpoint must remain **dormant**: empty `unsubscribe_base_url` means no body
-  link or headers and a reply-`STOP` footer. Do not configure a hostname, expose a public port, or
-  claim Gmail one-click is verified; that needs a publicly reachable HTTPS URL and separate
-  approval.
+- The two unsubscribe hosts are publicly reachable, but production `unsubscribe_base_url` remains
+  empty until the operator saves `https://unsubscribe.{sender_domain}` with the business postal
+  address. Empty still means no body link or headers and a reply-`STOP` footer. Do not claim Gmail
+  one-click is verified until the separately approved owner-address canary proves it.
 - Work on the current `b8.3-local-canary` branch. Do not branch off, push to `main`, or merge to
   `main` without explicit authorization. Make surgical edits, preserve unrelated dirty-worktree
   changes, and commit each completed task on the current branch.
@@ -71,13 +73,35 @@ The project is in **pre-real-domain testing**. Until the operator explicitly cha
 - The only correct projection drift command is
   `npx tsx apps/server/src/services/rebuildCli.ts --dry-run`. Require zero diffs after changes to
   events or projections; `checked 0 enrollments` proves only that the CLI ran.
-- Complete serial local gate passed 2026-08-20: type/lint/format; unit 331; web 52;
-  integration 158; API 112; GreenMail 29; golden exactly 47; mock E2E 51; real-backend E2E 1;
+- Complete serial local gate passed 2026-08-22: type/lint/format; unit 338; web 55;
+  integration 159; API 116; GreenMail 29; golden exactly 47; mock E2E 51; real-backend E2E 1;
   populated test DB `checked 5 enrollments — 0 diff(s)`; self-check clean.
 
-## Oracle canary procedure
+## Production deployments
 
-The Oracle VM is the only live deployment.
+Spaceship is the primary production deployment. Oracle remains paused and unchanged as the
+temporary rollback/canary environment.
+
+### Spaceship production
+
+- SSH alias: `sambhavbuilds-vps` (`root@104.207.93.174`, port 22022)
+- App: `/opt/email-campaign`; stack: `docker-compose.spaceship.yml` with `.env.prod`
+- Public UI: `https://sambhavpmtech.com/email-campaign/`
+- Internal gateway: `127.0.0.1:18080`; host Caddy is the only public 80/443 listener
+- Deployed branch/commit: `b8.3-local-canary` at `de8d158`
+
+After explicit deploy authorization, update to a reviewed pinned commit and run:
+
+```sh
+cd /opt/email-campaign
+sudo docker compose -f docker-compose.spaceship.yml --env-file .env.prod up -d --build
+```
+
+Then verify container health, public HTTPS/redirect routing, a zero-drift projection dry run,
+self-check, and a validated backup. Do not print `.env.prod`, resolved Compose output, container
+environment, or the backup sidecar's crontab.
+
+### Oracle rollback canary
 
 - SSH: `ssh -i ~/.ssh/oracle_canary ubuntu@92.4.79.54`
 - App: `~/app`; stack: `docker-compose.prod.yml` with `.env.prod`
@@ -95,16 +119,31 @@ sudo docker compose -f docker-compose.prod.yml --env-file .env.prod up -d --buil
 Then verify container health, `https://localhost/health`, and a zero-drift projection dry run in
 the app container.
 
-**Never print resolved production environment output.** `crontab -l` in the backup sidecar embeds
+**Never print resolved production environment output.** `crontab -l` in either backup sidecar embeds
 the full `DATABASE_URL`, including its password; print only the schedule. `docker inspect` and
 `docker compose config` also render secrets. This warning follows an actual credential exposure
 and password rotation.
 
-## Live canary state — final wrap complete
+## Live deployment state
 
-The bounded catch-up/never-burst canary passed on 2026-08-20 UTC and the accelerated settings were
-restored before the final deployment. Oracle is deployed on `b8.3-local-canary` at `4e9e125` plus
-the later documentation-only wrap commit.
+Spaceship production was deployed on 2026-08-22 at `de8d158` with a clean database. DNS and TLS
+are live for the two outreach domains and their unsubscribe subdomains. The route matrix is
+verified: `/email-campaign/` and direct SPA routes return 200; the bare app path canonicalizes;
+normal outreach-domain traffic redirects 308 to `https://sambhavbuilds.com/`; unsubscribe hosts
+serve only `/u/*` and return 404 elsewhere. The portfolio remains HTTP 200.
+
+- db/app/gateway/backup containers are healthy; only `127.0.0.1:18080` is published
+- production has zero mailboxes, campaigns, leads, and enrollments, so it cannot send
+- health and database checks pass; self-check is clean; projection dry-run is `0 diff(s)`
+- a fresh custom-format dump passed `pg_restore --list`; a scratch restore, rebuild, dry-run, and
+  self-check all passed; Spaceship AutoBackup is active on trial with a five-backup limit
+- Google OAuth code is deployed but the production client ID/secret are not configured
+- business postal address, unsubscribe template, first OAuth mailbox connection, and the bounded
+  owner-address send/reply/unsubscribe canary remain operator-gated
+
+The Oracle bounded catch-up/never-burst canary passed on 2026-08-20 UTC and remains paused. The
+accelerated settings were restored before the final deployment. Oracle is deployed on
+`b8.3-local-canary` at `4e9e125` plus the later documentation-only wrap commit.
 
 - `enforce_send_window=true`; `max_mailbox_daily_cap=50`
 - `pause_min_sends=25`; `delivery_confirm_hours=1`; `send_jitter_pct=20`; `min_ramp_days=7`

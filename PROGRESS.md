@@ -4,7 +4,11 @@
 
 **Legend:** `[ ]` not started · `[~]` in progress · `[x]` done · `[!]` blocked (note why in the log)
 
-**Current focus:** → **pre-real-domain launch preparation.** B8.3-local is complete on branch `b8.3-local-canary`; real-domain DNS, inbox, warming, public unsubscribe, and provider-specific validation remain gated on the operator obtaining that infrastructure.
+**Current focus:** → **Spaceship production commissioning.** The application, DNS/TLS routing,
+public unsubscribe hosts, and AutoBackup are live on the Spaceship VPS. Remaining before any real
+prospect mail: configure the Internal Workspace OAuth client, enter the business postal address and
+sender-domain unsubscribe template, connect/test one OAuth mailbox, and obtain separate approval
+for the bounded owner-address send/reply/unsubscribe canary.
 
 > **⚠️ Superseded framing (corrected 2026-08-09).** This line previously read "No code work is outstanding" and "everything left in B8 … is *operations*, not code." **That was wrong.** Operating the canary against a real provider exposed genuine **code** defects — the reply/send race (finding 15), whole-mailbox history ingestion (16), plain-text-only mail (19), and a class of backend-implemented/UI-invisible gaps (3–9). All were fixed on `b8.3-local-canary`. Treat [docs/17](docs/17-local-canary-runbook.md) as the authoritative status record, not this header.
 
@@ -13,6 +17,16 @@
 **2026-08-20 local gate:** reply/recontact safety plus findings 20–25 implemented; migration drill green; unit 331, web 52, integration 158, API 112, GreenMail 29, golden exactly 47, mock E2E 51, real-backend E2E 1; populated test DB `checked 5 enrollments — 0 diff(s)` and self-check clean. No Oracle state or external mail changed.
 
 **2026-08-21 final wrap:** docs/17 §6 catch-up/never-burst passed with four owner-address sends in two paced waves, a 925-second same-mailbox gap, and a `catchup_backlog` alert after 10,833 seconds of downtime. Safe settings were restored, both campaigns are paused, `4e9e125` is deployed, health and self-check are clean, a fresh backup was validated, and Oracle returned `checked 24 enrollments — 0 diff(s)`. Real Gmail DSN/OOO fixtures remain formally deferred unless matching messages can be captured read-only. Finding 12 remains for warmed real domains; finding 11 is closed as unanswerable with this rig. Findings 20–25 are closed. Real-domain work remains gated on docs/16 §6a.
+
+**2026-08-22 Spaceship production:** commits `096fa7c` and `de8d158` implement the
+`/email-campaign/` subpath, per-sender-domain unsubscribe URLs, individual Google OAuth/XOAUTH2,
+the production stack, and hardened dependencies. The complete gate passed (unit 338, web 55,
+integration 159, API 116, GreenMail 29, golden 47, mock E2E 51, real-backend E2E 1; populated test
+DB zero drift). Production is deployed at `de8d158` with a clean database and zero sendable state.
+DNS/TLS and the redirect matrix pass; the portfolio stayed online; self-check and production drift
+are clean; a custom dump and scratch restore drill passed; Spaceship AutoBackup is active on trial
+with five restore points. OAuth credentials, compliance settings, mailbox connection, and the
+owner-address canary remain. Oracle is unchanged and paused; `main` was not merged.
 
 ---
 

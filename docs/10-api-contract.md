@@ -1,6 +1,15 @@
 # API Contract — v1 (frozen seam between backend and frontend)
 
-All routes under `/api/v1` **except** `GET /health` and the public unsubscribe pair `GET|POST /u/:token`, which are registered outside that scope so they inherit neither the session plugin nor the CSRF-header check. JSON in/out (the `/u/:token` pair returns HTML). Session-cookie auth on everything except `POST /auth/login`, `GET /health` and `/u/:token`. Conventions per decision Z: error envelope `{"error":{"code","message","details?"}}`; lists return `{items, total, page, per_page}` with `?page=1&per_page=50` (max 200); timestamps ISO-8601 UTC. Executable schemas live in `packages/shared/src/api/` (decision H) — **a contract change edits this file and that package in the same commit.**
+All routes under `/api/v1` **except** `GET /health`, public Google callback
+`GET /oauth/google/callback`, and the public unsubscribe pair `GET|POST /u/:token`. The production
+gateway prefixes the app/API/callback with `/email-campaign` while leaving unsubscribe hosts at
+`/u/:token`. Public routes inherit neither session auth nor the API CSRF-header check. JSON in/out
+except the callback and unsubscribe HTML. Session-cookie auth on everything except
+`POST /auth/login`, `GET /health`, the callback, and `/u/:token`. Conventions per decision Z: error
+envelope `{"error":{"code","message","details?"}}`; lists return `{items, total, page, per_page}`
+with `?page=1&per_page=50` (max 200); timestamps ISO-8601 UTC. Executable schemas live in
+`packages/shared/src/api/` (decision H) — **a contract change edits this file and that package in
+the same commit.**
 
 Shapes below in TS notation. `Metric = { numerator: number, denominator: number | null, value: number }` (docs/05 §2).
 
@@ -21,12 +30,15 @@ Shapes below in TS notation. `Metric = { numerator: number, denominator: number 
 ## Mailboxes
 | | |
 |---|---|
-| GET `/mailboxes` | → `{items: Mailbox[]}` — `Mailbox = {id, display_name, from_address, smtp_host, smtp_port, imap_host, imap_port, daily_cap, effective_cap, send_window, status, status_reason, sent_today, hard_bounce_pct, seven_day_avg, last_successful_poll_at}` (no secrets, ever) |
-| POST `/mailboxes` | `{display_name, from_address, smtp_host, smtp_port, imap_host, imap_port, auth_type, password, daily_cap, send_window, timezone, poll_folders}` → `Mailbox` — password sealed into `mailbox_secrets`, absent from response. `daily_cap` above `settings.max_mailbox_daily_cap` → 422 (launch guardrail, 0011). `poll_folders` defaults to `['INBOX']`; each folder gets its OWN UID cursor seeded from that folder's UIDNEXT, so adding one never back-fills history (finding 16 applies per folder) |
+| GET `/mailboxes` | → `{items: Mailbox[]}` — `Mailbox` includes `auth_type: 'app_password'\|'google_oauth'` and `oauth_connected`, plus identity, connection metadata, caps, windows, health and poll fields. No password, refresh token, access token, or OAuth state is ever returned. |
+| POST `/mailboxes` | common connection/cap/window/folder fields plus `auth_type`. `app_password` requires `password`, which is sealed. `google_oauth` requires no password and starts `setup_required`, which the scheduler cannot select. Guardrails and per-folder UIDNEXT seeding still apply. |
 | PATCH `/mailboxes/:id` | any subset of the above (password optional) → `Mailbox` |
 | POST `/mailboxes/:id/test-connection` | → `{smtp_ok, imap_ok, round_trip_ms?}` — calls `transport.verify` (mock: scripted; real: send+read-back) |
 | POST `/mailboxes/:id/pause` / `/resume` | resume body `{cap_pct?: 50\|100}` → `Mailbox` — resume from `auto_paused` defaults 50 (walkthrough Stage 7) |
 | POST `/mailboxes/:id/reconnect` | `{password}` → `Mailbox` — re-seal secret, verify, `auth_failed`→`ok` on success |
+| POST `/mailboxes/:id/oauth/google/start` | → `{authorization_url}` — creates short-lived hashed one-time state plus PKCE; requests offline access. Requires the production OAuth client configuration. |
+| GET `/oauth/google/callback` | **Not under `/api/v1`.** Validates state/expiry/replay and PKCE, requires a refresh token, verifies the Google account equals the mailbox address, stores only the encrypted refresh credential, and redirects to Mailboxes. Production path is `/email-campaign/oauth/google/callback`. |
+| POST `/mailboxes/:id/oauth/google/disconnect` | → `Mailbox` — best-effort Google revoke, deletes the sealed refresh credential, clears in-memory access, and returns the mailbox to `setup_required`. Use the start endpoint again to reconnect. |
 | GET `/mailboxes/volume?days=30` | → `{items: {mailbox_id, series: {date, sends}[]}[], imbalance: boolean}` (metric #5) |
 
 ## Leads & imports
@@ -95,7 +107,7 @@ Shapes below in TS notation. `Metric = { numerator: number, denominator: number 
 | | |
 |---|---|
 | GET/PUT `/settings` | full `settings` row. PUT validates ranges; `delivery_confirm_hours` is immutable after the first `sent` event so replay cannot drift (finding 24). |
-| GET/PUT `/compliance` | `{physical_address, optout_text, unsubscribe_base_url}` — PUT with empty address → 422 (sends would halt). `unsubscribe_base_url` is `''` (dormant, no link and no `List-Unsubscribe` header) or an `https://` origin with no trailing slash, query or fragment; tokens are appended as `/u/<token>` |
+| GET/PUT `/compliance` | `{physical_address, optout_text, unsubscribe_base_url}` — PUT with empty address → 422 (sends would halt). `unsubscribe_base_url` is `''` (dormant), a fixed `https://` origin, or `https://unsubscribe.{sender_domain}`. The placeholder resolves from the mailbox From domain before `/u/<token>` is appended. |
 | GET `/alerts?unacked=true` · POST `/alerts/:id/ack` | `Alert = {id, kind, severity, payload, created_at, acknowledged_at}` — feeds banners: `catchup_backlog` → downtime panel; `mailbox_*` → failure panels |
 | GET `/health` | → `{ok, db, version}` (unauthenticated) |
 | GET `/u/:token` | **Not under `/api/v1`.** Unauthenticated, no CSRF. Returns an HTML confirmation page and **never unsubscribes** — scanners and privacy proxies prefetch links. An unknown token renders the same generic page as a valid one (no enumeration oracle) |
