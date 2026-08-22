@@ -1,0 +1,101 @@
+name: coldemail-spaceship
+
+x-logging: &default-logging
+  driver: json-file
+  options:
+    max-size: '10m'
+    max-file: '5'
+
+services:
+  db:
+    image: postgres:16
+    restart: unless-stopped
+    logging: *default-logging
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-coldemail}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env.prod}
+      POSTGRES_DB: ${POSTGRES_DB:-coldemail}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U ${POSTGRES_USER:-coldemail} -d ${POSTGRES_DB:-coldemail}']
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  app:
+    build:
+      context: .
+      target: app
+    restart: unless-stopped
+    logging: *default-logging
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgres://${POSTGRES_USER:-coldemail}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB:-coldemail}
+      SECRET_KEY: ${SECRET_KEY:?set SECRET_KEY in .env.prod}
+      SESSION_KEY: ${SESSION_KEY:?set SESSION_KEY in .env.prod}
+      OPERATOR_EMAIL: ${OPERATOR_EMAIL:?set OPERATOR_EMAIL in .env.prod}
+      OPERATOR_INITIAL_PASSWORD: ${OPERATOR_INITIAL_PASSWORD:?set OPERATOR_INITIAL_PASSWORD in .env.prod}
+      PUBLIC_APP_URL: https://sambhavpmtech.com/email-campaign
+      GOOGLE_OAUTH_CLIENT_ID: ${GOOGLE_OAUTH_CLIENT_ID:-}
+      GOOGLE_OAUTH_CLIENT_SECRET: ${GOOGLE_OAUTH_CLIENT_SECRET:-}
+      MAIL_TRANSPORT: smtp_imap
+      ROLE: all
+      HOST: 0.0.0.0
+      PORT: '3001'
+      NODE_ENV: production
+      LOG_LEVEL: ${LOG_LEVEL:-info}
+      BACKUP_DIR: /var/backups/coldemail
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+      ALERT_WEBHOOK_URL: ${ALERT_WEBHOOK_URL:-}
+    volumes:
+      - backups:/var/backups/coldemail:ro
+    expose:
+      - '3001'
+    healthcheck:
+      test:
+        [
+          'CMD',
+          'node',
+          '-e',
+          "fetch('http://127.0.0.1:3001/health').then(r=>r.json()).then(b=>process.exit(b.ok?0:1)).catch(()=>process.exit(1))",
+        ]
+      interval: 30s
+      timeout: 5s
+      retries: 5
+      start_period: 40s
+
+  gateway:
+    build:
+      context: .
+      target: spaceship-gateway
+      args:
+        VITE_APP_BASE: /email-campaign/
+    restart: unless-stopped
+    logging: *default-logging
+    depends_on:
+      app:
+        condition: service_healthy
+    ports:
+      - '127.0.0.1:18080:8080'
+
+  backup:
+    build:
+      context: .
+      dockerfile: docker/backup/Dockerfile
+    restart: unless-stopped
+    logging: *default-logging
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgres://${POSTGRES_USER:-coldemail}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB:-coldemail}
+      BACKUP_DIR: /var/backups/coldemail
+    volumes:
+      - backups:/var/backups/coldemail
+
+volumes:
+  pgdata:
+  backups:

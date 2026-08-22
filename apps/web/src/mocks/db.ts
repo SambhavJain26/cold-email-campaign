@@ -143,6 +143,8 @@ function buildMailboxes(): MailboxDto[] {
       send_window: { days: [1, 2, 3, 4, 5], start: '08:00', end: '17:00' },
       timezone: 'America/New_York',
       poll_folders: ['INBOX'], // finding 13 — INBOX-only until configured
+      auth_type: 'app_password',
+      oauth_connected: false,
       status: authFailed ? 'auth_failed' : autoPaused ? 'auto_paused' : 'ok',
       status_reason: authFailed
         ? 'IMAP authentication failed (535)'

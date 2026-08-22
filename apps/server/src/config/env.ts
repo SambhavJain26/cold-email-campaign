@@ -29,11 +29,15 @@ export const envSchema = z
     NODE_ENV: z.enum(['development', 'test', 'production']).default('production'),
     LOG_LEVEL: z.enum(['fatal', 'error', 'warn', 'info', 'debug', 'trace']).default('info'),
     BACKUP_DIR: z.string().default('/var/backups/coldemail'),
+    /** Canonical browser-visible application URL, including any deployment subpath. */
+    PUBLIC_APP_URL: z.url().default('http://localhost:5173'),
     /** Test-only (B6.12): VirtualClock + inline jobs + POST /system/advance-clock. */
     SIMULATED_CLOCK: z.stringbool().default(false),
     // optional
     ANTHROPIC_API_KEY: z.string().min(1).optional(),
     ALERT_WEBHOOK_URL: z.url().optional(),
+    GOOGLE_OAUTH_CLIENT_ID: z.string().min(1).optional(),
+    GOOGLE_OAUTH_CLIENT_SECRET: z.string().min(1).optional(),
     TEST_DATABASE_URL: z.url().optional(),
   })
   .superRefine((cfg, ctx) => {
@@ -60,6 +64,13 @@ export const envSchema = z
         code: 'custom',
         path: ['SIMULATED_CLOCK'],
         message: 'SIMULATED_CLOCK is refused in production',
+      });
+    }
+    if (Boolean(cfg.GOOGLE_OAUTH_CLIENT_ID) !== Boolean(cfg.GOOGLE_OAUTH_CLIENT_SECRET)) {
+      ctx.addIssue({
+        code: 'custom',
+        path: ['GOOGLE_OAUTH_CLIENT_ID'],
+        message: 'GOOGLE_OAUTH_CLIENT_ID and GOOGLE_OAUTH_CLIENT_SECRET must be set together',
       });
     }
   });

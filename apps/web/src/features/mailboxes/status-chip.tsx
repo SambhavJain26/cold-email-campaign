@@ -18,6 +18,11 @@ const CHIP: Record<MailboxStatus, { glyph: string; label: string; className: str
     label: 'provider blocked',
     className: 'bg-destructive/15 text-destructive',
   },
+  setup_required: {
+    glyph: '⚙️',
+    label: 'setup required',
+    className: 'bg-info/15 text-info',
+  },
 };
 
 export function MailboxStatusChip({ status }: { status: MailboxStatus }) {

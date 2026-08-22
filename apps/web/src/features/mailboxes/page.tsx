@@ -16,7 +16,12 @@ import {
 import { EmptyState } from '@/components/shared/empty-state';
 import { formatRelativeTime } from '@/lib/format';
 import { useMailboxes } from '@/api/queries/mailboxes';
-import { usePauseMailbox, useResumeMailbox } from '@/api/mutations/mailboxes';
+import {
+  useDisconnectGoogleOauth,
+  usePauseMailbox,
+  useResumeMailbox,
+  useStartGoogleOauth,
+} from '@/api/mutations/mailboxes';
 import { FailurePanels } from './failure-panels';
 import { MailboxDialog } from './mailbox-dialog';
 import { MailboxStatusChip } from './status-chip';
@@ -27,6 +32,8 @@ export default function MailboxesPage() {
   const { data, isPending, isError, refetch } = useMailboxes();
   const pause = usePauseMailbox();
   const resume = useResumeMailbox();
+  const startGoogle = useStartGoogleOauth();
+  const disconnectGoogle = useDisconnectGoogleOauth();
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editing, setEditing] = useState<MailboxDto | undefined>(undefined);
 
@@ -92,6 +99,13 @@ export default function MailboxesPage() {
                 <TableCell className="py-1.5">
                   <p className="text-sm font-medium">{mailbox.from_address}</p>
                   <p className="text-xs text-muted-foreground">{mailbox.display_name}</p>
+                  <p className="text-[11px] text-muted-foreground">
+                    {mailbox.auth_type === 'google_oauth'
+                      ? mailbox.oauth_connected
+                        ? 'Google OAuth connected'
+                        : 'Google OAuth'
+                      : 'App password'}
+                  </p>
                 </TableCell>
                 <TableCell className="py-1.5">
                   <MailboxStatusChip status={mailbox.status} />
@@ -122,6 +136,37 @@ export default function MailboxesPage() {
                     >
                       Edit
                     </Button>
+                    {mailbox.auth_type === 'google_oauth' &&
+                      (!mailbox.oauth_connected || mailbox.status === 'auth_failed') && (
+                        <Button
+                          variant="outline"
+                          size="xs"
+                          disabled={startGoogle.isPending}
+                          onClick={() => startGoogle.mutate(mailbox.id)}
+                        >
+                          {mailbox.oauth_connected ? 'Reconnect Google' : 'Connect Google'}
+                        </Button>
+                      )}
+                    {mailbox.auth_type === 'google_oauth' && mailbox.oauth_connected && (
+                      <Button
+                        variant="ghost"
+                        size="xs"
+                        disabled={disconnectGoogle.isPending}
+                        onClick={() => {
+                          if (
+                            !window.confirm(
+                              `Disconnect Google authorization for ${mailbox.from_address}?`,
+                            )
+                          )
+                            return;
+                          disconnectGoogle.mutate(mailbox.id, {
+                            onSuccess: () => toast.success('Google authorization disconnected'),
+                          });
+                        }}
+                      >
+                        Disconnect
+                      </Button>
+                    )}
                     {mailbox.status === 'paused' ? (
                       <Button
                         variant="ghost"

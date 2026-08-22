@@ -10,6 +10,11 @@
     "apps/*",
     "packages/*"
   ],
+  "overrides": {
+    "html-to-text": {
+      "deepmerge-ts": "8.0.0"
+    }
+  },
   "scripts": {
     "typecheck": "npm run typecheck --workspaces --if-present",
     "db:migrate": "npm run db:migrate -w @coldemail/server",

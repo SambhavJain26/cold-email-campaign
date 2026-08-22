@@ -34,6 +34,8 @@ export const mailboxSchema = z
      * cursor, seeded from UIDNEXT when first added.
      */
     poll_folders: z.array(z.string().min(1)).min(1),
+    auth_type: z.enum(['app_password', 'google_oauth']),
+    oauth_connected: z.boolean(),
     status: z.enum(MAILBOX_STATUSES),
     status_reason: z.string().nullable(),
     sent_today: z.number().int(),
@@ -50,21 +52,57 @@ export const createMailboxBodySchema = z
   .object({
     display_name: z.string().min(1),
     from_address: z.email(),
-    smtp_host: z.string().min(1),
+    smtp_host: z.string().min(1).optional(),
     smtp_port: z.number().int().min(1).max(65535).optional(),
-    imap_host: z.string().min(1),
+    imap_host: z.string().min(1).optional(),
     imap_port: z.number().int().min(1).max(65535).optional(),
-    auth_type: z.string().min(1).optional(), // default app_password (docs/03)
-    password: z.string().min(1),
+    auth_type: z.enum(['app_password', 'google_oauth']).optional(),
+    password: z.string().min(1).optional(),
+    daily_cap: z.number().int().min(1).optional(),
+    send_window: sendWindowSchema.optional(),
+    timezone: z.string().min(1).optional(),
+    poll_folders: z.array(z.string().min(1)).min(1).optional(),
+  })
+  .strict()
+  .superRefine((body, ctx) => {
+    if ((body.auth_type ?? 'app_password') === 'app_password' && !body.password) {
+      ctx.addIssue({
+        code: 'custom',
+        path: ['password'],
+        message: 'password is required for app-password mailboxes',
+      });
+    }
+    if ((body.auth_type ?? 'app_password') === 'app_password' && !body.smtp_host) {
+      ctx.addIssue({ code: 'custom', path: ['smtp_host'], message: 'smtp_host is required' });
+    }
+    if ((body.auth_type ?? 'app_password') === 'app_password' && !body.imap_host) {
+      ctx.addIssue({ code: 'custom', path: ['imap_host'], message: 'imap_host is required' });
+    }
+    if (body.auth_type === 'google_oauth' && body.password !== undefined) {
+      ctx.addIssue({
+        code: 'custom',
+        path: ['password'],
+        message: 'password is not accepted for Google OAuth mailboxes',
+      });
+    }
+  });
+export type CreateMailboxBody = z.infer<typeof createMailboxBodySchema>;
+
+export const patchMailboxBodySchema = z
+  .object({
+    display_name: z.string().min(1).optional(),
+    from_address: z.email().optional(),
+    smtp_host: z.string().min(1).optional(),
+    smtp_port: z.number().int().min(1).max(65535).optional(),
+    imap_host: z.string().min(1).optional(),
+    imap_port: z.number().int().min(1).max(65535).optional(),
+    password: z.string().min(1).optional(),
     daily_cap: z.number().int().min(1).optional(),
     send_window: sendWindowSchema.optional(),
     timezone: z.string().min(1).optional(),
     poll_folders: z.array(z.string().min(1)).min(1).optional(),
   })
   .strict();
-export type CreateMailboxBody = z.infer<typeof createMailboxBodySchema>;
-
-export const patchMailboxBodySchema = createMailboxBodySchema.partial();
 export type PatchMailboxBody = z.infer<typeof patchMailboxBodySchema>;
 
 export const testConnectionResponseSchema = z
@@ -82,6 +120,10 @@ export const resumeMailboxBodySchema = z
   .strict();
 
 export const reconnectMailboxBodySchema = z.object({ password: z.string().min(1) }).strict();
+
+export const googleOauthStartResponseSchema = z.object({ authorization_url: z.url() }).strict();
+
+export const googleOauthDisconnectResponseSchema = z.object({ ok: z.literal(true) }).strict();
 
 export const mailboxVolumeQuerySchema = z.object({
   days: z.coerce.number().int().min(1).max(365).default(30),

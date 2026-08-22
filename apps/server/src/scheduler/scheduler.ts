@@ -33,6 +33,7 @@ import {
 } from '../db/repos/enrollmentsRepo';
 import { insertSentMessage } from '../db/repos/sentMessagesRepo';
 import { issueToken } from '../db/repos/unsubscribeTokensRepo';
+import { resolveUnsubscribeBaseUrl } from '../services/unsubscribeBaseUrl';
 import { autoObservationsOf, getCampaign } from '../db/repos/campaignsRepo';
 import { getVariantById } from '../db/repos/sequencesRepo';
 import { buildEvent } from '../domain/events';
@@ -463,7 +464,12 @@ export class Scheduler {
     // Issued BEFORE render: the URL goes in the body, so it must exist first.
     // A send that then fails leaves an unused token row, which is harmless.
     const compliance = this.tickCtx?.compliance ?? (await getComplianceSettings(db));
-    const unsubscribeUrl = await this.unsubscribeUrlFor(e, stepNo, compliance.unsubscribeBaseUrl);
+    const unsubscribeUrl = await this.unsubscribeUrlFor(
+      e,
+      stepNo,
+      compliance.unsubscribeBaseUrl,
+      mb.fromAddress,
+    );
 
     const rendered = renderer.render({
       variant,
@@ -663,6 +669,7 @@ export class Scheduler {
     e: DueEnrollment,
     stepNo: number,
     baseUrl: string,
+    senderAddress: string,
   ): Promise<string | undefined> {
     if (baseUrl.trim() === '') return undefined;
     const { raw } = await issueToken(this.deps.db, {
@@ -671,7 +678,7 @@ export class Scheduler {
       campaignId: e.campaignId,
       stepNo,
     });
-    return `${baseUrl.trim()}/u/${raw}`;
+    return `${resolveUnsubscribeBaseUrl(baseUrl, senderAddress)}/u/${raw}`;
   }
 
   private async renderContextFor(

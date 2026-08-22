@@ -43,6 +43,7 @@ test('real backend: import → enroll → advance → reply/STOP → tag → met
   await page.getByRole('button', { name: 'Add Mailbox' }).click();
   await page.getByLabel('Display name').fill('Sender One');
   await page.getByLabel('From address').fill('sender1@outreach.test');
+  await page.getByLabel('Authentication').selectOption('app_password');
   await page.getByLabel('SMTP host').fill('smtp.outreach.test');
   await page.getByLabel('IMAP host').fill('imap.outreach.test');
   await page.getByLabel('App password', { exact: true }).fill('app-password-123');

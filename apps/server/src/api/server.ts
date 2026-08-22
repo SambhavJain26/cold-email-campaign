@@ -8,7 +8,7 @@ import { registerSession } from './plugins/session';
 import { registerCsrfHeader } from './plugins/csrfHeader';
 import { registerRequireAuth } from './plugins/requireAuth';
 import { authRoutes } from './auth';
-import { mailboxesRoutes } from './mailboxes';
+import { googleOauthCallbackRoutes, mailboxesRoutes } from './mailboxes';
 import { settingsRoutes } from './settings';
 import { alertsRoutes } from './alerts';
 import { leadsRoutes } from './leads';
@@ -52,6 +52,7 @@ export function buildServer({ logger, services }: ServerDeps): FastifyInstance {
   // one-click POST carries neither. See the route file for the full rules.
   void app.register(async (pub) => {
     await publicUnsubscribeRoutes(pub, services);
+    await googleOauthCallbackRoutes(pub, services);
   });
 
   // The /api/v1 scope (docs/10): zod compilers → session → CSRF header →

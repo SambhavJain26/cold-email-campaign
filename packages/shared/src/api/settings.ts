@@ -61,7 +61,9 @@ export type SettingsDto = z.infer<typeof settingsResponseSchema>;
  * normal state until a real sending domain exists — the renderer then emits no
  * link and no List-Unsubscribe header. HTTPS only, no trailing slash, and no
  * query/fragment: the token is appended as `/u/<token>` and must never share a
- * URL with anything that could carry recipient data.
+ * URL with anything that could carry recipient data. `{sender_domain}` may be
+ * used once in the hostname so each mailbox gets an unsubscribe host on its
+ * own sending domain.
  */
 export const unsubscribeBaseUrlSchema = z.string().refine(
   (v) => {
@@ -69,12 +71,19 @@ export const unsubscribeBaseUrlSchema = z.string().refine(
     if (!v.startsWith('https://') || v.endsWith('/')) return false;
     try {
       const u = new URL(v);
+      const placeholders = v.match(/\{sender_domain\}/g)?.length ?? 0;
+      if (placeholders > 1 || (placeholders === 1 && !u.hostname.includes('{sender_domain}'))) {
+        return false;
+      }
       return u.search === '' && u.hash === '' && u.hostname.includes('.');
     } catch {
       return false;
     }
   },
-  { message: 'must be empty or an https:// URL with no trailing slash, query or fragment' },
+  {
+    message:
+      'must be empty or an https:// URL (optionally using {sender_domain} in the hostname) with no trailing slash, query or fragment',
+  },
 );
 
 export const complianceSchema = z

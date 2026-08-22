@@ -48,4 +48,24 @@ describe('createLogger redaction', () => {
     log.info({ x: 2 }, 'at level');
     expect(parsed()).toHaveLength(1);
   });
+
+  it('redacts OAuth callback capabilities and the Google client secret', () => {
+    const { log, parsed } = captureLogger();
+    log.info({
+      req: {
+        method: 'GET',
+        url: '/oauth/google/callback?code=authorization-code&state=one-time-state&scope=mail',
+        headers: {},
+      },
+      GOOGLE_OAUTH_CLIENT_SECRET: 'client-secret',
+    });
+    const [line] = parsed();
+    expect((line!.req as { url: string }).url).toBe(
+      '/oauth/google/callback?code=[REDACTED]&state=[REDACTED]&scope=mail',
+    );
+    expect(line!.GOOGLE_OAUTH_CLIENT_SECRET).toBe('[REDACTED]');
+    expect(JSON.stringify(line)).not.toContain('authorization-code');
+    expect(JSON.stringify(line)).not.toContain('one-time-state');
+    expect(JSON.stringify(line)).not.toContain('client-secret');
+  });
 });

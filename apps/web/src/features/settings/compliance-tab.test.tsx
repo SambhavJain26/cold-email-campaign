@@ -67,4 +67,9 @@ describe('unsubscribe base URL field', () => {
 
     expect(await screen.findByText(/must be empty or an https:\/\/ URL/)).toBeInTheDocument();
   });
+
+  it('accepts the sender-domain host template used by multiple outreach domains', () => {
+    renderTab({ unsubscribe_base_url: 'https://unsubscribe.{sender_domain}' });
+    expect(preview()).toContain('https://unsubscribe.{sender_domain}/u/⟨token⟩');
+  });
 });

@@ -91,13 +91,15 @@ export function ComplianceTab({
             <Label htmlFor="compliance-unsub-url">Unsubscribe base URL</Label>
             <Input
               id="compliance-unsub-url"
-              placeholder="https://unsubscribe.example.com"
+              placeholder="https://unsubscribe.{sender_domain}"
               {...register('unsubscribe_base_url')}
             />
             <p className="text-xs text-muted-foreground">
               Leave blank until you have a real sending domain. Blank means no link and no
               <code className="mx-1">List-Unsubscribe</code>
-              header — recipients opt out by replying STOP. HTTPS only, no trailing slash.
+              header — recipients opt out by replying STOP. Use{' '}
+              <code>https://unsubscribe.{'{sender_domain}'}</code> to select the matching host for
+              every sending mailbox. HTTPS only, no trailing slash.
             </p>
             {errors.unsubscribe_base_url && (
               <p className="text-xs text-destructive">{errors.unsubscribe_base_url.message}</p>

@@ -12,6 +12,7 @@ import { useAlerts } from '@/api/queries/alerts';
 import {
   useReconnectMailbox,
   useResumeMailbox,
+  useStartGoogleOauth,
   useTestConnection,
 } from '@/api/mutations/mailboxes';
 
@@ -70,6 +71,7 @@ function PanelCard({
 function AuthFailedPanel({ mailbox }: { mailbox: MailboxDto }) {
   const [password, setPassword] = useState('');
   const reconnect = useReconnectMailbox();
+  const startGoogle = useStartGoogleOauth();
   return (
     <PanelCard
       tone="red"
@@ -81,28 +83,38 @@ function AuthFailedPanel({ mailbox }: { mailbox: MailboxDto }) {
         follow-ups remain queued for this mailbox; new sends from this address are on hold until it
         reconnects.
       </p>
-      <div className="flex max-w-md gap-2">
-        <Input
-          type="password"
-          placeholder="New app password"
-          autoComplete="new-password"
-          value={password}
-          onChange={(e) => setPassword(e.target.value)}
-          aria-label={`New app password for ${mailbox.from_address}`}
-        />
+      {mailbox.auth_type === 'google_oauth' ? (
         <Button
           variant="destructive"
-          disabled={password.length === 0 || reconnect.isPending}
-          onClick={() =>
-            reconnect.mutate(
-              { id: mailbox.id, password },
-              { onSuccess: () => toast.success(`${mailbox.from_address} reconnected`) },
-            )
-          }
+          disabled={startGoogle.isPending}
+          onClick={() => startGoogle.mutate(mailbox.id)}
         >
-          Reconnect Mailbox
+          Reconnect Google
         </Button>
-      </div>
+      ) : (
+        <div className="flex max-w-md gap-2">
+          <Input
+            type="password"
+            placeholder="New app password"
+            autoComplete="new-password"
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            aria-label={`New app password for ${mailbox.from_address}`}
+          />
+          <Button
+            variant="destructive"
+            disabled={password.length === 0 || reconnect.isPending}
+            onClick={() =>
+              reconnect.mutate(
+                { id: mailbox.id, password },
+                { onSuccess: () => toast.success(`${mailbox.from_address} reconnected`) },
+              )
+            }
+          >
+            Reconnect Mailbox
+          </Button>
+        </div>
+      )}
     </PanelCard>
   );
 }

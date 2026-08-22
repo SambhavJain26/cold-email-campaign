@@ -3,7 +3,7 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { useForm, useWatch } from 'react-hook-form';
 import { toast } from 'sonner';
 import { z } from 'zod';
-import { createMailboxBodySchema, sendWindowSchema, type MailboxDto } from '@coldemail/shared';
+import { sendWindowSchema, type CreateMailboxBody, type MailboxDto } from '@coldemail/shared';
 import { Button } from '@/components/ui/button';
 import {
   Dialog,
@@ -22,10 +22,14 @@ import { useSettings } from '@/api/queries/settings';
 /** The shared create schema, narrowed to the form's shape: ports/cap always
  *  present here (prefilled defaults), password validated per-mode at submit —
  *  blank in edit mode means "keep the sealed one" (never re-displayed, B6.2). */
-const formSchema = createMailboxBodySchema
-  .omit({ auth_type: true, send_window: true, poll_folders: true })
-  .extend({
+const formSchema = z
+  .object({
+    auth_type: z.enum(['app_password', 'google_oauth']),
+    display_name: z.string().min(1),
+    from_address: z.email(),
+    smtp_host: z.string(),
     smtp_port: z.number().int().min(1).max(65535),
+    imap_host: z.string(),
     imap_port: z.number().int().min(1).max(65535),
     daily_cap: z.number().int().min(1),
     password: z.string(),
@@ -34,6 +38,14 @@ const formSchema = createMailboxBodySchema
     // Edited as free text, split to the array at submit — a comma-separated
     // field is far easier to type than a list editor for two or three values.
     poll_folders_text: z.string().min(1, 'At least one folder — INBOX at minimum'),
+  })
+  .superRefine((values, ctx) => {
+    if (values.auth_type === 'app_password' && values.smtp_host.length === 0) {
+      ctx.addIssue({ code: 'custom', path: ['smtp_host'], message: 'SMTP host is required' });
+    }
+    if (values.auth_type === 'app_password' && values.imap_host.length === 0) {
+      ctx.addIssue({ code: 'custom', path: ['imap_host'], message: 'IMAP host is required' });
+    }
   });
 type FormValues = z.infer<typeof formSchema>;
 
@@ -67,6 +79,7 @@ export function MailboxDialog({
     resolver: zodResolver(formSchema),
   });
   const selectedDays = useWatch({ control, name: 'send_window.days' }) ?? [];
+  const authType = useWatch({ control, name: 'auth_type' }) ?? 'google_oauth';
   const timezones =
     typeof Intl.supportedValuesOf === 'function'
       ? Intl.supportedValuesOf('timeZone')
@@ -80,6 +93,7 @@ export function MailboxDialog({
       mailbox
         ? {
             display_name: mailbox.display_name,
+            auth_type: mailbox.auth_type,
             from_address: mailbox.from_address,
             smtp_host: mailbox.smtp_host,
             smtp_port: mailbox.smtp_port,
@@ -93,15 +107,16 @@ export function MailboxDialog({
           }
         : {
             display_name: '',
+            auth_type: 'google_oauth',
             from_address: '',
-            smtp_host: '',
-            smtp_port: 465,
-            imap_host: '',
+            smtp_host: 'smtp.gmail.com',
+            smtp_port: 587,
+            imap_host: 'imap.gmail.com',
             imap_port: 993,
             daily_cap: 30,
             timezone: settings.data?.default_timezone ?? 'UTC',
             send_window: { days: [1, 2, 3, 4, 5], start: '08:00', end: '17:00' },
-            poll_folders_text: 'INBOX',
+            poll_folders_text: 'INBOX, [Gmail]/Spam',
             password: '',
           },
     );
@@ -113,22 +128,23 @@ export function MailboxDialog({
   };
 
   const onSubmit = (values: FormValues) => {
-    if (!editing && values.password.length === 0) {
+    if (!editing && values.auth_type === 'app_password' && values.password.length === 0) {
       setError('password', { message: 'App password is required' });
       return;
     }
     // Free-text field → the contract's array. Blank entries are dropped so a
     // trailing comma cannot produce an empty folder name.
     const { poll_folders_text, ...values_ } = values;
-    const body = {
+    const body: CreateMailboxBody = {
       ...values_,
       poll_folders: poll_folders_text
         .split(',')
         .map((f) => f.trim())
         .filter((f) => f !== ''),
-    };
+      ...(values.auth_type === 'google_oauth' && { password: undefined }),
+    } as CreateMailboxBody;
     if (editing) {
-      const { password, ...rest } = body;
+      const { password, auth_type: _authType, ...rest } = body;
       patch.mutate(
         { id: mailbox.id, body: password ? { ...rest, password } : rest },
         {
@@ -141,7 +157,11 @@ export function MailboxDialog({
     } else {
       create.mutate(body, {
         onSuccess: () => {
-          toast.success('Mailbox added');
+          toast.success(
+            body.auth_type === 'google_oauth'
+              ? 'Mailbox added — connect Google to finish setup'
+              : 'Mailbox added',
+          );
           handleOpenChange(false);
         },
       });
@@ -173,22 +193,50 @@ export function MailboxDialog({
         <DialogHeader>
           <DialogTitle>{editing ? `Edit ${mailbox.from_address}` : 'Add mailbox'}</DialogTitle>
           <DialogDescription>
-            SMTP sends, IMAP reply detection. The password is sealed at rest and never shown again.
+            Google OAuth is recommended for Workspace inboxes. App passwords remain available as a
+            fallback and are sealed at rest.
           </DialogDescription>
         </DialogHeader>
         <form onSubmit={handleSubmit(onSubmit)} className="space-y-3" noValidate>
           <div className="grid grid-cols-2 gap-3">
+            <div className="col-span-2 space-y-1">
+              <Label htmlFor="mb-auth-type">Authentication</Label>
+              <select
+                id="mb-auth-type"
+                className="h-9 w-full rounded-md border border-input bg-transparent px-3 text-sm disabled:opacity-60"
+                disabled={editing}
+                {...register('auth_type', {
+                  onChange: (event) => {
+                    if (event.target.value === 'google_oauth') {
+                      setValue('smtp_host', 'smtp.gmail.com');
+                      setValue('smtp_port', 587);
+                      setValue('imap_host', 'imap.gmail.com');
+                      setValue('imap_port', 993);
+                      setValue('poll_folders_text', 'INBOX, [Gmail]/Spam');
+                    }
+                  },
+                })}
+              >
+                <option value="google_oauth">Google OAuth (recommended)</option>
+                <option value="app_password">App password</option>
+              </select>
+              <p className="text-xs text-muted-foreground">
+                OAuth opens Google after this mailbox is saved; the application never stores your
+                Google password.
+              </p>
+            </div>
             {field('display_name', 'Display name')}
             {field('from_address', 'From address')}
-            {field('smtp_host', 'SMTP host')}
-            {field('smtp_port', 'SMTP port', 'number')}
-            {field('imap_host', 'IMAP host')}
-            {field('imap_port', 'IMAP port', 'number')}
-            {field(
-              'password',
-              editing ? 'App password (blank = unchanged)' : 'App password',
-              'password',
-            )}
+            {authType === 'app_password' && field('smtp_host', 'SMTP host')}
+            {authType === 'app_password' && field('smtp_port', 'SMTP port', 'number')}
+            {authType === 'app_password' && field('imap_host', 'IMAP host')}
+            {authType === 'app_password' && field('imap_port', 'IMAP port', 'number')}
+            {authType === 'app_password' &&
+              field(
+                'password',
+                editing ? 'App password (blank = unchanged)' : 'App password',
+                'password',
+              )}
             {field('daily_cap', 'Daily cap', 'number')}
             <div className="space-y-1">
               <Label htmlFor="mb-poll-folders">Polled folders</Label>
@@ -278,7 +326,7 @@ export function MailboxDialog({
             </p>
           )}
           <DialogFooter>
-            {editing && (
+            {editing && (mailbox.auth_type !== 'google_oauth' || mailbox.oauth_connected) && (
               <Button
                 type="button"
                 variant="outline"

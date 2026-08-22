@@ -61,12 +61,17 @@ export class SmtpImapTransport implements MailTransport {
     try {
       conn = await this.opts.connections.load(msg.mailboxId);
     } catch (err) {
-      // Credential lookup failed (DB down, unseal failed): mailbox-scoped and
-      // permanent enough that sending through it must stop.
+      if (!(err instanceof TransportAuthError)) {
+        return {
+          messageId,
+          accepted: false,
+          transientError: `credentials temporarily unavailable: ${errText(err)}`,
+        };
+      }
       return {
         messageId,
         accepted: false,
-        permanentError: `credentials unavailable: ${errText(err)}`,
+        permanentError: err.message,
         errorScope: 'mailbox',
       };
     }
@@ -242,7 +247,7 @@ export class SmtpImapTransport implements MailTransport {
   // ── internals ──────────────────────────────────────────────────────────────
 
   private transporterFor(mailboxId: number, conn: MailboxConnection): Transporter {
-    const signature = `${conn.smtpHost}:${conn.smtpPort}:${conn.fromAddress}:${conn.password}`;
+    const signature = `${conn.smtpHost}:${conn.smtpPort}:${conn.fromAddress}:${conn.authType ?? 'app_password'}:${conn.password ?? conn.accessToken ?? ''}`;
     const cached = this.pools.get(mailboxId);
     if (cached && cached.signature === signature) return cached.transporter;
     cached?.transporter.close(); // credentials changed (reconnect) — rebuild
@@ -265,7 +270,7 @@ export class SmtpImapTransport implements MailTransport {
       port: config.smtpPort,
       secure: config.smtpPort === 465, // implicit TLS; otherwise STARTTLS
       requireTLS: !this.opts.insecureTls && config.smtpPort !== 465,
-      auth: { user: config.fromAddress, pass: config.password },
+      auth: smtpAuthFor(config),
       ...(this.opts.insecureTls && { ignoreTLS: true, tls: { rejectUnauthorized: false } }),
       // One connection per mailbox: the scheduler paces sends itself (docs/06 §3).
       ...(pool && { pool: true, maxConnections: 1, maxMessages: 100 }),
@@ -282,7 +287,7 @@ export class SmtpImapTransport implements MailTransport {
       host: config.imapHost,
       port: config.imapPort,
       secure: config.imapPort === 993,
-      auth: { user: config.fromAddress, pass: config.password },
+      auth: imapAuthFor(config),
       logger: false, // imapflow's default logger prints message content
       emitLogs: false,
       connectionTimeout: timeout,
@@ -312,6 +317,18 @@ export class SmtpImapTransport implements MailTransport {
     }
     return err instanceof Error ? err : new Error(errText(err));
   }
+}
+
+export function smtpAuthFor(config: MailboxVerifyConfig) {
+  return config.authType === 'google_oauth'
+    ? { type: 'OAuth2' as const, user: config.fromAddress, accessToken: config.accessToken }
+    : { user: config.fromAddress, pass: config.password ?? '' };
+}
+
+export function imapAuthFor(config: MailboxVerifyConfig) {
+  return config.authType === 'google_oauth'
+    ? { user: config.fromAddress, accessToken: config.accessToken ?? '' }
+    : { user: config.fromAddress, pass: config.password ?? '' };
 }
 
 function failureResult(

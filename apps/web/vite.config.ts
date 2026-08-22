@@ -10,8 +10,10 @@ const root = path.dirname(fileURLToPath(import.meta.url));
 // 'real' proxies /api to the Fastify server. Default matches the server's PORT
 // default (docs/16); override with VITE_API_TARGET when running it elsewhere.
 const apiTarget = process.env.VITE_API_TARGET ?? 'http://localhost:3001';
+const appBase = process.env.VITE_APP_BASE ?? '/';
 
 export default defineConfig({
+  base: appBase,
   plugins: [react(), tailwindcss()],
   resolve: {
     alias: { '@': path.resolve(root, 'src') },
@@ -20,6 +22,11 @@ export default defineConfig({
     port: 5173,
     proxy: {
       '/api': { target: apiTarget, changeOrigin: false },
+      '/email-campaign/api': {
+        target: apiTarget,
+        changeOrigin: false,
+        rewrite: (path) => path.replace(/^\/email-campaign/, ''),
+      },
     },
   },
 });

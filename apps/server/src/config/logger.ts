@@ -20,9 +20,11 @@ const REDACT_PATHS = [
   'SECRET_KEY',
   'SESSION_KEY',
   'ANTHROPIC_API_KEY',
+  'GOOGLE_OAUTH_CLIENT_SECRET',
   '*.SECRET_KEY',
   '*.SESSION_KEY',
   '*.ANTHROPIC_API_KEY',
+  '*.GOOGLE_OAUTH_CLIENT_SECRET',
   'req.headers.cookie',
   'req.headers.authorization',
   'res.headers["set-cookie"]',
@@ -36,9 +38,12 @@ const REDACT_PATHS = [
  * the secret is inside a string value, not at a key.
  */
 const UNSUBSCRIBE_PATH = /^(\/u\/)[^/?#]+/;
+const OAUTH_CALLBACK_SECRETS = /([?&](?:code|state)=)[^&#]*/g;
 
 function redactUrl(url: string): string {
-  return url.replace(UNSUBSCRIBE_PATH, '$1[REDACTED]');
+  return url
+    .replace(UNSUBSCRIBE_PATH, '$1[REDACTED]')
+    .replace(OAUTH_CALLBACK_SECRETS, '$1[REDACTED]');
 }
 
 export function createLogger(

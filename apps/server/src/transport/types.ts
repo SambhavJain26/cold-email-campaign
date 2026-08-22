@@ -73,7 +73,9 @@ export interface MailboxVerifyConfig {
   imapHost: string;
   imapPort: number;
   fromAddress: string;
-  password: string; // decrypted just-in-time; never logged
+  authType?: 'app_password' | 'google_oauth';
+  password?: string; // decrypted just-in-time; never logged
+  accessToken?: string; // short-lived and memory-only; never logged
 }
 
 export interface VerifyResult {
@@ -115,6 +117,10 @@ export interface MailboxConnection extends MailboxVerifyConfig {
 export interface MailboxConnectionProvider {
   /** null when the mailbox row is gone or has no sealed secret. */
   load(mailboxId: number): Promise<MailboxConnection | null>;
+}
+
+export interface OAuthAccessTokenProvider {
+  accessToken(mailboxId: number): Promise<string>;
 }
 
 export interface MailTransport {

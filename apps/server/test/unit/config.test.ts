@@ -18,6 +18,7 @@ describe('parseEnv', () => {
     expect(r.config.PORT).toBe(3001);
     expect(r.config.HOST).toBe('127.0.0.1');
     expect(r.config.NODE_ENV).toBe('production');
+    expect(r.config.PUBLIC_APP_URL).toBe('http://localhost:5173');
   });
 
   it('coerces PORT to a number', () => {
@@ -79,5 +80,16 @@ describe('parseEnv', () => {
     expect(r.success).toBe(false);
     if (r.success) return;
     expect(r.issues.some((i) => i.startsWith('SIMULATED_CLOCK'))).toBe(true);
+  });
+
+  it('requires both Google OAuth client values and accepts a subpath public URL', () => {
+    expect(parseEnv({ ...validEnv, GOOGLE_OAUTH_CLIENT_ID: 'client-id' }).success).toBe(false);
+    const configured = parseEnv({
+      ...validEnv,
+      PUBLIC_APP_URL: 'https://sambhavpmtech.com/email-campaign',
+      GOOGLE_OAUTH_CLIENT_ID: 'client-id',
+      GOOGLE_OAUTH_CLIENT_SECRET: 'client-secret',
+    });
+    expect(configured.success).toBe(true);
   });
 });

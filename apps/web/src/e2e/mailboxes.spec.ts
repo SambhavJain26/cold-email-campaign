@@ -28,6 +28,7 @@ test('add mailbox: dialog validates, saves, and the totals move', async ({ page 
 
   await page.getByLabel('Display name').fill('Sales 5');
   await page.getByLabel('From address').fill('sales5@coldmail-domain3.com');
+  await page.getByLabel('Authentication').selectOption('app_password');
   await page.getByLabel('SMTP host').fill('smtp.fastmail.com');
   await page.getByLabel('IMAP host').fill('imap.fastmail.com');
   await page.getByLabel('App password', { exact: true }).fill('app-password-123');

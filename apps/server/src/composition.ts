@@ -28,6 +28,7 @@ import type { DnsResolver } from './services/preflight';
 import { InlineJobQueue, SimulationDriver } from './services/simulation';
 import { isSteppable } from './clock';
 import { VirtualClock } from './clock/virtual';
+import { GoogleOAuthService } from './services/googleOAuth';
 
 export interface AppServices {
   config: Config;
@@ -49,6 +50,8 @@ export interface AppServices {
   simulation?: SimulationDriver;
   /** Domain-readiness preflight's DNS port — injected so it is testable offline. */
   dns: DnsResolver;
+  googleOAuth: GoogleOAuthService;
+  mailboxConnections: DbMailboxConnectionProvider;
 }
 
 export interface ComposeOverrides {
@@ -72,22 +75,29 @@ export function compose(config: Config, overrides: ComposeOverrides = {}): AppSe
   const databaseUrl = overrides.databaseUrl ?? config.DATABASE_URL;
   const { db, pool } = createDb(databaseUrl);
 
+  const alerts = new DbAlertSink(
+    db,
+    config.ALERT_WEBHOOK_URL ? new HttpAlertWebhook(config.ALERT_WEBHOOK_URL) : undefined,
+  );
+  const googleOAuth = new GoogleOAuthService({ db, clock, alerts, config });
+  const mailboxConnections = new DbMailboxConnectionProvider({
+    db,
+    secretKey: config.SECRET_KEY,
+    oauth: googleOAuth,
+  });
+
   // THE live switch (docs/16 §1, B8.2). SmtpImapTransport reaches mailboxes
   // through the connection provider — it never touches the DB itself.
   const transport =
     overrides.transport ??
     (config.MAIL_TRANSPORT === 'smtp_imap'
       ? new SmtpImapTransport({
-          connections: new DbMailboxConnectionProvider({ db, secretKey: config.SECRET_KEY }),
+          connections: mailboxConnections,
           insecureTls: config.MAIL_TLS_INSECURE,
         })
       : new MockTransport(clock));
 
   const store = new EventStore(db);
-  const alerts = new DbAlertSink(
-    db,
-    config.ALERT_WEBHOOK_URL ? new HttpAlertWebhook(config.ALERT_WEBHOOK_URL) : undefined,
-  );
   const sequences = overrides.sequences ?? new DbSequenceProvider(db); // 0003 tables (B4.1)
   const renderer = new RenderEngine(); // docs/08 — the only producer of outbound bodies
   const rng = overrides.rng ?? systemRng;
@@ -174,6 +184,8 @@ export function compose(config: Config, overrides: ComposeOverrides = {}): AppSe
     renderer,
     metrics: new MetricsEngine(db),
     dns: overrides.dns ?? createDnsResolver(),
+    googleOAuth,
+    mailboxConnections,
     ...(simulation && { simulation }),
   };
 }

@@ -13,11 +13,14 @@ RUN npm ci
 # --- SPA: real API mode disables MSW; the bundle calls same-origin /api/v1 ---
 FROM base AS web-build
 ENV VITE_API_MODE=real
+ARG VITE_APP_BASE=/
+ENV VITE_APP_BASE=$VITE_APP_BASE
 RUN npm run build -w @coldemail/web
 
 # --- app: runs migrations then boots (see docker/app-entrypoint.sh) ---
 FROM base AS app
 ENV NODE_ENV=production
+RUN npm prune --omit=dev
 COPY docker/app-entrypoint.sh /usr/local/bin/app-entrypoint.sh
 RUN chmod +x /usr/local/bin/app-entrypoint.sh
 EXPOSE 3001
@@ -30,3 +33,8 @@ ENTRYPOINT ["/usr/local/bin/app-entrypoint.sh"]
 FROM caddy:2 AS caddy
 COPY --from=web-build /app/apps/web/dist /srv
 COPY docker/Caddyfile /etc/caddy/Caddyfile
+
+# Existing-VPS deployment: plain HTTP gateway bound to host loopback. Host
+# Caddy remains the sole public TLS listener and owns every public hostname.
+FROM caddy AS spaceship-gateway
+COPY docker/Caddyfile.spaceship /etc/caddy/Caddyfile

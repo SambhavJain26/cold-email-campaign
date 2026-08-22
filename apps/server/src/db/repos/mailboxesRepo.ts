@@ -12,7 +12,7 @@ export interface NewMailbox {
   smtpPort?: number;
   imapHost: string;
   imapPort?: number;
-  authType?: string;
+  authType?: 'app_password' | 'google_oauth';
   dailyCap?: number;
   sendWindow?: MailboxRow['sendWindow'];
   timezone?: string;
@@ -70,6 +70,7 @@ export async function patchMailbox(
       | 'imapPort'
       | 'authType'
       | 'timezone'
+      | 'pollFolders'
     >
   >,
 ): Promise<void> {

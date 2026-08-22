@@ -33,6 +33,7 @@ import {
   validateTemplateBodySchema,
   type ApiErrorCode,
   type LeadDto,
+  type MailboxDto,
   type SequenceDto,
   type UniboxItemDto,
 } from '@coldemail/shared';
@@ -272,16 +273,22 @@ export const handlers: RequestHandler[] = [
         id: db.nextId++,
         display_name: body.display_name,
         from_address: body.from_address,
-        smtp_host: body.smtp_host,
+        smtp_host: body.auth_type === 'google_oauth' ? 'smtp.gmail.com' : body.smtp_host!,
         smtp_port: body.smtp_port ?? 465,
-        imap_host: body.imap_host,
+        imap_host: body.auth_type === 'google_oauth' ? 'imap.gmail.com' : body.imap_host!,
         imap_port: body.imap_port ?? 993,
         daily_cap: body.daily_cap ?? 30,
         effective_cap: body.daily_cap ?? 30,
         send_window: body.send_window ?? { days: [1, 2, 3, 4, 5], start: '08:00', end: '17:00' },
         timezone: body.timezone ?? 'America/New_York',
-        poll_folders: body.poll_folders ?? ['INBOX'],
-        status: 'ok' as const,
+        poll_folders:
+          body.poll_folders ??
+          (body.auth_type === 'google_oauth' ? ['INBOX', '[Gmail]/Spam'] : ['INBOX']),
+        auth_type: body.auth_type ?? 'app_password',
+        oauth_connected: false,
+        status: (body.auth_type === 'google_oauth'
+          ? 'setup_required'
+          : 'ok') as MailboxDto['status'],
         status_reason: null,
         sent_today: 0,
         hard_bounce_pct: 0,
@@ -299,7 +306,7 @@ export const handlers: RequestHandler[] = [
       if (!mailbox) return notFound('mailbox');
       const body = await parseBody(request, patchMailboxBodySchema);
       if (body instanceof Response) return body;
-      const { password: _pw, auth_type: _at, ...patch } = body;
+      const { password: _pw, ...patch } = body;
       Object.assign(mailbox, patch);
       if (body.daily_cap !== undefined) mailbox.effective_cap = body.daily_cap;
       return HttpResponse.json(mailbox);
@@ -325,6 +332,27 @@ export const handlers: RequestHandler[] = [
       if (!mailbox) return notFound('mailbox');
       const failed = mailbox.status === 'auth_failed';
       return HttpResponse.json({ smtp_ok: !failed, imap_ok: !failed, round_trip_ms: 142 });
+    }),
+  ),
+  http.post(
+    `${BASE}/mailboxes/:id/oauth/google/start`,
+    authed(({ params }) => {
+      const mailbox = db.mailboxes.find((m) => m.id === Number(params.id));
+      if (!mailbox) return notFound('mailbox');
+      return HttpResponse.json({
+        authorization_url: `https://accounts.google.com/o/oauth2/v2/auth?state=mock-${mailbox.id}`,
+      });
+    }),
+  ),
+  http.post(
+    `${BASE}/mailboxes/:id/oauth/google/disconnect`,
+    authed(({ params }) => {
+      const mailbox = db.mailboxes.find((m) => m.id === Number(params.id));
+      if (!mailbox) return notFound('mailbox');
+      mailbox.oauth_connected = false;
+      mailbox.status = 'setup_required';
+      mailbox.status_reason = 'Google authorization disconnected';
+      return HttpResponse.json({ ok: true });
     }),
   ),
   http.post(

@@ -17,6 +17,7 @@ const CONTRACT_ROUTES = [
   // inherits neither the session plugin nor the CSRF check.
   'GET /u/:token',
   'POST /u/:token',
+  'GET /oauth/google/callback',
   'POST /api/v1/auth/login',
   'POST /api/v1/auth/logout',
   'GET /api/v1/auth/me',
@@ -29,6 +30,8 @@ const CONTRACT_ROUTES = [
   'POST /api/v1/mailboxes/:id/pause',
   'POST /api/v1/mailboxes/:id/resume',
   'POST /api/v1/mailboxes/:id/reconnect',
+  'POST /api/v1/mailboxes/:id/oauth/google/start',
+  'POST /api/v1/mailboxes/:id/oauth/google/disconnect',
   'GET /api/v1/leads',
   'GET /api/v1/leads/:id',
   'PATCH /api/v1/leads/:id',

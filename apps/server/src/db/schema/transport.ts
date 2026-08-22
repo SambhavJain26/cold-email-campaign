@@ -81,6 +81,30 @@ export const mailboxSecrets = pgTable('mailbox_secrets', {
   updatedAt: tz('updated_at').notNull().defaultNow(),
 });
 
+export const mailboxOauthCredentials = pgTable('mailbox_oauth_credentials', {
+  mailboxId: bigint('mailbox_id', { mode: 'number' })
+    .primaryKey()
+    .references(() => mailboxes.id, { onDelete: 'cascade' }),
+  sealedRefreshToken: bytea('sealed_refresh_token').notNull(),
+  grantedEmail: text('granted_email').notNull(),
+  scopes: text('scopes').array().notNull().default([]),
+  updatedAt: tz('updated_at').notNull().defaultNow(),
+});
+
+export const mailboxOauthStates = pgTable(
+  'mailbox_oauth_states',
+  {
+    stateHash: text('state_hash').primaryKey(),
+    mailboxId: bigint('mailbox_id', { mode: 'number' })
+      .notNull()
+      .references(() => mailboxes.id, { onDelete: 'cascade' }),
+    sealedCodeVerifier: bytea('sealed_code_verifier').notNull(),
+    expiresAt: tz('expires_at').notNull(),
+    usedAt: tz('used_at'),
+  },
+  (t) => [index('mailbox_oauth_states_expiry').on(t.expiresAt)],
+);
+
 export const sentMessages = pgTable(
   'sent_messages',
   {

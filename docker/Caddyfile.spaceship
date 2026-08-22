@@ -1,0 +1,29 @@
+{
+	auto_https off
+}
+
+:8080 {
+	encode gzip zstd
+
+	# Host Caddy forwards the canonical subpath unchanged. Strip it before the
+	# Fastify routes and before looking up SPA assets in /srv.
+	@api path /email-campaign/api/* /email-campaign/health /email-campaign/oauth/google/callback
+	handle @api {
+		uri strip_prefix /email-campaign
+		reverse_proxy app:3001
+	}
+
+	# The two public unsubscribe hosts reach the same secure token endpoint.
+	@unsubscribe path /u/*
+	handle @unsubscribe {
+		reverse_proxy app:3001
+	}
+
+	handle_path /email-campaign/* {
+		root * /srv
+		try_files {path} /index.html
+		file_server
+	}
+
+	respond 404
+}

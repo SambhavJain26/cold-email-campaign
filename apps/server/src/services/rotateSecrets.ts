@@ -4,6 +4,7 @@
 // so a crash mid-rotation can never leave a mix the app can't unseal.
 import type { Db } from '../db/client';
 import { listMailboxSecrets, upsertMailboxSecret } from '../db/repos/mailboxesRepo';
+import { listOauthSecrets, replaceOauthSecret } from '../db/repos/mailboxOauthRepo';
 import { sealSecret, unsealSecret } from '../secrets/seal';
 
 const HEX_KEY_32 = /^[0-9a-f]{64}$/i;
@@ -39,6 +40,17 @@ export async function rotateSecrets(
       const resealed = await sealSecret(plaintext, newKey);
       await upsertMailboxSecret(tx, mailboxId, resealed, now);
     }
-    return { rotated: secrets.length };
+    const oauthSecrets = await listOauthSecrets(tx);
+    for (const secret of oauthSecrets) {
+      const plaintext = await unsealSecret(secret.sealed, oldKey);
+      const resealed = await sealSecret(plaintext, newKey);
+      await replaceOauthSecret(
+        tx,
+        secret.kind === 'refresh'
+          ? { kind: 'refresh', mailboxId: secret.mailboxId, sealed: resealed, at: now }
+          : { kind: 'pkce', stateHash: secret.stateHash, sealed: resealed },
+      );
+    }
+    return { rotated: secrets.length + oauthSecrets.length };
   });
 }

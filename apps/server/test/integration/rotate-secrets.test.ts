@@ -4,6 +4,11 @@
 import { afterAll, beforeEach, describe, expect, it } from 'vitest';
 import { createDb } from '../../src/db/client';
 import { getMailboxSecret, upsertMailboxSecret } from '../../src/db/repos/mailboxesRepo';
+import {
+  insertOauthState,
+  listOauthSecrets,
+  upsertOauthCredential,
+} from '../../src/db/repos/mailboxOauthRepo';
 import { sealSecret, unsealSecret } from '../../src/secrets/seal';
 import { rotateSecrets } from '../../src/services/rotateSecrets';
 import { resetCoreTables, seedMailboxes, TEST_DATABASE_URL } from '../helpers/db';
@@ -49,6 +54,32 @@ describe('B7.1 rotateSecrets', () => {
   it('is a no-op count over zero secrets (no mailboxes with creds yet)', async () => {
     const { rotated } = await rotateSecrets(db, KEY_A, KEY_B, NOW);
     expect(rotated).toBe(0);
+  });
+
+  it('rotates OAuth refresh credentials and pending PKCE verifiers atomically', async () => {
+    await upsertOauthCredential(db, {
+      mailboxId: 1,
+      sealedRefreshToken: await sealSecret('refresh-token', KEY_A),
+      grantedEmail: 'mb1@test.dev',
+      scopes: ['https://mail.google.com/'],
+      at: NOW,
+    });
+    await insertOauthState(db, {
+      stateHash: 'state-hash',
+      mailboxId: 1,
+      sealedCodeVerifier: await sealSecret('pkce-verifier', KEY_A),
+      expiresAt: new Date(NOW.getTime() + 600_000),
+    });
+
+    expect((await rotateSecrets(db, KEY_A, KEY_B, NOW)).rotated).toBe(2);
+    const rotated = await listOauthSecrets(db);
+    expect(rotated).toHaveLength(2);
+    for (const secret of rotated) {
+      expect(await unsealSecret(secret.sealed, KEY_B)).toBe(
+        secret.kind === 'refresh' ? 'refresh-token' : 'pkce-verifier',
+      );
+      await expect(unsealSecret(secret.sealed, KEY_A)).rejects.toThrow();
+    }
   });
 
   it('rejects an identical new key without touching anything', async () => {

@@ -1,0 +1,36 @@
+# Add these sites to /etc/caddy/Caddyfile. The existing sambhavbuilds.com site
+# stays unchanged and remains the portfolio origin.
+sambhavpmtech.com {
+	@emailAppRoot path /email-campaign
+	redir @emailAppRoot /email-campaign/ 308
+
+	@emailApp path /email-campaign/*
+	handle @emailApp {
+		reverse_proxy 127.0.0.1:18080
+	}
+
+	handle {
+		redir https://sambhavbuilds.com/ 308
+	}
+}
+
+www.sambhavpmtech.com {
+	@emailApp path /email-campaign /email-campaign/*
+	redir @emailApp https://sambhavpmtech.com{uri} 308
+	redir https://sambhavbuilds.com/ 308
+}
+
+sambhavpmops.com, www.sambhavpmops.com {
+	redir https://sambhavbuilds.com/ 308
+}
+
+unsubscribe.sambhavpmtech.com, unsubscribe.sambhavpmops.com {
+	@unsubscribe path /u/*
+	handle @unsubscribe {
+		reverse_proxy 127.0.0.1:18080
+	}
+
+	handle {
+		respond 404
+	}
+}

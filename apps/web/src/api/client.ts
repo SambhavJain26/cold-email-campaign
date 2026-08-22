@@ -35,7 +35,8 @@ export interface ApiFetchOptions {
   skipUnauthorizedHandler?: boolean;
 }
 
-export const API_BASE = '/api/v1';
+const appBase = import.meta.env.BASE_URL === '/' ? '' : import.meta.env.BASE_URL.replace(/\/$/, '');
+export const API_BASE = `${appBase}/api/v1`;
 
 export async function apiFetch<T>(
   path: string,

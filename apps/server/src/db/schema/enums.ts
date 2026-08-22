@@ -45,6 +45,7 @@ export const mailboxStatusEnum = pgEnum('mailbox_status', [
   'auth_failed',
   'imap_stale',
   'provider_blocked',
+  'setup_required',
 ]);
 export const incomingClassEnum = pgEnum('incoming_class', [
   'bounce',

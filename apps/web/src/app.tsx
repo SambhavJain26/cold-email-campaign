@@ -13,7 +13,7 @@ setOnUnauthorized(() => {
 export default function App() {
   return (
     <QueryClientProvider client={queryClient}>
-      <RouterProvider router={router} future={{ v7_startTransition: true }} />
+      <RouterProvider router={router} />
       <Toaster position="top-right" richColors />
     </QueryClientProvider>
   );

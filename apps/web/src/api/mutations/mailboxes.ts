@@ -3,6 +3,8 @@ import {
   mailboxSchema,
   okResponseSchema,
   testConnectionResponseSchema,
+  googleOauthDisconnectResponseSchema,
+  googleOauthStartResponseSchema,
   type CreateMailboxBody,
   type PatchMailboxBody,
 } from '@coldemail/shared';
@@ -73,6 +75,29 @@ export function useReconnectMailbox() {
       apiFetch(`/mailboxes/${id}/reconnect`, okResponseSchema, {
         method: 'POST',
         body: { password },
+      }),
+    onSuccess: invalidate,
+  });
+}
+
+export function useStartGoogleOauth() {
+  return useMutation({
+    mutationFn: (id: number) =>
+      apiFetch(`/mailboxes/${id}/oauth/google/start`, googleOauthStartResponseSchema, {
+        method: 'POST',
+      }),
+    onSuccess: ({ authorization_url }) => {
+      window.location.assign(authorization_url);
+    },
+  });
+}
+
+export function useDisconnectGoogleOauth() {
+  const invalidate = useInvalidateMailboxes();
+  return useMutation({
+    mutationFn: (id: number) =>
+      apiFetch(`/mailboxes/${id}/oauth/google/disconnect`, googleOauthDisconnectResponseSchema, {
+        method: 'POST',
       }),
     onSuccess: invalidate,
   });

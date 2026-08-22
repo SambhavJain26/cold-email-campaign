@@ -3,7 +3,11 @@
 // reads the `mailboxes` row, unseals the password just-in-time (never cached,
 // never logged) and hands over the UID high-water mark the IMAP fetch needs.
 import type { Db } from '../db/client';
-import type { MailboxConnection, MailboxConnectionProvider } from '../transport/types';
+import type {
+  MailboxConnection,
+  MailboxConnectionProvider,
+  OAuthAccessTokenProvider,
+} from '../transport/types';
 import { getMailbox, getMailboxSecret } from '../db/repos/mailboxesRepo';
 import { listCursors } from '../db/repos/pollCursorsRepo';
 import { unsealSecret } from '../secrets/seal';
@@ -12,6 +16,7 @@ export interface MailboxConnectionDeps {
   db: Db;
   /** SECRET_KEY — the libsodium sealing key (docs/16 §1). */
   secretKey: string;
+  oauth?: OAuthAccessTokenProvider;
 }
 
 export class DbMailboxConnectionProvider implements MailboxConnectionProvider {
@@ -21,8 +26,18 @@ export class DbMailboxConnectionProvider implements MailboxConnectionProvider {
     const { db, secretKey } = this.deps;
     const row = await getMailbox(db, mailboxId);
     if (!row) return null;
-    const sealed = await getMailboxSecret(db, mailboxId);
-    if (!sealed) return null;
+    let auth: Pick<MailboxConnection, 'authType' | 'password' | 'accessToken'>;
+    if (row.authType === 'google_oauth') {
+      if (!this.deps.oauth) return null;
+      auth = {
+        authType: 'google_oauth',
+        accessToken: await this.deps.oauth.accessToken(mailboxId),
+      };
+    } else {
+      const sealed = await getMailboxSecret(db, mailboxId);
+      if (!sealed) return null;
+      auth = { authType: 'app_password', password: await unsealSecret(sealed, secretKey) };
+    }
 
     return {
       displayName: row.displayName,
@@ -31,7 +46,7 @@ export class DbMailboxConnectionProvider implements MailboxConnectionProvider {
       smtpPort: row.smtpPort,
       imapHost: row.imapHost,
       imapPort: row.imapPort,
-      password: await unsealSecret(sealed, secretKey),
+      ...auth,
       folders: await this.foldersFor(mailboxId, row.pollFolders),
     };
   }

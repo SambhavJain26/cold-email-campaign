@@ -11,6 +11,8 @@ import {
   mailboxVolumeResponseSchema,
   patchMailboxBodySchema,
   reconnectMailboxBodySchema,
+  googleOauthDisconnectResponseSchema,
+  googleOauthStartResponseSchema,
   resumeMailboxBodySchema,
   testConnectionResponseSchema,
   type MailboxDto,
@@ -20,12 +22,12 @@ import type { AppServices } from '../composition';
 import {
   createMailbox,
   getMailbox,
-  getMailboxSecret,
   listMailboxes,
   patchMailbox,
   upsertMailboxSecret,
   type MailboxRow,
 } from '../db/repos/mailboxesRepo';
+import { hasOauthCredential } from '../db/repos/mailboxOauthRepo';
 import { mailboxVolume } from '../db/repos/metricsRepo';
 import { getSettings } from '../db/repos/settingsRepo';
 import { getCursor, seedCursorIfAbsent } from '../db/repos/pollCursorsRepo';
@@ -34,11 +36,13 @@ import type { Db } from '../db/client';
 import { mailboxStatsFor, type MailboxStats } from '../services/mailboxStats';
 import { resumeMailbox } from '../services/autoPause';
 import { mailboxImbalance } from '../services/metrics/watchRules';
-import { sealSecret, unsealSecret } from '../secrets/seal';
+import { sealSecret } from '../secrets/seal';
+import type { MailboxVerifyConfig } from '../transport/types';
+import { GoogleOauthError } from '../services/googleOAuth';
 import { AppError } from './errors';
 import type { ZodTypeProvider } from './plugins/zodCompilers';
 
-function toMailboxDto(row: MailboxRow, stats: MailboxStats): MailboxDto {
+function toMailboxDto(row: MailboxRow, stats: MailboxStats, oauthConnected: boolean): MailboxDto {
   return {
     id: row.id,
     display_name: row.displayName,
@@ -52,6 +56,8 @@ function toMailboxDto(row: MailboxRow, stats: MailboxStats): MailboxDto {
     send_window: row.sendWindow,
     timezone: row.timezone,
     poll_folders: row.pollFolders,
+    auth_type: row.authType === 'google_oauth' ? 'google_oauth' : 'app_password',
+    oauth_connected: oauthConnected,
     status: row.status,
     status_reason: row.statusReason,
     sent_today: stats.sentToday,
@@ -69,7 +75,6 @@ function patchColumns(body: PatchMailboxBody) {
     ...(body.smtp_port !== undefined && { smtpPort: body.smtp_port }),
     ...(body.imap_host !== undefined && { imapHost: body.imap_host }),
     ...(body.imap_port !== undefined && { imapPort: body.imap_port }),
-    ...(body.auth_type !== undefined && { authType: body.auth_type }),
     ...(body.daily_cap !== undefined && { dailyCap: body.daily_cap }),
     ...(body.send_window !== undefined && { sendWindow: body.send_window }),
     ...(body.timezone !== undefined && { timezone: body.timezone }),
@@ -95,22 +100,19 @@ async function seedPollCursorsFor(
     fromAddress: string;
     pollFolders: string[];
   },
-  password: string,
+  connection: MailboxVerifyConfig,
 ): Promise<void> {
   const { db, transport } = services;
   if (!transport.initialPollUid) return;
-  const config = {
-    smtpHost: row.smtpHost,
-    smtpPort: row.smtpPort,
-    imapHost: row.imapHost,
-    imapPort: row.imapPort,
-    fromAddress: row.fromAddress,
-    password,
-  };
   for (const folder of row.pollFolders) {
     if ((await getCursor(db, row.id, folder)) !== null) continue;
     try {
-      await seedCursorIfAbsent(db, row.id, folder, await transport.initialPollUid(config, folder));
+      await seedCursorIfAbsent(
+        db,
+        row.id,
+        folder,
+        await transport.initialPollUid(connection, folder),
+      );
     } catch {
       // A folder that does not exist yet on the provider must not fail the
       // whole save; the poller skips it until it appears.
@@ -164,7 +166,7 @@ function localCalendarDays(now: Date, timezone: string, count: number): string[]
 
 export async function mailboxesRoutes(app: FastifyInstance, services: AppServices): Promise<void> {
   const r = app.withTypeProvider<ZodTypeProvider>();
-  const { db, clock, transport, config, jobs } = services;
+  const { db, clock, transport, config, jobs, googleOAuth, mailboxConnections } = services;
 
   const requireMailbox = async (id: number): Promise<MailboxRow> => {
     const row = await getMailbox(db, id);
@@ -174,13 +176,19 @@ export async function mailboxesRoutes(app: FastifyInstance, services: AppService
 
   const dtoOf = async (row: MailboxRow): Promise<MailboxDto> => {
     const stats = await mailboxStatsFor({ db, clock }, [row]);
-    return toMailboxDto(row, stats.get(row.id)!);
+    return toMailboxDto(row, stats.get(row.id)!, await hasOauthCredential(db, row.id));
   };
 
   r.get('/mailboxes', { schema: { response: { 200: mailboxListResponseSchema } } }, async () => {
     const rows = await listMailboxes(db);
     const stats = await mailboxStatsFor({ db, clock }, rows);
-    return { items: rows.map((row) => toMailboxDto(row, stats.get(row.id)!)) };
+    return {
+      items: await Promise.all(
+        rows.map(async (row) =>
+          toMailboxDto(row, stats.get(row.id)!, await hasOauthCredential(db, row.id)),
+        ),
+      ),
+    };
   });
 
   r.get(
@@ -226,28 +234,34 @@ export async function mailboxesRoutes(app: FastifyInstance, services: AppService
     { schema: { body: createMailboxBodySchema, response: { 200: mailboxSchema } } },
     async (req) => {
       const b = req.body;
+      const authType = b.auth_type ?? 'app_password';
       if (b.timezone !== undefined) assertIanaTimezone(b.timezone);
       await assertDailyCapWithinGuardrail(db, b.daily_cap);
       const row = await createMailbox(db, {
         displayName: b.display_name,
         fromAddress: b.from_address,
-        smtpHost: b.smtp_host,
+        smtpHost: authType === 'google_oauth' ? 'smtp.gmail.com' : b.smtp_host!,
         smtpPort: b.smtp_port,
-        imapHost: b.imap_host,
+        imapHost: authType === 'google_oauth' ? 'imap.gmail.com' : b.imap_host!,
         imapPort: b.imap_port,
-        authType: b.auth_type,
+        authType,
         dailyCap: b.daily_cap,
         sendWindow: b.send_window,
         timezone: b.timezone,
-        pollFolders: b.poll_folders,
+        pollFolders:
+          b.poll_folders ?? (authType === 'google_oauth' ? ['INBOX', '[Gmail]/Spam'] : undefined),
+        status: authType === 'google_oauth' ? 'setup_required' : 'ok',
       });
-      const sealed = await sealSecret(b.password, config.SECRET_KEY);
-      await upsertMailboxSecret(db, row.id, sealed, clock.now());
-      await seedPollCursorsFor(services, row, b.password);
-      // Start polling THIS mailbox now: boot only registered the mailboxes that
-      // existed then, so without this a mailbox added through the UI would go
-      // unpolled until the next restart (no-op when workers aren't running).
-      await jobs.registerMailboxPoll(row.id);
+      if (authType === 'app_password') {
+        const password = b.password!;
+        const sealed = await sealSecret(password, config.SECRET_KEY);
+        await upsertMailboxSecret(db, row.id, sealed, clock.now());
+        const connection = await mailboxConnections.load(row.id);
+        if (connection) await seedPollCursorsFor(services, row, connection);
+        // OAuth mailboxes remain setup_required and unregistered until the
+        // callback stores a valid refresh credential.
+        await jobs.registerMailboxPoll(row.id);
+      }
       return dtoOf(row);
     },
   );
@@ -262,12 +276,15 @@ export async function mailboxesRoutes(app: FastifyInstance, services: AppService
       },
     },
     async (req) => {
-      await requireMailbox(req.params.id);
+      const existing = await requireMailbox(req.params.id);
       if (req.body.timezone !== undefined) assertIanaTimezone(req.body.timezone);
       await assertDailyCapWithinGuardrail(db, req.body.daily_cap);
       const cols = patchColumns(req.body);
       if (Object.keys(cols).length > 0) await patchMailbox(db, req.params.id, cols);
       if (req.body.password !== undefined) {
+        if (existing.authType === 'google_oauth') {
+          throw new AppError('validation', 422, 'OAuth mailboxes do not accept passwords');
+        }
         const sealed = await sealSecret(req.body.password, config.SECRET_KEY);
         await upsertMailboxSecret(db, req.params.id, sealed, clock.now());
       }
@@ -280,16 +297,10 @@ export async function mailboxesRoutes(app: FastifyInstance, services: AppService
     { schema: { params: idParamSchema, response: { 200: testConnectionResponseSchema } } },
     async (req) => {
       const row = await requireMailbox(req.params.id);
-      const sealed = await getMailboxSecret(db, row.id);
-      const password = sealed ? await unsealSecret(sealed, config.SECRET_KEY) : '';
-      const result = await transport.verify({
-        smtpHost: row.smtpHost,
-        smtpPort: row.smtpPort,
-        imapHost: row.imapHost,
-        imapPort: row.imapPort,
-        fromAddress: row.fromAddress,
-        password,
-      });
+      const connection = await mailboxConnections.load(row.id);
+      if (!connection)
+        throw new AppError('mailbox_unhealthy', 409, 'Mailbox credentials are not connected');
+      const result = await transport.verify(connection);
       return {
         smtp_ok: result.smtpOk,
         imap_ok: result.imapOk,
@@ -342,6 +353,9 @@ export async function mailboxesRoutes(app: FastifyInstance, services: AppService
     },
     async (req) => {
       const row = await requireMailbox(req.params.id);
+      if (row.authType === 'google_oauth') {
+        throw new AppError('validation', 422, 'Use Reconnect Google for an OAuth mailbox');
+      }
       const sealed = await sealSecret(req.body.password, config.SECRET_KEY);
       await upsertMailboxSecret(db, row.id, sealed, clock.now());
       const result = await transport.verify({
@@ -363,9 +377,77 @@ export async function mailboxesRoutes(app: FastifyInstance, services: AppService
       // folders that already have one, so a reconnect can never discard
       // messages that arrived while the mailbox was unavailable.
       if (result.smtpOk && result.imapOk) {
-        await seedPollCursorsFor(services, row, req.body.password);
+        const connection = await mailboxConnections.load(row.id);
+        if (connection) await seedPollCursorsFor(services, row, connection);
       }
       return dtoOf(await requireMailbox(req.params.id));
     },
   );
+
+  r.post(
+    '/mailboxes/:id/oauth/google/start',
+    {
+      schema: {
+        params: idParamSchema,
+        response: { 200: googleOauthStartResponseSchema },
+      },
+    },
+    async (req) => {
+      await requireMailbox(req.params.id);
+      try {
+        return { authorization_url: await googleOAuth.authorizationUrl(req.params.id) };
+      } catch (err) {
+        if (err instanceof GoogleOauthError) {
+          throw new AppError('validation', 422, err.message);
+        }
+        throw err;
+      }
+    },
+  );
+
+  r.post(
+    '/mailboxes/:id/oauth/google/disconnect',
+    {
+      schema: {
+        params: idParamSchema,
+        response: { 200: googleOauthDisconnectResponseSchema },
+      },
+    },
+    async (req) => {
+      const row = await requireMailbox(req.params.id);
+      if (row.authType !== 'google_oauth') {
+        throw new AppError('validation', 422, 'Mailbox does not use Google OAuth');
+      }
+      await googleOAuth.disconnect(row.id);
+      return { ok: true as const };
+    },
+  );
+}
+
+/** Public callback: state + PKCE are the authorization boundary, not a cookie session. */
+export async function googleOauthCallbackRoutes(
+  app: FastifyInstance,
+  services: AppServices,
+): Promise<void> {
+  app.get('/oauth/google/callback', async (req, reply) => {
+    const query = req.query as Record<string, unknown>;
+    const state = typeof query.state === 'string' ? query.state : '';
+    const code = typeof query.code === 'string' ? query.code : '';
+    const base = services.config.PUBLIC_APP_URL.replace(/\/$/, '');
+    if (!state || !code || query.error !== undefined) {
+      return reply.redirect(`${base}/mailboxes?oauth=error`);
+    }
+    try {
+      const mailboxId = await services.googleOAuth.completeAuthorization(state, code);
+      const connection = await services.mailboxConnections.load(mailboxId);
+      const row = await getMailbox(services.db, mailboxId);
+      if (connection && row) await seedPollCursorsFor(services, row, connection);
+      await services.jobs.registerMailboxPoll(mailboxId);
+      return reply.redirect(`${base}/mailboxes?oauth=connected`);
+    } catch (err) {
+      if (!(err instanceof GoogleOauthError))
+        req.log.error({ err }, 'Google OAuth callback failed');
+      return reply.redirect(`${base}/mailboxes?oauth=error`);
+    }
+  });
 }

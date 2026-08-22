@@ -83,6 +83,7 @@ export const MAILBOX_STATUSES = [
   'auth_failed',
   'imap_stale',
   'provider_blocked',
+  'setup_required',
 ] as const;
 export type MailboxStatus = (typeof MAILBOX_STATUSES)[number];
 

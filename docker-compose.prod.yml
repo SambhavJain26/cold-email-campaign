@@ -67,6 +67,9 @@ services:
       PORT: '3001'
       NODE_ENV: production
       LOG_LEVEL: ${LOG_LEVEL:-info}
+      PUBLIC_APP_URL: ${PUBLIC_APP_URL:-https://localhost}
+      GOOGLE_OAUTH_CLIENT_ID: ${GOOGLE_OAUTH_CLIENT_ID:-}
+      GOOGLE_OAUTH_CLIENT_SECRET: ${GOOGLE_OAUTH_CLIENT_SECRET:-}
       BACKUP_DIR: /var/backups/coldemail
       ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
       ALERT_WEBHOOK_URL: ${ALERT_WEBHOOK_URL:-}
