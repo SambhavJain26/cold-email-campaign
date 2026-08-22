@@ -16,7 +16,10 @@
 // legible is the CAN-SPAM "clear and conspicuous" line — hidden would not be.
 import { escapeHtml } from './html';
 
-export const FOOTER_SEPARATOR = '\n\n---\n';
+// A blank paragraph is the least distracting visual boundary in both the
+// plain-text and HTML alternatives. Keep this exact value aligned with
+// html.ts and the web preview splitter.
+export const FOOTER_SEPARATOR = '\n\n';
 
 export interface ComplianceInfo {
   physicalAddress: string;
@@ -37,14 +40,14 @@ const liveUrl = (c: ComplianceInfo): string | undefined => {
 export function appendFooter(body: string, compliance: ComplianceInfo): string {
   const url = liveUrl(compliance);
   const optout = url ? `Unsubscribe: ${url} or reply STOP` : compliance.optoutText;
-  return `${body}${FOOTER_SEPARATOR}${optout} | ${compliance.physicalAddress}`;
+  return `${body.trimEnd()}${FOOTER_SEPARATOR}${optout} | ${compliance.physicalAddress}`;
 }
 
 /** The HTML twin of appendFooter's trailing line — same words, linked. */
 export function footerHtml(compliance: ComplianceInfo): string {
   const url = liveUrl(compliance);
   const optout = url
-    ? `<a href="${escapeHtml(url)}">Unsubscribe</a> or reply STOP`
+    ? `<a href="${escapeHtml(url)}" style="color:#767676;text-decoration:underline">Unsubscribe</a> or reply STOP`
     : escapeHtml(compliance.optoutText);
   return `${optout} | ${escapeHtml(compliance.physicalAddress)}`;
 }

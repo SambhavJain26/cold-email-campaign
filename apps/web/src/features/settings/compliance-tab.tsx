@@ -39,8 +39,8 @@ export function ComplianceTab({
   const unsubBase = useWatch({ control, name: 'unsubscribe_base_url' });
   const addressEmpty = address.trim() === '';
 
-  // Mirrors render/footer.ts appendFooter — the two must agree or the preview
-  // lies about what recipients receive.
+  // Mirrors render/footer.ts appendFooter's content. The app preview stays at
+  // an accessible UI size; delivered HTML renders this line at 10px/#767676.
   const optoutLine =
     unsubBase.trim() === '' ? optout : `Unsubscribe: ${unsubBase.trim()}/u/⟨token⟩ or reply STOP`;
 
@@ -117,8 +117,11 @@ export function ComplianceTab({
             className="rounded-md border border-dashed border-border bg-muted/30 p-3 font-mono text-xs whitespace-pre-wrap text-muted-foreground"
             data-testid="footer-preview"
           >
-            {`—\n${optoutLine} | ${address || '⟨no address — sends blocked⟩'}`}
+            {`${optoutLine} | ${address || '⟨no address — sends blocked⟩'}`}
           </div>
+          <p className="mt-2 text-xs text-muted-foreground">
+            Delivered after a blank line in 10px light gray text. No visible divider is added.
+          </p>
         </CardContent>
       </Card>
 

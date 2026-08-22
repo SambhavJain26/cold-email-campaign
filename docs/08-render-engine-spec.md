@@ -45,10 +45,11 @@ field      := first_name | company | market | custom_observation
 ## 4. CAN-SPAM footer (spec Part 8 — non-removable)
 
 ```
-\n\n---\n{compliance_settings.physical_address}\n{compliance_settings.optout_text}
+\n\n{opt-out clause} | {compliance_settings.physical_address}
 ```
 
 - Appended at render time, **after** all expansion; template text cannot alter or remove it (a template containing its own footer text just gets the canonical one appended anyway — check #6 warns on duplication).
+- The boundary is one blank paragraph rather than a visible divider. The minimal HTML alternative renders the footer at `10px`, `#767676`, `line-height:1.5`, with a 16px top gap; the plain-text alternative uses the same words after one blank line.
 - Fatal boot/send guard: `physical_address` empty → sends are refused globally, alert raised (CAN-SPAM requires it; empty address = non-compliant mail).
 
 ## 5. Pre-send checks + deliverability score (decision W)

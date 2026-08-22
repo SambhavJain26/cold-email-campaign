@@ -89,14 +89,15 @@ describe('SmtpImapTransport over a real server (B8.1)', () => {
       mailboxId: CANARY_ID,
       to: LEAD.address,
       subject: 'A safe subject',
-      bodyText: 'Hi Sarah\n\n---\n123 Main St\nReply STOP',
-      bodyHtml: '<p>Hi Sarah</p><p style="font-size:11px;color:#666">123 Main St<br>Reply STOP</p>',
+      bodyText: 'Hi Sarah\n\n123 Main St\nReply STOP',
+      bodyHtml:
+        '<p>Hi Sarah</p><p style="margin:16px 0 0;font-size:10px;color:#767676;line-height:1.5">123 Main St<br>Reply STOP</p>',
       headers: { messageId: '<ce-html-1@coldemail.test>' },
     });
     const [stored] = await readInbox(LEAD);
     expect(stored!.source).toMatch(/Content-Type: multipart\/alternative/i);
     expect(stored!.source).toContain('Hi Sarah');
-    expect(stored!.source).toContain('font-size:11px');
+    expect(stored!.source).toContain('font-size:10px');
   });
 
   it('send: List-Unsubscribe and the one-click Post header reach the wire together', async () => {
@@ -105,7 +106,7 @@ describe('SmtpImapTransport over a real server (B8.1)', () => {
       mailboxId: CANARY_ID,
       to: LEAD.address,
       subject: 'A safe subject',
-      bodyText: `Hi Sarah\n\n---\nUnsubscribe: ${url} or reply STOP | 123 Main St`,
+      bodyText: `Hi Sarah\n\nUnsubscribe: ${url} or reply STOP | 123 Main St`,
       headers: { messageId: '<ce-unsub-1@coldemail.test>', listUnsubscribeUrl: url },
     });
     const [stored] = await readInbox(LEAD);
@@ -120,7 +121,7 @@ describe('SmtpImapTransport over a real server (B8.1)', () => {
       mailboxId: CANARY_ID,
       to: LEAD.address,
       subject: 'A safe subject',
-      bodyText: 'Hi Sarah\n\n---\nReply STOP to unsubscribe | 123 Main St',
+      bodyText: 'Hi Sarah\n\nReply STOP to unsubscribe | 123 Main St',
       headers: { messageId: '<ce-unsub-2@coldemail.test>' },
     });
     const [stored] = await readInbox(LEAD);

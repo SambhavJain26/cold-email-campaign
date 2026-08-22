@@ -15,10 +15,10 @@ export interface PreviewTarget {
   variant: DraftVariant;
 }
 
-const FOOTER_SEPARATOR = '\n\n---\n';
+const FOOTER_SEPARATOR = '\n\n';
 
-/** The engine appends the CAN-SPAM footer after all expansion (docs/08 §4) — split it
- *  back out so the panel can show it as the locked block the operator cannot edit. */
+/** The engine appends the CAN-SPAM footer after all expansion (docs/08 §4) — split
+ *  at the final blank line so earlier message paragraphs remain untouched. */
 export function splitFooter(body: string): { body: string; footer: string | null } {
   const index = body.lastIndexOf(FOOTER_SEPARATOR);
   if (index === -1) return { body, footer: null };

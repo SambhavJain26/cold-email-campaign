@@ -128,7 +128,7 @@ describe('parseSaveErrors', () => {
 
 describe('splitFooter', () => {
   it('splits the engine-appended CAN-SPAM footer off the body', () => {
-    const body = 'Hi Mike,\n\nWorth a chat?\n\n---\n4517 Congress Ave\nReply "stop".';
+    const body = 'Hi Mike,\n\nWorth a chat?\n\n4517 Congress Ave\nReply "stop".';
     expect(splitFooter(body)).toEqual({
       body: 'Hi Mike,\n\nWorth a chat?',
       footer: '4517 Congress Ave\nReply "stop".',

@@ -20,7 +20,7 @@ const compliance = {
   optoutText: "Don't want future emails? Reply STOP and I'll remove you immediately.",
 };
 
-const FOOTER = `\n\n---\n${compliance.optoutText} | ${compliance.physicalAddress}`;
+const FOOTER = `\n\n${compliance.optoutText} | ${compliance.physicalAddress}`;
 
 const SUBJECT = 'Quick question about {{company|your listings}}';
 const BODY =
@@ -114,7 +114,7 @@ describe('footer is unconditional (docs/08 §4)', () => {
     );
     expect(r.bodyText.endsWith(FOOTER)).toBe(true);
     // the fake one is still in the body — the canonical footer follows it
-    expect(r.bodyText.match(/---/g)).toHaveLength(2);
+    expect(r.bodyText.match(/---/g)).toHaveLength(1);
     expect(r.checks.warnings.some((w) => w.id === 'footer_duplicate')).toBe(true);
   });
 
@@ -128,7 +128,9 @@ describe('footer is unconditional (docs/08 §4)', () => {
     );
     expect(r.bodyHtml).toContain('<p>Hi Jane, &lt;unsafe&gt;</p>');
     expect(r.bodyHtml).toContain('<p>Second paragraph.</p>');
-    expect(r.bodyHtml).toContain('font-size:11px');
+    expect(r.bodyHtml).toContain('font-size:10px');
+    expect(r.bodyHtml).toContain('color:#767676');
+    expect(r.bodyHtml).toContain('margin:16px 0 0');
     expect(r.bodyHtml).toContain('123 Main St');
     expect(r.bodyHtml).not.toContain('<unsafe>');
   });
@@ -157,15 +159,17 @@ describe('unsubscribe link in the footer (0010, docs/16 §8)', () => {
 
   it('live: the HTML part says the SAME thing with the word linked', () => {
     const html = withLink().bodyHtml;
-    expect(html).toContain(`<a href="${URL}">Unsubscribe</a> or reply STOP | `);
+    expect(html).toContain(
+      `<a href="${URL}" style="color:#767676;text-decoration:underline">Unsubscribe</a> or reply STOP | `,
+    );
     expect(html).toContain(compliance.physicalAddress);
     // De-emphasised but legible — CAN-SPAM "clear and conspicuous".
-    expect(html).toContain('font-size:11px');
+    expect(html).toContain('font-size:10px');
   });
 
   it('the two parts stay semantically identical (finding 19)', () => {
     const r = withLink();
-    const textFooter = r.bodyText.split('\n\n---\n')[1]!;
+    const textFooter = r.bodyText.slice(r.bodyText.lastIndexOf('\n\n') + 2);
     const htmlFooter = r.bodyHtml.slice(r.bodyHtml.lastIndexOf('<p style='));
     for (const fragment of ['Unsubscribe', 'or reply STOP', compliance.physicalAddress, URL]) {
       expect(textFooter).toContain(fragment);
