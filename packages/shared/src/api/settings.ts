@@ -2,7 +2,7 @@
 // the full docs/03 settings row (snake_case); PUT validates ranges here —
 // e.g. pause_hard_pct 1–20 per the contract's example.
 import { z } from 'zod';
-import { isoDateTime } from './common';
+import { ianaTimezoneSchema, isoDateTime } from './common';
 
 const pct = z.number().min(0).max(100);
 
@@ -25,7 +25,7 @@ export const settingsSchema = z
     stale_poll_hours: z.number().int().min(1).max(72),
     delivery_confirm_hours: z.number().int().min(1).max(72),
     send_jitter_pct: pct,
-    default_timezone: z.string().min(1),
+    default_timezone: ianaTimezoneSchema,
     cold_storage_rest_days: z.number().int().min(0),
     /**
      * Launch guardrails (docs/16 §8 item 2) — ceilings on what may be

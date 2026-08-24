@@ -33,7 +33,8 @@ Shapes below in TS notation. `Metric = { numerator: number, denominator: number 
 | GET `/mailboxes` | → `{items: Mailbox[]}` — `Mailbox` includes `auth_type: 'app_password'\|'google_oauth'` and `oauth_connected`, plus identity, connection metadata, caps, windows, health and poll fields. No password, refresh token, access token, or OAuth state is ever returned. |
 | POST `/mailboxes` | common connection/cap/window/folder fields plus `auth_type`. `app_password` requires `password`, which is sealed. `google_oauth` requires no password and starts `setup_required`, which the scheduler cannot select. Guardrails and per-folder UIDNEXT seeding still apply. |
 | PATCH `/mailboxes/:id` | any subset of the above (password optional) → `Mailbox` |
-| POST `/mailboxes/:id/test-connection` | → `{smtp_ok, imap_ok, round_trip_ms?}` — calls `transport.verify` (mock: scripted; real: send+read-back) |
+| GET `/mailboxes/:id/folders` | → `{items: {name, special_use?}[]}` — authenticated read-only discovery; no message content or credentials |
+| POST `/mailboxes/:id/test-connection` | → `{smtp_ok, imap_ok, round_trip_ms?, folders: {name, exists, special_use?}[]}` — calls `transport.verify` and checks every configured folder |
 | POST `/mailboxes/:id/pause` / `/resume` | resume body `{cap_pct?: 50\|100}` → `Mailbox` — resume from `auto_paused` defaults 50 (walkthrough Stage 7) |
 | POST `/mailboxes/:id/reconnect` | `{password}` → `Mailbox` — re-seal secret, verify, `auth_failed`→`ok` on success |
 | POST `/mailboxes/:id/oauth/google/start` | → `{authorization_url}` — creates short-lived hashed one-time state plus PKCE; requests offline access. Requires the production OAuth client configuration. |
@@ -74,7 +75,7 @@ Shapes below in TS notation. `Metric = { numerator: number, denominator: number 
 | POST `/campaigns/:id/enroll` | `{count} \| {lead_ids, force?, allow_recontact?}` → `{enrolled, skipped: {reason, count}[]}`. Count enrollment excludes prior human repliers. Explicit recontact requires `allow_recontact:true`, completed reply disposition, and an elapsed `not_now` date; suppression is never overrideable. |
 | GET `/campaigns/:id/outcomes` | → `{UNSUBSCRIBED, BOUNCED, REPLIED: {positive, neutral}, COMPLETED, ACTIVE, NEW, total}` (Stage-9 completion panel) |
 | POST `/campaigns/:id/recycle` | `{source_campaign_id}` → same shape as enroll |
-| GET `/cold-storage?source_campaign_id=` | → `{items: {lead, completed_at, earliest_recycle_at, eligible: boolean}[]}` |
+| GET `/cold-storage?source_campaign_id=&page=&per_page=` | → `{items: {lead, completed_at, earliest_recycle_at, eligible: boolean}[], total, page, per_page}` |
 
 ## Unibox
 | | |
@@ -83,10 +84,14 @@ Shapes below in TS notation. `Metric = { numerator: number, denominator: number 
 | GET `/unibox/:incoming_message_id` | → `UniboxItem & {body_text, thread: {message_id, step_no, sent_at}[]}` — full reply text from `incoming_messages.body_text` (0007) |
 | POST `/unibox/:incoming_message_id/sentiment` | `{sentiment}` → item — appends `sentiment_tagged` (decision M) |
 | POST `/unibox/:incoming_message_id/disposition` | `{disposition, recontact_after?}` → item — appends `reply_dispositioned`. `not_now` requires a future date; `not_interested`, `wrong_person`, and `explicit_unsubscribe` append global unsubscribe suppression atomically. |
+| GET `/reminders?view=due_today\|upcoming\|overdue\|all&status=open\|done\|dismissed&page=` | → paginated reminder list plus `open_count` |
+| POST `/unibox/:incoming_message_id/reminders` | `{due_date, note?}` → `{ok}` — creates an in-app task only |
+| PATCH `/reminders/:id` | `{due_date?, note?, status?}` → `{ok}` — edit, complete, or dismiss; never changes contact permission or sends |
 | POST `/enrollments/:id/meeting-booked` | → `{ok}` — appends `meeting_booked` (state unchanged) |
-| POST `/enrollments/:id/snooze` | `{until}` → `{ok}` |
+| POST `/enrollments/:id/snooze` | `{until}` → `{ok}` — backward-compatible ACTIVE-enrollment scheduling only; replied enrollments must use reminders |
 | POST `/enrollments/:id/unsubscribe` | → `{ok}` — manual unsubscribe (source `manual`), used with tag_only mode or by choice |
-| POST `/manual-sends` | `{lead_id, campaign_id, mailbox_id?, subject, body, allow_recontact?}` → `{enrollment_id, message_id, checks}`. Prior human replies require explicit acknowledgement plus completed disposition review; suppression and future `not_now` dates always block. |
+| GET `/enrollments/:id/manual-compose-prefill` | → campaign, `step_no/step_count`, due date, personalization mode, rendered due-step subject/body, variant/draft identity, thread/pinned-mailbox context, and checks |
+| POST `/manual-sends` | `{lead_id, campaign_id, enrollment_id?, draft_id?, mailbox_id?, subject, body, allow_recontact?}` → `{enrollment_id, message_id, checks}`. Requires an existing active human-written enrollment; it never auto-enrolls. Prior human replies require explicit acknowledgement plus completed disposition review; suppression and future `not_now` dates always block. |
 
 ## Reply-detection debug (Stage-7 pending screen)
 | | |

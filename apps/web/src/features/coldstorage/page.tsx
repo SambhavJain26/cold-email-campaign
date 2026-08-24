@@ -2,15 +2,8 @@ import { useState } from 'react';
 import { Recycle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '@/components/ui/table';
 import { EmptyState } from '@/components/shared/empty-state';
+import { DataTable } from '@/components/shared/data-table';
 import { TierBadge } from '@/components/shared/tier-badge';
 import { useCampaignParam } from '@/components/layout/campaign-selector';
 import { useCampaigns, useColdStorage } from '@/api/queries/campaigns';
@@ -27,7 +20,9 @@ export default function ColdStoragePage() {
   const selected = useCampaignParam();
   const sourceCampaignId = selected ?? campaigns.data?.items[0]?.id;
   const source = campaigns.data?.items.find((c) => c.id === sourceCampaignId);
-  const { data, isPending, isError, refetch } = useColdStorage(sourceCampaignId ?? 0);
+  const [pagination, setPagination] = useState({ sourceCampaignId, page: 1 });
+  const page = pagination.sourceCampaignId === sourceCampaignId ? pagination.page : 1;
+  const { data, isPending, isError, refetch } = useColdStorage(sourceCampaignId ?? 0, page, 50);
   const [dialogOpen, setDialogOpen] = useState(false);
 
   if (campaigns.isPending || isPending) return <Skeleton className="m-6 h-64" />;
@@ -77,7 +72,7 @@ export default function ColdStoragePage() {
 
       <section className="space-y-1 rounded-lg border border-border bg-card p-4 text-xs">
         <p className="text-sm font-medium">
-          {eligible.length} of {rows.length} finished leads are ready for a second pass
+          {eligible.length} of {data.total} finished leads are ready on this page
         </p>
         <p className="text-muted-foreground">
           A large market means the same lead is worth contacting again — after a rest, with a
@@ -102,44 +97,67 @@ export default function ColdStoragePage() {
           description="Leads land here once their enrollment completes without a reply."
         />
       ) : (
-        <div className="overflow-x-auto rounded-lg border border-border">
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead className="text-xs">Lead</TableHead>
-                <TableHead className="text-xs">Tier</TableHead>
-                <TableHead className="text-xs">Completed</TableHead>
-                <TableHead className="text-xs">Earliest recycle</TableHead>
-                <TableHead className="text-xs">Eligible</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {rows.map((row) => (
-                <TableRow key={row.lead.id} data-testid={`cold-row-${row.lead.id}`}>
-                  <TableCell className="py-1.5 text-sm">{row.lead.email}</TableCell>
-                  <TableCell className="py-1.5">
-                    <TierBadge tier={row.lead.tier} />
-                  </TableCell>
-                  <TableCell className="py-1.5 text-xs text-muted-foreground">
-                    {formatDateTime(row.completed_at)}
-                  </TableCell>
-                  <TableCell className="py-1.5 text-xs text-muted-foreground">
-                    {formatDateTime(row.earliest_recycle_at)}
-                  </TableCell>
-                  <TableCell className="py-1.5 text-xs">
-                    {row.eligible ? (
-                      <span className="text-success">✓ ready</span>
-                    ) : (
-                      <span className="text-muted-foreground">
-                        ✗ in {Math.max(0, daysUntil(row.earliest_recycle_at))}d
-                      </span>
-                    )}
-                  </TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-        </div>
+        <DataTable
+          rows={rows}
+          rowKey={(row) => row.lead.id}
+          pagination={{
+            page: data.page,
+            perPage: data.per_page,
+            total: data.total,
+            onPageChange: (nextPage) => setPagination({ sourceCampaignId, page: nextPage }),
+          }}
+          columns={[
+            { key: 'lead', header: 'Lead', cell: (row) => row.lead.email },
+            { key: 'tier', header: 'Tier', cell: (row) => <TierBadge tier={row.lead.tier} /> },
+            {
+              key: 'completed',
+              header: 'Completed',
+              cell: (row) => (
+                <span className="text-xs text-muted-foreground">
+                  {formatDateTime(row.completed_at)}
+                </span>
+              ),
+            },
+            {
+              key: 'earliest',
+              header: 'Earliest recycle',
+              cell: (row) => (
+                <span className="text-xs text-muted-foreground">
+                  {formatDateTime(row.earliest_recycle_at)}
+                </span>
+              ),
+            },
+            {
+              key: 'eligible',
+              header: 'Eligible',
+              cell: (row) =>
+                row.eligible ? (
+                  <span className="text-success">✓ ready</span>
+                ) : (
+                  <span className="text-muted-foreground">
+                    ✗ in {Math.max(0, daysUntil(row.earliest_recycle_at))}d
+                  </span>
+                ),
+            },
+          ]}
+          mobileCard={(row) => (
+            <article
+              className="space-y-2 rounded-lg border border-border bg-card p-3"
+              data-testid={`cold-row-${row.lead.id}`}
+            >
+              <div className="flex items-center justify-between gap-2">
+                <p className="min-w-0 truncate text-sm font-medium">{row.lead.email}</p>
+                <TierBadge tier={row.lead.tier} />
+              </div>
+              <p className="text-xs text-muted-foreground">
+                Completed {formatDateTime(row.completed_at)}
+                <br />
+                Recycle{' '}
+                {row.eligible ? 'ready now' : `after ${formatDateTime(row.earliest_recycle_at)}`}
+              </p>
+            </article>
+          )}
+        />
       )}
 
       <RecycleDialog

@@ -12,15 +12,18 @@ import {
   complianceSchema,
   createCampaignBodySchema,
   createMailboxBodySchema,
+  createReminderBodySchema,
   deleteCampaignBodySchema,
   deleteSequenceBodySchema,
   deleteSuppressionBodySchema,
+  dispositionReplyBodySchema,
   eraseLeadBodySchema,
   loginBodySchema,
   manualSendBodySchema,
   patchCampaignBodySchema,
   patchLeadBodySchema,
   patchMailboxBodySchema,
+  patchReminderBodySchema,
   previewBodySchema,
   putSettingsBodySchema,
   rebuildBodySchema,
@@ -264,6 +267,20 @@ export const handlers: RequestHandler[] = [
     `${BASE}/mailboxes/volume`,
     authed(() => HttpResponse.json(db.volume)),
   ),
+  http.get(
+    `${BASE}/mailboxes/:id/folders`,
+    authed(({ params }) => {
+      const mailbox = db.mailboxes.find((item) => item.id === Number(params.id));
+      if (!mailbox) return notFound('mailbox');
+      return HttpResponse.json({
+        items: [
+          { name: 'INBOX', special_use: '\\Inbox' },
+          { name: '[Gmail]/Spam', special_use: '\\Junk' },
+          { name: 'Sent', special_use: '\\Sent' },
+        ],
+      });
+    }),
+  ),
   http.post(
     `${BASE}/mailboxes`,
     authed(async ({ request }) => {
@@ -331,7 +348,16 @@ export const handlers: RequestHandler[] = [
       const mailbox = db.mailboxes.find((m) => m.id === Number(params.id));
       if (!mailbox) return notFound('mailbox');
       const failed = mailbox.status === 'auth_failed';
-      return HttpResponse.json({ smtp_ok: !failed, imap_ok: !failed, round_trip_ms: 142 });
+      return HttpResponse.json({
+        smtp_ok: !failed,
+        imap_ok: !failed,
+        round_trip_ms: 142,
+        folders: mailbox.poll_folders.map((name) => ({
+          name,
+          exists: true,
+          special_use: name === 'INBOX' ? '\\Inbox' : name.includes('Spam') ? '\\Junk' : null,
+        })),
+      });
     }),
   ),
   http.post(
@@ -840,7 +866,8 @@ export const handlers: RequestHandler[] = [
         (l) => l.latest_enrollment?.current_state === 'COMPLETED' && !l.is_suppressed,
       );
       return HttpResponse.json({
-        items: completed.slice(0, 50).map((lead, i) => ({
+        ...paginate(completed, url),
+        items: paginate(completed, url).items.map((lead, i) => ({
           lead: { id: lead.id, email: lead.email, tier: lead.tier },
           completed_at: '2026-02-20T15:00:00.000Z',
           earliest_recycle_at:
@@ -883,6 +910,146 @@ export const handlers: RequestHandler[] = [
           sent_at: `2026-01-${String(6 + i * 3).padStart(2, '0')}T15:00:00.000Z`,
         })),
       });
+    }),
+  ),
+  http.get(
+    `${BASE}/enrollments/:id/manual-compose-prefill`,
+    authed(({ params }) => {
+      const enrollmentId = Number(params.id);
+      const lead = db.leads.find((item) => item.id === enrollmentId);
+      const campaign = db.campaigns.find(
+        (item) => item.id === lead?.latest_enrollment?.campaign_id,
+      );
+      if (!lead || !campaign) return notFound('enrollment');
+      const stepNo = Math.max(1, lead.latest_enrollment?.current_step_no ?? 1);
+      return HttpResponse.json({
+        enrollment_id: enrollmentId,
+        lead_id: lead.id,
+        campaign: { id: campaign.id, name: campaign.name },
+        step_no: stepNo,
+        step_count: 4,
+        due_at: NOW,
+        personalization_mode: 'human_written',
+        subject:
+          stepNo > 1
+            ? `Re: Quick question about ${lead.company}`
+            : `Quick question about ${lead.company}`,
+        body: `Hi ${lead.first_name ?? 'there'},\n\nThis is the due step starting point.`,
+        variant_id: 1,
+        draft_id: null,
+        thread: {
+          assigned_mailbox_id: stepNo > 1 ? 1 : null,
+          previous_message_ids: stepNo > 1 ? ['<ce-mock-1@example.com>'] : [],
+          in_thread: stepNo > 1,
+        },
+        checks: mockChecks,
+      });
+    }),
+  ),
+  http.get(
+    `${BASE}/reminders`,
+    authed(({ request }) => {
+      const url = new URL(request.url);
+      const status = url.searchParams.get('status') ?? 'open';
+      const items = db.reminders.filter((reminder) => reminder.status === status);
+      return HttpResponse.json({
+        ...paginate(items, url),
+        open_count: db.reminders.filter((reminder) => reminder.status === 'open').length,
+      });
+    }),
+  ),
+  http.post(
+    `${BASE}/unibox/:id/reminders`,
+    authed(async ({ request, params }) => {
+      const item = db.unibox.find(
+        (candidate) => candidate.incoming_message_id === Number(params.id),
+      );
+      if (!item) return notFound('message');
+      const body = await parseBody(request, createReminderBodySchema);
+      if (body instanceof Response) return body;
+      db.reminders.push({
+        id: db.nextId++,
+        enrollment_id: item.enrollment_id,
+        incoming_message_id: item.incoming_message_id,
+        due_date: body.due_date,
+        note: body.note ?? null,
+        source: 'manual',
+        status: 'open',
+        created_at: NOW,
+        completed_at: null,
+        lead: item.lead,
+        campaign_id: item.campaign_id,
+        reply_snippet: item.snippet,
+      });
+      return HttpResponse.json({ ok: true });
+    }),
+  ),
+  http.patch(
+    `${BASE}/reminders/:id`,
+    authed(async ({ request, params }) => {
+      const reminder = db.reminders.find((item) => item.id === Number(params.id));
+      if (!reminder) return notFound('reminder');
+      const body = await parseBody(request, patchReminderBodySchema);
+      if (body instanceof Response) return body;
+      if (body.due_date !== undefined) reminder.due_date = body.due_date;
+      if (body.note !== undefined) reminder.note = body.note ?? null;
+      if (body.status !== undefined) {
+        reminder.status = body.status;
+        reminder.completed_at = body.status === 'done' ? NOW : null;
+      }
+      return HttpResponse.json({ ok: true });
+    }),
+  ),
+  http.post(
+    `${BASE}/unibox/:id/disposition`,
+    authed(async ({ request, params }) => {
+      const item = db.unibox.find(
+        (candidate) => candidate.incoming_message_id === Number(params.id),
+      );
+      if (!item) return notFound('message');
+      const body = await parseBody(request, dispositionReplyBodySchema);
+      if (body instanceof Response) return body;
+
+      item.disposition = body.disposition;
+      item.recontact_after = body.recontact_after ?? null;
+      if (body.disposition === 'not_now' && body.recontact_after) {
+        const existing = db.reminders.find(
+          (reminder) =>
+            reminder.incoming_message_id === item.incoming_message_id &&
+            reminder.source === 'not_now',
+        );
+        if (existing) {
+          existing.due_date = body.recontact_after;
+          existing.status = 'open';
+          existing.completed_at = null;
+        } else {
+          db.reminders.push({
+            id: db.nextId++,
+            enrollment_id: item.enrollment_id,
+            incoming_message_id: item.incoming_message_id,
+            due_date: body.recontact_after,
+            note: "Follow up after this lead's requested date.",
+            source: 'not_now',
+            status: 'open',
+            created_at: NOW,
+            completed_at: null,
+            lead: item.lead,
+            campaign_id: item.campaign_id,
+            reply_snippet: item.snippet,
+          });
+        }
+      } else {
+        for (const reminder of db.reminders) {
+          if (
+            reminder.incoming_message_id === item.incoming_message_id &&
+            reminder.source === 'not_now' &&
+            reminder.status === 'open'
+          ) {
+            reminder.status = 'dismissed';
+          }
+        }
+      }
+      return HttpResponse.json(item);
     }),
   ),
   http.post(

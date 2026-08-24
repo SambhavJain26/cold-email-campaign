@@ -9,6 +9,7 @@ import { parseEnv } from '../../src/config/env';
 import { VirtualClock } from '../../src/clock/virtual';
 import type {
   IncomingMessage,
+  MailFolder,
   MailboxVerifyConfig,
   MailTransport,
   OutboundMessage,
@@ -29,6 +30,9 @@ class TrivialTransport implements MailTransport {
   }
   fetchNew(_mailboxId: number): Promise<IncomingMessage[]> {
     return Promise.resolve([]);
+  }
+  listFolders(_config: MailboxVerifyConfig): Promise<MailFolder[]> {
+    return Promise.resolve([{ name: 'INBOX', specialUse: '\\Inbox' }]);
   }
   verify(_config: MailboxVerifyConfig): Promise<VerifyResult> {
     return Promise.resolve({ smtpOk: true, imapOk: true });

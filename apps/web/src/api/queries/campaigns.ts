@@ -32,12 +32,12 @@ export function useCampaignOutcomes(campaignId: number) {
   });
 }
 
-export function useColdStorage(sourceCampaignId: number) {
+export function useColdStorage(sourceCampaignId: number, page = 1, perPage = 50) {
   return useQuery({
-    queryKey: ['cold-storage', sourceCampaignId],
+    queryKey: ['cold-storage', sourceCampaignId, page, perPage],
     queryFn: () =>
       apiFetch('/cold-storage', coldStorageResponseSchema, {
-        query: { source_campaign_id: sourceCampaignId },
+        query: { source_campaign_id: sourceCampaignId, page, per_page: perPage },
       }),
     refetchInterval: POLL.operational,
   });

@@ -6,6 +6,7 @@ import {
   createMailboxBodySchema,
   idParamSchema,
   mailboxListResponseSchema,
+  mailboxFoldersResponseSchema,
   mailboxSchema,
   mailboxVolumeQuerySchema,
   mailboxVolumeResponseSchema,
@@ -106,17 +107,35 @@ async function seedPollCursorsFor(
   if (!transport.initialPollUid) return;
   for (const folder of row.pollFolders) {
     if ((await getCursor(db, row.id, folder)) !== null) continue;
-    try {
-      await seedCursorIfAbsent(
-        db,
-        row.id,
-        folder,
-        await transport.initialPollUid(connection, folder),
-      );
-    } catch {
-      // A folder that does not exist yet on the provider must not fail the
-      // whole save; the poller skips it until it appears.
-    }
+    await seedCursorIfAbsent(
+      db,
+      row.id,
+      folder,
+      await transport.initialPollUid(connection, folder),
+    );
+  }
+}
+
+async function discoveredFolders(
+  services: AppServices,
+  connection: MailboxVerifyConfig,
+): Promise<Array<{ name: string; specialUse?: string }>> {
+  try {
+    return await services.transport.listFolders(connection);
+  } catch (error) {
+    const message = error instanceof Error ? error.message : 'folder discovery failed';
+    throw new AppError('mailbox_unhealthy', 409, `Could not discover IMAP folders: ${message}`);
+  }
+}
+
+function assertFoldersExist(
+  selected: string[],
+  discovered: Array<{ name: string; specialUse?: string }>,
+): void {
+  const names = new Set(discovered.map((folder) => folder.name));
+  const missing = selected.filter((folder) => !names.has(folder));
+  if (missing.length > 0) {
+    throw new AppError('validation', 422, `These IMAP folders do not exist: ${missing.join(', ')}`);
   }
 }
 
@@ -192,6 +211,29 @@ export async function mailboxesRoutes(app: FastifyInstance, services: AppService
   });
 
   r.get(
+    '/mailboxes/:id/folders',
+    {
+      schema: {
+        params: idParamSchema,
+        response: { 200: mailboxFoldersResponseSchema },
+      },
+    },
+    async (req) => {
+      const row = await requireMailbox(req.params.id);
+      const connection = await mailboxConnections.load(row.id);
+      if (!connection) {
+        throw new AppError('mailbox_unhealthy', 409, 'Mailbox credentials are not connected');
+      }
+      return {
+        items: (await discoveredFolders(services, connection)).map((folder) => ({
+          name: folder.name,
+          special_use: folder.specialUse ?? null,
+        })),
+      };
+    },
+  );
+
+  r.get(
     '/mailboxes/volume',
     {
       schema: {
@@ -237,27 +279,58 @@ export async function mailboxesRoutes(app: FastifyInstance, services: AppService
       const authType = b.auth_type ?? 'app_password';
       if (b.timezone !== undefined) assertIanaTimezone(b.timezone);
       await assertDailyCapWithinGuardrail(db, b.daily_cap);
-      const row = await createMailbox(db, {
-        displayName: b.display_name,
-        fromAddress: b.from_address,
-        smtpHost: authType === 'google_oauth' ? 'smtp.gmail.com' : b.smtp_host!,
-        smtpPort: b.smtp_port,
-        imapHost: authType === 'google_oauth' ? 'imap.gmail.com' : b.imap_host!,
-        imapPort: b.imap_port,
-        authType,
-        dailyCap: b.daily_cap,
-        sendWindow: b.send_window,
-        timezone: b.timezone,
-        pollFolders:
-          b.poll_folders ?? (authType === 'google_oauth' ? ['INBOX', '[Gmail]/Spam'] : undefined),
-        status: authType === 'google_oauth' ? 'setup_required' : 'ok',
+      const pollFolders =
+        b.poll_folders ?? (authType === 'google_oauth' ? ['INBOX', '[Gmail]/Spam'] : ['INBOX']);
+      let createConnection: MailboxVerifyConfig | null = null;
+      if (authType === 'app_password') {
+        createConnection = {
+          smtpHost: b.smtp_host!,
+          smtpPort: b.smtp_port ?? 587,
+          imapHost: b.imap_host!,
+          imapPort: b.imap_port ?? 993,
+          fromAddress: b.from_address,
+          authType,
+          password: b.password!,
+        };
+        assertFoldersExist(pollFolders, await discoveredFolders(services, createConnection));
+      }
+      const cursorSeeds =
+        authType === 'app_password'
+          ? await Promise.all(
+              pollFolders.map(async (folder) => ({
+                folder,
+                uid: transport.initialPollUid
+                  ? await transport.initialPollUid(createConnection!, folder)
+                  : 0,
+              })),
+            )
+          : [];
+      const sealed =
+        authType === 'app_password' ? await sealSecret(b.password!, config.SECRET_KEY) : null;
+      const row = await db.transaction(async (tx) => {
+        const created = await createMailbox(tx, {
+          displayName: b.display_name,
+          fromAddress: b.from_address,
+          smtpHost: authType === 'google_oauth' ? 'smtp.gmail.com' : b.smtp_host!,
+          smtpPort: b.smtp_port,
+          imapHost: authType === 'google_oauth' ? 'imap.gmail.com' : b.imap_host!,
+          imapPort: b.imap_port,
+          authType,
+          dailyCap: b.daily_cap,
+          sendWindow: b.send_window,
+          timezone: b.timezone,
+          pollFolders,
+          status: authType === 'google_oauth' ? 'setup_required' : 'ok',
+        });
+        if (sealed) {
+          await upsertMailboxSecret(tx, created.id, sealed, clock.now());
+          for (const seed of cursorSeeds) {
+            await seedCursorIfAbsent(tx, created.id, seed.folder, seed.uid);
+          }
+        }
+        return created;
       });
       if (authType === 'app_password') {
-        const password = b.password!;
-        const sealed = await sealSecret(password, config.SECRET_KEY);
-        await upsertMailboxSecret(db, row.id, sealed, clock.now());
-        const connection = await mailboxConnections.load(row.id);
-        if (connection) await seedPollCursorsFor(services, row, connection);
         // OAuth mailboxes remain setup_required and unregistered until the
         // callback stores a valid refresh credential.
         await jobs.registerMailboxPoll(row.id);
@@ -280,7 +353,34 @@ export async function mailboxesRoutes(app: FastifyInstance, services: AppService
       if (req.body.timezone !== undefined) assertIanaTimezone(req.body.timezone);
       await assertDailyCapWithinGuardrail(db, req.body.daily_cap);
       const cols = patchColumns(req.body);
-      if (Object.keys(cols).length > 0) await patchMailbox(db, req.params.id, cols);
+      if (req.body.poll_folders !== undefined) {
+        const connection = await mailboxConnections.load(existing.id);
+        if (!connection) {
+          throw new AppError(
+            'mailbox_unhealthy',
+            409,
+            'Connect mailbox credentials before changing polled folders',
+          );
+        }
+        assertFoldersExist(req.body.poll_folders, await discoveredFolders(services, connection));
+        const newFolders = req.body.poll_folders.filter(
+          (folder) => !existing.pollFolders.includes(folder),
+        );
+        const seeds = await Promise.all(
+          newFolders.map(async (folder) => ({
+            folder,
+            uid: transport.initialPollUid ? await transport.initialPollUid(connection, folder) : 0,
+          })),
+        );
+        await db.transaction(async (tx) => {
+          await patchMailbox(tx, req.params.id, cols);
+          for (const seed of seeds) {
+            await seedCursorIfAbsent(tx, req.params.id, seed.folder, seed.uid);
+          }
+        });
+      } else if (Object.keys(cols).length > 0) {
+        await patchMailbox(db, req.params.id, cols);
+      }
       if (req.body.password !== undefined) {
         if (existing.authType === 'google_oauth') {
           throw new AppError('validation', 422, 'OAuth mailboxes do not accept passwords');
@@ -301,10 +401,17 @@ export async function mailboxesRoutes(app: FastifyInstance, services: AppService
       if (!connection)
         throw new AppError('mailbox_unhealthy', 409, 'Mailbox credentials are not connected');
       const result = await transport.verify(connection);
+      const folders = result.imapOk ? await discoveredFolders(services, connection) : [];
+      const byName = new Map(folders.map((folder) => [folder.name, folder]));
       return {
         smtp_ok: result.smtpOk,
         imap_ok: result.imapOk,
         ...(result.roundTripMs !== undefined && { round_trip_ms: result.roundTripMs }),
+        folders: row.pollFolders.map((name) => ({
+          name,
+          exists: byName.has(name),
+          special_use: byName.get(name)?.specialUse ?? null,
+        })),
       };
     },
   );

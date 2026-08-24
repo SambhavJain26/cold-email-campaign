@@ -12,6 +12,7 @@ export function invalidateOperational(qc: QueryClient): void {
     ['analytics'],
     ['leads'],
     ['unibox'],
+    ['reminders'],
     ['mailboxes'],
     ['system'],
     ['cold-storage'],

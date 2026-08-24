@@ -28,6 +28,14 @@ on error:
 
 Fetching is read-only on the real mailbox: messages are never deleted or moved, and **`\Seen` is not set** — imapflow's `source` fetch uses `BODY.PEEK[]` (B8.1 settled the "configurable in B8" question: peek, always; the operator's own inbox must not have its unread state rewritten by the poller).
 
+Folder configuration is discovered through the authenticated mail transport. `GET
+/api/v1/mailboxes/:id/folders` returns selectable folder names and provider special-use metadata,
+without fetching message content. A save is refused if any selected folder was verified as absent.
+Every newly selected folder is inserted into `mailbox_poll_cursors` with that folder's current
+`UIDNEXT` in the same transaction as the mailbox update, so enabling Spam/Junk never backfills its
+old messages. The Google preset remains `INBOX` plus `[Gmail]/Spam`; other providers use their
+discovered names.
+
 **The `n:*` trap (B8.1).** `UID FETCH {last_poll_uid + 1}:*` does NOT return an empty set when the high-water mark is past the highest UID — IMAP clamps the range and returns the LAST message. `SmtpImapTransport.fetchNew` therefore filters `uid > last_poll_uid` client-side; without it every poll would re-deliver the newest message forever (the ledger would dedupe the events, but the poll would never be a no-op).
 
 ## 2. The classifier — strict order, first match wins (spec Part 6)
@@ -88,6 +96,16 @@ if match:
 Precedence in the reducer makes the terminal state UNSUBSCRIBED; suppression side effect fires in the same transaction (docs/04 §3). The Unibox still shows the reply with "auto-unsubscribed ✓" (walkthrough Stage 6, Tom Fisher card); the operator may still re-tag sentiment (appends `sentiment_tagged`) — the suppression stands regardless.
 
 `tag_only` mode: skip this block entirely; unsubscribe fires only from a manual Negative-tag action *if* the operator also clicks "unsubscribe" (separate button — tagging alone never suppresses).
+
+## 3.1 Operator outcomes and reminders
+
+Every human reply stops the sequence before it appears in Unibox. The operator can separately
+record a reply disposition and sentiment. `not_now` requires a future calendar date and atomically
+creates or updates an open `not_now` reminder. The same date remains the recontact permission
+guard: completing or dismissing the reminder changes only the task, never the guard, never the
+enrollment state, and never sends anything. Manual reminders are also non-sending tasks. The old
+snooze endpoint is retained only for already-active enrollment scheduling and refuses replied
+enrollments.
 
 ## 4. Threading contract (the hard requirement, spec Part 6)
 

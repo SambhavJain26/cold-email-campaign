@@ -1,9 +1,14 @@
 import { useEffect, useState } from 'react';
 import { zodResolver } from '@hookform/resolvers/zod';
-import { useForm, useWatch } from 'react-hook-form';
+import { Controller, useForm, useWatch } from 'react-hook-form';
 import { toast } from 'sonner';
 import { z } from 'zod';
-import { sendWindowSchema, type CreateMailboxBody, type MailboxDto } from '@coldemail/shared';
+import {
+  ianaTimezoneSchema,
+  sendWindowSchema,
+  type CreateMailboxBody,
+  type MailboxDto,
+} from '@coldemail/shared';
 import { Button } from '@/components/ui/button';
 import {
   Dialog,
@@ -18,6 +23,9 @@ import { Label } from '@/components/ui/label';
 import { Checkbox } from '@/components/ui/checkbox';
 import { useCreateMailbox, usePatchMailbox, useTestConnection } from '@/api/mutations/mailboxes';
 import { useSettings } from '@/api/queries/settings';
+import { useMailboxFolders } from '@/api/queries/mailboxes';
+import { FolderMultiSelect } from '@/components/shared/folder-multi-select';
+import { TimezoneCombobox } from '@/components/shared/timezone-combobox';
 
 /** The shared create schema, narrowed to the form's shape: ports/cap always
  *  present here (prefilled defaults), password validated per-mode at submit —
@@ -33,11 +41,9 @@ const formSchema = z
     imap_port: z.number().int().min(1).max(65535),
     daily_cap: z.number().int().min(1),
     password: z.string(),
-    timezone: z.string().min(1),
+    timezone: ianaTimezoneSchema,
     send_window: sendWindowSchema,
-    // Edited as free text, split to the array at submit — a comma-separated
-    // field is far easier to type than a list editor for two or three values.
-    poll_folders_text: z.string().min(1, 'At least one folder — INBOX at minimum'),
+    poll_folders: z.array(z.string().min(1)).min(1, 'Select at least one folder'),
   })
   .superRefine((values, ctx) => {
     if (values.auth_type === 'app_password' && values.smtp_host.length === 0) {
@@ -65,6 +71,7 @@ export function MailboxDialog({
   const patch = usePatchMailbox();
   const test = useTestConnection();
   const settings = useSettings();
+  const folders = useMailboxFolders(mailbox?.id, false);
   const [testResult, setTestResult] = useState<string | null>(null);
 
   const {
@@ -80,10 +87,6 @@ export function MailboxDialog({
   });
   const selectedDays = useWatch({ control, name: 'send_window.days' }) ?? [];
   const authType = useWatch({ control, name: 'auth_type' }) ?? 'google_oauth';
-  const timezones =
-    typeof Intl.supportedValuesOf === 'function'
-      ? Intl.supportedValuesOf('timeZone')
-      : ['America/New_York', 'America/Chicago', 'America/Denver', 'America/Los_Angeles', 'UTC'];
 
   // Stale test results are cleared in handleOpenChange (an event handler) —
   // setState inside this effect trips the react-hooks compiler rule.
@@ -102,7 +105,7 @@ export function MailboxDialog({
             daily_cap: mailbox.daily_cap,
             timezone: mailbox.timezone,
             send_window: mailbox.send_window,
-            poll_folders_text: mailbox.poll_folders.join(', '),
+            poll_folders: mailbox.poll_folders,
             password: '',
           }
         : {
@@ -116,7 +119,7 @@ export function MailboxDialog({
             daily_cap: 30,
             timezone: settings.data?.default_timezone ?? 'UTC',
             send_window: { days: [1, 2, 3, 4, 5], start: '08:00', end: '17:00' },
-            poll_folders_text: 'INBOX, [Gmail]/Spam',
+            poll_folders: ['INBOX', '[Gmail]/Spam'],
             password: '',
           },
     );
@@ -132,15 +135,8 @@ export function MailboxDialog({
       setError('password', { message: 'App password is required' });
       return;
     }
-    // Free-text field → the contract's array. Blank entries are dropped so a
-    // trailing comma cannot produce an empty folder name.
-    const { poll_folders_text, ...values_ } = values;
     const body: CreateMailboxBody = {
-      ...values_,
-      poll_folders: poll_folders_text
-        .split(',')
-        .map((f) => f.trim())
-        .filter((f) => f !== ''),
+      ...values,
       ...(values.auth_type === 'google_oauth' && { password: undefined }),
     } as CreateMailboxBody;
     if (editing) {
@@ -212,7 +208,7 @@ export function MailboxDialog({
                       setValue('smtp_port', 587);
                       setValue('imap_host', 'imap.gmail.com');
                       setValue('imap_port', 993);
-                      setValue('poll_folders_text', 'INBOX, [Gmail]/Spam');
+                      setValue('poll_folders', ['INBOX', '[Gmail]/Spam']);
                     }
                   },
                 })}
@@ -239,35 +235,52 @@ export function MailboxDialog({
               )}
             {field('daily_cap', 'Daily cap', 'number')}
             <div className="space-y-1">
-              <Label htmlFor="mb-poll-folders">Polled folders</Label>
-              <Input
-                id="mb-poll-folders"
-                placeholder="INBOX, [Gmail]/Spam"
-                {...register('poll_folders_text')}
+              <Label>Polled folders</Label>
+              <Controller
+                name="poll_folders"
+                control={control}
+                render={({ field }) => (
+                  <FolderMultiSelect
+                    value={field.value}
+                    options={
+                      folders.data?.items ?? [
+                        { name: 'INBOX', special_use: '\\Inbox' },
+                        { name: '[Gmail]/Spam', special_use: '\\Junk' },
+                      ]
+                    }
+                    onChange={field.onChange}
+                    onRefresh={editing ? () => void folders.refetch() : undefined}
+                    refreshing={folders.isFetching}
+                  />
+                )}
               />
               <p className="text-xs text-muted-foreground">
-                Comma-separated. Add the provider&rsquo;s spam folder ({''}
-                <code>[Gmail]/Spam</code>, <code>Junk</code>) so a spam-filed reply is not
-                invisible. Each folder starts from its current position — history is never
-                back-filled.
+                Select INBOX and the provider&rsquo;s spam folder so spam-filed replies remain
+                visible. New folders start at UIDNEXT; old message history is not imported.
               </p>
+              {errors.poll_folders && (
+                <p className="text-xs text-destructive">{errors.poll_folders.message}</p>
+              )}
             </div>
             <div className="space-y-1">
               <Label htmlFor="mb-timezone">Fallback timezone</Label>
-              <Input
-                id="mb-timezone"
-                list="mailbox-timezones"
-                placeholder="America/New_York"
-                {...register('timezone')}
+              <Controller
+                name="timezone"
+                control={control}
+                render={({ field }) => (
+                  <TimezoneCombobox
+                    id="mb-timezone"
+                    value={field.value}
+                    onChange={field.onChange}
+                  />
+                )}
               />
-              <datalist id="mailbox-timezones">
-                {timezones.map((zone) => (
-                  <option key={zone} value={zone} />
-                ))}
-              </datalist>
               <p className="text-xs text-muted-foreground">
                 Used only when a lead has no known local timezone.
               </p>
+              {errors.timezone && (
+                <p className="text-xs text-destructive">{errors.timezone.message}</p>
+              )}
             </div>
             <div className="col-span-2 grid grid-cols-2 gap-3">
               <div className="space-y-1">
@@ -335,7 +348,7 @@ export function MailboxDialog({
                   test.mutate(mailbox.id, {
                     onSuccess: (r) =>
                       setTestResult(
-                        `${r.smtp_ok ? '✅' : '❌'} SMTP ${r.smtp_ok ? 'OK' : 'failed'} · ${r.imap_ok ? '✅' : '❌'} IMAP ${r.imap_ok ? 'OK' : 'failed'}${r.round_trip_ms !== undefined ? ` · ${(r.round_trip_ms / 1000).toFixed(1)}s` : ''}`,
+                        `${r.smtp_ok ? '✅' : '❌'} SMTP ${r.smtp_ok ? 'OK' : 'failed'} · ${r.imap_ok ? '✅' : '❌'} IMAP ${r.imap_ok ? 'OK' : 'failed'} · ${r.folders.map((folder) => `${folder.exists ? '✅' : '❌'} ${folder.name}`).join(' · ')}${r.round_trip_ms !== undefined ? ` · ${(r.round_trip_ms / 1000).toFixed(1)}s` : ''}`,
                       ),
                   })
                 }

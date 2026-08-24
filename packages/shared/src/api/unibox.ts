@@ -1,7 +1,7 @@
 // Unibox + enrollment actions + manual-sends (docs/10 §Unibox).
 import { z } from 'zod';
 import { REPLY_DISPOSITIONS, SENTIMENTS } from '../domain/index';
-import { isoDateTime, listOf, pageQuerySchema } from './common';
+import { isoDate, isoDateTime, listOf, pageQuerySchema } from './common';
 import { renderChecksSchema } from './sequences';
 
 export const uniboxItemSchema = z
@@ -21,7 +21,7 @@ export const uniboxItemSchema = z
     effective_sentiment: z.enum(SENTIMENTS).nullable(),
     suggested_sentiment: z.enum(SENTIMENTS).nullable(),
     disposition: z.enum(REPLY_DISPOSITIONS).nullable(),
-    recontact_after: isoDateTime.nullable(),
+    recontact_after: isoDate.nullable(),
     auto_unsubscribed: z.boolean(),
     lead_suppressed: z.boolean(),
     sequence_continues: z.boolean(),
@@ -63,7 +63,7 @@ export const tagSentimentBodySchema = z.object({ sentiment: z.enum(SENTIMENTS) }
 export const dispositionReplyBodySchema = z
   .object({
     disposition: z.enum(REPLY_DISPOSITIONS),
-    recontact_after: isoDateTime.nullable().optional(),
+    recontact_after: isoDate.nullable().optional(),
   })
   .strict()
   .superRefine((value, ctx) => {
@@ -85,10 +85,78 @@ export const dispositionReplyBodySchema = z
 
 export const snoozeBodySchema = z.object({ until: isoDateTime }).strict();
 
+export const reminderSourceSchema = z.enum(['manual', 'not_now', 'legacy_snooze']);
+export const reminderStatusSchema = z.enum(['open', 'done', 'dismissed']);
+
+export const reminderSchema = z
+  .object({
+    id: z.number().int(),
+    enrollment_id: z.number().int(),
+    incoming_message_id: z.number().int().nullable(),
+    due_date: isoDate,
+    note: z.string().nullable(),
+    source: reminderSourceSchema,
+    status: reminderStatusSchema,
+    created_at: isoDateTime,
+    completed_at: isoDateTime.nullable(),
+    lead: z
+      .object({ id: z.number().int(), name: z.string(), company: z.string().nullable() })
+      .strict(),
+    campaign_id: z.number().int(),
+    reply_snippet: z.string().nullable(),
+  })
+  .strict();
+export type ReminderDto = z.infer<typeof reminderSchema>;
+
+export const reminderQuerySchema = pageQuerySchema.extend({
+  view: z.enum(['due_today', 'upcoming', 'overdue', 'all']).default('due_today'),
+  status: reminderStatusSchema.default('open'),
+});
+export const reminderListResponseSchema = listOf(reminderSchema).extend({
+  open_count: z.number().int().min(0),
+});
+export const createReminderBodySchema = z
+  .object({ due_date: isoDate, note: z.string().max(2000).nullable().optional() })
+  .strict();
+export const patchReminderBodySchema = z
+  .object({
+    due_date: isoDate.optional(),
+    note: z.string().max(2000).nullable().optional(),
+    status: reminderStatusSchema.optional(),
+  })
+  .strict()
+  .refine((body) => Object.keys(body).length > 0, { message: 'at least one change is required' });
+
+export const manualComposePrefillSchema = z
+  .object({
+    enrollment_id: z.number().int(),
+    lead_id: z.number().int(),
+    campaign: z.object({ id: z.number().int(), name: z.string() }).strict(),
+    step_no: z.number().int().positive(),
+    step_count: z.number().int().positive(),
+    due_at: isoDateTime.nullable(),
+    personalization_mode: z.enum(['human_written', 'template_researched', 'template_auto']),
+    subject: z.string(),
+    body: z.string(),
+    variant_id: z.number().int().nullable(),
+    draft_id: z.number().int().nullable(),
+    thread: z
+      .object({
+        assigned_mailbox_id: z.number().int().nullable(),
+        previous_message_ids: z.array(z.string()),
+        in_thread: z.boolean(),
+      })
+      .strict(),
+    checks: renderChecksSchema,
+  })
+  .strict();
+
 export const manualSendBodySchema = z
   .object({
     lead_id: z.number().int().positive(),
     campaign_id: z.number().int().positive(),
+    enrollment_id: z.number().int().positive().optional(),
+    draft_id: z.number().int().positive().optional(),
     mailbox_id: z.number().int().positive().optional(),
     subject: z.string().min(1),
     body: z.string().min(1),

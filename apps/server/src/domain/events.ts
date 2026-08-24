@@ -110,7 +110,9 @@ const replyDispositioned_ = base.extend({
     reply_event_id: id,
     incoming_message_id: id,
     disposition: z.enum(REPLY_DISPOSITIONS),
-    recontact_after: z.string().datetime().optional(),
+    // New records use a timezone-independent calendar date. Accept the old
+    // timestamp shape so the append-only ledger remains replay-compatible.
+    recontact_after: z.union([z.string().date(), z.string().datetime()]).optional(),
     dispositioned_by: z.enum(['human', 'auto']),
   }),
 });

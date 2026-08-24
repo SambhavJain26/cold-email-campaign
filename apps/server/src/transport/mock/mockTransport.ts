@@ -5,6 +5,7 @@
 import type { Clock } from '../../clock';
 import type {
   IncomingMessage,
+  MailFolder,
   MailboxVerifyConfig,
   MailTransport,
   OutboundMessage,
@@ -38,6 +39,7 @@ export class MockTransport implements MailTransport, ScriptableTransport {
   private verifyScript = new Map<string, VerifyResult>(); // fromAddress -> result
   private initialPollUids = new Map<string, number>(); // fromAddress -> existing UID high-water
   private fetchErrors = new Map<number, Error[]>(); // mailboxId -> FIFO of scripted fetch failures
+  private folderScript = new Map<string, MailFolder[]>();
 
   constructor(private readonly clock: Clock) {}
 
@@ -173,6 +175,19 @@ export class MockTransport implements MailTransport, ScriptableTransport {
 
   setInitialPollUid(address: string, uid: number): void {
     this.initialPollUids.set(address.toLowerCase(), uid);
+  }
+
+  onFolders(address: string, folders: MailFolder[]): void {
+    this.folderScript.set(address.toLowerCase(), folders);
+  }
+
+  listFolders(config: MailboxVerifyConfig): Promise<MailFolder[]> {
+    return Promise.resolve(
+      this.folderScript.get(config.fromAddress.toLowerCase()) ?? [
+        { name: 'INBOX', specialUse: '\\Inbox' },
+        { name: '[Gmail]/Spam', specialUse: '\\Junk' },
+      ],
+    );
   }
 
   initialPollUid(config: MailboxVerifyConfig): Promise<number> {

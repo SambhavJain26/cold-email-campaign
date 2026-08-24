@@ -3,7 +3,7 @@
 // password field fails the response validation loudly.
 import { z } from 'zod';
 import { MAILBOX_STATUSES } from '../domain/index';
-import { isoDateTime } from './common';
+import { ianaTimezoneSchema, isoDateTime } from './common';
 
 export const sendWindowSchema = z
   .object({
@@ -26,7 +26,7 @@ export const mailboxSchema = z
     daily_cap: z.number().int(),
     effective_cap: z.number().int(),
     send_window: sendWindowSchema,
-    timezone: z.string().min(1),
+    timezone: ianaTimezoneSchema,
     /**
      * Folders polled for replies (finding 13). INBOX-only by default; add the
      * provider's spam folder ("[Gmail]/Spam", "Junk", "Junk E-Mail") to stop a
@@ -60,7 +60,7 @@ export const createMailboxBodySchema = z
     password: z.string().min(1).optional(),
     daily_cap: z.number().int().min(1).optional(),
     send_window: sendWindowSchema.optional(),
-    timezone: z.string().min(1).optional(),
+    timezone: ianaTimezoneSchema.optional(),
     poll_folders: z.array(z.string().min(1)).min(1).optional(),
   })
   .strict()
@@ -99,7 +99,7 @@ export const patchMailboxBodySchema = z
     password: z.string().min(1).optional(),
     daily_cap: z.number().int().min(1).optional(),
     send_window: sendWindowSchema.optional(),
-    timezone: z.string().min(1).optional(),
+    timezone: ianaTimezoneSchema.optional(),
     poll_folders: z.array(z.string().min(1)).min(1).optional(),
   })
   .strict();
@@ -110,7 +110,27 @@ export const testConnectionResponseSchema = z
     smtp_ok: z.boolean(),
     imap_ok: z.boolean(),
     round_trip_ms: z.number().optional(),
+    folders: z.array(
+      z
+        .object({
+          name: z.string().min(1),
+          exists: z.boolean(),
+          special_use: z.string().nullable(),
+        })
+        .strict(),
+    ),
   })
+  .strict();
+
+export const mailboxFolderSchema = z
+  .object({
+    name: z.string().min(1),
+    special_use: z.string().nullable(),
+  })
+  .strict();
+
+export const mailboxFoldersResponseSchema = z
+  .object({ items: z.array(mailboxFolderSchema) })
   .strict();
 
 export const resumeMailboxBodySchema = z

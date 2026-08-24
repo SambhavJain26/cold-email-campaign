@@ -90,7 +90,9 @@ test('tag_only mode adds the explicit unsubscribe on negative cards', async ({ p
   await expect(page.getByText('Lead unsubscribed and suppressed')).toBeVisible();
 });
 
-test('manual composer prefills from step 1 and sends as a manual send', async ({ page }) => {
+test('manual composer prefills the enrollment due step and sends as a manual send', async ({
+  page,
+}) => {
   await login(page);
 
   // A campaign with a sequence, so there is something to prefill from.
@@ -114,7 +116,8 @@ test('manual composer prefills from step 1 and sends as a manual send', async ({
   const dialog = page.getByRole('dialog');
   await expect(dialog.getByLabel('Campaign')).toContainText('Manual Send Fixture');
 
-  // Prefilled from the step-1 render for THIS lead — the starting point.
+  // Prefilled by the server for THIS enrollment's current due step.
+  await expect(dialog.getByText(/Step \d+ of 4/)).toBeVisible();
   await expect(dialog.getByLabel('Subject')).toHaveValue(/Quick question about/);
   await expect(dialog.getByLabel('Body')).toHaveValue(/Hi /);
   await expect(page.getByTestId('composer-checks')).toBeVisible();
@@ -122,4 +125,22 @@ test('manual composer prefills from step 1 and sends as a manual send', async ({
   await dialog.getByLabel('Subject').fill('Following up personally');
   await page.getByRole('button', { name: 'Send & log as manual' }).click();
   await expect(page.getByText('Sent and logged as a manual send')).toBeVisible();
+});
+
+test('Not now creates an operator reminder without restarting the sequence', async ({ page }) => {
+  await login(page);
+  await page.getByRole('link', { name: 'Unibox' }).click();
+
+  const card = page.getByTestId('reply-card-101');
+  await card.getByLabel('Reply outcome').click();
+  await page.getByRole('option', { name: 'Not now — hold until date' }).click();
+  const tomorrow = new Date(Date.now() + 2 * 86_400_000).toISOString().slice(0, 10);
+  await card.getByLabel('Do not contact before').fill(tomorrow);
+  await card.getByRole('button', { name: 'Save outcome' }).click();
+  await expect(page.getByText('Reply outcome recorded')).toBeVisible();
+
+  await page.getByRole('tab', { name: /Reminders/ }).click();
+  await expect(page.getByText(/Follow up after this lead's requested date/)).toBeVisible();
+  await page.getByRole('button', { name: 'Complete' }).click();
+  await expect(page.getByText(/Follow up after this lead's requested date/)).toBeHidden();
 });

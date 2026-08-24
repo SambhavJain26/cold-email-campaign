@@ -63,7 +63,9 @@ Rules: features may import `components/*`, `api/*`, `lib`; never each other. All
 
 - Tailwind + shadcn defaults, dark-mode-first (dashboard tool); accent color per state: green (positive/ok), amber (warning/paused), red (negative/failed), blue (info/nurture) — matching the walkthrough's 🟢🟡⚪🔵 tier glyphs (`TierBadge` renders those exact glyphs).
 - Numbers are the product: `MetricStat` always renders `numerator / denominator = value%` on hover (title attr) with the headline value large — the spec's reconciliation transparency, in the UI.
-- Tables: dense rows, sticky header, right-aligned numerics, tabular-nums.
+- Tables: dense rows, sticky header, right-aligned numerics, tabular-nums. The shared collection
+  component accepts a phone-card renderer and numbered pagination with a visible range/total;
+  filters own the page state and reset it to 1 whenever their result set changes.
 - Charts: Recharts — `Sparkline` (tiny area, no axes) for 13d; bar/line only in Analytics. No pie charts.
 
 ## 6. Testing

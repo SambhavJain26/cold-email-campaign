@@ -12,6 +12,11 @@ Spaceship production infrastructure is live, but the project remains in **pre-pr
 commissioning**:
 
 - **Approved build scope — the only feature work authorized:** the completed 2026-08-15 list (public unsubscribe/one-click, launch guardrails, domain-readiness preflight, per-folder polling, and single-lead creation) plus the operator-approved 2026-08-20 pre-domain safety backlog: mandatory reply stopping; reply dispositions and conservative suppression; guarded cross-campaign recontact; broader opt-out phrases; findings #20–25; alert history and mailbox filters; arbitrary custom-field editing; copy-risk rubric improvements; local verification; and runbook/documentation reconciliation. Outside that list, the rule is unchanged: testing, verification, diagnosis, and documentation only.
+- **2026-08-25 approved implementation:** operational pagination; due-step Manual Compose; in-app
+  reminders; verified timezone/folder controls; imported manual drafts; Auto Observation and
+  namespaced sequence variables; activation-based staged ramp; direct/eventual variant analytics;
+  multi-source recycling; and a responsive/mobile redesign. Implement, test, document, commit, and
+  push in four stages. This does not authorize deployment, activation, enrollment, or any send.
 - The operator-approved Spaceship deployment, subpath support, sender-domain unsubscribe routing,
   and individual Google Workspace OAuth implementation are complete. Do not extend production
   scope or change DNS/Caddy/mailboxes outside the approved commissioning steps without fresh

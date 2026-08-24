@@ -4,15 +4,8 @@ import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '@/components/ui/table';
 import { EmptyState } from '@/components/shared/empty-state';
+import { DataTable } from '@/components/shared/data-table';
 import { useAlerts } from '@/api/queries/alerts';
 import { useAckAlert } from '@/api/mutations/alerts';
 import { formatDateTime } from '@/lib/format';
@@ -29,7 +22,8 @@ const KIND_LABEL: Record<string, string> = {
 
 export function AlertsHistory() {
   const [unackedOnly, setUnackedOnly] = useState(false);
-  const alerts = useAlerts(unackedOnly);
+  const [page, setPage] = useState(1);
+  const alerts = useAlerts(unackedOnly, page, 50);
   const ack = useAckAlert();
 
   return (
@@ -42,7 +36,14 @@ export function AlertsHistory() {
           </p>
         </div>
         <div className="flex items-center gap-2">
-          <Switch id="unacked-alerts" checked={unackedOnly} onCheckedChange={setUnackedOnly} />
+          <Switch
+            id="unacked-alerts"
+            checked={unackedOnly}
+            onCheckedChange={(checked) => {
+              setUnackedOnly(checked);
+              setPage(1);
+            }}
+          />
           <Label htmlFor="unacked-alerts" className="text-xs">
             Open only
           </Label>
@@ -60,57 +61,111 @@ export function AlertsHistory() {
       ) : alerts.data.items.length === 0 ? (
         <EmptyState title={unackedOnly ? 'No open alerts.' : 'No alert history yet.'} />
       ) : (
-        <div className="overflow-x-auto rounded-lg border border-border">
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead className="text-xs">Created</TableHead>
-                <TableHead className="text-xs">Alert</TableHead>
-                <TableHead className="text-xs">Severity</TableHead>
-                <TableHead className="text-xs">Details</TableHead>
-                <TableHead className="text-xs">Status</TableHead>
-                <TableHead className="text-right text-xs">Action</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {alerts.data.items.map((alert) => (
-                <TableRow key={alert.id}>
-                  <TableCell className="whitespace-nowrap py-2 text-xs text-muted-foreground">
-                    {formatDateTime(alert.created_at)}
-                  </TableCell>
-                  <TableCell className="py-2 text-xs font-medium">
+        <DataTable
+          rows={alerts.data.items}
+          rowKey={(alert) => alert.id}
+          pagination={{
+            page: alerts.data.page,
+            perPage: alerts.data.per_page,
+            total: alerts.data.total,
+            onPageChange: setPage,
+          }}
+          columns={[
+            {
+              key: 'created',
+              header: 'Created',
+              cell: (alert) => (
+                <span className="whitespace-nowrap text-xs text-muted-foreground">
+                  {formatDateTime(alert.created_at)}
+                </span>
+              ),
+            },
+            {
+              key: 'alert',
+              header: 'Alert',
+              cell: (alert) => (
+                <span className="text-xs font-medium">
+                  {KIND_LABEL[alert.kind] ?? alert.kind.replaceAll('_', ' ')}
+                </span>
+              ),
+            },
+            {
+              key: 'severity',
+              header: 'Severity',
+              cell: (alert) => (
+                <Badge variant={alert.severity === 'error' ? 'destructive' : 'outline'}>
+                  {alert.severity}
+                </Badge>
+              ),
+            },
+            {
+              key: 'details',
+              header: 'Details',
+              className: 'max-w-md font-mono text-[11px] text-muted-foreground',
+              cell: (alert) =>
+                Object.keys(alert.payload).length === 0 ? '—' : JSON.stringify(alert.payload),
+            },
+            {
+              key: 'status',
+              header: 'Status',
+              cell: (alert) =>
+                alert.acknowledged_at === null
+                  ? 'Open'
+                  : `Acknowledged ${formatDateTime(alert.acknowledged_at)}`,
+            },
+            {
+              key: 'action',
+              header: 'Action',
+              align: 'right',
+              cell: (alert) =>
+                alert.acknowledged_at === null ? (
+                  <Button
+                    size="xs"
+                    variant="outline"
+                    disabled={ack.isPending}
+                    onClick={() => ack.mutate(alert.id)}
+                  >
+                    Acknowledge
+                  </Button>
+                ) : null,
+            },
+          ]}
+          mobileCard={(alert) => (
+            <article className="space-y-2 rounded-lg border border-border bg-card p-3">
+              <div className="flex items-start justify-between gap-2">
+                <div>
+                  <p className="text-sm font-medium">
                     {KIND_LABEL[alert.kind] ?? alert.kind.replaceAll('_', ' ')}
-                  </TableCell>
-                  <TableCell className="py-2">
-                    <Badge variant={alert.severity === 'error' ? 'destructive' : 'outline'}>
-                      {alert.severity}
-                    </Badge>
-                  </TableCell>
-                  <TableCell className="max-w-md py-2 font-mono text-[11px] text-muted-foreground">
-                    {Object.keys(alert.payload).length === 0 ? '—' : JSON.stringify(alert.payload)}
-                  </TableCell>
-                  <TableCell className="whitespace-nowrap py-2 text-xs">
-                    {alert.acknowledged_at === null
-                      ? 'Open'
-                      : `Acknowledged ${formatDateTime(alert.acknowledged_at)}`}
-                  </TableCell>
-                  <TableCell className="py-2 text-right">
-                    {alert.acknowledged_at === null && (
-                      <Button
-                        size="xs"
-                        variant="outline"
-                        disabled={ack.isPending}
-                        onClick={() => ack.mutate(alert.id)}
-                      >
-                        Acknowledge
-                      </Button>
-                    )}
-                  </TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-        </div>
+                  </p>
+                  <p className="text-xs text-muted-foreground">
+                    {formatDateTime(alert.created_at)}
+                  </p>
+                </div>
+                <Badge variant={alert.severity === 'error' ? 'destructive' : 'outline'}>
+                  {alert.severity}
+                </Badge>
+              </div>
+              {Object.keys(alert.payload).length > 0 && (
+                <p className="break-words font-mono text-[11px] text-muted-foreground">
+                  {JSON.stringify(alert.payload)}
+                </p>
+              )}
+              <div className="flex items-center justify-between gap-2 text-xs">
+                <span>{alert.acknowledged_at === null ? 'Open' : 'Acknowledged'}</span>
+                {alert.acknowledged_at === null && (
+                  <Button
+                    size="xs"
+                    variant="outline"
+                    disabled={ack.isPending}
+                    onClick={() => ack.mutate(alert.id)}
+                  >
+                    Acknowledge
+                  </Button>
+                )}
+              </div>
+            </article>
+          )}
+        />
       )}
     </section>
   );

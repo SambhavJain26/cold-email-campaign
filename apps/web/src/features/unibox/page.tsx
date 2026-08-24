@@ -13,7 +13,9 @@ import {
 } from '@/components/ui/select';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { EmptyState } from '@/components/shared/empty-state';
-import { useUnibox } from '@/api/queries/unibox';
+import { CollectionPagination } from '@/components/shared/collection-pagination';
+import { useReminders, useUnibox } from '@/api/queries/unibox';
+import { usePatchReminder } from '@/api/mutations/unibox';
 import { useSettings } from '@/api/queries/settings';
 import { useMailboxes } from '@/api/queries/mailboxes';
 import { ReplyCard } from './reply-card';
@@ -23,7 +25,11 @@ const GLYPH: Record<Sentiment, string> = { positive: '🟢', neutral: '⚪', neg
 
 /** F6.1 — Unibox feed (docs/12 §7): human / auto-reply tabs + sentiment filters. */
 export default function UniboxPage() {
-  const [bucket, setBucket] = useState<'human' | 'auto_reply'>('human');
+  const [view, setView] = useState<'human' | 'auto_reply' | 'reminders'>('human');
+  const [page, setPage] = useState(1);
+  const [reminderView, setReminderView] = useState<'due_today' | 'upcoming' | 'overdue'>(
+    'due_today',
+  );
   const [sentiment, setSentiment] = useState<Sentiment | undefined>(undefined);
   const [unhandledOnly, setUnhandledOnly] = useState(false);
   const [threadId, setThreadId] = useState<number | null>(null);
@@ -32,17 +38,22 @@ export default function UniboxPage() {
   const settings = useSettings();
   const mailboxes = useMailboxes();
   const tagOnlyMode = settings.data?.optout_detection === 'tag_only';
+  const bucket = view === 'auto_reply' ? 'auto_reply' : 'human';
 
   const { data, isPending, isError, refetch } = useUnibox({
     bucket,
+    page,
     per_page: 50,
-    sentiment: bucket === 'human' ? sentiment : undefined,
-    unhandled: bucket === 'human' && unhandledOnly ? true : undefined,
+    sentiment: view === 'human' ? sentiment : undefined,
+    unhandled: view === 'human' && unhandledOnly ? true : undefined,
     mailbox_id: mailboxId === 'all' ? undefined : Number(mailboxId),
   });
+  const reminders = useReminders({ page, per_page: 50, view: reminderView, status: 'open' });
+  const patchReminder = usePatchReminder();
 
   const switchBucket = (next: string) => {
-    setBucket(next === 'auto_reply' ? 'auto_reply' : 'human');
+    setView(next === 'auto_reply' ? 'auto_reply' : next === 'reminders' ? 'reminders' : 'human');
+    setPage(1);
     setSentiment(undefined);
     setUnhandledOnly(false);
   };
@@ -63,28 +74,40 @@ export default function UniboxPage() {
       </div>
 
       <div className="flex flex-wrap items-center gap-4">
-        <Tabs value={bucket} onValueChange={switchBucket}>
+        <Tabs value={view} onValueChange={switchBucket}>
           <TabsList>
             <TabsTrigger value="human">Human replies</TabsTrigger>
             <TabsTrigger value="auto_reply">Auto-replies (OOO)</TabsTrigger>
+            <TabsTrigger value="reminders">
+              Reminders
+              {(reminders.data?.open_count ?? 0) > 0 ? ` (${reminders.data!.open_count})` : ''}
+            </TabsTrigger>
           </TabsList>
         </Tabs>
 
-        <Select value={mailboxId} onValueChange={setMailboxId}>
-          <SelectTrigger size="sm" className="w-60" aria-label="Filter by mailbox">
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">All mailboxes</SelectItem>
-            {(mailboxes.data?.items ?? []).map((mailbox) => (
-              <SelectItem key={mailbox.id} value={String(mailbox.id)}>
-                {mailbox.from_address}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
+        {view !== 'reminders' && (
+          <Select
+            value={mailboxId}
+            onValueChange={(value) => {
+              setMailboxId(value);
+              setPage(1);
+            }}
+          >
+            <SelectTrigger size="sm" className="w-60" aria-label="Filter by mailbox">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All mailboxes</SelectItem>
+              {(mailboxes.data?.items ?? []).map((mailbox) => (
+                <SelectItem key={mailbox.id} value={String(mailbox.id)}>
+                  {mailbox.from_address}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        )}
 
-        {bucket === 'human' && (
+        {view === 'human' && (
           <>
             <div className="flex gap-1" role="group" aria-label="Filter by sentiment">
               {SENTIMENTS.map((value) => (
@@ -93,7 +116,10 @@ export default function UniboxPage() {
                   variant={sentiment === value ? 'default' : 'outline'}
                   size="xs"
                   aria-pressed={sentiment === value}
-                  onClick={() => setSentiment(sentiment === value ? undefined : value)}
+                  onClick={() => {
+                    setSentiment(sentiment === value ? undefined : value);
+                    setPage(1);
+                  }}
                 >
                   {GLYPH[value]} {value}
                 </Button>
@@ -103,7 +129,10 @@ export default function UniboxPage() {
               <Switch
                 id="unhandled-only"
                 checked={unhandledOnly}
-                onCheckedChange={setUnhandledOnly}
+                onCheckedChange={(checked) => {
+                  setUnhandledOnly(checked);
+                  setPage(1);
+                }}
               />
               <Label htmlFor="unhandled-only" className="text-xs">
                 Needs outcome
@@ -113,7 +142,85 @@ export default function UniboxPage() {
         )}
       </div>
 
-      {isPending ? (
+      {view === 'reminders' && (
+        <div className="flex flex-wrap gap-1" role="group" aria-label="Reminder date filter">
+          {(['due_today', 'upcoming', 'overdue'] as const).map((value) => (
+            <Button
+              key={value}
+              size="xs"
+              variant={reminderView === value ? 'default' : 'outline'}
+              onClick={() => {
+                setReminderView(value);
+                setPage(1);
+              }}
+            >
+              {value === 'due_today' ? 'Due today' : value === 'upcoming' ? 'Upcoming' : 'Overdue'}
+            </Button>
+          ))}
+        </div>
+      )}
+
+      {view === 'reminders' ? (
+        reminders.isPending ? (
+          <Skeleton className="h-40 w-full" />
+        ) : reminders.isError ? (
+          <EmptyState
+            title="Failed to load reminders"
+            actionLabel="Retry"
+            onAction={() => reminders.refetch()}
+          />
+        ) : reminders.data.items.length === 0 ? (
+          <EmptyState title="No reminders match this date filter." />
+        ) : (
+          <div className="space-y-3">
+            {reminders.data.items.map((reminder) => (
+              <article
+                key={reminder.id}
+                className="space-y-2 rounded-lg border border-border bg-card p-4"
+              >
+                <div className="flex flex-wrap items-start justify-between gap-2">
+                  <div>
+                    <p className="text-sm font-medium">{reminder.lead.name}</p>
+                    <p className="text-xs text-muted-foreground">
+                      Due {reminder.due_date} · campaign #{reminder.campaign_id} ·{' '}
+                      {reminder.source.replace('_', ' ')}
+                    </p>
+                  </div>
+                  <div className="flex gap-1">
+                    <Button
+                      size="xs"
+                      variant="outline"
+                      disabled={patchReminder.isPending}
+                      onClick={() => patchReminder.mutate({ id: reminder.id, status: 'done' })}
+                    >
+                      Complete
+                    </Button>
+                    <Button
+                      size="xs"
+                      variant="ghost"
+                      disabled={patchReminder.isPending}
+                      onClick={() => patchReminder.mutate({ id: reminder.id, status: 'dismissed' })}
+                    >
+                      Dismiss
+                    </Button>
+                  </div>
+                </div>
+                {(reminder.note || reminder.reply_snippet) && (
+                  <p className="text-xs text-muted-foreground">
+                    {reminder.note ?? reminder.reply_snippet}
+                  </p>
+                )}
+              </article>
+            ))}
+            <CollectionPagination
+              page={reminders.data.page}
+              perPage={reminders.data.per_page}
+              total={reminders.data.total}
+              onPageChange={setPage}
+            />
+          </div>
+        )
+      ) : isPending ? (
         <div className="space-y-3">
           <Skeleton className="h-24 w-full" />
           <Skeleton className="h-24 w-full" />
@@ -123,7 +230,7 @@ export default function UniboxPage() {
       ) : data.items.length === 0 ? (
         <EmptyState
           title={
-            bucket === 'human'
+            view === 'human'
               ? "No replies yet — they'll appear here the moment the poller sees them."
               : 'No auto-replies in this window.'
           }
@@ -139,6 +246,12 @@ export default function UniboxPage() {
               onOpenThread={() => setThreadId(item.incoming_message_id)}
             />
           ))}
+          <CollectionPagination
+            page={data.page}
+            perPage={data.per_page}
+            total={data.total}
+            onPageChange={setPage}
+          />
         </div>
       )}
 

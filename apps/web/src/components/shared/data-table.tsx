@@ -1,5 +1,4 @@
 import type { ReactNode } from 'react';
-import { Button } from '@/components/ui/button';
 import {
   Table,
   TableBody,
@@ -10,6 +9,7 @@ import {
 } from '@/components/ui/table';
 import { cn } from '@/lib/utils';
 import { EmptyState } from './empty-state';
+import { CollectionPagination } from './collection-pagination';
 
 export interface DataTableColumn<T> {
   key: string;
@@ -33,26 +33,41 @@ export function DataTable<T>({
   columns,
   rows,
   rowKey,
+  rowTestId,
   pagination,
   emptyTitle = 'Nothing here yet',
   onRowClick,
   className,
+  mobileCard,
 }: {
   columns: Array<DataTableColumn<T>>;
   rows: T[];
   rowKey: (row: T) => string | number;
+  rowTestId?: (row: T) => string;
   pagination?: DataTablePagination;
   emptyTitle?: string;
   onRowClick?: (row: T) => void;
   className?: string;
+  mobileCard?: (row: T) => ReactNode;
 }) {
   if (rows.length === 0) {
     return <EmptyState title={emptyTitle} className={className} />;
   }
-  const lastPage = pagination ? Math.max(1, Math.ceil(pagination.total / pagination.perPage)) : 1;
   return (
     <div className={cn('space-y-2', className)}>
-      <div className="overflow-x-auto rounded-lg border border-border">
+      {mobileCard && (
+        <div className="space-y-2 md:hidden">
+          {rows.map((row) => (
+            <div key={rowKey(row)}>{mobileCard(row)}</div>
+          ))}
+        </div>
+      )}
+      <div
+        className={cn(
+          'overflow-x-auto rounded-lg border border-border',
+          mobileCard && 'hidden md:block',
+        )}
+      >
         <Table>
           <TableHeader className="sticky top-0 bg-card">
             <TableRow>
@@ -74,6 +89,7 @@ export function DataTable<T>({
             {rows.map((row) => (
               <TableRow
                 key={rowKey(row)}
+                data-testid={rowTestId?.(row)}
                 onClick={onRowClick ? () => onRowClick(row) : undefined}
                 className={cn(onRowClick && 'cursor-pointer')}
               >
@@ -94,32 +110,7 @@ export function DataTable<T>({
           </TableBody>
         </Table>
       </div>
-      {pagination && pagination.total > pagination.perPage && (
-        <div className="flex items-center justify-between text-xs text-muted-foreground">
-          <span className="tabular-nums">
-            {(pagination.page - 1) * pagination.perPage + 1}–
-            {Math.min(pagination.page * pagination.perPage, pagination.total)} of {pagination.total}
-          </span>
-          <div className="flex gap-1">
-            <Button
-              variant="outline"
-              size="sm"
-              disabled={pagination.page <= 1}
-              onClick={() => pagination.onPageChange(pagination.page - 1)}
-            >
-              Previous
-            </Button>
-            <Button
-              variant="outline"
-              size="sm"
-              disabled={pagination.page >= lastPage}
-              onClick={() => pagination.onPageChange(pagination.page + 1)}
-            >
-              Next
-            </Button>
-          </div>
-        </div>
-      )}
+      {pagination && <CollectionPagination {...pagination} />}
     </div>
   );
 }

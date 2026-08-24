@@ -85,6 +85,12 @@ export interface VerifyResult {
   error?: string;
 }
 
+export interface MailFolder {
+  name: string;
+  /** RFC 6154 special-use flag when the provider exposes one. */
+  specialUse?: string;
+}
+
 /**
  * Thrown by fetchNew on a PERMANENT auth/credential failure (docs/07 §5):
  * the poller flips the mailbox to auth_failed. Transient
@@ -134,6 +140,8 @@ export interface MailTransport {
    * way, or connecting it re-ingests its whole history (finding 16).
    */
   initialPollUid?(config: MailboxVerifyConfig, folder?: string): Promise<number>;
+  /** Discover selectable provider folders without reading message content. */
+  listFolders(config: MailboxVerifyConfig): Promise<MailFolder[]>;
   /** "Test Connection" + health monitoring. */
   verify(config: MailboxVerifyConfig): Promise<VerifyResult>;
   /** Release pooled connections on shutdown. Optional — the mock has none. */

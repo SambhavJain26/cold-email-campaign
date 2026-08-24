@@ -72,6 +72,15 @@ Escape hatches built in: `settings.optout_detection = 'auto' | 'tag_only'` (the 
 | AD | **`delivery_confirm_hours` becomes immutable after the first `sent` event.** | Completion replay currently depends on the active setting. Freezing it once history exists prevents finding #24 without rewriting append-only history. | Low |
 | AE | **Remove `redistributeUnstarted` and claims of pre-send redistribution.** Unassigned work already rotates across healthy mailboxes; started threads remain pinned. | Finding #25 proves the old predicate describes an impossible production state. Honest rotation is safer than inventing premature assignment. | Low |
 
+## Operator-workflow decisions (2026-08-25)
+
+| ID | Decision | Rationale | Swap cost |
+|---|---|---|---|
+| BA | **Operational collections use numbered server pagination.** Unibox, reminders, alerts, reply detection, and cold storage retain their filters while paging and reset to page 1 when a filter changes. | New work must remain discoverable when operational history grows beyond one screen. | Low |
+| BB | **Human-reply follow-up uses in-app reminders, not enrollment snoozes.** A `not_now` outcome creates an open reminder and an independent do-not-contact guard. Completing a reminder never authorizes or sends mail. | An operator task and permission to contact are different facts and must never be conflated. | Medium |
+| BC | **Manual Compose begins from the enrollment's actual due step.** The server resolves the current active human-written enrollment, step template, thread, and pinned mailbox; it never silently creates an enrollment. | Later-step manual work must preserve both the intended copy and conversation thread. | Medium |
+| BD | **Timezones and IMAP folders are verified selections.** Timezones are validated IANA names. Folder names come from authenticated discovery, and adding one atomically seeds its cursor from UIDNEXT. | Prevents typo-driven scheduling failures and accidental ingestion of old mailbox history. | Medium |
+
 ---
 
 ## Deliberately still open (kept as configuration, per plan §8)

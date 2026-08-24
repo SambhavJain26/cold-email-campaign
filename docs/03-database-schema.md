@@ -138,7 +138,7 @@ CREATE TABLE enrollments (
   soft_bounce_retries  int NOT NULL DEFAULT 0,          -- projection of soft_bounce events, max 2
   best_reply_sentiment sentiment,                       -- projection (decision M resolution order)
   meeting_booked       bool NOT NULL DEFAULT false,     -- milestone flag, NOT a state
-  snoozed_until        timestamptz,                     -- Unibox "Snooze to Q3"
+  snoozed_until        timestamptz,                     -- legacy ACTIVE-enrollment scheduling only
   enrolled_at          timestamptz NOT NULL,
   terminal_at          timestamptz,
   UNIQUE (lead_id, campaign_id)
@@ -147,6 +147,28 @@ CREATE INDEX enr_due    ON enrollments (next_send_at) WHERE current_state = 'ACT
 CREATE INDEX enr_state  ON enrollments (campaign_id, current_state);
 CREATE INDEX enr_mailbox ON enrollments (assigned_mailbox_id) WHERE current_state = 'ACTIVE';
 ```
+
+### `operator_reminders`
+
+In-app operator tasks are independent from enrollment scheduling and permission to contact.
+
+```sql
+CREATE TABLE operator_reminders (
+  id                  bigint GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+  enrollment_id       bigint NOT NULL REFERENCES enrollments(id),
+  incoming_message_id bigint REFERENCES incoming_messages(id),
+  due_date             date NOT NULL,
+  note                 text,
+  source               text NOT NULL CHECK (source IN ('manual','not_now','legacy_snooze')),
+  status               text NOT NULL CHECK (status IN ('open','done','dismissed')),
+  created_at           timestamptz NOT NULL DEFAULT now(),
+  completed_at         timestamptz
+);
+```
+
+Migration `0015` converts future snoozes on replied enrollments into `legacy_snooze` reminders.
+It deliberately preserves existing snoozes on active enrollments, where they retain their old
+scheduler meaning.
 
 ## 3. Supporting tables
 
@@ -361,5 +383,5 @@ GRANT  INSERT, SELECT ON events TO app_rw;
 ## 6. Migration policy
 
 - Migrations are **hand-authored paired SQL files** (`NNNN_name.up.sql` / `NNNN_name.down.sql`) in `apps/server/src/db/migrations/`, executed by the in-repo runner (`src/db/migrate.ts`, tracked in `schema_migrations`), committed to git, applied on boot (prod) and by `npm run db:migrate` / `db:rollback` / `db:status`. drizzle-kit is generation-assist only (diff SQL from schema defs into gitignored `drizzle-kit-out/`, hand-copied in) — it cannot execute or roll back migrations. *(Changed at B0.4: drizzle-kit has no down-migration support, and this doc requires tested downs; hand-written DDL also fits the trigger/grant-heavy schema.)*
-- Numbered plan continues through `0010_unsubscribe`, `0011_guardrails`, `0012_poll_folders`, and `0013_reply_safety` (reply dispositions, mandatory stop-on-reply, replay-stable completion setting). Later stages add columns only via new migrations — never edit an applied migration.
+- Numbered plan continues through `0010_unsubscribe`, `0011_guardrails`, `0012_poll_folders`, `0013_reply_safety`, `0014_google_oauth`, and `0015_operational_workflows`. Later stages add columns only via new migrations — never edit an applied migration.
 - Rollback: every migration ships a `down`; tested in CI (apply → down → apply).

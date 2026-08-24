@@ -10,6 +10,7 @@ import { Label } from '@/components/ui/label';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Switch } from '@/components/ui/switch';
 import { usePutSettings } from '@/api/mutations/settings';
+import { TimezoneCombobox } from '@/components/shared/timezone-combobox';
 
 /** F2.5 — the Stage-0 rules panel: every settings knob, PUT full-row (docs/12 §10). */
 export function RulesTab({
@@ -169,8 +170,21 @@ export function RulesTab({
           {num('cold_storage_rest_days', 'Cold-storage rest (days)', 'Wait before recycling.')}
           <div className="space-y-1">
             <Label htmlFor="rules-default_timezone">Default timezone</Label>
-            <Input id="rules-default_timezone" {...register('default_timezone')} />
+            <Controller
+              name="default_timezone"
+              control={control}
+              render={({ field }) => (
+                <TimezoneCombobox
+                  id="rules-default_timezone"
+                  value={field.value}
+                  onChange={field.onChange}
+                />
+              )}
+            />
             <p className="text-xs text-muted-foreground">Fallback when a lead has no state.</p>
+            {errors.default_timezone && (
+              <p className="text-xs text-destructive">{errors.default_timezone.message}</p>
+            )}
           </div>
         </CardContent>
       </Card>

@@ -177,6 +177,52 @@ export function useSnooze() {
   });
 }
 
+export function useCreateReminder() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({
+      incomingMessageId,
+      dueDate,
+      note,
+    }: {
+      incomingMessageId: number;
+      dueDate: string;
+      note?: string | null;
+    }) =>
+      apiFetch(`/unibox/${incomingMessageId}/reminders`, okResponseSchema, {
+        method: 'POST',
+        body: { due_date: dueDate, ...(note !== undefined && { note }) },
+      }),
+    onSuccess: () => invalidateOperational(qc),
+  });
+}
+
+export function usePatchReminder() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({
+      id,
+      dueDate,
+      note,
+      status,
+    }: {
+      id: number;
+      dueDate?: string;
+      note?: string | null;
+      status?: 'open' | 'done' | 'dismissed';
+    }) =>
+      apiFetch(`/reminders/${id}`, okResponseSchema, {
+        method: 'PATCH',
+        body: {
+          ...(dueDate !== undefined && { due_date: dueDate }),
+          ...(note !== undefined && { note }),
+          ...(status !== undefined && { status }),
+        },
+      }),
+    onSuccess: () => invalidateOperational(qc),
+  });
+}
+
 export function useUnsubscribe() {
   const invalidate = useInvalidateUniboxMetrics();
   return useMutation({

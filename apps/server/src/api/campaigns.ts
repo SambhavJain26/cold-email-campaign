@@ -269,7 +269,9 @@ export async function campaignsRoutes(app: FastifyInstance, services: AppService
       if (!(await getCampaign(db, req.query.source_campaign_id))) {
         throw AppError.notFound('campaign');
       }
-      const items = await coldStorage({ db, clock }, req.query.source_campaign_id);
+      const allItems = await coldStorage({ db, clock }, req.query.source_campaign_id);
+      const start = (req.query.page - 1) * req.query.per_page;
+      const items = allItems.slice(start, start + req.query.per_page);
       return {
         items: items.map((i) => ({
           lead: { id: i.leadId, email: i.email, tier: i.tier },
@@ -277,6 +279,9 @@ export async function campaignsRoutes(app: FastifyInstance, services: AppService
           earliest_recycle_at: i.earliestRecycleAt.toISOString(),
           eligible: i.eligible,
         })),
+        total: allItems.length,
+        page: req.query.page,
+        per_page: req.query.per_page,
       };
     },
   );

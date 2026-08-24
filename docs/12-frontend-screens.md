@@ -51,8 +51,8 @@ Three steps in a dialog: **Upload** (drag/drop CSV, client-side 10 MB check) →
 
 ## 7. 💬 Unibox `/unibox` (§Stage 6)
 
-**Data:** `GET /unibox` (poll 60 s), tabs `human` / `auto_reply`; mailbox and sentiment filters; **Needs outcome** filters replies without a disposition.
-**Card per item:** every human reply shows the mandatory stopped-sequence caption and an outcome selector. `not_now` requires a future date; not-interested, wrong-person and explicit opt-out indicate global suppression. Sentiment remains a separate analytics tag. Meeting, snooze and thread actions remain available.
+**Data:** `GET /unibox` (poll 60 s), tabs `human` / `auto_reply` / `reminders`; mailbox and sentiment filters; **Needs outcome** filters replies without a disposition. Each tab is independently paginated at 50 rows and resets to page 1 when a filter changes.
+**Card per item:** every human reply shows the mandatory stopped-sequence caption and an outcome selector. `not_now` requires a future date and creates an in-app reminder; not-interested, wrong-person and explicit opt-out indicate global suppression. Sentiment remains a separate analytics tag. Meeting, reminder and thread actions remain available. Reminders can be filtered by Due today, Upcoming, or Overdue and completed/dismissed without restarting a sequence or authorizing contact.
 **Auto-reply tab:** OOO items, caption "NOT counted as a reply. Sequence continues normally."
 **Edge:** `tag_only` mode (settings) adds an explicit **[Unsubscribe lead]** button on negative-tagged cards → `POST enrollments/:id/unsubscribe`. Empty state: "No replies yet — they'll appear here the moment the poller sees them."
 
@@ -63,18 +63,18 @@ All tables show the reconciliation footers ("meetings sum to 17 ✓") — comput
 
 ## 9. ♻️ Cold Storage `/cold-storage` (§Stage 9)
 
-**Data:** `GET /cold-storage`, recycle mutation.
+**Data:** paginated `GET /cold-storage`, recycle mutation.
 **Regions:** guidance card (large-market copy, earliest-recycle date, pass history); table: lead, completed date, earliest recycle, eligible ✓/✗-in-N-days.
 **Recycle flow:** **[Recycle into campaign…]** → dialog: pick/create target draft campaign → warns if target sequence shares content hashes ("identical to Pass 1 — change the message first", from 409 `recycle_sequence_conflict`) → confirm → enroll result summary.
 
 ## 10. ⚙️ Settings `/settings` (§Stage 0 rules)
 
-Tabs: **Rules** — deliverability toggles + bounce auto-pause params (the Stage-0 panel, numeric inputs with the spec's defaults and inline explainers) + timing (tick/poll/stale/delivery-confirm/jitter/rest-days) + `optout_detection` radio (with decision-F explainer) + default timezone select. **Compliance** — the CAN-SPAM footer editor (pending screen): physical address textarea + opt-out text input + live footer preview as it will render; empty address → blocking error explaining sends halt. **Account** — email, change password.
+Tabs: **Rules** — deliverability toggles + bounce auto-pause params (the Stage-0 panel, numeric inputs with the spec's defaults and inline explainers) + timing (tick/poll/stale/delivery-confirm/jitter/rest-days) + `optout_detection` radio (with decision-F explainer) + searchable, backend-validated IANA default-timezone combobox. **Compliance** — the CAN-SPAM footer editor: physical address textarea + opt-out text input + live footer preview as it will render; empty address → blocking error explaining sends halt. **Account** — email, change password. Mailbox create/edit uses the same safe timezone selector plus authenticated folder discovery/multi-select and per-folder Test Connection results.
 All PUTs full-row with zod validation; dirty-state guard on tab switch.
 
 ## 11. 🖥 System `/system` (pending screens: reply-detection view + job status)
 
-**Reply-detection debug:** `GET /incoming-messages` table — time, mailbox, from, subject, classification chip (bounce/auto-reply/human/unrelated), DSN status, matched enrollment link, resulting events. Filter by classification/mailbox. This is the walkthrough's "How the IMAP Poller Classifies" made inspectable.
+**Reply-detection debug:** paginated `GET /incoming-messages` table (100/page) — time, mailbox, from, subject, classification chip (bounce/auto-reply/human/unrelated), DSN status, matched enrollment link, resulting events. Filter by classification/mailbox. This is the walkthrough's "How the IMAP Poller Classifies" made inspectable.
 **Job status:** `GET /system/status` — scheduler last tick, transport mode, poller freshness, pending jobs, and projection dry-run. **Alerts history** uses the all-alerts view so acknowledged operational alerts remain reviewable.
 
 ## 12. Catch-up notice (pending screen; global)
@@ -87,5 +87,5 @@ Email + password → `POST auth/login`; error toast on 401/429; redirect to inte
 
 ## 14. Manual composer (Mode 1) — dialog from Lead detail / Leads row (§Stage 3)
 
-Lead context header (company, tier, notes — the validation-phase profile card); campaign picker (defaults to active); mailbox display "auto-rotated: {suggested}" (server picks unless overridden); subject + body editors prefilled from the campaign sequence's step-1 template rendered for this lead (starting point to deviate from — Mode 1's definition); live checks strip (from preview endpoint); **[Send & log as manual]** → `POST /manual-sends` → toast + timeline refresh.
+Lead context header (company, tier, notes — the validation-phase profile card); campaign picker (defaults to active); server-generated context shows campaign, `Step N of M`, due date, personalization mode, and whether the message is in-thread; mailbox display "auto-rotated: {suggested}" (the pinned mailbox is retained after the first send); subject + body editors are prefilled from the enrollment's actual due-step template; live checks strip; **[Send & log as manual]** → `POST /manual-sends` → toast + timeline refresh. Manual Compose requires an existing active human-written enrollment and never silently enrolls a lead.
 **Edge:** all mailboxes at cap/unhealthy → 409 `mailbox_unhealthy` → explanatory dialog. Fatal checks → 422 with checks listed.

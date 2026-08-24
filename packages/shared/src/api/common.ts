@@ -68,6 +68,28 @@ export type MetricDto = z.infer<typeof metricSchema>;
 /** Timestamps: ISO-8601 UTC strings (decision K). */
 export const isoDateTime = z.iso.datetime();
 
+/** Calendar date with no time component. */
+export const isoDate = z.iso.date();
+
+/**
+ * IANA timezone shared by browser and server validation. `Intl` is available
+ * in both runtimes and rejects misspellings instead of silently falling back.
+ */
+export const ianaTimezoneSchema = z
+  .string()
+  .min(1)
+  .refine(
+    (value) => {
+      try {
+        new Intl.DateTimeFormat('en-US', { timeZone: value }).format();
+        return true;
+      } catch {
+        return false;
+      }
+    },
+    { message: 'must be a valid IANA timezone such as Asia/Kolkata' },
+  );
+
 /** Numeric path id (decision J — bigint identity, exposed as numbers). */
 export const idParamSchema = z.object({ id: z.coerce.number().int().positive() });
 

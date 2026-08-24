@@ -11,6 +11,7 @@ import type {
   ImportDto,
   LeadDto,
   MailboxDto,
+  ReminderDto,
   SequenceDto,
   UniboxItemDto,
 } from '@coldemail/shared';
@@ -430,6 +431,7 @@ export interface MockDb {
   sequences: SequenceDto[];
   unibox: UniboxItemDto[];
   alerts: AlertDto[];
+  reminders: ReminderDto[];
   imports: ImportDto[];
   settings: Record<string, unknown>;
   compliance: ComplianceDto;
@@ -454,6 +456,7 @@ function build(): MockDb {
     sequences: [buildSequence()],
     unibox: buildUnibox(leads),
     alerts: buildAlerts(),
+    reminders: [],
     imports: [
       {
         id: 1,

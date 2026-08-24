@@ -4,11 +4,9 @@
 
 **Legend:** `[ ]` not started · `[~]` in progress · `[x]` done · `[!]` blocked (note why in the log)
 
-**Current focus:** → **Spaceship production commissioning.** The application, DNS/TLS routing,
-public unsubscribe hosts, AutoBackup, Internal Workspace OAuth credentials, business postal address,
-and sender-domain unsubscribe template are live on the Spaceship VPS. Remaining before any real
-prospect mail: connect/test one OAuth mailbox and obtain separate approval for the bounded
-owner-address send/reply/unsubscribe canary.
+**Current focus:** → **2026-08-25 ten-workstream implementation.** Build and verify four local
+stages, then request separate approval for one pinned production deployment. No campaign activation,
+enrollment, send, Oracle change, or production deploy is authorized by the implementation plan.
 
 > **⚠️ Superseded framing (corrected 2026-08-09).** This line previously read "No code work is outstanding" and "everything left in B8 … is *operations*, not code." **That was wrong.** Operating the canary against a real provider exposed genuine **code** defects — the reply/send race (finding 15), whole-mailbox history ingestion (16), plain-text-only mail (19), and a class of backend-implemented/UI-invisible gaps (3–9). All were fixed on `b8.3-local-canary`. Treat [docs/17](docs/17-local-canary-runbook.md) as the authoritative status record, not this header.
 
@@ -36,6 +34,13 @@ mirror the new boundary. Focused gates passed: typecheck, lint, format, unit 338
 manual-compose integration 5, and GreenMail 29. Post-deploy containers and public HTTPS health are
 green, the live asset contains the updated preview copy, self-check is clean, and production remains
 at `checked 0 enrollments — 0 diff(s)`.
+
+**2026-08-25 implementation Stage 1:** operational list pagination, due-step Manual Compose,
+non-sending reminders, and verified IANA timezone/IMAP-folder controls are complete locally.
+Migration `0015` down/up passed; type/lint/format, unit 338, web 55, API 118, integration 159, and
+19 affected mock-browser journeys are green. The event-backed populated test DB returned `checked 5
+enrollments — 0 diff(s)` and self-check is clean. Stages 2–4 and the final complete gate remain;
+production and Oracle are unchanged.
 
 ---
 

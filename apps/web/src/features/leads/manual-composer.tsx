@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { AlertTriangle, CheckCircle2, XCircle } from 'lucide-react';
 import { toast } from 'sonner';
-import type { CampaignDto, LeadDto, RenderChecks } from '@coldemail/shared';
+import type { LeadDto, RenderChecks } from '@coldemail/shared';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
 import {
@@ -25,9 +25,8 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Textarea } from '@/components/ui/textarea';
 import { TierBadge } from '@/components/shared/tier-badge';
 import { AppApiError } from '@/api/client';
-import { useCampaigns } from '@/api/queries/campaigns';
 import { useMailboxes } from '@/api/queries/mailboxes';
-import { useSequencePreview, useSequences } from '@/api/queries/sequences';
+import { useManualComposePrefill } from '@/api/queries/unibox';
 import { useManualSend } from '@/api/mutations/unibox';
 
 const AUTO_ROTATE = '__auto__';
@@ -41,8 +40,7 @@ type ComposerLead = LeadDto & {
   }>;
 };
 
-/** F6.4 — Mode-1 manual composer (docs/12 §14). The step-1 render is a STARTING
- *  POINT the operator deviates from — that deviation is what makes it Mode 1. */
+/** Mode-1 composer. The server owns due-step resolution and the starting copy. */
 export function ManualComposer({
   lead,
   open,
@@ -52,24 +50,11 @@ export function ManualComposer({
   open: boolean;
   onOpenChange: (open: boolean) => void;
 }) {
-  const campaigns = useCampaigns();
-  const sequences = useSequences();
-  const [campaignId, setCampaignId] = useState<number | undefined>(undefined);
-
-  const eligibleIds = new Set(
-    (lead.manual_sendable_enrollments ?? []).map((entry) => entry.campaign_id),
-  );
-  const items = (campaigns.data?.items ?? []).filter(
-    (campaign) => campaign.status === 'active' && eligibleIds.has(campaign.id),
-  );
-  const campaign = items.find((c) => c.id === campaignId) ?? items[0];
-  const sequence = sequences.data?.items.find((s) => s.id === campaign?.sequence_id);
-  const variant = sequence?.steps.find((s) => s.step_no === 1)?.variants.find((v) => v.active);
-
-  const preview = useSequencePreview(
-    open ? sequence?.id : undefined,
-    variant ? { lead_id: lead.id, step_no: 1, variant_id: variant.id } : undefined,
-  );
+  const items = lead.manual_sendable_enrollments ?? [];
+  const [selectedEnrollmentId, setSelectedEnrollmentId] = useState<number | undefined>(undefined);
+  const enrollment =
+    items.find((entry) => entry.enrollment_id === selectedEnrollmentId) ?? items[0];
+  const prefill = useManualComposePrefill(open ? enrollment?.enrollment_id : undefined);
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -100,17 +85,16 @@ export function ManualComposer({
             Campaign
           </Label>
           <Select
-            value={campaign ? String(campaign.id) : ''}
-            onValueChange={(value) => setCampaignId(Number(value))}
+            value={enrollment ? String(enrollment.enrollment_id) : ''}
+            onValueChange={(value) => setSelectedEnrollmentId(Number(value))}
           >
             <SelectTrigger id="composer-campaign" size="sm" className="w-full">
               <SelectValue placeholder="Select…" />
             </SelectTrigger>
             <SelectContent>
               {items.map((option) => (
-                <SelectItem key={option.id} value={String(option.id)}>
-                  {option.name}
-                  {option.status !== 'active' && ` (${option.status})`}
+                <SelectItem key={option.enrollment_id} value={String(option.enrollment_id)}>
+                  {option.campaign_name}
                 </SelectItem>
               ))}
             </SelectContent>
@@ -122,20 +106,16 @@ export function ManualComposer({
           )}
         </div>
 
-        {preview.isFetching ? (
+        {prefill.isFetching ? (
           <Skeleton className="h-64 w-full" />
         ) : (
           // key = the render identity: a different campaign/variant remounts the
           // form so its useState initializers pick up the new starting point
           // (seeding state in an effect is banned by the react-hooks rules).
           <ComposerForm
-            key={`${campaign?.id ?? 0}:${variant?.id ?? 0}:${preview.dataUpdatedAt}`}
+            key={`${enrollment?.enrollment_id ?? 0}:${prefill.dataUpdatedAt}`}
             lead={lead}
-            campaign={campaign}
-            hasSequence={sequence !== undefined}
-            initialSubject={preview.data?.subject ?? ''}
-            initialBody={preview.data?.body ?? ''}
-            initialChecks={preview.data?.checks ?? null}
+            prefill={prefill.data}
             onDone={() => onOpenChange(false)}
           />
         )}
@@ -146,27 +126,37 @@ export function ManualComposer({
 
 function ComposerForm({
   lead,
-  campaign,
-  hasSequence,
-  initialSubject,
-  initialBody,
-  initialChecks,
+  prefill,
   onDone,
 }: {
   lead: ComposerLead;
-  campaign: CampaignDto | undefined;
-  hasSequence: boolean;
-  initialSubject: string;
-  initialBody: string;
-  initialChecks: RenderChecks | null;
+  prefill:
+    | {
+        enrollment_id: number;
+        campaign: { id: number; name: string };
+        step_no: number;
+        step_count: number;
+        due_at: string | null;
+        personalization_mode: 'human_written' | 'template_researched' | 'template_auto';
+        subject: string;
+        body: string;
+        draft_id: number | null;
+        thread: {
+          assigned_mailbox_id: number | null;
+          previous_message_ids: string[];
+          in_thread: boolean;
+        };
+        checks: RenderChecks;
+      }
+    | undefined;
   onDone: () => void;
 }) {
   const mailboxes = useMailboxes();
   const send = useManualSend();
   const [mailboxId, setMailboxId] = useState<string>(AUTO_ROTATE);
-  const [subject, setSubject] = useState(initialSubject);
-  const [body, setBody] = useState(initialBody);
-  const [checks, setChecks] = useState<RenderChecks | null>(initialChecks);
+  const [subject, setSubject] = useState(prefill?.subject ?? '');
+  const [body, setBody] = useState(prefill?.body ?? '');
+  const [checks, setChecks] = useState<RenderChecks | null>(prefill?.checks ?? null);
   const [blockedReason, setBlockedReason] = useState<string | null>(null);
   const [allowRecontact, setAllowRecontact] = useState(false);
 
@@ -175,12 +165,14 @@ function ComposerForm({
   );
 
   const submit = () => {
-    if (!campaign) return;
+    if (!prefill) return;
     setBlockedReason(null);
     send.mutate(
       {
         lead_id: lead.id,
-        campaign_id: campaign.id,
+        campaign_id: prefill.campaign.id,
+        enrollment_id: prefill.enrollment_id,
+        ...(prefill.draft_id === null ? {} : { draft_id: prefill.draft_id }),
         ...(mailboxId === AUTO_ROTATE ? {} : { mailbox_id: Number(mailboxId) }),
         subject,
         body,
@@ -231,10 +223,18 @@ function ComposerForm({
         </Select>
       </div>
 
-      {!hasSequence && (
-        <p className="text-xs text-muted-foreground" data-testid="composer-no-sequence">
-          This campaign has no sequence, so there is nothing to prefill — write from scratch.
-        </p>
+      {prefill && (
+        <div className="rounded-md border border-border bg-muted/30 p-3 text-xs">
+          <p className="font-medium">
+            {prefill.campaign.name} · Step {prefill.step_no} of {prefill.step_count}
+          </p>
+          <p className="text-muted-foreground">
+            {prefill.thread.in_thread
+              ? `In thread with ${prefill.thread.previous_message_ids.length} earlier message(s); mailbox remains pinned.`
+              : 'New thread; a healthy mailbox will be selected unless you choose one.'}
+            {prefill.due_at ? ` Due ${new Date(prefill.due_at).toLocaleString()}.` : ''}
+          </p>
+        </div>
       )}
 
       <div className="space-y-1.5">
@@ -268,7 +268,7 @@ function ComposerForm({
       {checks && (
         <div className="space-y-1 text-[11px]" data-testid="composer-checks">
           <span className="text-muted-foreground tabular-nums">
-            score {checks.score.toFixed(1)} / 10 · from the step-1 render; the send re-runs the
+            score {checks.score.toFixed(1)} / 10 · from the due-step render; the send re-runs the
             checks on your text
           </span>
           {checks.fatal.map((item) => (
@@ -312,7 +312,7 @@ function ComposerForm({
           Cancel
         </Button>
         <Button
-          disabled={send.isPending || subject.trim() === '' || body.trim() === '' || !campaign}
+          disabled={send.isPending || subject.trim() === '' || body.trim() === '' || !prefill}
           onClick={submit}
         >
           {send.isPending ? 'Sending…' : 'Send & log as manual'}

@@ -38,7 +38,7 @@ field      := first_name | company | market | custom_observation
 
 | Mode (`enrollments.personalization_mode`) | `{{custom_observation}}` source | Send path |
 |---|---|---|
-| `human_written` (Mode 1, Tier A) | Whole email is bespoke: the **manual composer** submits final subject+body per lead. Stored as a one-off variant (`step_variants` row flagged `attributes.bespoke=true` — hash still computed, recycle guard still applies). Follow-ups may fall back to templates. | `POST /manual-sends` → same render pipeline with steps 1–3 skipped (already literal), footer + checks still applied |
+| `human_written` (Mode 1, Tier A) | Whole email is bespoke: the **manual composer** submits final subject+body per lead. The server starts the editor from the active enrollment's actual due step (not always Step 1), preserving its thread and pinned mailbox. Stored as a one-off variant (`step_variants` row flagged `attributes.bespoke=true` — hash still computed, recycle guard still applies). | `GET /enrollments/:id/manual-compose-prefill` resolves the starting point; `POST /manual-sends` uses the same render pipeline with steps 1–3 skipped (already literal), footer + checks still applied |
 | `template_researched` (Mode 2a, Tier B) | `leads.custom_fields.custom_observation` — filled per lead by the operator (Leads screen inline edit). Empty → falls back to segment rule (below) + warning check | scheduler |
 | `template_auto` (Mode 2b, Tier C) | Segment rule: market-keyed lookup table in `campaigns.tier_effort_config.auto_observations` (e.g. `{"TX": "your listings move fast in Texas", "default": "..."}` ) | scheduler |
 

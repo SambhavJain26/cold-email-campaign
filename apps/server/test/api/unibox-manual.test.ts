@@ -1,7 +1,7 @@
 // B6.7 unibox + enrollment actions, B6.8 manual-sends. Traceability rows:
 // sentiment → sentiment_tagged; meeting → meeting_booked; unsubscribe →
 // unsubscribe(manual) + suppression side effect; snooze → NO event;
-// manual-send → (enrolled?) + sent.
+// manual-send → sent on an existing active manual enrollment.
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { getById } from '../../src/db/repos/enrollmentsRepo';
 import { getLeadByEmail } from '../../src/db/repos/leadsRepo';
@@ -40,6 +40,19 @@ describe('B6.7 unibox + B6.8 manual-sends', () => {
                 },
               ],
             },
+            {
+              step_no: 2,
+              wait_days: 3,
+              in_thread: true,
+              variants: [
+                {
+                  label: 'A',
+                  subject_template: 'Wrong subject if threading breaks',
+                  body_template: 'Step two for {{first_name|there}} — following up here.',
+                  active: true,
+                },
+              ],
+            },
           ],
         },
       })
@@ -67,6 +80,19 @@ describe('B6.7 unibox + B6.8 manual-sends', () => {
       `INSERT INTO enrollments (campaign_id, lead_id, current_state, current_step_no,
                                 personalization_mode, assigned_mailbox_id, enrolled_at)
        VALUES ($1, 1, 'REPLIED', 2, 'human_written', 1, now())`,
+      [campaignId],
+    );
+    await h.pool.query(
+      `INSERT INTO enrollments (campaign_id, lead_id, current_state, current_step_no,
+                                personalization_mode, next_send_at, enrolled_at)
+       VALUES ($1, 2, 'ACTIVE', 1, 'human_written', now(), now()),
+              ($1, 3, 'ACTIVE', 1, 'human_written', now(), now())`,
+      [campaignId],
+    );
+    await h.pool.query(
+      `INSERT INTO events (type, occurred_at, lead_id, enrollment_id, campaign_id, attributes)
+       VALUES ('enrolled', now(), 2, 2, $1, '{"tier":"A"}'),
+              ('enrolled', now(), 3, 3, $1, '{"tier":"A"}')`,
       [campaignId],
     );
     await h.pool.query(
@@ -246,7 +272,45 @@ describe('B6.7 unibox + B6.8 manual-sends', () => {
     expect(item.meeting_booked).toBe(true);
   });
 
-  it('snooze patches scheduling and appends NO event', async () => {
+  it('Not now creates a reminder; completing it neither sends nor authorizes contact', async () => {
+    const wm = await eventWatermark(h.pool);
+    const disposition = await h.inject({
+      method: 'POST',
+      url: '/api/v1/unibox/1/disposition',
+      payload: { disposition: 'not_now', recontact_after: '2099-02-03' },
+    });
+    expect(disposition.statusCode, disposition.body).toBe(200);
+    expect(disposition.json().recontact_after).toBe('2099-02-03');
+    await expectAppended(h.pool, wm, { reply_dispositioned: 1 });
+
+    const reminders = (
+      await h.inject({ method: 'GET', url: '/api/v1/reminders?view=upcoming' })
+    ).json();
+    expect(reminders.open_count).toBe(1);
+    expect(reminders.items[0]).toMatchObject({
+      enrollment_id: 1,
+      incoming_message_id: 1,
+      due_date: '2099-02-03',
+      source: 'not_now',
+      status: 'open',
+    });
+
+    const completeWm = await eventWatermark(h.pool);
+    expect(
+      (
+        await h.inject({
+          method: 'PATCH',
+          url: `/api/v1/reminders/${reminders.items[0].id}`,
+          payload: { status: 'done' },
+        })
+      ).statusCode,
+    ).toBe(200);
+    await expectNoNewEvents(h.pool, completeWm);
+    const refreshed = (await h.inject({ method: 'GET', url: '/api/v1/unibox/1' })).json();
+    expect(refreshed.recontact_after).toBe('2099-02-03');
+  });
+
+  it('reply snooze is refused; reminders replace it without appending an event', async () => {
     const wm = await eventWatermark(h.pool);
     const until = '2026-02-01T09:00:00.000Z';
     const res = await h.inject({
@@ -254,8 +318,8 @@ describe('B6.7 unibox + B6.8 manual-sends', () => {
       url: '/api/v1/enrollments/1/snooze',
       payload: { until },
     });
-    expect(res.statusCode).toBe(200);
-    expect((await getById(h.services.db, 1))!.snoozedUntil?.toISOString()).toBe(until);
+    expect(res.statusCode).toBe(409);
+    expect((await getById(h.services.db, 1))!.snoozedUntil).toBeNull();
     await expectNoNewEvents(h.pool, wm);
   });
 
@@ -271,7 +335,7 @@ describe('B6.7 unibox + B6.8 manual-sends', () => {
     expect(lead!.suppressionReason).toBe('unsubscribed');
   });
 
-  it('manual-send enrolls if needed, sends, and returns message_id + checks', async () => {
+  it('manual-send uses an existing due enrollment, sends, and returns message_id + checks', async () => {
     const wm = await eventWatermark(h.pool);
     const res = await h.inject({
       method: 'POST',
@@ -279,20 +343,36 @@ describe('B6.7 unibox + B6.8 manual-sends', () => {
       payload: {
         lead_id: 2,
         campaign_id: campaignId,
+        enrollment_id: 2,
         subject: 'Saw your work at Fresh LLC',
         body: 'Manny — impressive portfolio. Fifteen minutes this week to talk seller leads?',
       },
     });
     expect(res.statusCode).toBe(200);
     const body = res.json();
-    expect(body.enrollment_id).toBeGreaterThan(1);
+    expect(body.enrollment_id).toBe(2);
     expect(body.message_id).toMatch(/^<ce-/);
     expect(body.checks.fatal).toEqual([]);
-    await expectAppended(h.pool, wm, { enrolled: 1, sent: 1 }); // the (enrolled?)+sent row
+    await expectAppended(h.pool, wm, { sent: 1 });
 
     const e = await getById(h.services.db, body.enrollment_id);
     expect(e!.personalizationMode).toBe('human_written');
     expect(e!.currentStepNo).toBe(2); // sent advanced the step
+
+    const prefill = (
+      await h.inject({
+        method: 'GET',
+        url: `/api/v1/enrollments/${body.enrollment_id}/manual-compose-prefill`,
+      })
+    ).json();
+    expect(prefill).toMatchObject({
+      enrollment_id: 2,
+      step_no: 2,
+      step_count: 2,
+      subject: 'Re: Saw your work at Fresh LLC',
+      body: 'Step two for Manny — following up here.',
+      thread: { assigned_mailbox_id: 1, in_thread: true },
+    });
 
     const variants = (
       await h.inject({
@@ -316,8 +396,9 @@ describe('B6.7 unibox + B6.8 manual-sends', () => {
       method: 'POST',
       url: '/api/v1/manual-sends',
       payload: {
-        lead_id: 3, // fresh lead → enroll-if-needed lands at step 1
+        lead_id: 3,
         campaign_id: campaignId,
+        enrollment_id: 3,
         subject: 'Quick look',
         body: 'Carla — see https://my-portfolio.dev for examples.',
       },
@@ -348,6 +429,7 @@ describe('B6.7 unibox + B6.8 manual-sends', () => {
       payload: {
         lead_id: 3,
         campaign_id: campaignId,
+        enrollment_id: 3,
         subject: 'Another angle',
         body: 'Different content entirely, still solid.',
       },

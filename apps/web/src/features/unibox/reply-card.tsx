@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { CalendarCheck, Clock } from 'lucide-react';
+import { BellPlus, CalendarCheck } from 'lucide-react';
 import { toast } from 'sonner';
 import {
   REPLY_DISPOSITIONS,
@@ -24,8 +24,8 @@ import { formatRelativeTime } from '@/lib/format';
 import { cn } from '@/lib/utils';
 import {
   useMeetingBooked,
+  useCreateReminder,
   useDispositionReply,
-  useSnooze,
   useTagSentiment,
   useUnsubscribe,
 } from '@/api/mutations/unibox';
@@ -57,10 +57,11 @@ export function ReplyCard({
   const tag = useTagSentiment();
   const meeting = useMeetingBooked();
   const dispositionReply = useDispositionReply();
-  const snooze = useSnooze();
+  const createReminder = useCreateReminder();
   const unsubscribe = useUnsubscribe();
-  const [snoozeUntil, setSnoozeUntil] = useState('');
-  const [snoozeOpen, setSnoozeOpen] = useState(false);
+  const [reminderDate, setReminderDate] = useState('');
+  const [reminderNote, setReminderNote] = useState('');
+  const [reminderOpen, setReminderOpen] = useState(false);
   const [disposition, setDisposition] = useState<ReplyDisposition | ''>(item.disposition ?? '');
   const [recontactDate, setRecontactDate] = useState(item.recontact_after?.slice(0, 10) ?? '');
   const [minimumRecontactDate] = useState(() =>
@@ -173,9 +174,7 @@ export function ReplyCard({
                   {
                     incomingMessageId: item.incoming_message_id,
                     disposition,
-                    ...(disposition === 'not_now'
-                      ? { recontactAfter: new Date(`${recontactDate}T00:00:00Z`).toISOString() }
-                      : {}),
+                    ...(disposition === 'not_now' ? { recontactAfter: recontactDate } : {}),
                   },
                   {
                     onSuccess: () => toast.success('Reply outcome recorded'),
@@ -232,43 +231,52 @@ export function ReplyCard({
               </Button>
             )}
 
-            <Popover open={snoozeOpen} onOpenChange={setSnoozeOpen}>
+            <Popover open={reminderOpen} onOpenChange={setReminderOpen}>
               <PopoverTrigger asChild>
                 <Button variant="ghost" size="xs">
-                  <Clock className="size-3.5" /> Snooze…
+                  <BellPlus className="size-3.5" /> Add reminder…
                 </Button>
               </PopoverTrigger>
-              <PopoverContent className="w-56 space-y-2">
+              <PopoverContent className="w-64 space-y-2">
                 <p className="text-xs text-muted-foreground">
-                  Hold the next step until this date — scheduling only, no event.
+                  Creates an operator task only. It never sends or authorizes contact.
                 </p>
                 <Input
                   type="date"
-                  aria-label="Snooze until"
+                  aria-label="Reminder due date"
                   className="h-8"
-                  value={snoozeUntil}
-                  onChange={(event) => setSnoozeUntil(event.target.value)}
+                  min={new Date().toISOString().slice(0, 10)}
+                  value={reminderDate}
+                  onChange={(event) => setReminderDate(event.target.value)}
+                />
+                <Input
+                  aria-label="Reminder note"
+                  placeholder="Optional note"
+                  className="h-8"
+                  value={reminderNote}
+                  onChange={(event) => setReminderNote(event.target.value)}
                 />
                 <Button
                   size="xs"
                   className="w-full"
-                  disabled={snoozeUntil === '' || snooze.isPending}
+                  disabled={reminderDate === '' || createReminder.isPending}
                   onClick={() =>
-                    snooze.mutate(
+                    createReminder.mutate(
                       {
-                        enrollmentId: item.enrollment_id,
-                        until: new Date(`${snoozeUntil}T00:00:00Z`).toISOString(),
+                        incomingMessageId: item.incoming_message_id,
+                        dueDate: reminderDate,
+                        note: reminderNote.trim() || null,
                       },
                       {
                         onSuccess: () => {
-                          toast.success(`Snoozed until ${snoozeUntil}`);
-                          setSnoozeOpen(false);
+                          toast.success(`Reminder set for ${reminderDate}`);
+                          setReminderOpen(false);
                         },
                       },
                     )
                   }
                 >
-                  Snooze
+                  Save reminder
                 </Button>
               </PopoverContent>
             </Popover>

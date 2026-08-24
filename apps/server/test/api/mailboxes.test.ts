@@ -89,11 +89,51 @@ describe('B6.2 mailboxes', () => {
   it('test-connection returns the transport verify result', async () => {
     const ok = await h.inject({ method: 'POST', url: '/api/v1/mailboxes/1/test-connection' });
     expect(ok.statusCode).toBe(200);
-    expect(ok.json()).toEqual({ smtp_ok: true, imap_ok: true, round_trip_ms: 42 });
+    expect(ok.json()).toEqual({
+      smtp_ok: true,
+      imap_ok: true,
+      round_trip_ms: 42,
+      folders: [{ name: 'INBOX', exists: true, special_use: '\\Inbox' }],
+    });
 
     transport.onVerify('sarah@agency.dev', { smtpOk: true, imapOk: false, error: 'IMAP refused' });
     const bad = await h.inject({ method: 'POST', url: '/api/v1/mailboxes/1/test-connection' });
-    expect(bad.json()).toEqual({ smtp_ok: true, imap_ok: false });
+    expect(bad.json()).toEqual({
+      smtp_ok: true,
+      imap_ok: false,
+      folders: [{ name: 'INBOX', exists: false, special_use: null }],
+    });
+  });
+
+  it('discovers folders, rejects typos, and seeds each newly selected folder at UIDNEXT', async () => {
+    transport.onFolders('sarah@agency.dev', [
+      { name: 'INBOX', specialUse: '\\Inbox' },
+      { name: 'Junk', specialUse: '\\Junk' },
+    ]);
+    transport.setInitialPollUid('sarah@agency.dev', 77);
+    const discovered = await h.inject({ method: 'GET', url: '/api/v1/mailboxes/1/folders' });
+    expect(discovered.statusCode).toBe(200);
+    expect(discovered.json().items).toEqual([
+      { name: 'INBOX', special_use: '\\Inbox' },
+      { name: 'Junk', special_use: '\\Junk' },
+    ]);
+
+    const typo = await h.inject({
+      method: 'PATCH',
+      url: '/api/v1/mailboxes/1',
+      payload: { poll_folders: ['INBOX', 'Jnuk'] },
+    });
+    expect(typo.statusCode).toBe(422);
+    expect((await getMailbox(h.services.db, 1))!.pollFolders).toEqual(['INBOX']);
+
+    const saved = await h.inject({
+      method: 'PATCH',
+      url: '/api/v1/mailboxes/1',
+      payload: { poll_folders: ['INBOX', 'Junk'] },
+    });
+    expect(saved.statusCode).toBe(200);
+    expect(saved.json().poll_folders).toEqual(['INBOX', 'Junk']);
+    expect(await getCursor(h.services.db, 1, 'Junk')).toBe(77);
   });
 
   it('pause → paused; resume from operator pause returns to full cap', async () => {

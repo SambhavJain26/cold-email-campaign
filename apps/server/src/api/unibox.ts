@@ -6,10 +6,15 @@
 import type { FastifyInstance } from 'fastify';
 import {
   idParamSchema,
+  createReminderBodySchema,
   dispositionReplyBodySchema,
+  manualComposePrefillSchema,
   manualSendBodySchema,
   manualSendResponseSchema,
   okResponseSchema,
+  patchReminderBodySchema,
+  reminderListResponseSchema,
+  reminderQuerySchema,
   snoozeBodySchema,
   tagSentimentBodySchema,
   uniboxDetailResponseSchema,
@@ -22,11 +27,56 @@ import type { AppServices } from '../composition';
 import { getUniboxRow, listUnibox, type UniboxRow } from '../db/repos/incomingMessagesRepo';
 import { getById, patchScheduling } from '../db/repos/enrollmentsRepo';
 import { listThreadMessageIds } from '../db/repos/sentMessagesRepo';
-import { FatalChecksError, MailboxUnhealthyError, manualSend } from '../services/manualCompose';
+import {
+  FatalChecksError,
+  MailboxUnhealthyError,
+  manualComposePrefill,
+  manualSend,
+} from '../services/manualCompose';
 import { buildEvent } from '../domain/events';
 import type { DomainEvent } from '../domain/events';
 import { AppError } from './errors';
 import type { ZodTypeProvider } from './plugins/zodCompilers';
+import {
+  createReminder,
+  dismissNotNowReminder,
+  getReminder,
+  listReminders,
+  patchReminder,
+  upsertNotNowReminder,
+  type ReminderListRow,
+} from '../db/repos/remindersRepo';
+import { getSettings } from '../db/repos/settingsRepo';
+
+function calendarDateInZone(at: Date, timeZone: string): string {
+  const parts = new Intl.DateTimeFormat('en-US', {
+    timeZone,
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  }).formatToParts(at);
+  const value = (type: Intl.DateTimeFormatPartTypes) =>
+    parts.find((part) => part.type === type)?.value ?? '';
+  return `${value('year')}-${value('month')}-${value('day')}`;
+}
+
+function toReminderDto(row: ReminderListRow) {
+  const name = [row.leadFirstName, row.leadLastName].filter(Boolean).join(' ') || row.leadEmail;
+  return {
+    id: row.id,
+    enrollment_id: row.enrollmentId,
+    incoming_message_id: row.incomingMessageId,
+    due_date: row.dueDate,
+    note: row.note,
+    source: row.source,
+    status: row.status,
+    created_at: row.createdAt.toISOString(),
+    completed_at: row.completedAt?.toISOString() ?? null,
+    lead: { id: row.leadId, name, company: row.leadCompany },
+    campaign_id: row.campaignId,
+    reply_snippet: row.replySnippet,
+  };
+}
 
 function toUniboxItemDto(row: UniboxRow): UniboxItemDto {
   const name = [row.leadFirstName, row.leadLastName].filter(Boolean).join(' ') || row.leadEmail;
@@ -40,7 +90,7 @@ function toUniboxItemDto(row: UniboxRow): UniboxItemDto {
     effective_sentiment: row.effectiveSentiment as UniboxItemDto['effective_sentiment'],
     suggested_sentiment: row.suggestedSentiment as UniboxItemDto['suggested_sentiment'],
     disposition: row.disposition as UniboxItemDto['disposition'],
-    recontact_after: row.recontactAfter,
+    recontact_after: row.recontactAfter?.slice(0, 10) ?? null,
     auto_unsubscribed: row.autoUnsubscribed,
     lead_suppressed: row.leadSuppressed,
     sequence_continues: row.enrollmentState === 'ACTIVE' || row.enrollmentState === 'NEW',
@@ -52,6 +102,95 @@ function toUniboxItemDto(row: UniboxRow): UniboxItemDto {
 export async function uniboxRoutes(app: FastifyInstance, services: AppServices): Promise<void> {
   const r = app.withTypeProvider<ZodTypeProvider>();
   const { db, clock, store, scheduler, renderer, sequences } = services;
+
+  r.get(
+    '/reminders',
+    {
+      schema: {
+        querystring: reminderQuerySchema,
+        response: { 200: reminderListResponseSchema },
+      },
+    },
+    async (req) => {
+      const settings = await getSettings(db);
+      const today = calendarDateInZone(clock.now(), settings.defaultTimezone);
+      const result = await listReminders(db, {
+        today,
+        view: req.query.view,
+        status: req.query.status,
+        page: req.query.page,
+        perPage: req.query.per_page,
+      });
+      return {
+        items: result.items.map(toReminderDto),
+        total: result.total,
+        page: req.query.page,
+        per_page: req.query.per_page,
+        open_count: result.openCount,
+      };
+    },
+  );
+
+  r.post(
+    '/unibox/:id/reminders',
+    {
+      schema: {
+        params: idParamSchema,
+        body: createReminderBodySchema,
+        response: { 200: okResponseSchema },
+      },
+    },
+    async (req) => {
+      const row = await getUniboxRow(db, req.params.id);
+      if (!row) throw AppError.notFound('unibox item');
+      const settings = await getSettings(db);
+      const today = calendarDateInZone(clock.now(), settings.defaultTimezone);
+      if (req.body.due_date < today) {
+        throw new AppError('validation', 400, 'reminder due_date cannot be in the past');
+      }
+      await createReminder(db, {
+        enrollmentId: row.enrollmentId,
+        incomingMessageId: row.incomingMessageId,
+        dueDate: req.body.due_date,
+        note: req.body.note,
+        source: 'manual',
+        at: clock.now(),
+      });
+      return { ok: true } as const;
+    },
+  );
+
+  r.patch(
+    '/reminders/:id',
+    {
+      schema: {
+        params: idParamSchema,
+        body: patchReminderBodySchema,
+        response: { 200: okResponseSchema },
+      },
+    },
+    async (req) => {
+      if (!(await getReminder(db, req.params.id))) throw AppError.notFound('reminder');
+      if (req.body.due_date !== undefined) {
+        const settings = await getSettings(db);
+        const today = calendarDateInZone(clock.now(), settings.defaultTimezone);
+        if (req.body.due_date < today) {
+          throw new AppError('validation', 400, 'reminder due_date cannot be in the past');
+        }
+      }
+      await patchReminder(
+        db,
+        req.params.id,
+        {
+          ...(req.body.due_date !== undefined && { dueDate: req.body.due_date }),
+          ...(req.body.note !== undefined && { note: req.body.note }),
+          ...(req.body.status !== undefined && { status: req.body.status }),
+        },
+        clock.now(),
+      );
+      return { ok: true } as const;
+    },
+  );
 
   r.get(
     '/unibox',
@@ -140,10 +279,20 @@ export async function uniboxRoutes(app: FastifyInstance, services: AppServices):
         throw new AppError('conflict', 409, 'only human replies can be dispositioned');
       }
       const recontactAfter = req.body.recontact_after ?? null;
-      if (recontactAfter !== null && new Date(recontactAfter) <= clock.now()) {
-        throw new AppError('validation', 400, 'recontact_after must be in the future');
+      const storedRecontactAfter = row.recontactAfter?.slice(0, 10) ?? null;
+      const now = clock.now();
+      const settings = await getSettings(db);
+      if (
+        recontactAfter !== null &&
+        recontactAfter <= calendarDateInZone(now, settings.defaultTimezone)
+      ) {
+        throw new AppError('validation', 400, 'recontact_after must be a future calendar date');
       }
-      if (row.disposition === req.body.disposition && row.recontactAfter === recontactAfter) {
+      if (
+        row.disposition === req.body.disposition &&
+        storedRecontactAfter === recontactAfter &&
+        req.body.disposition !== 'not_now'
+      ) {
         return toUniboxItemDto(row);
       }
 
@@ -176,8 +325,58 @@ export async function uniboxRoutes(app: FastifyInstance, services: AppServices):
           }),
         );
       }
-      await store.append(events);
+      await store.append(events, {
+        txWork: async (tx) => {
+          if (req.body.disposition === 'not_now') {
+            await upsertNotNowReminder(tx, {
+              enrollmentId: row.enrollmentId,
+              incomingMessageId: row.incomingMessageId,
+              dueDate: recontactAfter!,
+              at: now,
+            });
+          } else {
+            await dismissNotNowReminder(tx, row.incomingMessageId, now);
+          }
+        },
+      });
       return toUniboxItemDto((await getUniboxRow(db, req.params.id))!);
+    },
+  );
+
+  r.get(
+    '/enrollments/:id/manual-compose-prefill',
+    {
+      schema: { params: idParamSchema, response: { 200: manualComposePrefillSchema } },
+    },
+    async (req) => {
+      try {
+        const result = await manualComposePrefill({ db, renderer }, req.params.id);
+        return {
+          enrollment_id: result.enrollmentId,
+          lead_id: result.leadId,
+          campaign: result.campaign,
+          step_no: result.stepNo,
+          step_count: result.stepCount,
+          due_at: result.dueAt?.toISOString() ?? null,
+          personalization_mode: result.personalizationMode,
+          subject: result.subject,
+          body: result.body,
+          variant_id: result.variantId,
+          draft_id: result.draftId,
+          thread: {
+            assigned_mailbox_id: result.thread.assignedMailboxId,
+            previous_message_ids: result.thread.previousMessageIds,
+            in_thread: result.thread.inThread,
+          },
+          checks: result.checks,
+        };
+      } catch (error) {
+        if (error instanceof Error && error.message.includes('not found')) {
+          throw AppError.notFound('enrollment');
+        }
+        if (error instanceof Error) throw new AppError('conflict', 409, error.message);
+        throw error;
+      }
     },
   );
 
@@ -211,6 +410,13 @@ export async function uniboxRoutes(app: FastifyInstance, services: AppServices):
     async (req) => {
       const e = await getById(db, req.params.id);
       if (!e) throw AppError.notFound('enrollment');
+      if (e.currentState !== 'ACTIVE') {
+        throw new AppError(
+          'conflict',
+          409,
+          'Snooze is retained only for active legacy scheduling; use a reminder for replies',
+        );
+      }
       await patchScheduling(db, e.id, { snoozedUntil: new Date(req.body.until) });
       return { ok: true } as const;
     },
@@ -246,6 +452,8 @@ export async function uniboxRoutes(app: FastifyInstance, services: AppServices):
           {
             leadId: req.body.lead_id,
             campaignId: req.body.campaign_id,
+            enrollmentId: req.body.enrollment_id,
+            draftId: req.body.draft_id,
             mailboxId: req.body.mailbox_id,
             subject: req.body.subject,
             bodyText: req.body.body,

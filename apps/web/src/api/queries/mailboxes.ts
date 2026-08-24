@@ -1,5 +1,9 @@
 import { useQuery } from '@tanstack/react-query';
-import { mailboxListResponseSchema, mailboxVolumeResponseSchema } from '@coldemail/shared';
+import {
+  mailboxFoldersResponseSchema,
+  mailboxListResponseSchema,
+  mailboxVolumeResponseSchema,
+} from '@coldemail/shared';
 import { apiFetch } from '../client';
 import { POLL } from '../queryClient';
 
@@ -8,6 +12,15 @@ export function useMailboxes() {
     queryKey: ['mailboxes'],
     queryFn: () => apiFetch('/mailboxes', mailboxListResponseSchema),
     refetchInterval: POLL.mailboxes,
+  });
+}
+
+export function useMailboxFolders(mailboxId: number | undefined, enabled = true) {
+  return useQuery({
+    queryKey: ['mailboxes', mailboxId, 'folders'],
+    queryFn: () => apiFetch(`/mailboxes/${mailboxId}/folders`, mailboxFoldersResponseSchema),
+    enabled: enabled && mailboxId !== undefined,
+    staleTime: 5 * 60_000,
   });
 }
 

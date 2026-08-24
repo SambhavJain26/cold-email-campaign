@@ -23,6 +23,7 @@ import {
   type IncomingMessage,
   type MailboxConnection,
   type MailboxConnectionProvider,
+  type MailFolder,
   type MailboxVerifyConfig,
   type MailTransport,
   type OutboundMessage,
@@ -195,6 +196,24 @@ export class SmtpImapTransport implements MailTransport {
       } finally {
         lock.release();
       }
+    } catch (err) {
+      throw this.imapError(err);
+    } finally {
+      await client.logout().catch(() => client.close());
+    }
+  }
+
+  async listFolders(config: MailboxVerifyConfig): Promise<MailFolder[]> {
+    const client = this.imapClient(config);
+    try {
+      await client.connect();
+      return (await client.list())
+        .filter((folder) => folder.listed && !folder.flags.has('\\Noselect'))
+        .map((folder) => ({
+          name: folder.path,
+          ...(folder.specialUse !== undefined && { specialUse: folder.specialUse }),
+        }))
+        .sort((a, b) => a.name.localeCompare(b.name));
     } catch (err) {
       throw this.imapError(err);
     } finally {

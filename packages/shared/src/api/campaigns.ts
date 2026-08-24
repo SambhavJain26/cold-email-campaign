@@ -2,7 +2,7 @@
 // enroll/recycle (dual body shapes), the Stage-9 outcomes panel, cold storage.
 import { z } from 'zod';
 import { CAMPAIGN_STATUSES, LEAD_TIERS, PERSONALIZATION_MODES } from '../domain/index';
-import { isoDateTime, listOf } from './common';
+import { isoDateTime, listOf, pageQuerySchema } from './common';
 
 export const tierEffortConfigSchema = z
   .object({
@@ -119,27 +119,23 @@ export const recycleBodySchema = z
   .object({ source_campaign_id: z.number().int().positive() })
   .strict();
 
-export const coldStorageQuerySchema = z.object({
+export const coldStorageQuerySchema = pageQuerySchema.extend({
   source_campaign_id: z.coerce.number().int().positive(),
 });
 
-export const coldStorageResponseSchema = z
+export const coldStorageItemSchema = z
   .object({
-    items: z.array(
-      z
-        .object({
-          lead: z
-            .object({
-              id: z.number().int(),
-              email: z.string(),
-              tier: z.enum(LEAD_TIERS).nullable(),
-            })
-            .strict(),
-          completed_at: isoDateTime,
-          earliest_recycle_at: isoDateTime,
-          eligible: z.boolean(),
-        })
-        .strict(),
-    ),
+    lead: z
+      .object({
+        id: z.number().int(),
+        email: z.string(),
+        tier: z.enum(LEAD_TIERS).nullable(),
+      })
+      .strict(),
+    completed_at: isoDateTime,
+    earliest_recycle_at: isoDateTime,
+    eligible: z.boolean(),
   })
   .strict();
+
+export const coldStorageResponseSchema = listOf(coldStorageItemSchema);

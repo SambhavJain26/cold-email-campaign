@@ -11,16 +11,24 @@ import type { Scheduler, SendOutcomeKind } from '../scheduler/scheduler';
 import type { Renderer, SequenceProvider } from '../scheduler/types';
 import type { RenderChecks } from '../render/types';
 import type { DueEnrollment } from '../db/repos/enrollmentsRepo';
-import { findByLeadAndCampaign, getById, insertEnrollments } from '../db/repos/enrollmentsRepo';
+import { findByLeadAndCampaign, getById } from '../db/repos/enrollmentsRepo';
 import { getLeadById, recontactStatusByLeadIds } from '../db/repos/leadsRepo';
 import { getComplianceSettings, getSettings } from '../db/repos/settingsRepo';
 import { listMailboxesByStatus } from '../db/repos/mailboxesRepo';
 import { leadReceivedContentHash } from '../db/repos/eventsRepo';
-import { getStepId, insertBespokeVariant, sequenceIdForCampaign } from '../db/repos/sequencesRepo';
-import { latestSentMessageId } from '../db/repos/sentMessagesRepo';
+import {
+  getStepId,
+  getVariantById,
+  insertBespokeVariant,
+  loadSequenceDef,
+  sequenceIdForCampaign,
+} from '../db/repos/sequencesRepo';
+import { latestSentMessageId, listThreadMessageIds } from '../db/repos/sentMessagesRepo';
 import { getCampaign } from '../db/repos/campaignsRepo';
 import { contentHashOf } from '../render/hash';
-import { buildEvent } from '../domain/events';
+import { firstSentEvent } from '../db/repos/eventsRepo';
+import { autoObservationsOf } from '../db/repos/campaignsRepo';
+import { FOOTER_SEPARATOR } from '../render/footer';
 import type { EventStore } from './eventStore';
 
 /** No sendable mailbox (all at cap/unhealthy, or the override is) → 409 mailbox_unhealthy. */
@@ -211,6 +219,8 @@ export interface ManualSendDeps extends ManualComposeDeps {
 export interface ManualSendInput {
   leadId: number;
   campaignId: number;
+  enrollmentId?: number;
+  draftId?: number;
   mailboxId?: number;
   subject: string;
   bodyText: string;
@@ -218,15 +228,15 @@ export interface ManualSendInput {
 }
 
 /**
- * B6.8 POST /manual-sends: enroll-if-needed, then the manualCompose path.
- * A fresh enrollment is created human_written (Mode 1 by definition) with an
- * `enrolled` event — the docs/10 traceability row (`enrolled`?) + `sent`.
+ * Manual sends only operate on an existing active human-written enrollment.
+ * The lead/campaign fields remain in the request for backwards compatibility,
+ * while enrollmentId removes ambiguity when the composer has resolved one.
  */
 export async function manualSend(
   deps: ManualSendDeps,
   input: ManualSendInput,
 ): Promise<ManualComposeResult & { enrollmentId: number }> {
-  const { db, clock, store } = deps;
+  const { db, clock } = deps;
   const now = clock.now();
 
   const campaign = await getCampaign(db, input.campaignId);
@@ -247,29 +257,12 @@ export async function manualSend(
     throw new Error(`lead is marked not now until ${replyStatus!.blockedUntil!.toISOString()}`);
   }
 
-  let enrollment = await findByLeadAndCampaign(db, input.leadId, input.campaignId);
-  if (!enrollment) {
-    const [enrollmentId] = await insertEnrollments(db, [
-      {
-        leadId: lead.id,
-        campaignId: input.campaignId,
-        enrolledTier: lead.tier,
-        personalizationMode: 'human_written',
-        enrolledAt: now,
-      },
-    ]);
-    await store.append(
-      [
-        buildEvent.enrolled({
-          leadId: lead.id,
-          enrollmentId: enrollmentId!,
-          campaignId: input.campaignId,
-          occurredAt: now,
-        }),
-      ],
-      { patches: [{ enrollmentId: enrollmentId!, nextSendAt: now }] },
-    );
-    enrollment = await getById(db, enrollmentId!);
+  const enrollment = input.enrollmentId
+    ? await getById(db, input.enrollmentId)
+    : await findByLeadAndCampaign(db, input.leadId, input.campaignId);
+  if (!enrollment) throw new Error('an active manual enrollment is required before composing');
+  if (enrollment.leadId !== input.leadId || enrollment.campaignId !== input.campaignId) {
+    throw new Error('enrollment does not belong to the requested lead and campaign');
   }
 
   const result = await manualCompose(deps, {
@@ -278,5 +271,119 @@ export async function manualSend(
     bodyText: input.bodyText,
     mailboxId: input.mailboxId,
   });
-  return { ...result, enrollmentId: enrollment!.id };
+  return { ...result, enrollmentId: enrollment.id };
+}
+
+export interface ManualComposePrefill {
+  enrollmentId: number;
+  leadId: number;
+  campaign: { id: number; name: string };
+  stepNo: number;
+  stepCount: number;
+  dueAt: Date | null;
+  personalizationMode: 'human_written' | 'template_researched' | 'template_auto';
+  subject: string;
+  body: string;
+  variantId: number | null;
+  draftId: number | null;
+  thread: { assignedMailboxId: number | null; previousMessageIds: string[]; inThread: boolean };
+  checks: RenderChecks;
+}
+
+/** Server-owned starting point for the enrollment's actual due step. */
+export async function manualComposePrefill(
+  deps: Pick<ManualComposeDeps, 'db' | 'renderer'>,
+  enrollmentId: number,
+): Promise<ManualComposePrefill> {
+  const { db, renderer } = deps;
+  const enrollment = await getById(db, enrollmentId);
+  if (!enrollment) throw new Error(`enrollment ${enrollmentId} not found`);
+  if (enrollment.currentState !== 'ACTIVE' || enrollment.personalizationMode !== 'human_written') {
+    throw new Error('manual compose requires an active human-written enrollment');
+  }
+  const [lead, campaign] = await Promise.all([
+    getLeadById(db, enrollment.leadId),
+    getCampaign(db, enrollment.campaignId),
+  ]);
+  if (!lead || !campaign || campaign.status !== 'active' || campaign.sequenceId === null) {
+    throw new Error('manual compose requires an active campaign with a sequence');
+  }
+  const sequence = await loadSequenceDef(db, campaign.sequenceId);
+  const step = sequence?.steps.find((candidate) => candidate.stepNo === enrollment.currentStepNo);
+  const variant = step?.variants.toSorted((a, b) => a.id - b.id)[0];
+  if (!sequence || !step || !variant)
+    throw new Error('the due step has no active template variant');
+
+  const compliance = await getComplianceSettings(db);
+  const customFields = (lead.customFields ?? {}) as Record<string, string>;
+  let threadSubject: string | undefined;
+  if (step.inThread && step.stepNo > 1) {
+    const first = await firstSentEvent(db, enrollment.id);
+    if (first?.variantId !== null && first?.variantId !== undefined) {
+      const firstVariant = await getVariantById(db, first.variantId);
+      if (firstVariant) {
+        threadSubject = renderer.render({
+          variant: firstVariant,
+          step: { stepNo: first.stepNo, inThread: false },
+          lead: {
+            id: lead.id,
+            email: lead.email,
+            firstName: lead.firstName,
+            company: lead.company,
+            state: lead.state,
+          },
+          enrollmentId: enrollment.id,
+          ctx: {
+            mode: enrollment.personalizationMode,
+            customFields,
+            autoObservations: autoObservationsOf(campaign),
+            compliance,
+            literal: firstVariant.attributes.bespoke === true,
+          },
+        }).subject;
+      }
+    }
+  }
+
+  const rendered = renderer.render({
+    variant,
+    step: { stepNo: step.stepNo, inThread: step.inThread },
+    lead: {
+      id: lead.id,
+      email: lead.email,
+      firstName: lead.firstName,
+      company: lead.company,
+      state: lead.state,
+    },
+    enrollmentId: enrollment.id,
+    ctx: {
+      mode: enrollment.personalizationMode,
+      customFields,
+      autoObservations: autoObservationsOf(campaign),
+      compliance,
+      threadSubject,
+    },
+  });
+  const footerStart = rendered.bodyText.lastIndexOf(FOOTER_SEPARATOR);
+  return {
+    enrollmentId: enrollment.id,
+    leadId: lead.id,
+    campaign: { id: campaign.id, name: campaign.name },
+    stepNo: step.stepNo,
+    stepCount: sequence.steps.length,
+    dueAt: enrollment.nextSendAt,
+    personalizationMode: enrollment.personalizationMode,
+    subject: rendered.subject,
+    body: footerStart < 0 ? rendered.bodyText : rendered.bodyText.slice(0, footerStart),
+    variantId: variant.id,
+    draftId: null,
+    thread: {
+      assignedMailboxId: enrollment.assignedMailboxId,
+      previousMessageIds: (await listThreadMessageIds(db, enrollment.id)).map(
+        (row) => row.messageId,
+      ),
+      inThread: step.inThread && step.stepNo > 1,
+    },
+    checks: rendered.checks,
+  };
 }

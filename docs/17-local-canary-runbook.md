@@ -1,5 +1,20 @@
 # Local canary runbook (B8.3-local) — two-week validation on throwaway Gmail
 
+## 2026-08-25 ten-workstream implementation — Stage 1 verified locally
+
+The operator approved four implementation stages with a single, separately approved production
+deployment after the final gate. Stage 1 is complete locally: numbered pagination for Unibox,
+reminders, alerts, reply detection, and cold storage; server-resolved due-step Manual Compose;
+non-sending operator reminders with automatic `not_now` tasks; strict IANA timezone controls; and
+authenticated IMAP-folder discovery/validation with transactionally seeded UIDNEXT cursors.
+
+No campaign was activated, no lead was enrolled for outreach, no email was sent, and production and
+Oracle were not changed. Migration `0015_operational_workflows` passed down/up on the disposable
+test database. Verified gates: typecheck, lint, format; unit **338**; web **55**; API **118**;
+integration **159**; affected mock-browser journeys **19**. The event-backed populated test cohort
+returned `checked 5 enrollments — 0 diff(s)` and self-check reported no invariant violations.
+Stages 2–4 and the final full serial gate remain open; this stage is not deployed.
+
 ## 2026-08-22 Spaceship production commissioning gate
 
 The operator-approved production build is deployed at
