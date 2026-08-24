@@ -29,8 +29,17 @@ import {
 } from '../db/repos/sequencesRepo';
 import { getLeadById } from '../db/repos/leadsRepo';
 import { getComplianceSettings } from '../db/repos/settingsRepo';
+import {
+  autoObservationConfigOf,
+  getCampaign,
+  resolvedVariablesOf,
+  variableOverridesOf,
+} from '../db/repos/campaignsRepo';
 import { contentHashOf } from '../render/hash';
 import { parseTemplate, variationCount } from '../render/template';
+import { resolveObservation } from '../render/slots';
+import { seededPick } from '../render/spintax';
+import { spintaxRng } from '../render/seed';
 import { AppError } from './errors';
 import type { ZodTypeProvider } from './plugins/zodCompilers';
 
@@ -41,6 +50,7 @@ function toSequenceDto(n: NestedSequence): SequenceDto {
     stop_on_reply: n.sequence.stopOnReply,
     stop_on_hard_bounce: true,
     stop_on_unsubscribe: true,
+    variable_defaults: n.sequence.variableDefaults,
     steps: n.steps.map(({ step, variants }) => ({
       id: step.id,
       step_no: step.stepNo,
@@ -109,6 +119,7 @@ export async function sequencesRoutes(app: FastifyInstance, services: AppService
       assertTemplatesParse(req.body);
       const id = await createSequence(db, {
         name: req.body.name,
+        variableDefaults: req.body.variable_defaults,
         stopOnReply: req.body.stop_on_reply,
         steps: toSaveSteps(req.body).map(({ id: _new, ...s }) => s),
       });
@@ -135,6 +146,7 @@ export async function sequencesRoutes(app: FastifyInstance, services: AppService
         req.params.id,
         {
           name: req.body.name,
+          variableDefaults: req.body.variable_defaults,
           stopOnReply: req.body.stop_on_reply,
           steps: toSaveSteps(req.body),
         },
@@ -195,6 +207,27 @@ export async function sequencesRoutes(app: FastifyInstance, services: AppService
           ? 'template_researched'
           : 'template_auto';
 
+      const campaign = req.body.campaign_id
+        ? await getCampaign(db, req.body.campaign_id)
+        : undefined;
+      if (req.body.campaign_id && (!campaign || campaign.sequenceId !== nested.sequence.id)) {
+        throw AppError.notFound('campaign');
+      }
+      const autoConfig = campaign ? autoObservationConfigOf(campaign) : { field: null, rules: {} };
+      const sequenceVariables = campaign
+        ? campaign.firstActivatedAt
+          ? resolvedVariablesOf(campaign)
+          : { ...nested.sequence.variableDefaults, ...variableOverridesOf(campaign) }
+        : nested.sequence.variableDefaults;
+      const renderContext = {
+        mode,
+        customFields,
+        autoObservations: Object.keys(autoConfig.rules).length > 0 ? autoConfig.rules : null,
+        autoObservationField: autoConfig.field,
+        sequenceVariables,
+        compliance: await getComplianceSettings(db),
+      } as const;
+
       const rendered = renderer.render({
         variant: {
           id: variant.id,
@@ -209,20 +242,108 @@ export async function sequencesRoutes(app: FastifyInstance, services: AppService
           email: lead.email,
           firstName: lead.firstName,
           company: lead.company,
+          website: lead.website,
+          city: lead.city,
           state: lead.state,
         },
         enrollmentId: 0, // no enrollment in preview — deterministic seed anchor
-        ctx: {
-          mode,
-          customFields,
-          autoObservations: null,
-          compliance: await getComplianceSettings(db),
-        },
+        ctx: renderContext,
       });
+      const leadLite = {
+        id: lead.id,
+        email: lead.email,
+        firstName: lead.firstName,
+        company: lead.company,
+        website: lead.website,
+        city: lead.city,
+        state: lead.state,
+      };
+      const observation = resolveObservation(leadLite, renderContext);
+      const selectedFieldValue = autoConfig.field
+        ? ({
+            state: lead.state,
+            city: lead.city,
+            company: lead.company,
+            website: lead.website,
+          }[autoConfig.field] ?? customFields[autoConfig.field])
+        : undefined;
+      const matchedRule =
+        mode === 'template_researched' && customFields.custom_observation?.trim()
+          ? 'custom_observation'
+          : (Object.entries(autoConfig.rules).find(
+              ([key]) =>
+                key !== 'default' &&
+                key.trim().toLocaleLowerCase() === selectedFieldValue?.trim().toLocaleLowerCase(),
+            )?.[0] ?? (Object.hasOwn(autoConfig.rules, 'default') ? 'default' : null));
+      const parsedTemplates = [
+        parseTemplate(variant.subjectTemplate),
+        parseTemplate(variant.bodyTemplate),
+      ];
+      const fallbackVariables = Object.fromEntries(
+        parsedTemplates
+          .flatMap((parsed) => parsed.tokens)
+          .filter(
+            (token) =>
+              token.kind === 'tag' &&
+              token.field.startsWith('sequence.') &&
+              !Object.hasOwn(sequenceVariables, token.field.slice('sequence.'.length)) &&
+              token.fallback !== null,
+          )
+          .map((token) => {
+            if (token.kind !== 'tag') throw new Error('unreachable');
+            return [
+              token.field.slice('sequence.'.length),
+              { value: token.fallback!, source: 'fallback' as const },
+            ];
+          }),
+      );
+      const pick = seededPick(spintaxRng(0, stepEntry.step.stepNo, variant.id));
+      const spintaxChoices = parsedTemplates.flatMap((parsed) =>
+        parsed.tokens.flatMap((token) =>
+          token.kind === 'random'
+            ? [{ options: token.options, selected: pick(token.options) }]
+            : [],
+        ),
+      );
       return {
         subject: rendered.subject,
         body: rendered.bodyText,
         checks: rendered.checks,
+        resolution_trace: {
+          lead_values: {
+            first_name: lead.firstName,
+            company: lead.company,
+            website: lead.website,
+            city: lead.city,
+            state: lead.state,
+            ...Object.fromEntries(
+              Object.entries(customFields).map(([key, value]) => [key, value ?? null]),
+            ),
+          },
+          observation: {
+            field: autoConfig.field,
+            matched_rule: matchedRule,
+            value: observation.value ?? '',
+          },
+          sequence_variables: Object.fromEntries([
+            ...Object.entries(sequenceVariables).map(
+              ([key, value]) =>
+                [
+                  key,
+                  {
+                    value,
+                    source:
+                      campaign && Object.hasOwn(variableOverridesOf(campaign), key)
+                        ? ('campaign' as const)
+                        : ('sequence' as const),
+                  },
+                ] as const,
+            ),
+            ...Object.entries(fallbackVariables),
+          ]),
+          spintax_choices: spintaxChoices,
+          warnings: rendered.checks.warnings.map((warning) => warning.message),
+        },
       };
     },
   );

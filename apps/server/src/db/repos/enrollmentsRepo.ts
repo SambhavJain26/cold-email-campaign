@@ -57,6 +57,8 @@ export interface DueEnrollment {
   leadEmail: string;
   leadFirstName: string | null;
   leadCompany: string | null;
+  leadWebsite: string | null;
+  leadCity: string | null;
   leadState: string | null;
   leadCustomFields: Record<string, string>;
 }
@@ -82,6 +84,8 @@ export async function listDue(db: DbLike, now: Date): Promise<DueEnrollment[]> {
       leadEmail: leads.email,
       leadFirstName: leads.firstName,
       leadCompany: leads.company,
+      leadWebsite: leads.website,
+      leadCity: leads.city,
       leadState: leads.state,
       leadCustomFields: leads.customFields,
     })

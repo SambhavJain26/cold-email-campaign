@@ -18,6 +18,17 @@ export interface RampConfig {
   ramp_daily_enroll_cap: number;
 }
 
+export interface RampStage {
+  start_day: number;
+  end_day: number;
+  cap: number;
+}
+
+export interface AutoObservationConfig {
+  field: string | null;
+  rules: Record<string, string>;
+}
+
 export async function getCampaign(db: DbLike, id: number): Promise<CampaignRow | undefined> {
   const rows = await db.select().from(campaigns).where(eq(campaigns.id, id));
   return rows[0];
@@ -37,9 +48,29 @@ export function rampOf(c: CampaignRow): RampConfig {
   return c.rampConfig as RampConfig;
 }
 
+export function rampStagesOf(c: CampaignRow): RampStage[] {
+  return c.rampStages as RampStage[];
+}
+
+export function variableOverridesOf(c: CampaignRow): Record<string, string> {
+  return c.variableOverrides as Record<string, string>;
+}
+
+export function resolvedVariablesOf(c: CampaignRow): Record<string, string> {
+  return c.resolvedVariables as Record<string, string>;
+}
+
+export function autoObservationConfigOf(c: CampaignRow): AutoObservationConfig {
+  return {
+    field: c.autoObservationField,
+    rules: c.autoObservationRules as Record<string, string>,
+  };
+}
+
 /** The campaign's auto_observations table, or null when unset (docs/08 §3). */
 export function autoObservationsOf(c: CampaignRow): Record<string, string> | null {
-  return tierEffortOf(c).auto_observations ?? null;
+  const current = autoObservationConfigOf(c).rules;
+  return Object.keys(current).length > 0 ? current : (tierEffortOf(c).auto_observations ?? null);
 }
 
 export interface CampaignCounts {
@@ -96,6 +127,9 @@ export async function createCampaign(
     sequenceId: number;
     tierEffortConfig?: TierEffortConfig;
     rampConfig?: RampConfig;
+    rampStages?: RampStage[];
+    variableOverrides?: Record<string, string>;
+    autoObservation?: AutoObservationConfig;
   },
 ): Promise<CampaignRow> {
   const rows = await db
@@ -105,6 +139,12 @@ export async function createCampaign(
       sequenceId: input.sequenceId,
       ...(input.tierEffortConfig !== undefined && { tierEffortConfig: input.tierEffortConfig }),
       ...(input.rampConfig !== undefined && { rampConfig: input.rampConfig }),
+      ...(input.rampStages !== undefined && { rampStages: input.rampStages }),
+      ...(input.variableOverrides !== undefined && { variableOverrides: input.variableOverrides }),
+      ...(input.autoObservation !== undefined && {
+        autoObservationField: input.autoObservation.field,
+        autoObservationRules: input.autoObservation.rules,
+      }),
     })
     .returning();
   return rows[0]!;
@@ -113,13 +153,29 @@ export async function createCampaign(
 export async function patchCampaign(
   db: DbLike,
   id: number,
-  patch: { name?: string; status?: CampaignRow['status'] },
+  patch: {
+    name?: string;
+    status?: CampaignRow['status'];
+    tierEffortConfig?: TierEffortConfig;
+    rampStages?: RampStage[];
+    variableOverrides?: Record<string, string>;
+    autoObservation?: AutoObservationConfig;
+    firstActivatedAt?: Date;
+  },
 ): Promise<CampaignRow | undefined> {
   const rows = await db
     .update(campaigns)
     .set({
       ...(patch.name !== undefined && { name: patch.name }),
       ...(patch.status !== undefined && { status: patch.status }),
+      ...(patch.tierEffortConfig !== undefined && { tierEffortConfig: patch.tierEffortConfig }),
+      ...(patch.rampStages !== undefined && { rampStages: patch.rampStages }),
+      ...(patch.variableOverrides !== undefined && { variableOverrides: patch.variableOverrides }),
+      ...(patch.autoObservation !== undefined && {
+        autoObservationField: patch.autoObservation.field,
+        autoObservationRules: patch.autoObservation.rules,
+      }),
+      ...(patch.firstActivatedAt !== undefined && { firstActivatedAt: patch.firstActivatedAt }),
     })
     .where(eq(campaigns.id, id))
     .returning();

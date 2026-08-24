@@ -12,7 +12,22 @@ export interface ObservationResolution {
 function segmentRule(lead: LeadLite, ctx: RenderContext): string | null {
   const table = ctx.autoObservations;
   if (!table) return null;
-  return (lead.state !== null ? table[lead.state] : undefined) ?? table['default'] ?? null;
+  const field = ctx.autoObservationField ?? 'state';
+  const standard: Record<string, string | null | undefined> = {
+    state: lead.state,
+    city: lead.city,
+    company: lead.company,
+    website: lead.website,
+  };
+  const raw = standard[field] ?? ctx.customFields[field];
+  const normalized = raw?.trim().toLocaleLowerCase();
+  if (normalized) {
+    const matched = Object.entries(table).find(
+      ([key]) => key !== 'default' && key.trim().toLocaleLowerCase() === normalized,
+    );
+    if (matched) return matched[1];
+  }
+  return table['default'] ?? null;
 }
 
 export function resolveObservation(lead: LeadLite, ctx: RenderContext): ObservationResolution {

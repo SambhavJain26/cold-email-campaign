@@ -16,11 +16,20 @@ function rawValue(
   ctx: RenderContext,
   observation: string | null,
 ): string | null | undefined {
+  if (field.startsWith('sequence.')) {
+    return ctx.sequenceVariables?.[field.slice('sequence.'.length)];
+  }
   switch (field) {
     case 'first_name':
       return lead.firstName;
     case 'company':
       return lead.company;
+    case 'website':
+      return lead.website;
+    case 'city':
+      return lead.city;
+    case 'state':
+      return lead.state;
     case 'market':
       return lead.state !== null ? (STATE_NAMES[lead.state] ?? null) : null;
     case 'custom_observation':

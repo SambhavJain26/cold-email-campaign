@@ -15,6 +15,7 @@ import { useSequences } from '@/api/queries/sequences';
 import { useDeleteCampaign, usePatchCampaign } from '@/api/mutations/campaigns';
 import { CompletionPanel } from './completion-panel';
 import { CampaignStatusBadge } from './status-badge';
+import { DraftConfigurationEditor } from './draft-configuration';
 import { useState } from 'react';
 
 const MODE_LABEL: Record<string, string> = {
@@ -127,6 +128,8 @@ export default function CampaignDetailPage() {
 
       <CatchupBanner />
 
+      {campaign.status === 'draft' && <DraftConfigurationEditor campaign={campaign} />}
+
       {campaign.tier_effort_config.A === 'human_written' && (
         <Alert>
           <AlertTitle>Tier A is manual-only</AlertTitle>
@@ -219,14 +222,19 @@ export default function CampaignDetailPage() {
               <div className="flex justify-between gap-4">
                 <dt className="text-muted-foreground">Ramp</dt>
                 <dd className="tabular-nums">
-                  {campaign.ramp_config.ramp_days} days ·{' '}
-                  {campaign.ramp_config.ramp_daily_enroll_cap}/day cap
+                  {campaign.ramp_stages
+                    .map(
+                      (stage) =>
+                        `${stage.start_day}${stage.end_day === stage.start_day ? '' : `–${stage.end_day}`}: ${stage.cap}`,
+                    )
+                    .join(' · ')}
                 </dd>
               </div>
             </dl>
             <p className="mt-2 text-xs text-muted-foreground">
-              Effort and ramp are fixed at creation — PATCH /campaigns carries name and status only,
-              so changing them means a new campaign.
+              {campaign.first_activated_at
+                ? `Frozen on first activation ${new Date(campaign.first_activated_at).toLocaleString()}. Pausing does not restart the ramp calendar.`
+                : 'Editable while draft. First activation freezes effort, observations, variables, and ramp permanently.'}
             </p>
           </section>
         </div>

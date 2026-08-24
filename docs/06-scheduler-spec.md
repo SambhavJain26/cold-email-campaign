@@ -123,8 +123,9 @@ capacityToday(campaign):
   followupsDue = count ACTIVE enrollments with sent-count ≥ 1 AND next_send_at < endOfDay
   sentSoFar    = Σ sentToday
   roomForNew   = max(0, total - sentSoFar - followupsDue)
-  rampCap      = campaign in ramp window (enrolled_at of campaign < ramp_days ago)
-                   ? ramp_daily_enroll_cap - enrolledToday : ∞
+  rampDay      = calendar day since campaign.first_activated_at (day 1 on activation)
+  rampStage    = staged range containing rampDay, or none after final stage
+  rampCap      = rampStage ? rampStage.cap - enrolledToday : ∞
   suggested    = min(roomForNew, rampCap)
 ```
 

@@ -1,4 +1,4 @@
-// F5.6 — campaigns: list, create → activate → enroll 20 with the capacity math,
+// F5.6 — campaigns: list, create → activate → enroll within the staged ramp,
 // the Stage-9 completion panel, and the catch-up banner (docs/15 F5).
 import { expect, test } from '@playwright/test';
 import { enableFailureFixtures, login } from './helpers';
@@ -36,7 +36,7 @@ test('completion panel reconciles the terminal outcomes to the enrolled total', 
   await expect(panel.getByRole('link', { name: 'Recycle cold storage' })).toBeVisible();
 });
 
-test('create → activate → enroll 20 → capacity math moves', async ({ page }) => {
+test('create → activate → day-1 ramp enrolls 5 and blocks more', async ({ page }) => {
   await login(page);
   await page.getByRole('link', { name: 'Campaigns' }).click();
   await page.getByRole('button', { name: 'New Campaign' }).click();
@@ -53,23 +53,25 @@ test('create → activate → enroll 20 → capacity math moves', async ({ page 
   await page.getByRole('button', { name: 'Activate' }).click();
   const today = page.getByTestId('today-panel');
   await expect(today).toContainText('Room for new openers');
-  await expect(page.getByTestId('suggested')).toHaveText('20');
+  await expect(page.getByTestId('suggested')).toHaveText('5');
 
-  await page.getByRole('button', { name: 'Enroll next 20' }).click();
-  await expect(page.getByText('Enrolled 20')).toBeVisible();
-  // 120 room − 20 enrolled = 100 left today.
-  await expect(today).toContainText('100');
+  await page.getByRole('button', { name: 'Enroll next 5' }).click();
+  await expect(page.getByText('Enrolled 5')).toBeVisible();
+  // Mailbox capacity still has room, but the campaign's day-1 stage is exhausted.
+  await expect(today).toContainText('115');
+  await expect(today).toContainText('Ramp cap remaining');
+  await expect(page.getByTestId('suggested')).toHaveText('0');
 
-  // Over-asking hits the ramp cap: 409 capacity_exceeded explains and offers the fit.
+  // Over-asking hits the ramp cap: 409 capacity_exceeded explains that nothing else fits today.
   await page.getByLabel('Enroll').fill('200');
   await page.getByRole('button', { name: 'Enroll next 200' }).click();
-  await expect(page.getByTestId('ramp-note')).toContainText('allows 100 more');
-  await expect(page.getByLabel('Enroll')).toHaveValue('100');
+  await expect(page.getByTestId('ramp-note')).toContainText('allows 0 more');
+  await expect(page.getByLabel('Enroll')).toHaveValue('0');
 
   // The list reflects the enrollment.
   await page.getByRole('button', { name: 'Back to list' }).click();
   const row = page.getByRole('row', { name: /Pass 2 — recycled/ });
-  await expect(row).toContainText('20');
+  await expect(row).toContainText('5');
 });
 
 test('catch-up banner explains the backlog and acknowledges', async ({ page }) => {

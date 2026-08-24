@@ -38,7 +38,7 @@ Three steps in a dialog: **Upload** (drag/drop CSV, client-side 10 MB check) →
 
 **Data:** `GET/POST/PATCH /sequences`, `POST validate-template` (debounced 500 ms), `POST preview`.
 **Regions:** list (name, steps, stop conditions, active-in-campaigns); builder — step list (step_no, wait_days stepper, in-thread toggle) matching the walkthrough card; per step: variant tabs (A/B/+); template editor (textarea, monospace) with live validation chips (tag errors, variation count) from `validate-template`; stop-condition toggles; sticky footer **[Save sequence]**.
-**Preview panel** (right side): lead picker (search) → `POST preview` → rendered subject/body with the footer visually separated + the pre-send checklist verbatim (✅/⚠️/❌ per check, score badge, variation count). Footer block is read-only with a lock icon + link to Compliance settings (non-removability made visible).
+**Preview panel** (right side): sequence-default/campaign-context selector + lead picker → `POST preview` → rendered subject/body with the footer visually separated + checklist. Resolution details show lead values, matched Auto Observation rule, sequence-variable sources/fallbacks, and spintax choices. Footer remains locked.
 **Interactions:** remove step (walkthrough 13b "Remove Step 3") = delete step in builder + save; deactivate variant lives in Analytics (§12-8).
 **Edge:** save with fatal template errors → 422 `sequence_invalid`, errors mapped to the offending step/variant tab.
 
@@ -46,7 +46,7 @@ Three steps in a dialog: **Upload** (drag/drop CSV, client-side 10 MB check) →
 
 **Data:** campaigns CRUD, capacity, outcomes, cold-storage, recycle.
 **List:** name, status, sequence, enrolled/contacted, progress bar, Pass-2 badge when `recycled_from_campaign_id`.
-**Detail regions:** (a) capacity meter card = walkthrough Day-13/Day-20 panel (total/follow-ups/room/ramp note/suggested + enroll-from-tier note + **[Enroll next N]**); (b) enrollment breakdown by state (live outcome counts); (c) **completion panel** when all enrollments terminal: the Stage-9 report — terminal outcomes table summing to total ✓, event-based rates block (with the "may overlap" caption), and two CTAs: **[Recycle cold storage]** (→ recycle flow §12-9) and **[Import fresh leads]** (→ import wizard); (d) ramp/tier-effort config (the §8 deferred-decision knobs) — **editable at creation only**: `PATCH /campaigns` carries `name`/`status` alone (docs/10), so the form lives in the create dialog and the detail page shows the values read-only. Changing effort/ramp means a new campaign.
+**Detail regions:** (a) capacity meter with activation-day/current-stage details + **[Enroll next N]**; (b) enrollment breakdown; (c) completion panel; (d) draft-only editor for tier effort, staged ramp, Auto Observation field/rules, and sequence-variable overrides. First activation freezes configuration and records the permanent ramp start; pause/resume does not unlock or restart it.
 **Edge:** enroll into `draft` campaign → blocked with "Activate first"; sequence missing → blocked.
 
 ## 7. 💬 Unibox `/unibox` (§Stage 6)
@@ -87,5 +87,5 @@ Email + password → `POST auth/login`; error toast on 401/429; redirect to inte
 
 ## 14. Manual composer (Mode 1) — dialog from Lead detail / Leads row (§Stage 3)
 
-Lead context header (company, tier, notes — the validation-phase profile card); campaign picker (defaults to active); server-generated context shows campaign, `Step N of M`, due date, personalization mode, and whether the message is in-thread; mailbox display "auto-rotated: {suggested}" (the pinned mailbox is retained after the first send); subject + body editors are prefilled from the enrollment's actual due-step template; live checks strip; **[Send & log as manual]** → `POST /manual-sends` → toast + timeline refresh. Manual Compose requires an existing active human-written enrollment and never silently enrolls a lead.
+Lead context header; active human-written enrollment picker; server-generated campaign/`Step N of M`/due/thread context; mailbox rotation with pin preservation; subject/body prefilled from an eligible Step-1 campaign draft or the actual due-step variant. Imported drafts expose **Save Draft**, **Mark Ready**, and gated **Send & log**; successful sending links and marks the draft sent. Manual Compose never silently enrolls a lead.
 **Edge:** all mailboxes at cap/unhealthy → 409 `mailbox_unhealthy` → explanatory dialog. Fatal checks → 422 with checks listed.

@@ -38,8 +38,11 @@
     "followups_due_today": 0,
     "sent_so_far_today": 0,
     "room_for_new": 120,
-    "ramp_cap_remaining": 20,
-    "suggested": 20
+    "ramp_cap_remaining": 5,
+    "ramp_day": 1,
+    "ramp_stage": { "start_day": 1, "end_day": 1, "cap": 5 },
+    "enrolled_today": 0,
+    "suggested": 5
   },
   "watch_flags": []
 }

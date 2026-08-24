@@ -9,10 +9,12 @@ import {
   createReminderBodySchema,
   dispositionReplyBodySchema,
   manualComposePrefillSchema,
+  manualDraftSchema,
   manualSendBodySchema,
   manualSendResponseSchema,
   okResponseSchema,
   patchReminderBodySchema,
+  patchManualDraftBodySchema,
   reminderListResponseSchema,
   reminderQuerySchema,
   snoozeBodySchema,
@@ -47,6 +49,27 @@ import {
   type ReminderListRow,
 } from '../db/repos/remindersRepo';
 import { getSettings } from '../db/repos/settingsRepo';
+import {
+  getManualDraft,
+  patchManualDraft as updateManualDraft,
+  type ManualDraftRow,
+} from '../db/repos/manualDraftsRepo';
+
+function toManualDraftDto(row: ManualDraftRow) {
+  return {
+    id: row.id,
+    lead_id: row.leadId,
+    campaign_id: row.campaignId,
+    step_no: 1 as const,
+    source_import_id: row.sourceImportId,
+    subject: row.subject,
+    body: row.body,
+    status: row.status,
+    created_at: row.createdAt.toISOString(),
+    updated_at: row.updatedAt.toISOString(),
+    sent_at: row.sentAt?.toISOString() ?? null,
+  };
+}
 
 function calendarDateInZone(at: Date, timeZone: string): string {
   const parts = new Intl.DateTimeFormat('en-US', {
@@ -363,6 +386,8 @@ export async function uniboxRoutes(app: FastifyInstance, services: AppServices):
           body: result.body,
           variant_id: result.variantId,
           draft_id: result.draftId,
+          draft_status: result.draftStatus,
+          draft_source_import_id: result.draftSourceImportId,
           thread: {
             assigned_mailbox_id: result.thread.assignedMailboxId,
             previous_message_ids: result.thread.previousMessageIds,
@@ -377,6 +402,44 @@ export async function uniboxRoutes(app: FastifyInstance, services: AppServices):
         if (error instanceof Error) throw new AppError('conflict', 409, error.message);
         throw error;
       }
+    },
+  );
+
+  r.get(
+    '/manual-drafts/:id',
+    { schema: { params: idParamSchema, response: { 200: manualDraftSchema } } },
+    async (req) => {
+      const draft = await getManualDraft(db, req.params.id);
+      if (!draft) throw AppError.notFound('manual draft');
+      return toManualDraftDto(draft);
+    },
+  );
+
+  r.patch(
+    '/manual-drafts/:id',
+    {
+      schema: {
+        params: idParamSchema,
+        body: patchManualDraftBodySchema,
+        response: { 200: manualDraftSchema },
+      },
+    },
+    async (req) => {
+      const existing = await getManualDraft(db, req.params.id);
+      if (!existing) throw AppError.notFound('manual draft');
+      if (existing.status === 'sent') {
+        throw new AppError('conflict', 409, 'sent drafts are immutable');
+      }
+      const draft = await updateManualDraft(db, req.params.id, {
+        subject: req.body.subject,
+        body: req.body.body,
+        status:
+          req.body.status ??
+          (req.body.subject !== undefined || req.body.body !== undefined
+            ? 'needs_review'
+            : undefined),
+      });
+      return toManualDraftDto(draft!);
     },
   );
 

@@ -14,6 +14,18 @@ export async function getLeadByEmail(db: DbLike, email: string): Promise<LeadRow
   return rows[0];
 }
 
+export async function leadsByEmails(
+  db: DbLike,
+  emails: readonly string[],
+): Promise<Map<string, LeadRow>> {
+  if (emails.length === 0) return new Map();
+  const rows = await db
+    .select()
+    .from(leads)
+    .where(inArray(leads.email, [...new Set(emails)]));
+  return new Map(rows.map((row) => [row.email, row]));
+}
+
 export async function getLeadById(db: DbLike, id: number): Promise<LeadRow | undefined> {
   const rows = await db
     .select()

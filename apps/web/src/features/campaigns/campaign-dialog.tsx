@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { Controller, useForm, useWatch } from 'react-hook-form';
 import { toast } from 'sonner';
@@ -33,7 +33,7 @@ import { useCreateCampaign } from '@/api/mutations/campaigns';
  *  place tier-effort and ramp are set (docs/10 §Campaigns). */
 const formSchema = createCampaignBodySchema.required({
   tier_effort_config: true,
-  ramp_config: true,
+  ramp_stages: true,
 });
 type FormValues = z.infer<typeof formSchema>;
 
@@ -55,6 +55,12 @@ export function CampaignDialog({
   const sequences = useSequences();
   const create = useCreateCampaign();
   const wasOpen = useRef(false);
+  const [autoField, setAutoField] = useState('');
+  const [autoRules, setAutoRules] = useState<Array<{ key: string; value: string }>>([
+    { key: 'default', value: '' },
+  ]);
+  const [overrides, setOverrides] = useState<Array<{ key: string; value: string }>>([]);
+  const [testSegment, setTestSegment] = useState('');
 
   const {
     register,
@@ -76,25 +82,60 @@ export function CampaignDialog({
         B: 'template_researched',
         C: 'template_auto',
       },
-      ramp_config: { ramp_days: 7, ramp_daily_enroll_cap: 20 },
+      ramp_stages: [
+        { start_day: 1, end_day: 1, cap: 5 },
+        { start_day: 2, end_day: 2, cap: 8 },
+        { start_day: 3, end_day: 3, cap: 10 },
+        { start_day: 4, end_day: 4, cap: 12 },
+        { start_day: 5, end_day: 7, cap: 15 },
+      ],
       acknowledge_tier_a_manual: false,
     });
+    setAutoField('');
+    setAutoRules([{ key: 'default', value: '' }]);
+    setOverrides([]);
+    setTestSegment('');
   }, [open, reset, sequences.data]);
   const tierAMode = useWatch({ control, name: 'tier_effort_config.A' });
+  const normalizedRuleKeys = autoRules.map((rule) => rule.key.trim().toLowerCase()).filter(Boolean);
+  const duplicateRuleKeys = new Set(normalizedRuleKeys).size !== normalizedRuleKeys.length;
 
   const onSubmit = (values: FormValues) => {
-    create.mutate(values, {
-      onSuccess: (campaign) => {
-        toast.success(`Campaign "${campaign.name}" created`);
-        onOpenChange(false);
-        navigate(`/campaigns/${campaign.id}`);
+    if (duplicateRuleKeys) {
+      toast.error('Auto Observation rule keys must be unique, ignoring case');
+      return;
+    }
+    const rules = Object.fromEntries(
+      autoRules
+        .filter((rule) => rule.key.trim() !== '' && rule.value.trim() !== '')
+        .map((rule) => [rule.key.trim(), rule.value]),
+    );
+    const variableOverrides = Object.fromEntries(
+      overrides
+        .filter((entry) => entry.key.trim() !== '')
+        .map((entry) => [entry.key.trim().toLowerCase(), entry.value]),
+    );
+    create.mutate(
+      {
+        ...values,
+        ...(autoField.trim() && Object.keys(rules).length > 0
+          ? { auto_observation: { field: autoField.trim(), rules } }
+          : {}),
+        variable_overrides: variableOverrides,
       },
-    });
+      {
+        onSuccess: (campaign) => {
+          toast.success(`Campaign "${campaign.name}" created`);
+          onOpenChange(false);
+          navigate(`/campaigns/${campaign.id}`);
+        },
+      },
+    );
   };
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-lg">
+      <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-2xl">
         <DialogHeader>
           <DialogTitle>New campaign</DialogTitle>
           <DialogDescription>
@@ -202,37 +243,139 @@ export function CampaignDialog({
           )}
 
           <fieldset className="space-y-2 rounded-lg border border-border p-3">
-            <legend className="px-1 text-xs font-medium">Ramp</legend>
+            <legend className="px-1 text-xs font-medium">Activation-based ramp stages</legend>
             <p className="text-xs text-muted-foreground">
-              New mailboxes warm up: for the first N days the campaign enrolls at most the ramp cap
-              per day.
+              The calendar starts once, on first activation. Pausing does not restart it.
             </p>
-            <div className="flex gap-4">
-              <div className="space-y-1.5">
-                <Label htmlFor="ramp-days" className="text-xs">
-                  Ramp days
-                </Label>
+            {[0, 1, 2, 3, 4].map((index) => (
+              <div key={index} className="grid grid-cols-3 gap-2">
                 <Input
-                  id="ramp-days"
+                  aria-label={`Ramp stage ${index + 1} start day`}
+                  type="number"
+                  min={1}
+                  {...register(`ramp_stages.${index}.start_day`, { valueAsNumber: true })}
+                />
+                <Input
+                  aria-label={`Ramp stage ${index + 1} end day`}
+                  type="number"
+                  min={1}
+                  {...register(`ramp_stages.${index}.end_day`, { valueAsNumber: true })}
+                />
+                <Input
+                  aria-label={`Ramp stage ${index + 1} cap`}
                   type="number"
                   min={0}
-                  className="h-8 w-24 tabular-nums"
-                  {...register('ramp_config.ramp_days', { valueAsNumber: true })}
+                  {...register(`ramp_stages.${index}.cap`, { valueAsNumber: true })}
                 />
               </div>
-              <div className="space-y-1.5">
-                <Label htmlFor="ramp-cap" className="text-xs">
-                  Daily enroll cap
-                </Label>
+            ))}
+          </fieldset>
+
+          <fieldset className="space-y-3 rounded-lg border border-border p-3">
+            <legend className="px-1 text-xs font-medium">Auto Observation rules</legend>
+            <Input
+              aria-label="Auto Observation segmentation field"
+              placeholder="Field: state, city, company, industry…"
+              value={autoField}
+              onChange={(event) => setAutoField(event.target.value)}
+            />
+            {autoRules.map((rule, index) => (
+              <div key={index} className="grid grid-cols-2 gap-2">
                 <Input
-                  id="ramp-cap"
-                  type="number"
-                  min={0}
-                  className="h-8 w-24 tabular-nums"
-                  {...register('ramp_config.ramp_daily_enroll_cap', { valueAsNumber: true })}
+                  aria-label={`Observation rule key ${index + 1}`}
+                  placeholder={index === 0 ? 'default' : 'Exact field value'}
+                  value={rule.key}
+                  disabled={index === 0}
+                  onChange={(event) =>
+                    setAutoRules((current) =>
+                      current.map((item, itemIndex) =>
+                        itemIndex === index ? { ...item, key: event.target.value } : item,
+                      ),
+                    )
+                  }
+                />
+                <Input
+                  aria-label={`Observation rule value ${index + 1}`}
+                  placeholder="Observation text"
+                  value={rule.value}
+                  onChange={(event) =>
+                    setAutoRules((current) =>
+                      current.map((item, itemIndex) =>
+                        itemIndex === index ? { ...item, value: event.target.value } : item,
+                      ),
+                    )
+                  }
                 />
               </div>
-            </div>
+            ))}
+            <Button
+              type="button"
+              size="sm"
+              variant="outline"
+              onClick={() => setAutoRules((current) => [...current, { key: '', value: '' }])}
+            >
+              Add observation rule
+            </Button>
+            <Input
+              aria-label="Test Auto Observation value"
+              placeholder="Preview a field value"
+              value={testSegment}
+              onChange={(event) => setTestSegment(event.target.value)}
+            />
+            {testSegment && (
+              <p className="text-xs text-muted-foreground">
+                Matched rule:{' '}
+                {autoRules.find(
+                  (rule) =>
+                    rule.key !== 'default' &&
+                    rule.key.trim().toLowerCase() === testSegment.trim().toLowerCase(),
+                )?.key ?? 'default'}
+              </p>
+            )}
+            {duplicateRuleKeys && (
+              <p role="alert" className="text-xs text-destructive">
+                Duplicate rule keys are not allowed (matching ignores case).
+              </p>
+            )}
+          </fieldset>
+
+          <fieldset className="space-y-3 rounded-lg border border-border p-3">
+            <legend className="px-1 text-xs font-medium">Campaign variable overrides</legend>
+            {overrides.map((entry, index) => (
+              <div key={index} className="grid grid-cols-2 gap-2">
+                <Input
+                  aria-label={`Campaign variable key ${index + 1}`}
+                  placeholder="offer_name"
+                  value={entry.key}
+                  onChange={(event) =>
+                    setOverrides((current) =>
+                      current.map((item, itemIndex) =>
+                        itemIndex === index ? { ...item, key: event.target.value } : item,
+                      ),
+                    )
+                  }
+                />
+                <Input
+                  aria-label={`Campaign variable value ${index + 1}`}
+                  value={entry.value}
+                  onChange={(event) =>
+                    setOverrides((current) =>
+                      current.map((item, itemIndex) =>
+                        itemIndex === index ? { ...item, value: event.target.value } : item,
+                      ),
+                    )
+                  }
+                />
+              </div>
+            ))}
+            <Button
+              type="button"
+              size="sm"
+              variant="outline"
+              onClick={() => setOverrides((current) => [...current, { key: '', value: '' }])}
+            >
+              Add override
+            </Button>
           </fieldset>
 
           <DialogFooter>

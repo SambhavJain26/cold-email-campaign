@@ -58,7 +58,7 @@ export function EnrollPanel({
             setRampNote(
               suggested === undefined
                 ? error.message
-                : `Today's ramp cap allows ${suggested} more — the daily cap ramps up over the campaign's ramp_days so mailboxes stay warm.`,
+                : `Today's ramp stage allows ${suggested} more new enrollments.`,
             );
             if (typeof suggested === 'number') setCount(suggested);
           }
@@ -71,6 +71,30 @@ export function EnrollPanel({
     <section className={className} data-testid="today-panel">
       <h2 className="mb-3 text-sm font-semibold">TODAY</h2>
       <CapacityMeter capacity={capacity} />
+
+      {campaign && capacity.ramp_day !== null && (
+        <div className="mt-3 rounded-md bg-muted/50 px-3 py-2 text-xs text-muted-foreground">
+          <p>
+            Ramp started{' '}
+            {campaign.first_activated_at
+              ? new Date(campaign.first_activated_at).toLocaleDateString()
+              : 'on activation'}
+            . Pausing does not restart this calendar.
+          </p>
+          {campaign.ramp_stages.some((stage) => stage.start_day > capacity.ramp_day!) && (
+            <p className="mt-1">
+              Upcoming:{' '}
+              {campaign.ramp_stages
+                .filter((stage) => stage.start_day > capacity.ramp_day!)
+                .map(
+                  (stage) =>
+                    `days ${stage.start_day}${stage.end_day === stage.start_day ? '' : `–${stage.end_day}`}: ${stage.cap}`,
+                )
+                .join(' · ')}
+            </p>
+          )}
+        </div>
+      )}
 
       {campaign?.tier_effort_config.A === 'human_written' && campaign.manual_only_count > 0 && (
         <p className="mt-3 text-xs text-muted-foreground">

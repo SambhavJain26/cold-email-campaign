@@ -7,7 +7,7 @@ import { compose, type AppServices } from '../../src/composition';
 import { parseEnv } from '../../src/config/env';
 import { VirtualClock } from '../../src/clock/virtual';
 import { MockTransport } from '../../src/transport/mock/mockTransport';
-import { manualCompose } from '../../src/services/manualCompose';
+import { manualCompose, manualComposePrefill, manualSend } from '../../src/services/manualCompose';
 import { createSequence } from '../../src/db/repos/sequencesRepo';
 import { selectEligibleLeads } from '../../src/db/repos/leadsRepo';
 import { contentHashOf } from '../../src/render/hash';
@@ -186,5 +186,77 @@ describe('manual compose (B4.10)', () => {
     await expect(
       manualCompose(deps(), { enrollmentId: 1, subject: SUBJECT, bodyText: BODY }),
     ).rejects.toThrow(/suppressed/);
+  });
+
+  it('prefills the enrollment actual due step instead of always using Step 1', async () => {
+    await pool.query(`UPDATE enrollments SET current_step_no = 2, next_send_at = $1 WHERE id = 1`, [
+      clock.now(),
+    ]);
+    const prefill = await manualComposePrefill({ db: services.db, renderer: services.renderer }, 1);
+    expect(prefill.stepNo).toBe(2);
+    expect(prefill.stepCount).toBe(2);
+    expect(prefill.subject).toBe('Re: Template subject 2');
+    expect(prefill.body).toContain('Template body 2 for Jane');
+    expect(prefill.body).not.toContain('Template body 1');
+    expect(prefill.draftId).toBeNull();
+  });
+
+  it('requires imported drafts to be reviewed, then marks the exact sent draft with message and event linkage', async () => {
+    const imp = await pool.query(
+      `INSERT INTO imports (filename, rows_total, counts)
+       VALUES ('draft.csv', 1, '{"ok":1,"missing_first_name":0,"role_based":0,"invalid":0,"duplicate":0,"suppressed":0}')
+       RETURNING id`,
+    );
+    await pool.query(
+      `INSERT INTO manual_campaign_drafts
+         (lead_id, campaign_id, source_import_id, subject, body)
+       VALUES (1, 1, $1, $2, $3)`,
+      [imp.rows[0].id, SUBJECT, BODY],
+    );
+    const prefill = await manualComposePrefill({ db: services.db, renderer: services.renderer }, 1);
+    expect(prefill).toMatchObject({
+      draftId: 1,
+      draftStatus: 'needs_review',
+      draftSourceImportId: Number(imp.rows[0].id),
+      subject: SUBJECT,
+      body: BODY,
+    });
+
+    const sendInput = {
+      leadId: 1,
+      campaignId: 1,
+      enrollmentId: 1,
+      draftId: 1,
+      subject: SUBJECT,
+      bodyText: BODY,
+    };
+    await expect(
+      manualSend(
+        {
+          ...deps(),
+          store: services.store,
+          sequences: services.sequences,
+        },
+        sendInput,
+      ),
+    ).rejects.toThrow(/marked ready/);
+
+    await pool.query(`UPDATE manual_campaign_drafts SET status = 'ready' WHERE id = 1`);
+    const result = await manualSend(
+      {
+        ...deps(),
+        store: services.store,
+        sequences: services.sequences,
+      },
+      sendInput,
+    );
+    expect(result.outcome).toBe('sent');
+    const draft = await pool.query(
+      `SELECT status, sent_message_id, sent_event_id, sent_at FROM manual_campaign_drafts WHERE id = 1`,
+    );
+    expect(draft.rows[0].status).toBe('sent');
+    expect(draft.rows[0].sent_message_id).toBe(result.messageId);
+    expect(draft.rows[0].sent_event_id).not.toBeNull();
+    expect(draft.rows[0].sent_at).not.toBeNull();
   });
 });

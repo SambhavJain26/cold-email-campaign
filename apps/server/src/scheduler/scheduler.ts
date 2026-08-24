@@ -2,7 +2,7 @@
 // crash-safe — a pg advisory lock stops overlapping ticks; every send commits
 // (event appended) before the next is attempted.
 import type { Pool } from 'pg';
-import type { Db } from '../db/client';
+import type { Db, DbLike } from '../db/client';
 import type { Clock } from '../clock';
 import type { MailTransport, OutboundMessage } from '../transport/types';
 import type { Rng } from '../util/rng';
@@ -34,7 +34,12 @@ import {
 import { insertSentMessage } from '../db/repos/sentMessagesRepo';
 import { issueToken } from '../db/repos/unsubscribeTokensRepo';
 import { resolveUnsubscribeBaseUrl } from '../services/unsubscribeBaseUrl';
-import { autoObservationsOf, getCampaign } from '../db/repos/campaignsRepo';
+import {
+  autoObservationConfigOf,
+  autoObservationsOf,
+  getCampaign,
+  resolvedVariablesOf,
+} from '../db/repos/campaignsRepo';
 import { getVariantById } from '../db/repos/sequencesRepo';
 import { buildEvent } from '../domain/events';
 import {
@@ -416,7 +421,12 @@ export class Scheduler {
     mb: { id: number; fromAddress: string },
     now: Date,
     settings: SettingsRow,
-    opts: { variantOverride?: VariantDef; literal?: boolean } = {},
+    opts: {
+      variantOverride?: VariantDef;
+      literal?: boolean;
+      /** Additional state that must commit atomically with an accepted send. */
+      acceptedTxWork?: (tx: DbLike, eventId: number, messageId: string) => Promise<void>;
+    } = {},
   ): Promise<SendOutcomeKind> {
     const { db, store, transport, renderer, sequences, jobs, alerts } = this.deps;
 
@@ -539,7 +549,7 @@ export class Scheduler {
               assignedMailboxId: e.assignedMailboxId ?? mb.id,
             },
           ],
-          txWork: async (lockedTx) => {
+          txWork: async (lockedTx, eventIds) => {
             await insertSentMessage(lockedTx, {
               messageId,
               enrollmentId: e.id,
@@ -549,6 +559,9 @@ export class Scheduler {
               contentHash: rendered.contentHash,
               sentAt: now,
             });
+            if (opts.acceptedTxWork) {
+              await opts.acceptedTxWork(lockedTx, eventIds[0]!, messageId);
+            }
           },
         },
       );
@@ -655,6 +668,8 @@ export class Scheduler {
       email: e.leadEmail,
       firstName: e.leadFirstName,
       company: e.leadCompany,
+      website: e.leadWebsite,
+      city: e.leadCity,
       state: e.leadState,
     };
   }
@@ -688,10 +703,14 @@ export class Scheduler {
     opts: { literal: boolean; unsubscribeUrl?: string },
   ): Promise<RenderContext> {
     const compliance = this.tickCtx?.compliance ?? (await getComplianceSettings(this.deps.db));
+    const campaign = await getCampaign(this.deps.db, e.campaignId);
+    const autoConfig = campaign ? autoObservationConfigOf(campaign) : null;
     const base: RenderContext = {
       mode: e.personalizationMode,
       customFields: e.leadCustomFields,
       autoObservations: await this.autoObsFor(e.campaignId),
+      autoObservationField: autoConfig?.field ?? null,
+      sequenceVariables: campaign ? resolvedVariablesOf(campaign) : {},
       compliance: { ...compliance, unsubscribeUrl: opts.unsubscribeUrl },
       literal: opts.literal,
     };

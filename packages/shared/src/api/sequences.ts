@@ -3,6 +3,11 @@
 // see the docs/10 footnote, decision 2026-07-23).
 import { z } from 'zod';
 
+export const sequenceVariableKeySchema = z
+  .string()
+  .regex(/^[a-z][a-z0-9_]*$/, 'use lowercase letters, numbers, and underscores');
+export const sequenceVariablesSchema = z.record(sequenceVariableKeySchema, z.string());
+
 export const variantSchema = z
   .object({
     id: z.number().int(),
@@ -33,6 +38,7 @@ export const sequenceSchema = z
     /** Legacy read-only compatibility; bounces and STOP always terminate. */
     stop_on_hard_bounce: z.boolean(),
     stop_on_unsubscribe: z.boolean(),
+    variable_defaults: sequenceVariablesSchema,
     steps: z.array(stepSchema),
   })
   .strict();
@@ -65,6 +71,7 @@ export const stepWriteSchema = z
 export const sequenceWriteBodySchema = z.object({
   name: z.string().min(1),
   stop_on_reply: z.literal(true).default(true),
+  variable_defaults: sequenceVariablesSchema.default({}),
   steps: z.array(stepWriteSchema).min(1),
 });
 export type SequenceWriteBody = z.infer<typeof sequenceWriteBodySchema>;
@@ -79,6 +86,7 @@ export const previewBodySchema = z
     lead_id: z.number().int().positive(),
     step_no: z.number().int().min(1),
     variant_id: z.number().int().positive(),
+    campaign_id: z.number().int().positive().optional(),
   })
   .strict();
 
@@ -100,6 +108,29 @@ export const previewResponseSchema = z
     subject: z.string(),
     body: z.string(),
     checks: renderChecksSchema,
+    resolution_trace: z
+      .object({
+        lead_values: z.record(z.string(), z.string().nullable()),
+        observation: z
+          .object({
+            field: z.string().nullable(),
+            matched_rule: z.string().nullable(),
+            value: z.string(),
+          })
+          .strict(),
+        sequence_variables: z.record(
+          z.string(),
+          z
+            .object({ value: z.string(), source: z.enum(['campaign', 'sequence', 'fallback']) })
+            .strict(),
+        ),
+        spintax_choices: z.array(
+          z.object({ options: z.array(z.string()), selected: z.string() }).strict(),
+        ),
+        warnings: z.array(z.string()),
+      })
+      .strict()
+      .optional(),
   })
   .strict();
 

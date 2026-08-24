@@ -1,5 +1,11 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query';
-import { campaignSchema, enrollResponseSchema, okResponseSchema } from '@coldemail/shared';
+import {
+  campaignSchema,
+  enrollResponseSchema,
+  okResponseSchema,
+  type CreateCampaignBody,
+  type PatchCampaignBody,
+} from '@coldemail/shared';
 import { apiFetch } from '../client';
 import { invalidateOperational } from '../operational-cache';
 
@@ -9,13 +15,8 @@ type EnrollBody =
 export function useCreateCampaign() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (body: {
-      name: string;
-      sequence_id: number;
-      tier_effort_config?: unknown;
-      ramp_config?: unknown;
-      acknowledge_tier_a_manual?: boolean;
-    }) => apiFetch('/campaigns', campaignSchema, { method: 'POST', body }),
+    mutationFn: (body: CreateCampaignBody) =>
+      apiFetch('/campaigns', campaignSchema, { method: 'POST', body }),
     onSuccess: () => invalidateOperational(qc),
   });
 }
@@ -23,13 +24,8 @@ export function useCreateCampaign() {
 export function usePatchCampaign() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: ({
-      id,
-      body,
-    }: {
-      id: number;
-      body: { name?: string; status?: 'active' | 'paused' | 'archived' };
-    }) => apiFetch(`/campaigns/${id}`, campaignSchema, { method: 'PATCH', body }),
+    mutationFn: ({ id, body }: { id: number; body: PatchCampaignBody }) =>
+      apiFetch(`/campaigns/${id}`, campaignSchema, { method: 'PATCH', body }),
     onSuccess: () => invalidateOperational(qc),
   });
 }

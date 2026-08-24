@@ -20,6 +20,10 @@ export const sequences = pgTable('sequences', {
   stopOnHardBounce: boolean('stop_on_hard_bounce').notNull().default(true),
   stopOnUnsubscribe: boolean('stop_on_unsubscribe').notNull().default(true),
   archived: boolean('archived').notNull().default(false),
+  variableDefaults: jsonb('variable_defaults')
+    .$type<Record<string, string>>()
+    .notNull()
+    .default({}),
   createdAt: tz('created_at').notNull().defaultNow(),
 });
 

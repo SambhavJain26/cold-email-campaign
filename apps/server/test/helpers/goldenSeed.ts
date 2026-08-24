@@ -25,7 +25,10 @@ export async function seedGoldenCohort(db: Db, pool: Pool): Promise<number> {
     `INSERT INTO leads (email, tier) SELECT * FROM unnest($1::text[], $2::lead_tier[])`,
     [emails, tiers],
   );
-  await pool.query(`INSERT INTO campaigns (name, status) VALUES ('Golden Pass 1', 'active')`);
+  await pool.query(
+    `INSERT INTO campaigns (name, status, created_at)
+     VALUES ('Golden Pass 1', 'active', '2027-01-01T00:00:00Z')`,
+  );
   const modes = Array.from({ length: n }, (_, i) => personalizationModeOf(i + 1));
   await pool.query(
     `INSERT INTO enrollments (lead_id, campaign_id, current_state, enrolled_tier, personalization_mode, enrolled_at)

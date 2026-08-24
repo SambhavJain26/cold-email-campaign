@@ -16,6 +16,7 @@ Parsed with `csv-parse` (streaming, BOM-tolerant, `,`/`;`/tab auto-detect). Head
 | `company` | company, company_name, business, brokerage |
 | `website` | website, url, domain, site |
 | `city` / `state` / `phone` / `notes` | same + obvious aliases |
+| `manual_subject` / `manual_body` | special paired Step-1 draft columns; both required |
 | anything else | preserved into `custom_fields` under its lowercase_snake_case header (usable as merge tags) |
 
 File limits: ≤ 10 MB, ≤ 50,000 rows; reject otherwise with `import_too_large`.
@@ -37,11 +38,16 @@ Preview response = counts per flag + 20 sample rows per flag (walkthrough Stage 
 
 ## 3. Commit
 
-`POST /imports/:id/commit { mode: 'drop_flagged' | 'import_all' }`
+`POST /imports/:id/commit { mode, draft_campaign_id?, replace_existing_drafts? }`
 
 - `drop_flagged`: insert rows flagged `ok` + `missing_first_name`.
 - `import_all`: additionally insert `role_based` + `invalid`-lite… **No.** `invalid` and `suppressed` are *never* imported under either mode (undeliverable / illegal); `import_all` only additionally admits `role_based`. The preview labels the buttons accordingly ("Import 885" vs "Import 945 incl. role-based").
 - Inserted leads: `tier = NULL` (untiered, decision R), `import_id` set, `custom_fields` populated. `import_rows.lead_id` backfilled. Fixture test locks the walkthrough split: 1,000 → 60 role + 40 invalid + 15 dup → 885 committed with 82 missing-name among them.
+- When paired manual-draft columns are detected, commit requires one target campaign. Drafts are
+  Step 1 only, start `needs_review`, and never enroll/activate/send. Existing unsuppressed leads may
+  receive a draft without overwriting profile data; suppressed/erased leads do not. Existing
+  unsent-draft conflicts skip unless replacement is explicitly selected. Results report lead and
+  draft counts separately.
 
 ## 4. Tiering (walkthrough Stage 2)
 

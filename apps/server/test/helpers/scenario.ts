@@ -175,10 +175,16 @@ export class Scenario {
       );
     }
     const ramp = this.cfg.ramp ?? { ramp_days: 0, ramp_daily_enroll_cap: 0 }; // no ramp by default
+    const rampStages =
+      ramp.ramp_days > 0
+        ? [{ start_day: 1, end_day: ramp.ramp_days, cap: ramp.ramp_daily_enroll_cap }]
+        : [];
     await this.pool.query(
-      `INSERT INTO campaigns (name, status, ramp_config, tier_effort_config) VALUES ('Scenario Campaign', 'active', $1, $2)`,
+      `INSERT INTO campaigns (name, status, ramp_config, ramp_stages, tier_effort_config)
+       VALUES ('Scenario Campaign', 'active', $1, $2, $3)`,
       [
         JSON.stringify(ramp),
+        JSON.stringify(rampStages),
         JSON.stringify(
           this.cfg.tierEffortConfig ?? {
             A: 'human_written',

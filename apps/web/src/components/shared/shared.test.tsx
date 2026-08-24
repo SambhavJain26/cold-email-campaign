@@ -102,6 +102,9 @@ describe('CapacityMeter', () => {
           sent_so_far_today: 12,
           room_for_new: 74,
           ramp_cap_remaining: 20,
+          ramp_day: 2,
+          ramp_stage: { start_day: 2, end_day: 2, cap: 20 },
+          enrolled_today: 0,
           suggested: 20,
         }}
       />,
@@ -122,6 +125,9 @@ describe('CapacityMeter', () => {
           sent_so_far_today: 0,
           room_for_new: 120,
           ramp_cap_remaining: null,
+          ramp_day: null,
+          ramp_stage: null,
+          enrolled_today: 0,
           suggested: 120,
         }}
       />,

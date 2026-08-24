@@ -27,7 +27,7 @@ import { TierBadge } from '@/components/shared/tier-badge';
 import { AppApiError } from '@/api/client';
 import { useMailboxes } from '@/api/queries/mailboxes';
 import { useManualComposePrefill } from '@/api/queries/unibox';
-import { useManualSend } from '@/api/mutations/unibox';
+import { useManualSend, usePatchManualDraft } from '@/api/mutations/unibox';
 
 const AUTO_ROTATE = '__auto__';
 
@@ -141,6 +141,8 @@ function ComposerForm({
         subject: string;
         body: string;
         draft_id: number | null;
+        draft_status: 'needs_review' | 'ready' | null;
+        draft_source_import_id: number | null;
         thread: {
           assigned_mailbox_id: number | null;
           previous_message_ids: string[];
@@ -153,12 +155,14 @@ function ComposerForm({
 }) {
   const mailboxes = useMailboxes();
   const send = useManualSend();
+  const patchDraft = usePatchManualDraft();
   const [mailboxId, setMailboxId] = useState<string>(AUTO_ROTATE);
   const [subject, setSubject] = useState(prefill?.subject ?? '');
   const [body, setBody] = useState(prefill?.body ?? '');
   const [checks, setChecks] = useState<RenderChecks | null>(prefill?.checks ?? null);
   const [blockedReason, setBlockedReason] = useState<string | null>(null);
   const [allowRecontact, setAllowRecontact] = useState(false);
+  const [draftStatus, setDraftStatus] = useState(prefill?.draft_status ?? null);
 
   const healthyMailboxes = (mailboxes.data?.items ?? []).filter(
     (mailbox) => mailbox.status === 'ok',
@@ -237,6 +241,16 @@ function ComposerForm({
         </div>
       )}
 
+      {prefill?.draft_id && (
+        <div className="rounded-md border border-info/40 bg-info/10 p-3 text-xs">
+          <p className="font-medium">Imported draft — review required</p>
+          <p className="text-muted-foreground">
+            Source import #{prefill.draft_source_import_id ?? 'unknown'} · status{' '}
+            {draftStatus?.replace('_', ' ')}. It cannot send until you explicitly mark it ready.
+          </p>
+        </div>
+      )}
+
       <div className="space-y-1.5">
         <Label htmlFor="composer-subject" className="text-xs">
           Subject
@@ -245,7 +259,10 @@ function ComposerForm({
           id="composer-subject"
           className="h-8"
           value={subject}
-          onChange={(event) => setSubject(event.target.value)}
+          onChange={(event) => {
+            setSubject(event.target.value);
+            if (prefill?.draft_id) setDraftStatus('needs_review');
+          }}
         />
       </div>
 
@@ -258,7 +275,10 @@ function ComposerForm({
           rows={12}
           className="font-mono text-xs"
           value={body}
-          onChange={(event) => setBody(event.target.value)}
+          onChange={(event) => {
+            setBody(event.target.value);
+            if (prefill?.draft_id) setDraftStatus('needs_review');
+          }}
         />
         <p className="text-[11px] text-muted-foreground">
           The compliance footer is appended at send time — it is not part of this text.
@@ -311,8 +331,52 @@ function ComposerForm({
         <Button variant="ghost" onClick={onDone}>
           Cancel
         </Button>
+        {prefill?.draft_id && (
+          <>
+            <Button
+              variant="outline"
+              disabled={patchDraft.isPending || subject.trim() === '' || body.trim() === ''}
+              onClick={() =>
+                patchDraft.mutate(
+                  { id: prefill.draft_id!, subject, body, status: 'needs_review' },
+                  {
+                    onSuccess: () => {
+                      setDraftStatus('needs_review');
+                      toast.success('Draft saved');
+                    },
+                  },
+                )
+              }
+            >
+              Save Draft
+            </Button>
+            <Button
+              variant="outline"
+              disabled={patchDraft.isPending || subject.trim() === '' || body.trim() === ''}
+              onClick={() =>
+                patchDraft.mutate(
+                  { id: prefill.draft_id!, subject, body, status: 'ready' },
+                  {
+                    onSuccess: () => {
+                      setDraftStatus('ready');
+                      toast.success('Draft marked ready');
+                    },
+                  },
+                )
+              }
+            >
+              Mark Ready
+            </Button>
+          </>
+        )}
         <Button
-          disabled={send.isPending || subject.trim() === '' || body.trim() === '' || !prefill}
+          disabled={
+            send.isPending ||
+            subject.trim() === '' ||
+            body.trim() === '' ||
+            !prefill ||
+            (prefill.draft_id !== null && draftStatus !== 'ready')
+          }
           onClick={submit}
         >
           {send.isPending ? 'Sending…' : 'Send & log as manual'}

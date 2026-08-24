@@ -95,6 +95,7 @@ export async function getVariantById(
 
 export interface CreateSequenceInput {
   name: string;
+  variableDefaults?: Record<string, string>;
   stopOnReply?: boolean;
   stopOnHardBounce?: boolean;
   stopOnUnsubscribe?: boolean;
@@ -119,6 +120,7 @@ export async function createSequence(db: DbLike, input: CreateSequenceInput): Pr
     .insert(sequences)
     .values({
       name: input.name,
+      variableDefaults: input.variableDefaults ?? {},
       ...(input.stopOnReply !== undefined && { stopOnReply: input.stopOnReply }),
       // These columns remain for backwards-compatible storage only. Runtime
       // behaviour is intentionally mandatory for bounces and STOP requests.
@@ -255,6 +257,7 @@ export class SequenceEditConflictError extends Error {
 
 export interface SequenceSaveInput {
   name: string;
+  variableDefaults: Record<string, string>;
   stopOnReply: boolean;
   steps: Array<{
     id?: number;
@@ -293,6 +296,7 @@ export async function updateSequenceReplaceSet(
       .update(sequences)
       .set({
         name: input.name,
+        variableDefaults: input.variableDefaults,
         stopOnReply: input.stopOnReply,
         stopOnHardBounce: true,
         stopOnUnsubscribe: true,

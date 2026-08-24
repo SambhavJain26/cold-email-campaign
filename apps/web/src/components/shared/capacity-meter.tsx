@@ -7,6 +7,9 @@ export interface CapacityDto {
   sent_so_far_today: number;
   room_for_new: number;
   ramp_cap_remaining: number | null;
+  ramp_day: number | null;
+  ramp_stage: { start_day: number; end_day: number; cap: number } | null;
+  enrolled_today: number;
   suggested: number;
 }
 
@@ -23,6 +26,10 @@ export function CapacityMeter({
     ['Room for new openers', String(capacity.room_for_new)],
   ];
   if (capacity.ramp_cap_remaining !== null) {
+    if (capacity.ramp_day !== null && capacity.ramp_stage !== null) {
+      rows.push([`Campaign day ${capacity.ramp_day} · stage cap`, String(capacity.ramp_stage.cap)]);
+      rows.push(['New enrollments today', String(capacity.enrolled_today)]);
+    }
     rows.push(['Ramp cap remaining', String(capacity.ramp_cap_remaining)]);
   }
   return (

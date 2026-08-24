@@ -4,9 +4,10 @@
 
 **Legend:** `[ ]` not started · `[~]` in progress · `[x]` done · `[!]` blocked (note why in the log)
 
-**Current focus:** → **2026-08-25 ten-workstream implementation.** Build and verify four local
-stages, then request separate approval for one pinned production deployment. No campaign activation,
-enrollment, send, Oracle change, or production deploy is authorized by the implementation plan.
+**Current focus:** → **2026-08-25 ten-workstream implementation paused after Stage 2 by operator.**
+Stages 1–2 are complete locally. Do not begin Stage 3 analytics/recycling or Stage 4 mobile work
+until the operator explicitly continues. No campaign activation, enrollment, send, Oracle change,
+or production deploy is authorized by the implementation plan.
 
 > **⚠️ Superseded framing (corrected 2026-08-09).** This line previously read "No code work is outstanding" and "everything left in B8 … is *operations*, not code." **That was wrong.** Operating the canary against a real provider exposed genuine **code** defects — the reply/send race (finding 15), whole-mailbox history ingestion (16), plain-text-only mail (19), and a class of backend-implemented/UI-invisible gaps (3–9). All were fixed on `b8.3-local-canary`. Treat [docs/17](docs/17-local-canary-runbook.md) as the authoritative status record, not this header.
 
@@ -41,6 +42,14 @@ Migration `0015` down/up passed; type/lint/format, unit 338, web 55, API 118, in
 19 affected mock-browser journeys are green. The event-backed populated test DB returned `checked 5
 enrollments — 0 diff(s)` and self-check is clean. Stages 2–4 and the final complete gate remain;
 production and Oracle are unchanged.
+
+**2026-08-25 implementation Stage 2:** imported campaign-scoped Step-1 manual drafts,
+review/ready/sent controls, due-step compose resolution, Auto Observation rules, namespaced sequence
+variables with frozen campaign snapshots, resolution-trace previews, and activation-based staged
+ramps are complete locally. Migration `0016` passed apply/down/apply; type/lint/format, unit 341,
+web 55, API 119, integration 162, GreenMail 29, golden exactly 47, mock E2E 52, and real-backend
+E2E 1 are green. The populated event-backed test DB returned `checked 5 enrollments — 0 diff(s)`;
+self-check is clean. Stages 3–4 are deferred; production and Oracle are unchanged.
 
 ---
 

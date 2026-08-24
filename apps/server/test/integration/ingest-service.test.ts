@@ -3,7 +3,7 @@
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import type { Pool } from 'pg';
 import { createDb, type Db } from '../../src/db/client';
-import { commitImport, createImportPreview } from '../../src/ingest/service';
+import { commitImport, createImportPreview, previewImportDrafts } from '../../src/ingest/service';
 import { TEST_DATABASE_URL, resetCoreTables } from '../helpers/db';
 
 const buf = (s: string): Buffer => Buffer.from(s, 'utf8');
@@ -67,7 +67,14 @@ describe('ingest service (B5.3–B5.5)', () => {
   it('drop_flagged commits ok + missing_first_name only; fields + custom_fields land; tier NULL', async () => {
     const p = await createImportPreview({ db }, { filename: 'leads.csv', content: buf(FILE) });
     const r = await commitImport({ db }, { importId: p.importId, mode: 'drop_flagged' });
-    expect(r).toEqual({ inserted: 2, skipped: 0 });
+    expect(r).toEqual({
+      inserted: 2,
+      skipped: 0,
+      draftsCreated: 0,
+      draftsReplaced: 0,
+      draftsSkipped: 0,
+      invalidDrafts: 0,
+    });
 
     const rows = await pool.query(
       `SELECT email, first_name, company, custom_fields, tier, import_id FROM leads ORDER BY email`,
@@ -118,7 +125,14 @@ describe('ingest service (B5.3–B5.5)', () => {
       `INSERT INTO suppressions (email, reason, created_at) VALUES ('ann@acme.dev', 'manual', now())`,
     );
     const r = await commitImport({ db }, { importId: p.importId, mode: 'drop_flagged' });
-    expect(r).toEqual({ inserted: 1, skipped: 1 }); // only bob
+    expect(r).toEqual({
+      inserted: 1,
+      skipped: 1,
+      draftsCreated: 0,
+      draftsReplaced: 0,
+      draftsSkipped: 0,
+      invalidDrafts: 0,
+    }); // only bob
     const emails = await pool.query(`SELECT email FROM leads`);
     expect(emails.rows).toEqual([{ email: 'bob@beta.dev' }]);
   });
@@ -137,14 +151,28 @@ describe('ingest service (B5.3–B5.5)', () => {
       suppressed: 1,
     });
     const r = await commitImport({ db }, { importId: p2.importId, mode: 'drop_flagged' });
-    expect(r).toEqual({ inserted: 0, skipped: 0 });
+    expect(r).toEqual({
+      inserted: 0,
+      skipped: 0,
+      draftsCreated: 0,
+      draftsReplaced: 0,
+      draftsSkipped: 0,
+      invalidDrafts: 0,
+    });
   });
 
   it('a lead created between preview and commit is skipped, not an error', async () => {
     const p = await createImportPreview({ db }, { filename: 'leads.csv', content: buf(FILE) });
     await pool.query(`INSERT INTO leads (email) VALUES ('ann@acme.dev')`);
     const r = await commitImport({ db }, { importId: p.importId, mode: 'drop_flagged' });
-    expect(r).toEqual({ inserted: 1, skipped: 1 });
+    expect(r).toEqual({
+      inserted: 1,
+      skipped: 1,
+      draftsCreated: 0,
+      draftsReplaced: 0,
+      draftsSkipped: 0,
+      invalidDrafts: 0,
+    });
   });
 
   it('double commit is refused', async () => {
@@ -153,5 +181,116 @@ describe('ingest service (B5.3–B5.5)', () => {
     await expect(
       commitImport({ db }, { importId: p.importId, mode: 'import_all' }),
     ).rejects.toThrow(/already committed/);
+  });
+
+  it('imports multiline Step-1 drafts for new and existing leads, preserves lead data, and handles conflicts explicitly', async () => {
+    await pool.query(`INSERT INTO campaigns (name, status) VALUES ('Draft target', 'draft')`);
+    await pool.query(
+      `INSERT INTO leads (email, first_name, company, custom_fields)
+       VALUES ('existing@acme.dev', 'Original', 'Original Co', '{"industry":"saas"}')`,
+    );
+    await pool.query(
+      `INSERT INTO suppressions (email, reason) VALUES ('blocked@acme.dev', 'unsubscribed')`,
+    );
+    const csv =
+      'email,first_name,company,manual_subject,manual_body\n' +
+      'new@acme.dev,New,New Co,"Idea for New Co","Hi New,\n\nI noticed the expansion.\n\nWorth comparing notes?"\n' +
+      'existing@acme.dev,Overwrite,Wrong Co,"Idea for Original Co","Hi Original,\n\nYour SaaS motion stood out."\n' +
+      'blocked@acme.dev,Blocked,Blocked Co,"Blocked","Must never be stored"\n' +
+      'incomplete@acme.dev,Incomplete,Test,"Only a subject",\n';
+
+    const preview = await createImportPreview(
+      { db },
+      { filename: 'researched.csv', content: buf(csv) },
+    );
+    expect(preview.draftCounts).toMatchObject({ validDrafts: 2, invalidDrafts: 1 });
+    await expect(
+      commitImport({ db }, { importId: preview.importId, mode: 'drop_flagged' }),
+    ).rejects.toThrow(/select one target campaign/);
+
+    const selected = await previewImportDrafts(
+      { db },
+      { importId: preview.importId, campaignId: 1 },
+    );
+    expect(selected).toMatchObject({
+      validDrafts: 2,
+      invalidDrafts: 2,
+      existingDraftConflicts: 0,
+    });
+    const committed = await commitImport(
+      { db },
+      { importId: preview.importId, mode: 'drop_flagged', draftCampaignId: 1 },
+    );
+    expect(committed).toMatchObject({
+      inserted: 2,
+      draftsCreated: 2,
+      draftsReplaced: 0,
+      draftsSkipped: 1,
+      invalidDrafts: 1,
+    });
+    const existing = await pool.query(
+      `SELECT first_name, company, custom_fields FROM leads WHERE email = 'existing@acme.dev'`,
+    );
+    expect(existing.rows[0]).toEqual({
+      first_name: 'Original',
+      company: 'Original Co',
+      custom_fields: { industry: 'saas' },
+    });
+    const drafts = await pool.query(
+      `SELECT l.email, d.step_no, d.status, d.subject, d.body
+         FROM manual_campaign_drafts d JOIN leads l ON l.id = d.lead_id
+        ORDER BY l.email`,
+    );
+    expect(drafts.rows).toHaveLength(2);
+    expect(drafts.rows[1].body).toContain('I noticed the expansion.\n\nWorth comparing notes?');
+
+    const second = await createImportPreview(
+      { db },
+      {
+        filename: 'replacement.csv',
+        content: buf(
+          'email,manual_subject,manual_body\nexisting@acme.dev,"Replacement","Replacement body"\n',
+        ),
+      },
+    );
+    expect(
+      await previewImportDrafts({ db }, { importId: second.importId, campaignId: 1 }),
+    ).toMatchObject({ existingDraftConflicts: 1 });
+    expect(
+      await commitImport(
+        { db },
+        { importId: second.importId, mode: 'drop_flagged', draftCampaignId: 1 },
+      ),
+    ).toMatchObject({ draftsCreated: 0, draftsReplaced: 0, draftsSkipped: 1 });
+
+    const third = await createImportPreview(
+      { db },
+      {
+        filename: 'replacement-explicit.csv',
+        content: buf(
+          'email,manual_subject,manual_body\nexisting@acme.dev,"Replacement","Replacement body"\n',
+        ),
+      },
+    );
+    expect(
+      await commitImport(
+        { db },
+        {
+          importId: third.importId,
+          mode: 'drop_flagged',
+          draftCampaignId: 1,
+          replaceExistingDrafts: true,
+        },
+      ),
+    ).toMatchObject({ draftsReplaced: 1 });
+    const replaced = await pool.query(
+      `SELECT subject, body, status FROM manual_campaign_drafts d
+       JOIN leads l ON l.id = d.lead_id WHERE l.email = 'existing@acme.dev'`,
+    );
+    expect(replaced.rows[0]).toEqual({
+      subject: 'Replacement',
+      body: 'Replacement body',
+      status: 'needs_review',
+    });
   });
 });

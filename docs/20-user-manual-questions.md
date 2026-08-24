@@ -158,12 +158,7 @@ tag taxonomy and tag filters.
 
 ### 1.6 Can CSV research automatically prefill the manual composer?
 
-**Not as a complete draft today.** Imported custom columns are retained and can already be used as
-merge tags, but the manual composer does not currently recognize `manual_subject` and
-`manual_body` as special fields. It starts from the sequence's step-1 preview.
-
-The proposed workflow is valuable and feasible. The simplest design would use two ordinary CSV
-columns rather than JSON:
+**Yes. This is now implemented for Step 1.** Use two CSV columns rather than JSON:
 
 ```csv
 email,first_name,company,manual_subject,manual_body,notes
@@ -184,22 +179,16 @@ alex@example.com,"Alex called the launch ""a major step"" in the interview.
 Would comparing notes be useful?"
 ```
 
-Recommended product behavior for this **new feature**:
+Both `manual_subject` and `manual_body` are required for a valid draft. After upload, select one
+target campaign. The preview shows new/existing leads, valid/incomplete drafts, and conflicts with
+an existing unsent draft. Conflicts skip by default; **Replace existing unsent drafts** is an
+explicit option. Existing lead profile data is preserved, while suppressed or erased leads never
+receive drafts.
 
-1. Import and store `manual_subject` and `manual_body` as a draft attached to that lead and
-   campaign.
-2. When the manual composer opens, prefer that imported draft over the generic sequence preview.
-3. Show an **Imported draft—review required** badge.
-4. Let the operator edit and either **Save draft** or **Send & log**. The current composer has no
-   separate Save Draft action, so that is also part of the feature.
-5. Never send an imported draft automatically.
-6. Mark the draft reviewed/sent after use so stale copy is not accidentally reused.
-7. Keep the compliance footer outside the imported body; the server appends it at send time.
-
-For the first version, two columns are safer and easier to inspect than JSON inside CSV. If one
-lead needs different drafts for several campaigns, the long-term design should store separate
-campaign-scoped draft records. A large nested JSON object inside one CSV cell would be harder to
-create and troubleshoot.
+The stored draft belongs to that lead, campaign, and Step 1. It starts as **needs review** and does
+not enroll, activate, or send anything. In Manual Compose, use **Save Draft**, then **Mark Ready**.
+Only a ready draft can use **Send & log as manual**. The compliance footer remains outside the CSV
+body and is appended by the server.
 
 ## 2. Mailboxes: controls, table columns, timezones, and polled folders
 
@@ -258,27 +247,14 @@ folders without moving mail or marking it read.
 
 ### 2.4 Should timezone and folders be text inputs?
 
-Your concern is valid.
+They are no longer fragile free-text controls. Mailbox and Settings timezones use the same
+searchable IANA timezone control with friendly UTC offsets, and the backend rejects invalid names.
 
-**Timezone is partly supported well:** the mailbox field has browser suggestions for valid IANA
-timezone names such as `Asia/Kolkata` and `America/New_York`, and the mailbox API rejects an
-invalid IANA timezone. However, it still looks and behaves like a text box. The default timezone
-in Settings is an even plainer text field.
-
-**Polled folders are more error-prone:** they are a comma-separated text field. A typo such as
-`[Gmail]/Spamm` can cause polling errors or make a real folder invisible.
-
-Recommended improvements:
-
-- Replace both timezone fields with the same searchable timezone combobox.
-- Validate the Settings timezone at save time as strictly as mailbox timezones.
-- Give Google OAuth mailboxes a safe preset for `INBOX` and `[Gmail]/Spam`.
-- Add a **Discover folders** action and a multi-select populated from the actual mailbox. A fixed
-  universal dropdown would not be enough because providers use different folder names.
-- Make **Test Connection** verify that every selected folder exists.
-
-These are **UI and validation improvements**, not prerequisites for understanding the current
-values.
+Mailbox folders use a multi-select. **Discover folders** asks the connected provider for its real
+folder names and special-use information; Google starts with `INBOX` and `[Gmail]/Spam`. **Test
+Connection** reports existence per selected folder, and a verified nonexistent folder cannot be
+saved. Adding a valid folder seeds its cursor from that folder's current `UIDNEXT`, so the first
+poll does not ingest old history.
 
 ## 3. Personalization, merge tags, modes, manual compose, and spintax
 
@@ -320,6 +296,18 @@ Useful built-in values include `first_name`, `company`, `market`,
 `custom_observation`, and `sender_physical_address`. Arbitrary imported CSV columns also become
 merge tags after their headers are converted to lowercase underscores.
 
+Reusable non-lead values use a separate namespace:
+
+```text
+{{sequence.competitors|other tools}}
+{{sequence.offer_name|the service}}
+```
+
+Define defaults in the Sequence Builder. A draft campaign may override them. First activation
+freezes `campaign override → sequence default`, so later sequence edits cannot silently alter an
+active campaign. Variable values are literal strings and are not parsed again for nested tags or
+spintax.
+
 `market` is derived from recognized US state abbreviations/names. For example, `state=TX` can
 produce `market=Texas`. For international segmentation, import an explicit custom column such as
 `market` or `region_name` rather than assuming every state name can be derived.
@@ -357,8 +345,8 @@ If the researched observation is empty, the renderer can fall back to a campaign
 raise a warning.
 
 **Mode 2—auto slot (`template_auto`)** ignores the lead's individual
-`custom_observation`. It expects a campaign-level observation selected by the lead's state, or a
-`default` observation.
+`custom_observation`. It uses the draft campaign's selected standard/custom lead field to choose an
+exact-match observation rule, or the required `default` observation.
 
 Conceptual example:
 
@@ -370,15 +358,11 @@ Conceptual example:
 }
 ```
 
-There is an important current limitation: **the campaign creation screen does not provide an
-editor for these `auto_observations` rules.** The backend understands them, but an ordinary
-operator cannot configure them through the current UI. Consequently, an auto-slot template that
-depends on `{{custom_observation}}` may use the tag's written fallback or be blocked if no fallback
-exists. This is **partly supported** and deserves a campaign UI editor before auto observations
-are treated as a complete operator feature.
-
-For ordinary CSV-driven personalization today, the researched slot plus imported custom fields is
-the clearer choice.
+This is now configurable on the draft campaign detail page. Choose a field such as `state`, `city`,
+`industry`, or any imported custom field, add key/value rules, and provide `default`. Matching
+trims and ignores case. Activation is blocked if an Auto Slot template needs observations and the
+field/rules/default are incomplete. Researched mode still prefers the lead's individual
+`custom_observation`, then uses the campaign rule as fallback.
 
 ### 3.3 What “effort per tier” controls
 
@@ -405,12 +389,12 @@ same two steps. Alex's enrollment is marked human-written and waits for the manu
 Priya's enrollment is rendered and scheduled automatically with her researched values.
 
 The mode is copied onto the enrollment when it is created. Changing a lead's tier afterward does
-not silently change the effort mode of an existing enrollment. Campaign effort settings are also
-creation-time settings in the current UI.
+not silently change the effort mode of an existing enrollment. Campaign effort settings can be
+edited while the campaign is draft, then freeze permanently on first activation.
 
 ### 3.4 What Manual Compose is
 
-**Already supported, with an important limitation.** Manual Compose is Mode 1: an operator writes
+**Already supported.** Manual Compose is Mode 1: an operator writes
 or reviews the final email for a human-written enrollment, while the application still handles
 mailbox selection, safety checks, delivery, threading, logging, and analytics.
 
@@ -436,11 +420,10 @@ has a recorded outcome that permits later contact, and you have consciously deci
 contact is appropriate. It cannot override a global suppression, an undispositioned reply, or a
 future `Not now` date.
 
-Current limitation: the composer always uses **step 1** as its starting preview, even if a later
-step is due. Human-written enrollments remain manual-only at every due step, so blindly reusing
-the step-1 prefill for a follow-up would be confusing. Until that UI is corrected, always inspect
-the thread and write the appropriate follow-up rather than assuming the prefill represents the
-current step. This is a **recommended correction**.
+The server now resolves the enrollment's actual due step. The composer shows campaign, **Step N of
+M**, due time, personalization mode, and thread context. Step 1 prefers an eligible saved campaign
+draft; otherwise the lowest-ID active variant of the due step is rendered. Later steps therefore
+start from their own template, while threading and mailbox pinning remain intact.
 
 ### 3.5 Does the application support spintax?
 
@@ -588,27 +571,21 @@ for new leads cannot exceed 12 before applying the campaign ramp limit.
 Ramp limits **new enrollments**, not every send and not mailbox warm-up itself. Follow-ups from
 already enrolled leads still consume mailbox capacity.
 
-Current example:
+The schedule is now progressive and starts on **first activation**, not campaign creation:
 
-```text
-Ramp days: 7
-Daily enroll cap: 20
-```
+| Campaign day | New-enrollment cap |
+| ---: | ---: |
+| 1 | 5 |
+| 2 | 8 |
+| 3 | 10 |
+| 4 | 12 |
+| 5–7 | 15 |
+| After day 7 | No campaign ramp limit |
 
-For the first seven days after the campaign was **created**, that campaign may add at most 20 new
-enrollments per application day. After the seven-day window, the campaign-specific ramp limit
-ends; mailbox capacity and other safeguards continue.
-
-Two important clarifications:
-
-1. It is a **flat early limit**, not a progressive schedule. It does not currently do 5 on day 1,
-   8 on day 2, 12 on day 3, and so on.
-2. The clock starts at campaign creation, not first activation or first enrollment. If a campaign
-   remains a draft for more than its ramp period, its ramp can expire before the campaign starts.
-
-That second behavior is a real design weakness. **Recommended correction:** base the window on
-first activation/first enrollment and either rename the current control to **Initial daily
-enrollment limit** or implement a true staged ramp schedule.
+Pausing does not stop or restart this calendar. Draft campaigns may define custom contiguous stages
+before first activation. First activation freezes the schedule permanently. The campaign detail
+shows the current day/stage, enrolled today, remaining today, and upcoming stages. Mailbox caps,
+pace gaps, send windows, follow-up reservations, and other safeguards always continue to apply.
 
 Also remember that a ramp value inside the configured ceiling is merely permitted. It does not
 prove that a real mailbox is warmed enough for that volume.
@@ -1036,20 +1013,19 @@ This can remain the same web application; a separate native mobile app is not re
 meaningful cross-application project rather than one CSS tweak and should receive its own design,
 implementation, accessibility, and browser-testing phase.
 
-## 11. Suggested product priorities from these questions
+## 11. Implementation status from these questions
 
-No product changes were made while preparing this document. Based on operator impact, a sensible
-order for later work is:
+Stages 1–2 of the approved improvement plan are now complete locally and are not deployed. The
+operator explicitly deferred Stages 3–4 until a later session.
 
 | Priority | Improvement | Why |
 | --- | --- | --- |
-| 1 | Add Unibox/System pagination and correct manual-composer current-step prefilling. | Hidden replies and misleading follow-up copy have direct operational risk. |
-| 2 | Replace/rework reply Snooze and add strict searchable timezone/folder selection. | Current controls can mislead operators or accept fragile input. |
-| 3 | Build the phone-responsive navigation and core operational screens. | The application is currently impractical on a phone. |
-| 4 | Add imported manual drafts with Save Draft/review status. | This can make researched Tier-A work much faster without authorizing automatic sends. |
-| 5 | Add an auto-observations campaign editor and later-step variant analytics. | These complete currently partial personalization/analysis workflows. |
-| 6 | Add multi-source cold-storage recycling with honest provenance. | Useful at larger scale, but less urgent than reply and sending safety. |
-| 7 | Rename Bulk tag and clarify ramp wording; then redesign ramp around first activation. | Removes present confusion and makes staged launch behavior match operator expectations. |
+| Status | Improvement | Notes |
+| --- | --- | --- |
+| Complete locally | Unibox/System pagination, due-step Manual Compose, reminders, safe timezone/folder controls | Stage 1; not deployed |
+| Complete locally | Imported manual drafts, Auto Observation rules, sequence variables, activation-based staged ramp | Stage 2; not deployed |
+| Deferred | Later-step direct/eventual variant analytics and multi-source recycling | Stage 3; wait for explicit continuation |
+| Deferred | Phone-responsive navigation and complete mobile redesign | Stage 4; wait for explicit continuation |
 
 ## 12. Question coverage map
 

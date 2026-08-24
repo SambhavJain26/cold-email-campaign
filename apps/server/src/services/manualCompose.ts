@@ -8,14 +8,14 @@
 import type { Db } from '../db/client';
 import type { Clock } from '../clock';
 import type { Scheduler, SendOutcomeKind } from '../scheduler/scheduler';
-import type { Renderer, SequenceProvider } from '../scheduler/types';
+import type { Renderer } from '../scheduler/types';
 import type { RenderChecks } from '../render/types';
 import type { DueEnrollment } from '../db/repos/enrollmentsRepo';
 import { findByLeadAndCampaign, getById } from '../db/repos/enrollmentsRepo';
 import { getLeadById, recontactStatusByLeadIds } from '../db/repos/leadsRepo';
 import { getComplianceSettings, getSettings } from '../db/repos/settingsRepo';
 import { listMailboxesByStatus } from '../db/repos/mailboxesRepo';
-import { leadReceivedContentHash } from '../db/repos/eventsRepo';
+import { firstSentEvent, leadReceivedContentHash } from '../db/repos/eventsRepo';
 import {
   getStepId,
   getVariantById,
@@ -24,12 +24,19 @@ import {
   sequenceIdForCampaign,
 } from '../db/repos/sequencesRepo';
 import { latestSentMessageId, listThreadMessageIds } from '../db/repos/sentMessagesRepo';
-import { getCampaign } from '../db/repos/campaignsRepo';
+import {
+  autoObservationConfigOf,
+  getCampaign,
+  resolvedVariablesOf,
+} from '../db/repos/campaignsRepo';
 import { contentHashOf } from '../render/hash';
-import { firstSentEvent } from '../db/repos/eventsRepo';
 import { autoObservationsOf } from '../db/repos/campaignsRepo';
+import {
+  getManualDraft,
+  getUnsentManualDraft,
+  markManualDraftSent,
+} from '../db/repos/manualDraftsRepo';
 import { FOOTER_SEPARATOR } from '../render/footer';
-import type { EventStore } from './eventStore';
 
 /** No sendable mailbox (all at cap/unhealthy, or the override is) → 409 mailbox_unhealthy. */
 export class MailboxUnhealthyError extends Error {
@@ -61,6 +68,8 @@ export interface ManualComposeInput {
   bodyText: string;
   /** Operator override (docs/10 `mailbox_id?`). Never reroutes a threaded follow-up. */
   mailboxId?: number;
+  /** Reviewed import draft to mark sent in the same transaction as the sent event. */
+  draftId?: number;
 }
 
 export interface ManualComposeResult {
@@ -117,6 +126,8 @@ export async function manualCompose(
       email: lead.email,
       firstName: lead.firstName,
       company: lead.company,
+      website: lead.website,
+      city: lead.city,
       state: lead.state,
     },
     enrollmentId: enrollment.id,
@@ -184,6 +195,8 @@ export async function manualCompose(
     leadEmail: lead.email,
     leadFirstName: lead.firstName,
     leadCompany: lead.company,
+    leadWebsite: lead.website,
+    leadCity: lead.city,
     leadState: lead.state,
     leadCustomFields: (lead.customFields ?? {}) as Record<string, string>,
   };
@@ -203,6 +216,11 @@ export async function manualCompose(
         bodyTemplate: input.bodyText,
       },
       literal: true,
+      ...(input.draftId !== undefined && {
+        acceptedTxWork: async (tx, eventId, messageId) => {
+          await markManualDraftSent(tx, input.draftId!, messageId, eventId, now);
+        },
+      }),
     },
   );
 
@@ -211,10 +229,7 @@ export async function manualCompose(
   return { outcome, variantId, contentHash, checks: preview.checks, messageId };
 }
 
-export interface ManualSendDeps extends ManualComposeDeps {
-  store: EventStore;
-  sequences: SequenceProvider;
-}
+export type ManualSendDeps = ManualComposeDeps;
 
 export interface ManualSendInput {
   leadId: number;
@@ -265,11 +280,25 @@ export async function manualSend(
     throw new Error('enrollment does not belong to the requested lead and campaign');
   }
 
+  const draft = input.draftId === undefined ? undefined : await getManualDraft(db, input.draftId);
+  if (input.draftId !== undefined) {
+    if (!draft || draft.leadId !== input.leadId || draft.campaignId !== input.campaignId) {
+      throw new Error('manual draft does not belong to the requested lead and campaign');
+    }
+    if (draft.status !== 'ready') {
+      throw new Error('imported draft must be reviewed and marked ready before sending');
+    }
+    if (draft.subject !== input.subject || draft.body !== input.bodyText) {
+      throw new Error('save and mark the edited draft ready before sending');
+    }
+  }
+
   const result = await manualCompose(deps, {
     enrollmentId: enrollment!.id,
     subject: input.subject,
     bodyText: input.bodyText,
     mailboxId: input.mailboxId,
+    draftId: draft?.id,
   });
   return { ...result, enrollmentId: enrollment.id };
 }
@@ -286,6 +315,8 @@ export interface ManualComposePrefill {
   body: string;
   variantId: number | null;
   draftId: number | null;
+  draftStatus: 'needs_review' | 'ready' | null;
+  draftSourceImportId: number | null;
   thread: { assignedMailboxId: number | null; previousMessageIds: string[]; inThread: boolean };
   checks: RenderChecks;
 }
@@ -310,9 +341,22 @@ export async function manualComposePrefill(
   }
   const sequence = await loadSequenceDef(db, campaign.sequenceId);
   const step = sequence?.steps.find((candidate) => candidate.stepNo === enrollment.currentStepNo);
-  const variant = step?.variants.toSorted((a, b) => a.id - b.id)[0];
-  if (!sequence || !step || !variant)
-    throw new Error('the due step has no active template variant');
+  const draft =
+    enrollment.currentStepNo === 1
+      ? await getUnsentManualDraft(db, lead.id, campaign.id, 1)
+      : undefined;
+  const templateVariant = step?.variants.toSorted((a, b) => a.id - b.id)[0];
+  if (!sequence || !step || (!draft && !templateVariant))
+    throw new Error('the due step has no saved draft or active template variant');
+  const variant = draft
+    ? {
+        id: 0,
+        label: 'imported-draft',
+        contentHash: contentHashOf(draft.subject, draft.body),
+        subjectTemplate: draft.subject,
+        bodyTemplate: draft.body,
+      }
+    : templateVariant!;
 
   const compliance = await getComplianceSettings(db);
   const customFields = (lead.customFields ?? {}) as Record<string, string>;
@@ -330,6 +374,8 @@ export async function manualComposePrefill(
             email: lead.email,
             firstName: lead.firstName,
             company: lead.company,
+            website: lead.website,
+            city: lead.city,
             state: lead.state,
           },
           enrollmentId: enrollment.id,
@@ -337,6 +383,8 @@ export async function manualComposePrefill(
             mode: enrollment.personalizationMode,
             customFields,
             autoObservations: autoObservationsOf(campaign),
+            autoObservationField: autoObservationConfigOf(campaign).field,
+            sequenceVariables: resolvedVariablesOf(campaign),
             compliance,
             literal: firstVariant.attributes.bespoke === true,
           },
@@ -353,6 +401,8 @@ export async function manualComposePrefill(
       email: lead.email,
       firstName: lead.firstName,
       company: lead.company,
+      website: lead.website,
+      city: lead.city,
       state: lead.state,
     },
     enrollmentId: enrollment.id,
@@ -360,8 +410,11 @@ export async function manualComposePrefill(
       mode: enrollment.personalizationMode,
       customFields,
       autoObservations: autoObservationsOf(campaign),
+      autoObservationField: autoObservationConfigOf(campaign).field,
+      sequenceVariables: resolvedVariablesOf(campaign),
       compliance,
       threadSubject,
+      literal: Boolean(draft),
     },
   });
   const footerStart = rendered.bodyText.lastIndexOf(FOOTER_SEPARATOR);
@@ -375,8 +428,10 @@ export async function manualComposePrefill(
     personalizationMode: enrollment.personalizationMode,
     subject: rendered.subject,
     body: footerStart < 0 ? rendered.bodyText : rendered.bodyText.slice(0, footerStart),
-    variantId: variant.id,
-    draftId: null,
+    variantId: draft ? null : variant.id,
+    draftId: draft?.id ?? null,
+    draftStatus: draft?.status === 'sent' ? null : (draft?.status ?? null),
+    draftSourceImportId: draft?.sourceImportId ?? null,
     thread: {
       assignedMailboxId: enrollment.assignedMailboxId,
       previousMessageIds: (await listThreadMessageIds(db, enrollment.id)).map(

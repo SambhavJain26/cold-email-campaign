@@ -563,6 +563,7 @@ export const handlers: RequestHandler[] = [
           duplicate: [{ row_no: 81, email: 'mike.kim7@example.com' }],
           missing_first_name: [{ row_no: 102, email: 'jbrooks@dwell.com' }],
         },
+        draft_counts: { new_leads: 885, existing_leads: 15, valid_drafts: 0, invalid_drafts: 0 },
       });
     }),
   ),
@@ -576,7 +577,28 @@ export const handlers: RequestHandler[] = [
       if (body instanceof Response) return body;
       importRow.committed = true;
       importRow.commit_mode = body.mode;
-      return HttpResponse.json({ imported: body.mode === 'drop_flagged' ? 885 : 945 });
+      const imported = body.mode === 'drop_flagged' ? 885 : 945;
+      return HttpResponse.json({
+        imported,
+        leads_created: imported,
+        drafts_created: 0,
+        drafts_replaced: 0,
+        drafts_skipped: 0,
+        invalid_drafts: 0,
+      });
+    }),
+  ),
+  http.get(
+    `${BASE}/imports/:id/draft-preview`,
+    authed(({ params }) => {
+      if (!db.imports.some((item) => item.id === Number(params.id))) return notFound('import');
+      return HttpResponse.json({
+        new_leads: 885,
+        existing_leads: 15,
+        valid_drafts: 0,
+        invalid_drafts: 0,
+        existing_draft_conflicts: 0,
+      });
     }),
   ),
   http.get(
@@ -605,6 +627,7 @@ export const handlers: RequestHandler[] = [
         stop_on_reply: body.stop_on_reply,
         stop_on_hard_bounce: true,
         stop_on_unsubscribe: true,
+        variable_defaults: body.variable_defaults,
         steps: body.steps.map((step) => ({
           id: db.nextId++,
           step_no: step.step_no,
@@ -642,6 +665,7 @@ export const handlers: RequestHandler[] = [
         stop_on_reply: body.stop_on_reply,
         stop_on_hard_bounce: true,
         stop_on_unsubscribe: true,
+        variable_defaults: body.variable_defaults,
         steps: body.steps.map((step) => ({
           id: step.id ?? db.nextId++,
           step_no: step.step_no,
@@ -750,6 +774,17 @@ export const handlers: RequestHandler[] = [
           C: 'template_auto' as const,
         },
         ramp_config: body.ramp_config ?? { ramp_days: 7, ramp_daily_enroll_cap: 20 },
+        ramp_stages: body.ramp_stages ?? [
+          { start_day: 1, end_day: 1, cap: 5 },
+          { start_day: 2, end_day: 2, cap: 8 },
+          { start_day: 3, end_day: 3, cap: 10 },
+          { start_day: 4, end_day: 4, cap: 12 },
+          { start_day: 5, end_day: 7, cap: 15 },
+        ],
+        first_activated_at: null,
+        variable_overrides: body.variable_overrides ?? {},
+        resolved_variables: {},
+        auto_observation: body.auto_observation ?? { field: null, rules: {} },
         recycled_from_campaign_id: null,
         enrolled_count: 0,
         contacted_count: 0,
@@ -767,6 +802,14 @@ export const handlers: RequestHandler[] = [
       const body = await parseBody(request, patchCampaignBodySchema);
       if (body instanceof Response) return body;
       Object.assign(campaign, body);
+      if (body.status === 'active' && campaign.first_activated_at === null) {
+        campaign.first_activated_at = NOW;
+        const sequence = db.sequences.find((item) => item.id === campaign.sequence_id);
+        campaign.resolved_variables = {
+          ...(sequence?.variable_defaults ?? {}),
+          ...campaign.variable_overrides,
+        };
+      }
       return HttpResponse.json(campaign);
     }),
   ),
@@ -805,16 +848,22 @@ export const handlers: RequestHandler[] = [
       const count = raw?.count ?? raw?.lead_ids?.length ?? 0;
       if (count < 1) return err('validation', 'count or lead_ids required', 400);
       const room = db.overview.capacity.room_for_new;
-      if (count > room) {
-        return err('capacity_exceeded', `only ${room} slots available today`, 409, {
-          suggested: room,
+      const rampRoom = db.overview.capacity.ramp_cap_remaining ?? room;
+      const available = Math.min(room, rampRoom);
+      if (count > available) {
+        return err('capacity_exceeded', `only ${available} slots available today`, 409, {
+          suggested: available,
         });
       }
       campaign.enrolled_count += count;
       db.overview.capacity.room_for_new -= count;
+      db.overview.capacity.enrolled_today += count;
+      if (db.overview.capacity.ramp_cap_remaining !== null) {
+        db.overview.capacity.ramp_cap_remaining -= count;
+      }
       db.overview.capacity.suggested = Math.min(
-        db.overview.capacity.suggested,
         db.overview.capacity.room_for_new,
+        db.overview.capacity.ramp_cap_remaining ?? db.overview.capacity.room_for_new,
       );
       db.outcomes.NEW += count;
       db.outcomes.total += count;
@@ -937,6 +986,8 @@ export const handlers: RequestHandler[] = [
         body: `Hi ${lead.first_name ?? 'there'},\n\nThis is the due step starting point.`,
         variant_id: 1,
         draft_id: null,
+        draft_status: null,
+        draft_source_import_id: null,
         thread: {
           assigned_mailbox_id: stepNo > 1 ? 1 : null,
           previous_message_ids: stepNo > 1 ? ['<ce-mock-1@example.com>'] : [],

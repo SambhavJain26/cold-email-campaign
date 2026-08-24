@@ -53,16 +53,17 @@ Shapes below in TS notation. `Metric = { numerator: number, denominator: number 
 | POST `/leads` | `{email, first_name?, last_name?, company?, website?, city?, state?, phone?, notes?}` → `{created, reason?}`. Finding 10. Runs the **same** preview+commit as a CSV upload (one-row CSV, `drop_flagged` mode) so normalization, dedup, hygiene and the commit-time suppression re-check cannot diverge from the bulk path — `created:false` carries the refusing flag (`invalid\|duplicate\|suppressed\|role_based`). Costs one `imports` row per lead, deliberately: it really is an import, and the audit trail stays whole |
 | PATCH `/leads/:id` | `{tier?, notes?, custom_fields?}` → `Lead` (edits `custom_observation` here) |
 | POST `/leads/bulk-tier` | `{lead_ids?: number[], filter?: LeadFilter, tier}` → `{updated: number}` |
-| POST `/imports` | multipart CSV → `{import_id, counts, samples: Record<flag, Row[]>}` (preview; nothing committed) |
-| POST `/imports/:id/commit` | `{mode: 'drop_flagged'\|'import_all'}` → `{imported: number}` |
+| POST `/imports` | multipart CSV → `{import_id, counts, samples, draft_counts}` (preview; nothing committed) |
+| GET `/imports/:id/draft-preview?campaign_id=` | → new/existing lead counts, valid/invalid draft counts, and existing-draft conflicts |
+| POST `/imports/:id/commit` | `{mode, draft_campaign_id?, replace_existing_drafts?}` → separate lead/draft created/replaced/skipped/invalid counts |
 | GET `/imports` | → import history rows |
 | DELETE `/suppressions/:email` | `{confirm: string}` (must equal the email) → `{ok}` — decision U; audit alert emitted |
 
 ## Sequences
 | | |
 |---|---|
-| GET `/sequences` · POST `/sequences` · PATCH `/sequences/:id` | `Sequence = {id, name, stop_on_reply, stop_on_hard_bounce, stop_on_unsubscribe, steps: Step[]}`; `Step = {id, step_no, wait_days, in_thread, variants: Variant[]}`; `Variant = {id, label, subject_template, body_template, active}` — steps/variants are nested writes (replace-set semantics per save¹) |
-| POST `/sequences/:id/preview` | `{lead_id, step_no, variant_id}` → `{subject, body, checks: {fatal[], warnings[], score, variations}}` — the Preview & Pre-send panel verbatim |
+| GET `/sequences` · POST `/sequences` · PATCH `/sequences/:id` | `Sequence` includes `variable_defaults`; steps/variants remain nested replace-set writes¹ |
+| POST `/sequences/:id/preview` | `{lead_id, step_no, variant_id, campaign_id?}` → rendered content, checks, and optional resolution trace |
 | POST `/sequences/validate-template` | `{template}` → `{tokens, errors, variations}` — live builder validation |
 
 ¹ Replace-set is literal only while the sequence has **zero sends**. Once sends exist (2026-07-23 operator decision): variants missing from a save are **retired** (`active=false`, rows kept — deleting would orphan variant analytics and punch holes in the content-hash recycle guard), and steps can be edited/added but not deleted or renumbered (violations → 422 `sequence_invalid`). Bespoke (Mode-1) variant rows are never touched by saves. Existing rows are matched by `id`; rows without `id` are inserted.
@@ -70,8 +71,8 @@ Shapes below in TS notation. `Metric = { numerator: number, denominator: number 
 ## Campaigns
 | | |
 |---|---|
-| GET `/campaigns` · POST `/campaigns` `{name, sequence_id, tier_effort_config?, ramp_config?}` · PATCH `/campaigns/:id` (status: active/paused/archived) | `Campaign = {id, name, status, sequence_id, tier_effort_config, ramp_config, recycled_from_campaign_id, enrolled_count, contacted_count}` |
-| GET `/campaigns/:id/capacity` | → `{total_daily_capacity, followups_due_today, sent_so_far_today, room_for_new, ramp_cap_remaining, suggested}` (docs/06 §7 — the capacity meter) |
+| GET `/campaigns` · POST `/campaigns` · PATCH `/campaigns/:id` | Campaign includes effort, staged ramp, first activation, Auto Observation, variable overrides/frozen snapshot, provenance, and counts. Personalization/ramp patches are draft-only. |
+| GET `/campaigns/:id/capacity` | → capacity plus `ramp_day`, current `ramp_stage`, `enrolled_today`, and remaining stage allowance |
 | POST `/campaigns/:id/enroll` | `{count} \| {lead_ids, force?, allow_recontact?}` → `{enrolled, skipped: {reason, count}[]}`. Count enrollment excludes prior human repliers. Explicit recontact requires `allow_recontact:true`, completed reply disposition, and an elapsed `not_now` date; suppression is never overrideable. |
 | GET `/campaigns/:id/outcomes` | → `{UNSUBSCRIBED, BOUNCED, REPLIED: {positive, neutral}, COMPLETED, ACTIVE, NEW, total}` (Stage-9 completion panel) |
 | POST `/campaigns/:id/recycle` | `{source_campaign_id}` → same shape as enroll |
@@ -91,6 +92,8 @@ Shapes below in TS notation. `Metric = { numerator: number, denominator: number 
 | POST `/enrollments/:id/snooze` | `{until}` → `{ok}` — backward-compatible ACTIVE-enrollment scheduling only; replied enrollments must use reminders |
 | POST `/enrollments/:id/unsubscribe` | → `{ok}` — manual unsubscribe (source `manual`), used with tag_only mode or by choice |
 | GET `/enrollments/:id/manual-compose-prefill` | → campaign, `step_no/step_count`, due date, personalization mode, rendered due-step subject/body, variant/draft identity, thread/pinned-mailbox context, and checks |
+| PATCH `/manual-drafts/:id` | `{subject?, body?, status?: needs_review\|ready}` → updated draft; editing never sends |
+| DELETE `/manual-drafts/:id` | removes an unsent draft only |
 | POST `/manual-sends` | `{lead_id, campaign_id, enrollment_id?, draft_id?, mailbox_id?, subject, body, allow_recontact?}` → `{enrollment_id, message_id, checks}`. Requires an existing active human-written enrollment; it never auto-enrolls. Prior human replies require explicit acknowledgement plus completed disposition review; suppression and future `not_now` dates always block. |
 
 ## Reply-detection debug (Stage-7 pending screen)

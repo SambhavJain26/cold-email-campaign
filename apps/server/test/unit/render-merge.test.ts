@@ -82,6 +82,27 @@ describe('field resolution', () => {
     expect(render('{{empty_field|fb}}').out).toBe('fb');
   });
 
+  it('sequence variables are namespaced, support fallbacks, and remain literal', () => {
+    const sequenceCtx: RenderContext = {
+      ...ctx,
+      sequenceVariables: {
+        offer_name: 'audit {{first_name}}',
+        proof_point: 'cut review time by 40%',
+      },
+    };
+    expect(render('{{sequence.proof_point}}', lead, sequenceCtx).out).toBe(
+      'cut review time by 40%',
+    );
+    expect(render('{{sequence.offer_name}}', lead, sequenceCtx).out).toBe('audit {{first_name}}');
+    expect(render('{{sequence.missing|the service}}', lead, sequenceCtx).out).toBe('the service');
+    expect(render('{{sequence.missing}}', lead, sequenceCtx).fatals).toEqual([
+      {
+        id: 'merge_tag',
+        message: "unknown field 'sequence.missing' with no fallback",
+      },
+    ]);
+  });
+
   it('unknown field with fallback renders the fallback; without = fatal', () => {
     expect(render('{{nope|fb}}').fatals).toEqual([]);
     expect(render('{{nope|fb}}').out).toBe('fb');

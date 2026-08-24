@@ -11,7 +11,7 @@ import {
   text,
   timestamp,
 } from 'drizzle-orm/pg-core';
-import { leads } from './core';
+import { campaigns, events, leads } from './core';
 
 const tz = (name: string) => timestamp(name, { withTimezone: true, mode: 'date' });
 
@@ -51,4 +51,33 @@ export const importRows = pgTable(
     leadId: bigint('lead_id', { mode: 'number' }).references(() => leads.id),
   },
   (t) => [index('ir_import_flag').on(t.importId, t.flag)],
+);
+
+export const manualCampaignDrafts = pgTable(
+  'manual_campaign_drafts',
+  {
+    id: bigint('id', { mode: 'number' }).generatedAlwaysAsIdentity().primaryKey(),
+    leadId: bigint('lead_id', { mode: 'number' })
+      .notNull()
+      .references(() => leads.id, { onDelete: 'cascade' }),
+    campaignId: bigint('campaign_id', { mode: 'number' })
+      .notNull()
+      .references(() => campaigns.id, { onDelete: 'cascade' }),
+    stepNo: integer('step_no').notNull().default(1),
+    sourceImportId: bigint('source_import_id', { mode: 'number' }).references(() => imports.id, {
+      onDelete: 'set null',
+    }),
+    subject: text('subject').notNull(),
+    body: text('body').notNull(),
+    status: text('status')
+      .$type<'needs_review' | 'ready' | 'sent'>()
+      .notNull()
+      .default('needs_review'),
+    sentEventId: bigint('sent_event_id', { mode: 'number' }).references(() => events.id),
+    sentMessageId: text('sent_message_id'),
+    createdAt: tz('created_at').notNull().defaultNow(),
+    updatedAt: tz('updated_at').notNull().defaultNow(),
+    sentAt: tz('sent_at'),
+  },
+  (t) => [index('manual_campaign_drafts_campaign_status').on(t.campaignId, t.status, t.id)],
 );

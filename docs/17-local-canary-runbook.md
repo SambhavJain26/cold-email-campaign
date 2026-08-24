@@ -1,5 +1,21 @@
 # Local canary runbook (B8.3-local) — two-week validation on throwaway Gmail
 
+## 2026-08-25 ten-workstream implementation — Stage 2 verified locally
+
+The operator explicitly stopped the current implementation run after Stage 2. Stage 2 is complete
+locally: campaign-scoped Step-1 CSV drafts with review/ready/sent lifecycle; server-resolved
+due-step Manual Compose; Auto Observation field/rule configuration; namespaced sequence defaults
+with draft campaign overrides and first-activation snapshots; resolution-trace previews; and
+activation-based ramp stages with the default 5/8/10/12/15 schedule.
+
+No campaign was activated in production, no lead was enrolled for outreach, no email was sent, and
+production and Oracle were not changed. Migration `0016_personalization_ramp_drafts` passed
+apply/down/apply on the disposable test database. Verified gates: typecheck, lint, format; unit
+**341**; web **55**; API **119**; integration **162**; GreenMail **29**; locked golden exactly
+**47**; mock-browser E2E **52**; real-backend E2E **1**. The event-backed populated test cohort
+returned `checked 5 enrollments — 0 diff(s)` and self-check reported no invariant violations.
+Stages 3–4 are deferred until the operator explicitly continues; this stage is not deployed.
+
 ## 2026-08-25 ten-workstream implementation — Stage 1 verified locally
 
 The operator approved four implementation stages with a single, separately approved production

@@ -30,6 +30,7 @@ export interface DraftStep {
 export interface SequenceDraft {
   name: string;
   stop_on_reply: true;
+  variable_defaults: Record<string, string>;
   steps: DraftStep[];
 }
 
@@ -43,6 +44,7 @@ export function draftFromSequence(sequence: SequenceDto): SequenceDraft {
   return {
     name: sequence.name,
     stop_on_reply: true,
+    variable_defaults: sequence.variable_defaults,
     steps: [...sequence.steps]
       .sort((a, b) => a.step_no - b.step_no)
       .map((step) => ({
@@ -79,6 +81,7 @@ export function blankDraft(): SequenceDraft {
   return {
     name: '',
     stop_on_reply: true,
+    variable_defaults: {},
     steps: [blankStep(false, 0)],
   };
 }
@@ -98,6 +101,7 @@ export function toWriteBody(draft: SequenceDraft): SequenceWriteBody {
   return {
     name: draft.name.trim(),
     stop_on_reply: true,
+    variable_defaults: draft.variable_defaults,
     steps: draft.steps.map((step, index) => ({
       ...(step.id === undefined ? {} : { id: step.id }),
       step_no: index + 1,
@@ -119,6 +123,11 @@ export function draftBlockers(draft: SequenceDraft): string[] {
   const blockers: string[] = [];
   if (draft.name.trim() === '') blockers.push('Sequence needs a name');
   if (draft.steps.length === 0) blockers.push('Sequence needs at least one step');
+  for (const [key] of Object.entries(draft.variable_defaults)) {
+    if (!/^[a-z][a-z0-9_]*$/.test(key)) {
+      blockers.push(`Variable key "${key}" must use lowercase letters, numbers, and underscores`);
+    }
+  }
   draft.steps.forEach((step, index) => {
     const stepNo = index + 1;
     if (step.variants.length === 0) blockers.push(`Step ${stepNo} needs at least one variant`);

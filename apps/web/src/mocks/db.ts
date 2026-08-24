@@ -167,6 +167,10 @@ function buildSequence(): SequenceDto {
     stop_on_reply: true,
     stop_on_hard_bounce: true,
     stop_on_unsubscribe: true,
+    variable_defaults: {
+      competitors: 'other tools',
+      offer_name: 'the service',
+    },
     steps: [
       {
         id: 1,
@@ -251,7 +255,15 @@ function buildSequence(): SequenceDto {
 function buildCampaigns(): CampaignDto[] {
   const [golden] = structuredClone(campaignsFx.items) as CampaignDto[];
   return [
-    { ...golden!, sequence_id: 1 },
+    {
+      ...golden!,
+      sequence_id: 1,
+      ramp_stages: [{ start_day: 1, end_day: 7, cap: 20 }],
+      first_activated_at: golden!.status === 'draft' ? null : NOW,
+      variable_overrides: {},
+      resolved_variables: {},
+      auto_observation: { field: null, rules: {} },
+    },
     {
       id: 2,
       name: 'Manual Send Fixture',
@@ -263,6 +275,11 @@ function buildCampaigns(): CampaignDto[] {
         C: 'template_auto',
       },
       ramp_config: { ramp_days: 7, ramp_daily_enroll_cap: 20 },
+      ramp_stages: [{ start_day: 1, end_day: 7, cap: 20 }],
+      first_activated_at: NOW,
+      variable_overrides: {},
+      resolved_variables: {},
+      auto_observation: { field: null, rules: {} },
       recycled_from_campaign_id: null,
       enrolled_count: 1,
       contacted_count: 0,
@@ -420,7 +437,13 @@ export interface MockDb {
   operatorEmail: string;
   campaigns: CampaignDto[];
   outcomes: typeof outcomesFx;
-  overview: typeof overviewFx;
+  overview: Omit<typeof overviewFx, 'capacity'> & {
+    capacity: (typeof overviewFx)['capacity'] & {
+      ramp_day: number | null;
+      ramp_stage: { start_day: number; end_day: number; cap: number } | null;
+      enrolled_today: number;
+    };
+  };
   steps: typeof stepsFx;
   tiers: typeof tiersFx;
   health: typeof healthFx;
@@ -445,7 +468,15 @@ function build(): MockDb {
     operatorEmail: OPERATOR_EMAIL,
     campaigns: buildCampaigns(),
     outcomes: structuredClone(outcomesFx),
-    overview: structuredClone(overviewFx),
+    overview: {
+      ...structuredClone(overviewFx),
+      capacity: {
+        ...structuredClone(overviewFx.capacity),
+        ramp_day: 1,
+        ramp_stage: { start_day: 1, end_day: 7, cap: 20 },
+        enrolled_today: 0,
+      },
+    },
     steps: structuredClone(stepsFx),
     tiers: structuredClone(tiersFx),
     health: structuredClone(healthFx),

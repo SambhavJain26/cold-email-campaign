@@ -68,6 +68,20 @@ export const campaigns = pgTable('campaigns', {
     .notNull()
     .default({ A: 'human_written', B: 'template_researched', C: 'template_auto' }),
   rampConfig: jsonb('ramp_config').notNull().default({ ramp_days: 7, ramp_daily_enroll_cap: 20 }),
+  variableOverrides: jsonb('variable_overrides').notNull().default({}),
+  resolvedVariables: jsonb('resolved_variables').notNull().default({}),
+  autoObservationField: text('auto_observation_field'),
+  autoObservationRules: jsonb('auto_observation_rules').notNull().default({}),
+  firstActivatedAt: tz('first_activated_at'),
+  rampStages: jsonb('ramp_stages')
+    .notNull()
+    .default([
+      { start_day: 1, end_day: 1, cap: 5 },
+      { start_day: 2, end_day: 2, cap: 8 },
+      { start_day: 3, end_day: 3, cap: 10 },
+      { start_day: 4, end_day: 4, cap: 12 },
+      { start_day: 5, end_day: 7, cap: 15 },
+    ]),
   recycledFromCampaignId: bigint('recycled_from_campaign_id', { mode: 'number' }),
   createdAt: tz('created_at').notNull().defaultNow(),
 });

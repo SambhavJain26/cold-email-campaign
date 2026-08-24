@@ -122,7 +122,7 @@ The canary in §5 assumes warmed mailboxes on authenticated domains — the walk
 
 - **Secondary sending domains** — never the primary business domain. A deliverability mistake burns the domain, not just the mailbox.
 - **SPF, DKIM, DMARC** published for each sending domain, and verified with a mail tester before the first send. Missing DKIM alone is enough to land in spam regardless of content.
-- **Warming** — each mailbox aged and ramped by a warming service or by hand over ~2–4 weeks before it carries campaign volume. The app's ramp (`ramp_days` / `ramp_daily_enroll_cap`) governs *enrollment*, not mailbox reputation.
+- **Warming** — each mailbox aged and ramped by a warming service or by hand over ~2–4 weeks before it carries campaign volume. The app's activation-based ramp stages govern *new campaign enrollments*, not mailbox reputation.
 - **Provider authentication** — each mailbox can use a sealed app password or individual Google
   OAuth. Google OAuth needs the operator-owned Internal Workspace client, exact callback
   `https://sambhavpmtech.com/email-campaign/oauth/google/callback`, and per-mailbox consent. No

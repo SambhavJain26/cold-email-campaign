@@ -140,6 +140,8 @@ export const manualComposePrefillSchema = z
     body: z.string(),
     variant_id: z.number().int().nullable(),
     draft_id: z.number().int().nullable(),
+    draft_status: z.enum(['needs_review', 'ready']).nullable(),
+    draft_source_import_id: z.number().int().nullable(),
     thread: z
       .object({
         assigned_mailbox_id: z.number().int().nullable(),

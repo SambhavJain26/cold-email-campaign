@@ -282,6 +282,9 @@ describe('capacity + enroll (B3.9)', () => {
       followupsDue: 0,
       roomForNew: 60,
       rampCap: 20,
+      rampDay: 1,
+      rampStage: { start_day: 1, end_day: 7, cap: 20 },
+      enrolledToday: 0,
       suggested: 20, // min(roomForNew, rampCap)
     });
   });

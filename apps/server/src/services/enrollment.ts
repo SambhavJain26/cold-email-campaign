@@ -14,7 +14,13 @@ import {
   enrolledLeadIdsIn,
   insertEnrollments,
 } from '../db/repos/enrollmentsRepo';
-import { getCampaign, rampOf, setRecycledFrom, tierEffortOf } from '../db/repos/campaignsRepo';
+import {
+  getCampaign,
+  rampStagesOf,
+  setRecycledFrom,
+  tierEffortOf,
+  type RampStage,
+} from '../db/repos/campaignsRepo';
 import {
   leadsByIds,
   recontactStatusByLeadIds,
@@ -40,6 +46,9 @@ export interface Capacity {
   roomForNew: number;
   rampCap: number | null; // null = campaign out of ramp window (no ramp limit)
   suggested: number;
+  rampDay: number | null;
+  rampStage: RampStage | null;
+  enrolledToday: number;
 }
 
 export async function capacityToday(
@@ -68,11 +77,25 @@ export async function capacityToday(
 
   const campaign = await getCampaign(db, campaignId);
   if (!campaign) throw new Error(`campaign ${campaignId} not found`);
-  const ramp = rampOf(campaign);
-  const inRampWindow = now.getTime() - campaign.createdAt.getTime() < ramp.ramp_days * 86_400_000;
-  const rampCap = inRampWindow
-    ? Math.max(0, ramp.ramp_daily_enroll_cap - (await countEnrolledSince(db, campaignId, midnight)))
+  const enrolledToday = await countEnrolledSince(db, campaignId, midnight);
+  const activation = campaign.firstActivatedAt;
+  const rampDay = activation
+    ? Math.max(
+        1,
+        Math.floor(
+          (startOfLocalDay(now, settings.defaultTimezone).getTime() -
+            startOfLocalDay(activation, settings.defaultTimezone).getTime()) /
+            86_400_000,
+        ) + 1,
+      )
     : null;
+  const rampStage =
+    rampDay === null
+      ? null
+      : (rampStagesOf(campaign).find(
+          (stage) => rampDay >= stage.start_day && rampDay <= stage.end_day,
+        ) ?? null);
+  const rampCap = rampStage ? Math.max(0, rampStage.cap - enrolledToday) : null;
 
   return {
     total,
@@ -81,6 +104,9 @@ export async function capacityToday(
     roomForNew,
     rampCap,
     suggested: rampCap === null ? roomForNew : Math.min(roomForNew, rampCap),
+    rampDay,
+    rampStage,
+    enrolledToday,
   };
 }
 

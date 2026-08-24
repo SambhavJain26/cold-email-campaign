@@ -64,7 +64,14 @@ describe('B6.4 imports', () => {
       payload: { mode: 'drop_flagged' },
     });
     expect(commit.statusCode).toBe(200);
-    expect(commit.json()).toEqual({ imported: 885 });
+    expect(commit.json()).toEqual({
+      imported: 885,
+      leads_created: 885,
+      drafts_created: 0,
+      drafts_replaced: 0,
+      drafts_skipped: 0,
+      invalid_drafts: 0,
+    });
 
     const leads = await h.pool.query('SELECT count(*)::int AS n FROM leads');
     expect(leads.rows[0].n).toBe(885);

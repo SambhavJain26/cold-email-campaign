@@ -3,6 +3,7 @@
 import { z } from 'zod';
 import { CAMPAIGN_STATUSES, LEAD_TIERS, PERSONALIZATION_MODES } from '../domain/index';
 import { isoDateTime, listOf, pageQuerySchema } from './common';
+import { sequenceVariablesSchema } from './sequences';
 
 export const tierEffortConfigSchema = z
   .object({
@@ -20,6 +21,44 @@ export const rampConfigSchema = z
   })
   .strict();
 
+export const rampStageSchema = z
+  .object({
+    start_day: z.number().int().min(1),
+    end_day: z.number().int().min(1),
+    cap: z.number().int().min(0),
+  })
+  .strict();
+
+export const DEFAULT_RAMP_STAGES = [
+  { start_day: 1, end_day: 1, cap: 5 },
+  { start_day: 2, end_day: 2, cap: 8 },
+  { start_day: 3, end_day: 3, cap: 10 },
+  { start_day: 4, end_day: 4, cap: 12 },
+  { start_day: 5, end_day: 7, cap: 15 },
+] as const;
+
+export const rampStagesSchema = z.array(rampStageSchema).superRefine((stages, ctx) => {
+  const sorted = [...stages].sort((a, b) => a.start_day - b.start_day);
+  for (let i = 0; i < sorted.length; i++) {
+    const stage = sorted[i]!;
+    const expected = i === 0 ? 1 : sorted[i - 1]!.end_day + 1;
+    if (stage.end_day < stage.start_day || stage.start_day !== expected) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: 'ramp stages must cover every day from 1 with no overlaps or gaps',
+      });
+      break;
+    }
+  }
+});
+
+export const autoObservationConfigSchema = z
+  .object({
+    field: z.string().min(1).nullable(),
+    rules: z.record(z.string(), z.string()),
+  })
+  .strict();
+
 export const campaignSchema = z
   .object({
     id: z.number().int(),
@@ -28,6 +67,11 @@ export const campaignSchema = z
     sequence_id: z.number().int().nullable(),
     tier_effort_config: tierEffortConfigSchema,
     ramp_config: rampConfigSchema,
+    ramp_stages: rampStagesSchema,
+    first_activated_at: isoDateTime.nullable(),
+    variable_overrides: sequenceVariablesSchema,
+    resolved_variables: sequenceVariablesSchema,
+    auto_observation: autoObservationConfigSchema,
     recycled_from_campaign_id: z.number().int().nullable(),
     enrolled_count: z.number().int().min(0),
     contacted_count: z.number().int().min(0),
@@ -44,6 +88,9 @@ export const createCampaignBodySchema = z
     sequence_id: z.number().int().positive(),
     tier_effort_config: tierEffortConfigSchema.optional(),
     ramp_config: rampConfigSchema.optional(),
+    ramp_stages: rampStagesSchema.default(DEFAULT_RAMP_STAGES.map((stage) => ({ ...stage }))),
+    variable_overrides: sequenceVariablesSchema.optional(),
+    auto_observation: autoObservationConfigSchema.optional(),
     acknowledge_tier_a_manual: z.boolean().optional(),
   })
   .strict()
@@ -59,13 +106,19 @@ export const createCampaignBodySchema = z
       });
     }
   });
+export type CreateCampaignBody = z.infer<typeof createCampaignBodySchema>;
 
 export const patchCampaignBodySchema = z
   .object({
     name: z.string().min(1).optional(),
     status: z.enum(['active', 'paused', 'archived']).optional(),
+    tier_effort_config: tierEffortConfigSchema.optional(),
+    ramp_stages: rampStagesSchema.optional(),
+    variable_overrides: sequenceVariablesSchema.optional(),
+    auto_observation: autoObservationConfigSchema.optional(),
   })
   .strict();
+export type PatchCampaignBody = z.infer<typeof patchCampaignBodySchema>;
 
 /** Typed confirmation for irreversible metadata deletion. */
 export const deleteCampaignBodySchema = z.object({ confirm: z.string().min(1) }).strict();
@@ -77,6 +130,9 @@ export const capacityResponseSchema = z
     sent_so_far_today: z.number().int(),
     room_for_new: z.number().int(),
     ramp_cap_remaining: z.number().int().nullable(),
+    ramp_day: z.number().int().positive().nullable(),
+    ramp_stage: rampStageSchema.nullable(),
+    enrolled_today: z.number().int().min(0),
     suggested: z.number().int(),
   })
   .strict();

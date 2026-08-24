@@ -6,9 +6,17 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useLeads } from '@/api/queries/leads';
+import { useCampaigns } from '@/api/queries/campaigns';
 import { usePreviewSequence } from '@/api/mutations/sequences';
 import { useDebounced } from '@/lib/use-debounced';
 import type { DraftVariant } from './draft';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 
 export interface PreviewTarget {
   stepNo: number;
@@ -38,8 +46,10 @@ export function PreviewPanel({
 }) {
   const [search, setSearch] = useState('');
   const [leadId, setLeadId] = useState<number | null>(null);
+  const [campaignId, setCampaignId] = useState<number | null>(null);
   const debouncedSearch = useDebounced(search, 300);
   const leads = useLeads({ per_page: 8, q: debouncedSearch === '' ? undefined : debouncedSearch });
+  const campaigns = useCampaigns();
   const preview = usePreviewSequence(sequenceId ?? 0);
 
   const selectedLead = leads.data?.items.find((lead) => lead.id === leadId);
@@ -71,6 +81,29 @@ export function PreviewPanel({
         </p>
       ) : (
         <>
+          <div className="space-y-1.5">
+            <Label className="text-xs">Campaign context</Label>
+            <Select
+              value={campaignId === null ? 'sequence-defaults' : String(campaignId)}
+              onValueChange={(value) =>
+                setCampaignId(value === 'sequence-defaults' ? null : Number(value))
+              }
+            >
+              <SelectTrigger aria-label="Preview campaign context" className="w-full">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="sequence-defaults">Sequence defaults</SelectItem>
+                {(campaigns.data?.items ?? [])
+                  .filter((campaign) => campaign.sequence_id === sequenceId)
+                  .map((campaign) => (
+                    <SelectItem key={campaign.id} value={String(campaign.id)}>
+                      {campaign.name} · {campaign.status}
+                    </SelectItem>
+                  ))}
+              </SelectContent>
+            </Select>
+          </div>
           <div className="space-y-1.5">
             <Label htmlFor="preview-lead" className="text-xs">
               Lead
@@ -120,6 +153,7 @@ export function PreviewPanel({
                 lead_id: leadId,
                 step_no: target.stepNo,
                 variant_id: target.variant.id!,
+                ...(campaignId !== null && { campaign_id: campaignId }),
               });
             }}
           >
@@ -174,6 +208,47 @@ export function PreviewPanel({
                   </div>
                 )}
               </div>
+
+              {preview.data.resolution_trace && (
+                <details className="rounded-md border border-border p-2 text-xs">
+                  <summary className="cursor-pointer font-medium">Resolution details</summary>
+                  <div className="mt-2 space-y-2 text-muted-foreground">
+                    <p>
+                      Observation: {preview.data.resolution_trace.observation.value || 'none'} ·
+                      rule {preview.data.resolution_trace.observation.matched_rule ?? 'none'}
+                    </p>
+                    <dl className="space-y-1">
+                      {Object.entries(preview.data.resolution_trace.lead_values).map(
+                        ([key, value]) => (
+                          <div key={key} className="flex justify-between gap-3">
+                            <dt>{key}</dt>
+                            <dd className="text-right text-foreground">{value || 'empty'}</dd>
+                          </div>
+                        ),
+                      )}
+                    </dl>
+                    {Object.entries(preview.data.resolution_trace.sequence_variables).map(
+                      ([key, item]) => (
+                        <p key={key}>
+                          sequence.{key} = <span className="text-foreground">{item.value}</span> (
+                          {item.source})
+                        </p>
+                      ),
+                    )}
+                    {preview.data.resolution_trace.spintax_choices.map((choice, index) => (
+                      <p key={`${choice.selected}-${index}`}>
+                        Spintax chose <span className="text-foreground">{choice.selected}</span>{' '}
+                        from {choice.options.join(' / ')}
+                      </p>
+                    ))}
+                    {preview.data.resolution_trace.warnings.map((warning) => (
+                      <p key={warning} className="text-warning">
+                        {warning}
+                      </p>
+                    ))}
+                  </div>
+                </details>
+              )}
 
               {checks && (
                 <div className="space-y-1" data-testid="preview-checks">

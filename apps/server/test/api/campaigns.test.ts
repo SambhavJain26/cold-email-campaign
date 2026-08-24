@@ -62,7 +62,7 @@ describe('B6.6 campaigns', () => {
       url: '/api/v1/campaigns',
       payload: { name: 'Spring Outreach', sequence_id: seqId, acknowledge_tier_a_manual: true },
     });
-    expect(res.statusCode).toBe(200);
+    expect(res.statusCode, res.body).toBe(200);
     const c = res.json();
     campaignId = c.id;
     expect(c).toMatchObject({
@@ -74,6 +74,13 @@ describe('B6.6 campaigns', () => {
       recycled_from_campaign_id: null,
     });
     expect(c.ramp_config).toEqual({ ramp_days: 7, ramp_daily_enroll_cap: 20 });
+    expect(c.ramp_stages).toEqual([
+      { start_day: 1, end_day: 1, cap: 5 },
+      { start_day: 2, end_day: 2, cap: 8 },
+      { start_day: 3, end_day: 3, cap: 10 },
+      { start_day: 4, end_day: 4, cap: 12 },
+      { start_day: 5, end_day: 7, cap: 15 },
+    ]);
 
     const list = (await h.inject({ method: 'GET', url: '/api/v1/campaigns' })).json();
     expect(list.total).toBe(1);
@@ -113,8 +120,11 @@ describe('B6.6 campaigns', () => {
       followups_due_today: 0,
       sent_so_far_today: 0,
       room_for_new: 60,
-      ramp_cap_remaining: 20, // day 1 of the 7-day ramp
-      suggested: 20,
+      ramp_cap_remaining: 5,
+      ramp_day: 1,
+      ramp_stage: { start_day: 1, end_day: 1, cap: 5 },
+      enrolled_today: 0,
+      suggested: 5,
     });
   });
 
@@ -139,7 +149,7 @@ describe('B6.6 campaigns', () => {
     const cap = (
       await h.inject({ method: 'GET', url: `/api/v1/campaigns/${campaignId}/capacity` })
     ).json();
-    expect(cap.ramp_cap_remaining).toBe(15);
+    expect(cap.ramp_cap_remaining).toBe(0);
   });
 
   it('enroll beyond suggested → 409 capacity_exceeded with the suggested number', async () => {
@@ -150,7 +160,7 @@ describe('B6.6 campaigns', () => {
     });
     expect(res.statusCode).toBe(409);
     expect(res.json().error.code).toBe('capacity_exceeded');
-    expect(res.json().error.details.suggested).toBe(15);
+    expect(res.json().error.details.suggested).toBe(0);
   });
 
   it('enroll {lead_ids}: per-reason skipped buckets; force bypasses capacity', async () => {
@@ -191,6 +201,109 @@ describe('B6.6 campaigns', () => {
       ]),
     );
     await expectAppended(h.pool, wm, { enrolled: 1 });
+  });
+
+  it('freezes variables, Auto Observation rules, effort, and staged ramp on first activation', async () => {
+    const variableSequence = (
+      await h.inject({
+        method: 'POST',
+        url: '/api/v1/sequences',
+        payload: {
+          ...SEQ('Variable sequence', '{{sequence.offer_name|the service}} for {{company}}'),
+          variable_defaults: {
+            offer_name: 'the audit',
+            proof_point: '40% faster reviews',
+          },
+        },
+      })
+    ).json();
+    const created = await h.inject({
+      method: 'POST',
+      url: '/api/v1/campaigns',
+      payload: {
+        name: 'Frozen personalization',
+        sequence_id: variableSequence.id,
+        tier_effort_config: {
+          A: 'template_auto',
+          B: 'template_auto',
+          C: 'template_auto',
+        },
+        ramp_stages: [
+          { start_day: 1, end_day: 1, cap: 5 },
+          { start_day: 2, end_day: 7, cap: 8 },
+        ],
+        variable_overrides: { offer_name: 'the teardown' },
+        auto_observation: {
+          field: 'industry',
+          rules: { SaaS: 'noticed your product-led motion', default: 'noticed the growth' },
+        },
+      },
+    });
+    expect(created.statusCode).toBe(200);
+    expect(created.json().first_activated_at).toBeNull();
+
+    const activated = await h.inject({
+      method: 'PATCH',
+      url: `/api/v1/campaigns/${created.json().id}`,
+      payload: { status: 'active' },
+    });
+    expect(activated.statusCode).toBe(200);
+    expect(activated.json().resolved_variables).toEqual({
+      offer_name: 'the teardown',
+      proof_point: '40% faster reviews',
+    });
+    const firstActivatedAt = activated.json().first_activated_at;
+    expect(firstActivatedAt).not.toBeNull();
+
+    await h.pool.query(
+      `UPDATE sequences SET variable_defaults = '{"offer_name":"changed later"}' WHERE id = $1`,
+      [variableSequence.id],
+    );
+    const paused = await h.inject({
+      method: 'PATCH',
+      url: `/api/v1/campaigns/${created.json().id}`,
+      payload: { status: 'paused' },
+    });
+    const resumed = await h.inject({
+      method: 'PATCH',
+      url: `/api/v1/campaigns/${created.json().id}`,
+      payload: { status: 'active' },
+    });
+    expect(paused.json().first_activated_at).toBe(firstActivatedAt);
+    expect(resumed.json().first_activated_at).toBe(firstActivatedAt);
+    expect(resumed.json().resolved_variables.offer_name).toBe('the teardown');
+
+    const frozen = await h.inject({
+      method: 'PATCH',
+      url: `/api/v1/campaigns/${created.json().id}`,
+      payload: { variable_overrides: { offer_name: 'should fail' } },
+    });
+    expect(frozen.statusCode).toBe(409);
+    expect(frozen.json().error.message).toMatch(/frozen/);
+
+    const dayOne = (
+      await h.inject({
+        method: 'GET',
+        url: `/api/v1/campaigns/${created.json().id}/capacity`,
+      })
+    ).json();
+    expect(dayOne).toMatchObject({
+      ramp_day: 1,
+      ramp_stage: { start_day: 1, end_day: 1, cap: 5 },
+      ramp_cap_remaining: 5,
+    });
+    h.clock.advance({ days: 1 });
+    const dayTwo = (
+      await h.inject({
+        method: 'GET',
+        url: `/api/v1/campaigns/${created.json().id}/capacity`,
+      })
+    ).json();
+    expect(dayTwo).toMatchObject({
+      ramp_day: 2,
+      ramp_stage: { start_day: 2, end_day: 7, cap: 8 },
+      ramp_cap_remaining: 8,
+    });
   });
 
   it('outcomes panel mirrors the fixture-locked grouping', async () => {

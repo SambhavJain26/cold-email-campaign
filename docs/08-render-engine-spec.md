@@ -40,7 +40,12 @@ field      := first_name | company | market | custom_observation
 |---|---|---|
 | `human_written` (Mode 1, Tier A) | Whole email is bespoke: the **manual composer** submits final subject+body per lead. The server starts the editor from the active enrollment's actual due step (not always Step 1), preserving its thread and pinned mailbox. Stored as a one-off variant (`step_variants` row flagged `attributes.bespoke=true` — hash still computed, recycle guard still applies). | `GET /enrollments/:id/manual-compose-prefill` resolves the starting point; `POST /manual-sends` uses the same render pipeline with steps 1–3 skipped (already literal), footer + checks still applied |
 | `template_researched` (Mode 2a, Tier B) | `leads.custom_fields.custom_observation` — filled per lead by the operator (Leads screen inline edit). Empty → falls back to segment rule (below) + warning check | scheduler |
-| `template_auto` (Mode 2b, Tier C) | Segment rule: market-keyed lookup table in `campaigns.tier_effort_config.auto_observations` (e.g. `{"TX": "your listings move fast in Texas", "default": "..."}` ) | scheduler |
+| `template_auto` (Mode 2b, Tier C) | Campaign chooses one standard/custom lead field and an exact-match rule table with a required `default`; keys are trim/case-fold matched. | scheduler |
+
+Reusable non-lead variables use `{{sequence.key|fallback}}`. Defaults live on the sequence; a
+draft campaign may override them, and first activation freezes the resolved snapshot. Values are
+literal and are never recursively parsed as tags or spintax. Campaign-context preview reports the
+matched observation rule, resolved variable source, fallbacks, and deterministic spintax choices.
 
 ## 4. CAN-SPAM footer (spec Part 8 — non-removable)
 

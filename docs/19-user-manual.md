@@ -423,6 +423,21 @@ Requirements:
 Recognized header aliases include `email`, `e-mail`, `email_address`, `work_email`, common first
 and last-name variants, company/business, website/domain, city, state, phone, and notes.
 
+Two special optional columns create a reviewed manual opener workflow:
+
+```csv
+email,first_name,company,manual_subject,manual_body
+alex@example.com,Alex,Acme,"Idea for Acme","Hi Alex,
+
+I noticed Acme's Austin expansion.
+
+Would comparing notes be useful?"
+```
+
+`manual_subject` and `manual_body` must both be present on a row. Multiline bodies work when the
+whole CSV value is enclosed in double quotes; double an internal quote as `""`. These values are
+stored as a Step-1 draft, not as ordinary lead custom fields.
+
 Preview categories:
 
 | Category | Meaning | Import behavior |
@@ -439,6 +454,24 @@ addresses; invalid, duplicate, and suppressed rows remain excluded. Expand **sam
 representative rows before committing.
 
 All imported leads start untiered.
+
+#### Imported manual-draft workflow
+
+When the preview detects valid manual drafts, select one target campaign before committing the
+import. The preview separates new leads, existing leads, valid/incomplete drafts, and conflicts
+with an existing unsent draft. Existing lead profile fields are preserved; an existing
+unsuppressed lead may still receive a new draft for the selected campaign.
+
+The default conflict action is **skip**. Select **Replace existing unsent drafts** only when the
+new CSV should overwrite those drafts. Suppressed or erased leads never receive drafts. The result
+separately reports leads created and drafts created, replaced, skipped, or invalid.
+
+Imported drafts:
+
+- belong to one lead, one campaign, and Step 1;
+- start as **needs review**;
+- never enroll a lead, activate a campaign, or send automatically; and
+- are shown in Manual compose with their source import.
 
 ### 8.4 Bulk tiering
 
@@ -494,18 +527,25 @@ This is not an undoable archive action. Use it only for a genuine privacy/erasur
 Manual compose is available only when the lead is not suppressed and has an active,
 manual-sendable enrollment.
 
-1. Select the active campaign.
-2. Review the lead's tier, observation, and notes.
-3. Start from the rendered step-1 subject/body or write from scratch if no sequence exists.
-4. Choose **Auto-rotate** or a specific healthy mailbox.
-5. Review the copy checks.
-6. If the lead has replied before, select the explicit recontact acknowledgement only after
+1. Select the active campaign enrollment.
+2. Confirm the displayed **Step N of M**, due time, personalization mode, and thread context.
+3. Review the lead's tier, observation, and notes.
+4. Start from an eligible saved Step-1 draft when one exists; otherwise the application renders
+   the lowest-ID active variant for the enrollment's actual due step.
+5. Choose **Auto-rotate** or a specific healthy mailbox.
+6. Review the copy checks.
+7. If the lead has replied before, select the explicit recontact acknowledgement only after
    reviewing every prior reply and outcome.
-7. Choose **Send & log as manual**.
+8. Choose **Send & log as manual**.
+
+For an imported draft, editing returns it to **needs review**. Use **Save Draft** to preserve work,
+then **Mark Ready** after review. **Send & log as manual** remains disabled until that draft is
+ready. A successful send marks it sent and links it to the recorded sent message.
 
 The compliance footer is appended at send time. The server re-runs checks on the edited text.
 Fatal checks block the send. A manual send is logged like a normal campaign send, retains metrics
-and threading, and creates an enrollment when needed.
+and threading. Manual sending requires an existing active human-written enrollment; a draft alone
+never creates or starts one.
 
 The recontact acknowledgement never overrides suppression, an undispositioned reply, or a future
 “not now” date.
@@ -550,8 +590,10 @@ Choose **Add Mailbox** and configure:
 - **App password:** required only for app-password authentication; sealed at rest and never shown
   again.
 - **Daily cap:** maximum accepted sends per mailbox-local day, subject to the global guardrail.
-- **Polled folders:** comma-separated folders, at minimum `INBOX`.
-- **Fallback timezone:** used when a lead's local timezone cannot be derived.
+- **Polled folders:** provider-discovered multi-select, at minimum `INBOX`; refresh discovery after
+  provider-side folder changes.
+- **Fallback timezone:** searchable IANA timezone used when a lead's local timezone cannot be
+  derived.
 - **Send-window start/end and weekdays:** mailbox hours evaluated in the recipient's timezone.
 
 The Google OAuth form defaults to `smtp.gmail.com:587`, `imap.gmail.com:993`, `INBOX,
@@ -600,8 +642,10 @@ cursor seeding and can ingest years of third-party mail.
 Choose **Edit**. For an app-password mailbox, leave the password blank to retain the sealed
 credential; entering one replaces it. OAuth mailboxes instead offer **Reconnect Google** and
 **Disconnect** actions on the mailbox row. Disconnect revokes/removes authorization and returns the
-mailbox to `setup_required`; it cannot send until reconnected. **Test Connection** verifies SMTP and
-IMAP for either authentication type and reports round-trip time when available.
+mailbox to `setup_required`; it cannot send until reconnected. **Discover folders** refreshes the
+provider's real folder list and special-use roles. **Test Connection** verifies SMTP and IMAP for
+either authentication type, reports per-selected-folder existence, and reports round-trip time when
+available. A folder verified as nonexistent cannot be saved.
 
 Testing the connection confirms authentication/connectivity. It does not send a campaign email,
 prove inbox placement, or prove the account is warmed.
@@ -676,6 +720,8 @@ Merge tags:
 {{market|your area}}
 {{custom_observation|something relevant to your work}}
 {{any_custom_field|fallback}}
+{{sequence.competitors|other tools}}
+{{sequence.offer_name|the service}}
 {{sender_physical_address}}
 ```
 
@@ -684,6 +730,12 @@ Merge tags:
 - `market` derives from lead state where possible.
 - `sender_physical_address` comes from Compliance settings.
 - Unknown custom fields are fatal unless a fallback resolves the missing value.
+- `sequence.*` values are reusable copy variables. Define defaults in the Sequence Builder and,
+  while a campaign is still draft, optionally override them on the campaign detail page.
+- Sequence-variable keys use lowercase letters, numbers, and underscores. Their values are literal
+  strings—even multiline values—and are not recursively parsed as merge tags or spintax.
+- On first campaign activation, `campaign override → sequence default` is resolved and frozen.
+  Later sequence edits do not change an active campaign's snapshot.
 - Use `\{\{` when literal opening braces are needed.
 - Nested tags are unsupported.
 
@@ -705,6 +757,13 @@ subject and body.
 | Mode 2 — researched slot | `custom_observation` comes from the lead; a missing value falls back with a warning. |
 | Mode 2 — auto slot | Campaign segment/default observation data supplies the slot. |
 
+For Auto Slot, configure one **Auto Observation field** on the draft campaign—for example `state`,
+`city`, `industry`, or another imported custom field—then add exact-match rules plus a required
+`default`. Matching trims whitespace and ignores case. A blank/missing lead value uses `default`.
+Researched mode first prefers the lead's own `custom_observation`, then falls back to the matching
+campaign rule; Auto mode uses the campaign rule directly. Activation is blocked when a template
+uses the Auto Slot but the field, rules, or default are invalid.
+
 #### Choosing the approach for different lead types
 
 The sequence contains the message structure; the campaign decides how much human effort each tier
@@ -721,8 +780,9 @@ idea.
 | A copy experiment for the same audience and offer | Another active variant in the same step | Change one meaningful idea at a time so Analytics can compare variants coherently |
 | Rested completed leads receiving a genuinely new angle | New sequence in a Pass-2 campaign | Change the proposition/content enough to pass the content-hash guard; do not resend the old sequence |
 
-The **New campaign** dialog is where Tier A/B/C are mapped to these modes. The mapping is fixed at
-campaign creation, so review it before creating the campaign.
+The **New campaign** dialog sets the initial Tier A/B/C mapping. While the campaign remains draft,
+the detail page can edit that mapping together with Auto Observation rules, sequence-variable
+overrides, and ramp stages. First activation freezes all of them permanently.
 
 ### 10.5 Live validation and copy-risk score
 
@@ -753,9 +813,11 @@ out,” “15 minutes,” “per my last email,” and promotional claims such a
 Save first, then select a variant's **Preview**, search for a representative lead, select it, and
 choose **Render preview**.
 
-The panel shows the exact saved-template render, locked compliance footer, score, warnings, and
-fatal errors. Unsaved edits are not included; save and render again. Test multiple leads, including
-missing-name and missing-custom-field cases.
+Choose **Sequence defaults** or a specific campaign context. The panel shows the exact
+saved-template render, locked compliance footer, score, warnings, and fatal errors. Expand
+**Resolution details** to inspect lead values, the matched observation rule, sequence-variable
+sources, fallbacks, and deterministic spintax choices. Unsaved edits are not included; save and
+render again. Test multiple leads, including missing-name and missing-custom-field cases.
 
 ![Rendered sequence preview showing personalized subject/body, locked footer, score, variations, and warnings](images/user-manual/06-sequence-preview.png)
 
@@ -797,16 +859,36 @@ Choose **New Campaign** and set:
 - **Name**;
 - **Sequence**;
 - **Effort per tier** for A, B, and C; and
-- **Ramp days / daily enrollment cap**.
+- initial ramp settings.
 
 Campaigns start as drafts. When Tier A uses human-written mode, you must acknowledge that the
 scheduler will never send those Tier-A openers and that you will use Manual compose.
 
-Effort mapping and ramp are fixed at creation. The normal campaign update action changes only name
-or status. Create a new campaign if the effort/ramp design needs to change.
+On the draft campaign detail page, configure:
 
-The global launch guardrails can refuse a ramp that is too short or a daily ramp cap that is too
-high.
+- Tier A/B/C effort modes;
+- staged new-enrollment caps;
+- the Auto Observation field, exact-match rules, and required default; and
+- sequence-variable campaign overrides.
+
+These controls are editable only while the campaign is draft. First activation permanently freezes
+them and records the ramp start. Pausing and resuming neither unlocks the configuration nor restarts
+the ramp. Create a new campaign if the design must change after activation.
+
+New campaigns use this default schedule:
+
+| Campaign day | Maximum new enrollments |
+|---:|---:|
+| 1 | 5 |
+| 2 | 8 |
+| 3 | 10 |
+| 4 | 12 |
+| 5–7 | 15 |
+| After day 7 | No campaign ramp limit; mailbox and other safeguards remain |
+
+Custom stages must cover every day from 1 through the final ramp day exactly once, with no gaps or
+overlaps. Global guardrails can refuse a stage cap that is too high or a schedule that ends too
+early.
 
 ### 11.3 Campaign detail
 
@@ -817,7 +899,8 @@ The header provides **Activate, Pause, Resume, Archive, Delete,** and **Back to 
   Campaigns with history cannot be deleted as though they never existed.
 
 The page also includes catch-up status, a Tier-A manual-only warning, TODAY capacity/enrollment,
-state breakdown, and read-only configuration.
+state breakdown, and configuration. Drafts show the editable personalization/ramp panel; activated
+campaigns show the frozen configuration and first-activation time.
 
 ### 11.4 Capacity calculation
 
@@ -827,7 +910,7 @@ Suggested new enrollment capacity is approximately:
 healthy mailbox effective capacity
 − sends already made today
 − follow-ups due today
-bounded by the remaining campaign ramp allowance
+bounded by the current activation-day ramp stage
 ```
 
 Follow-ups are reserved before new openers. A high mailbox cap or allowed configuration is not
@@ -1440,7 +1523,8 @@ Do not send real prospect mail until every applicable item is complete.
 - [ ] Sequence previews pass against representative leads and missing-data cases.
 - [ ] No fatal render checks remain.
 - [ ] Subjects are accurate and non-deceptive.
-- [ ] Tier effort and ramp are correct; they cannot be edited later on the campaign.
+- [ ] Tier effort, Auto Observation rules, variable overrides, and ramp stages are correct before
+  first activation; they cannot be edited afterward.
 - [ ] Tier-A manual responsibility is understood.
 - [ ] The first approved batch is deliberately small and named.
 - [ ] Someone is available to monitor Unibox, bounces, alerts, and complaints.

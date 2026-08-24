@@ -10,6 +10,8 @@ export interface LeadLite {
   email: string;
   firstName: string | null;
   company: string | null;
+  website?: string | null;
+  city?: string | null;
   state: string | null;
 }
 
@@ -30,6 +32,10 @@ export interface RenderContext {
   customFields: Record<string, string>;
   /** campaigns.tier_effort_config.auto_observations — market-keyed segment rule (docs/08 §3). */
   autoObservations: Record<string, string> | null;
+  /** Selected standard/custom segmentation field for Auto Observation rules. */
+  autoObservationField?: string | null;
+  /** Frozen campaign snapshot (or sequence defaults in builder preview). */
+  sequenceVariables?: Record<string, string>;
   /** Footer ingredients; `unsubscribeUrl` is per-send and absent when dormant. */
   compliance: ComplianceInfo;
   /**

@@ -19,6 +19,7 @@ const sequence: SequenceDto = {
   stop_on_reply: true,
   stop_on_hard_bounce: true,
   stop_on_unsubscribe: false,
+  variable_defaults: {},
   steps: [
     {
       id: 20,

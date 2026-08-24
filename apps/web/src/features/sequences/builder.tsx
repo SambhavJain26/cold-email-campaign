@@ -53,6 +53,20 @@ export function SequenceBuilder({ sequence }: { sequence?: SequenceDto }) {
       steps: [...draft.steps, blankStep(draft.steps.length > 0, draft.steps.length === 0 ? 0 : 3)],
     });
 
+  const variableEntries = Object.entries(draft.variable_defaults);
+  const addVariable = () => {
+    let index = variableEntries.length + 1;
+    let key = `variable_${index}`;
+    while (Object.hasOwn(draft.variable_defaults, key)) key = `variable_${++index}`;
+    edit({ ...draft, variable_defaults: { ...draft.variable_defaults, [key]: '' } });
+  };
+  const renameVariable = (oldKey: string, nextKey: string) => {
+    const entries = Object.entries(draft.variable_defaults).map(([key, value]) =>
+      key === oldKey ? [nextKey, value] : [key, value],
+    );
+    edit({ ...draft, variable_defaults: Object.fromEntries(entries) });
+  };
+
   const removeStep = (uid: string) => {
     edit({ ...draft, steps: draft.steps.filter((step) => step.uid !== uid) });
     setTarget(null);
@@ -136,6 +150,52 @@ export function SequenceBuilder({ sequence }: { sequence?: SequenceDto }) {
 
       <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_360px]">
         <div className="space-y-4">
+          <section className="space-y-3 rounded-lg border border-border p-4">
+            <div>
+              <h2 className="text-sm font-semibold">Sequence variables</h2>
+              <p className="text-xs text-muted-foreground">
+                Reuse values with tags such as <code>{'{{sequence.competitors|other tools}}'}</code>
+                . Values are literal and are not parsed as tags or spintax.
+              </p>
+            </div>
+            {variableEntries.map(([key, value]) => (
+              <div key={key} className="grid gap-2 sm:grid-cols-[1fr_2fr_auto]">
+                <Input
+                  aria-label={`Variable key ${key}`}
+                  value={key}
+                  onChange={(event) => renameVariable(key, event.target.value.toLowerCase())}
+                />
+                <Input
+                  aria-label={`Variable value ${key}`}
+                  value={value}
+                  onChange={(event) =>
+                    edit({
+                      ...draft,
+                      variable_defaults: {
+                        ...draft.variable_defaults,
+                        [key]: event.target.value,
+                      },
+                    })
+                  }
+                />
+                <Button
+                  type="button"
+                  variant="ghost"
+                  onClick={() => {
+                    const next = { ...draft.variable_defaults };
+                    delete next[key];
+                    edit({ ...draft, variable_defaults: next });
+                  }}
+                >
+                  Remove
+                </Button>
+              </div>
+            ))}
+            <Button type="button" size="sm" variant="outline" onClick={addVariable}>
+              <Plus className="size-4" /> Add variable
+            </Button>
+          </section>
+
           {draft.steps.map((step, index) => (
             <StepCard
               key={step.uid}

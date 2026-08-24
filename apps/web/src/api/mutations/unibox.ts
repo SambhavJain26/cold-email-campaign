@@ -1,6 +1,7 @@
 import { useMutation, useQueryClient, type QueryClient } from '@tanstack/react-query';
 import {
   manualSendResponseSchema,
+  manualDraftSchema,
   okResponseSchema,
   uniboxItemSchema,
   type ManualSendBody,
@@ -240,5 +241,34 @@ export function useManualSend() {
     mutationFn: (body: ManualSendBody) =>
       apiFetch('/manual-sends', manualSendResponseSchema, { method: 'POST', body }),
     onSuccess: () => invalidateOperational(qc),
+  });
+}
+
+export function usePatchManualDraft() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({
+      id,
+      subject,
+      body,
+      status,
+    }: {
+      id: number;
+      subject?: string;
+      body?: string;
+      status?: 'needs_review' | 'ready';
+    }) =>
+      apiFetch(`/manual-drafts/${id}`, manualDraftSchema, {
+        method: 'PATCH',
+        body: {
+          ...(subject !== undefined && { subject }),
+          ...(body !== undefined && { body }),
+          ...(status !== undefined && { status }),
+        },
+      }),
+    onSuccess: (draft) => {
+      void qc.invalidateQueries({ queryKey: ['manual-compose-prefill'] });
+      qc.setQueryData(['manual-draft', draft.id], draft);
+    },
   });
 }

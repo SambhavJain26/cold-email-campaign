@@ -30,7 +30,11 @@ import {
   outcomeCounts,
   patchCampaign,
   rampOf,
+  rampStagesOf,
+  resolvedVariablesOf,
   tierEffortOf,
+  autoObservationConfigOf,
+  variableOverridesOf,
   type CampaignCounts,
   type CampaignRow,
 } from '../db/repos/campaignsRepo';
@@ -44,7 +48,7 @@ import {
   type EnrollResult,
 } from '../services/enrollment';
 import { getSettings } from '../db/repos/settingsRepo';
-import { checkRamp } from '../services/guardrails';
+import { checkRamp, checkRampStages } from '../services/guardrails';
 import { AppError } from './errors';
 import type { ZodTypeProvider } from './plugins/zodCompilers';
 
@@ -56,6 +60,11 @@ function toCampaignDto(row: CampaignRow, counts: CampaignCounts): CampaignDto {
     sequence_id: row.sequenceId,
     tier_effort_config: tierEffortOf(row),
     ramp_config: rampOf(row),
+    ramp_stages: rampStagesOf(row),
+    first_activated_at: row.firstActivatedAt?.toISOString() ?? null,
+    variable_overrides: variableOverridesOf(row),
+    resolved_variables: resolvedVariablesOf(row),
+    auto_observation: autoObservationConfigOf(row),
     recycled_from_campaign_id: row.recycledFromCampaignId,
     enrolled_count: counts.enrolledCount,
     contacted_count: counts.contactedCount,
@@ -71,6 +80,53 @@ export async function campaignsRoutes(app: FastifyInstance, services: AppService
   const r = app.withTypeProvider<ZodTypeProvider>();
   const { db, clock, store, sequences } = services;
   const enrollDeps = { db, store, clock, sequences };
+
+  const validateDraftConfiguration = async (
+    campaign: CampaignRow,
+    patch: {
+      tierEffortConfig?: ReturnType<typeof tierEffortOf>;
+      rampStages?: ReturnType<typeof rampStagesOf>;
+      autoObservation?: ReturnType<typeof autoObservationConfigOf>;
+    } = {},
+  ) => {
+    const settings = await getSettings(db);
+    const rampViolation = checkRampStages(patch.rampStages ?? rampStagesOf(campaign), {
+      maxMailboxDailyCap: settings.maxMailboxDailyCap,
+      maxRampDailyEnrollCap: settings.maxRampDailyEnrollCap,
+      minRampDays: settings.minRampDays,
+    });
+    if (rampViolation) throw new AppError('validation', 422, rampViolation);
+
+    const effort = patch.tierEffortConfig ?? tierEffortOf(campaign);
+    const auto = patch.autoObservation ?? autoObservationConfigOf(campaign);
+    const nested = campaign.sequenceId ? await getSequenceNested(db, campaign.sequenceId) : null;
+    const usesAutoSlot =
+      Object.values(effort).includes('template_auto') &&
+      nested?.steps.some(({ variants }) =>
+        variants.some(
+          (variant) =>
+            variant.subjectTemplate.includes('{{custom_observation') ||
+            variant.bodyTemplate.includes('{{custom_observation'),
+        ),
+      );
+    if (usesAutoSlot) {
+      if (!auto.field?.trim()) {
+        throw new AppError('validation', 422, 'Auto Slot requires a segmentation field');
+      }
+      const entries = Object.entries(auto.rules);
+      if (!Object.hasOwn(auto.rules, 'default') || auto.rules.default?.trim() === '') {
+        throw new AppError('validation', 422, 'Auto Slot requires a non-empty default observation');
+      }
+      const keys = entries.map(([key]) => key.trim().toLocaleLowerCase());
+      if (new Set(keys).size !== keys.length || entries.some(([, value]) => value.trim() === '')) {
+        throw new AppError(
+          'validation',
+          422,
+          'Auto Observation keys must be unique and values non-empty',
+        );
+      }
+    }
+  };
 
   const requireCampaign = async (id: number): Promise<CampaignRow> => {
     const row = await getCampaign(db, id);
@@ -109,12 +165,21 @@ export async function campaignsRoutes(app: FastifyInstance, services: AppService
         minRampDays: s.minRampDays,
       });
       if (violation) throw new AppError('validation', 422, violation);
+      const stageViolation = checkRampStages(req.body.ramp_stages, {
+        maxMailboxDailyCap: s.maxMailboxDailyCap,
+        maxRampDailyEnrollCap: s.maxRampDailyEnrollCap,
+        minRampDays: s.minRampDays,
+      });
+      if (stageViolation) throw new AppError('validation', 422, stageViolation);
 
       const row = await createCampaign(db, {
         name: req.body.name,
         sequenceId: req.body.sequence_id,
         tierEffortConfig: req.body.tier_effort_config,
         rampConfig: req.body.ramp_config,
+        rampStages: req.body.ramp_stages,
+        variableOverrides: req.body.variable_overrides,
+        autoObservation: req.body.auto_observation,
       });
       return toCampaignDto(row, { enrolledCount: 0, contactedCount: 0, manualOnlyCount: 0 });
     },
@@ -130,10 +195,37 @@ export async function campaignsRoutes(app: FastifyInstance, services: AppService
       },
     },
     async (req) => {
-      await requireCampaign(req.params.id);
+      const existing = await requireCampaign(req.params.id);
+      const changesConfiguration =
+        req.body.tier_effort_config !== undefined ||
+        req.body.ramp_stages !== undefined ||
+        req.body.variable_overrides !== undefined ||
+        req.body.auto_observation !== undefined;
+      if (changesConfiguration && existing.status !== 'draft') {
+        throw new AppError(
+          'conflict',
+          409,
+          'campaign personalization and ramp configuration is frozen after first activation',
+        );
+      }
+      if (changesConfiguration || (existing.status === 'draft' && req.body.status === 'active')) {
+        await validateDraftConfiguration(existing, {
+          tierEffortConfig: req.body.tier_effort_config,
+          rampStages: req.body.ramp_stages,
+          autoObservation: req.body.auto_observation,
+        });
+      }
       const row = await patchCampaign(db, req.params.id, {
         name: req.body.name,
         status: req.body.status,
+        tierEffortConfig: req.body.tier_effort_config,
+        rampStages: req.body.ramp_stages,
+        variableOverrides: req.body.variable_overrides,
+        autoObservation: req.body.auto_observation,
+        firstActivatedAt:
+          existing.firstActivatedAt === null && req.body.status === 'active'
+            ? clock.now()
+            : undefined,
       });
       return toCampaignDto(row!, await campaignCounts(db, req.params.id));
     },
@@ -173,6 +265,9 @@ export async function campaignsRoutes(app: FastifyInstance, services: AppService
         sent_so_far_today: cap.sentSoFar,
         room_for_new: cap.roomForNew,
         ramp_cap_remaining: cap.rampCap,
+        ramp_day: cap.rampDay,
+        ramp_stage: cap.rampStage,
+        enrolled_today: cap.enrolledToday,
         suggested: cap.suggested,
       };
     },

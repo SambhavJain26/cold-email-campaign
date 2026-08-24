@@ -8,13 +8,16 @@ import {
   commitImportResponseSchema,
   idParamSchema,
   importPreviewResponseSchema,
+  importDraftPreviewQuerySchema,
+  importDraftPreviewResponseSchema,
   importsListResponseSchema,
   pageQuerySchema,
   type ImportDto,
 } from '@coldemail/shared';
 import type { AppServices } from '../composition';
 import { getImport, listImports, type ImportRow } from '../db/repos/importsRepo';
-import { commitImport, createImportPreview } from '../ingest/service';
+import { commitImport, createImportPreview, previewImportDrafts } from '../ingest/service';
+import { getCampaign } from '../db/repos/campaignsRepo';
 import { MAX_BYTES } from '../ingest/parse';
 import { AppError } from './errors';
 import type { ZodTypeProvider } from './plugins/zodCompilers';
@@ -66,6 +69,12 @@ export async function importsRoutes(app: FastifyInstance, services: AppServices)
             rows.map((s) => ({ row_no: s.rowNo, email: s.email })),
           ]),
         ),
+        draft_counts: {
+          new_leads: preview.draftCounts.newLeads,
+          existing_leads: preview.draftCounts.existingLeads,
+          valid_drafts: preview.draftCounts.validDrafts,
+          invalid_drafts: preview.draftCounts.invalidDrafts,
+        },
       };
     },
   );
@@ -85,8 +94,53 @@ export async function importsRoutes(app: FastifyInstance, services: AppServices)
       if (imp.committed) {
         throw new AppError('conflict', 409, `import ${imp.id} already committed`);
       }
-      const result = await commitImport({ db }, { importId: req.params.id, mode: req.body.mode });
-      return { imported: result.inserted };
+      if (req.body.draft_campaign_id !== undefined) {
+        const campaign = await getCampaign(db, req.body.draft_campaign_id);
+        if (!campaign) throw AppError.notFound('campaign');
+      }
+      const result = await commitImport(
+        { db },
+        {
+          importId: req.params.id,
+          mode: req.body.mode,
+          draftCampaignId: req.body.draft_campaign_id,
+          replaceExistingDrafts: req.body.replace_existing_drafts,
+        },
+      );
+      return {
+        imported: result.inserted,
+        leads_created: result.inserted,
+        drafts_created: result.draftsCreated,
+        drafts_replaced: result.draftsReplaced,
+        drafts_skipped: result.draftsSkipped,
+        invalid_drafts: result.invalidDrafts,
+      };
+    },
+  );
+
+  r.get(
+    '/imports/:id/draft-preview',
+    {
+      schema: {
+        params: idParamSchema,
+        querystring: importDraftPreviewQuerySchema,
+        response: { 200: importDraftPreviewResponseSchema },
+      },
+    },
+    async (req) => {
+      if (!(await getImport(db, req.params.id))) throw AppError.notFound('import');
+      if (!(await getCampaign(db, req.query.campaign_id))) throw AppError.notFound('campaign');
+      const preview = await previewImportDrafts(
+        { db },
+        { importId: req.params.id, campaignId: req.query.campaign_id },
+      );
+      return {
+        new_leads: preview.newLeads,
+        existing_leads: preview.existingLeads,
+        valid_drafts: preview.validDrafts,
+        invalid_drafts: preview.invalidDrafts,
+        existing_draft_conflicts: preview.existingDraftConflicts,
+      };
     },
   );
 

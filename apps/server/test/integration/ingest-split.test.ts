@@ -57,7 +57,14 @@ describe('the 1000 → 885 fixture split (B5.8)', () => {
     });
 
     const r = await commitImport({ db }, { importId: p.importId, mode: 'drop_flagged' });
-    expect(r).toEqual({ inserted: 885, skipped: 0 });
+    expect(r).toEqual({
+      inserted: 885,
+      skipped: 0,
+      draftsCreated: 0,
+      draftsReplaced: 0,
+      draftsSkipped: 0,
+      invalidDrafts: 0,
+    });
 
     const leads = await pool.query(
       `SELECT count(*)::int total,

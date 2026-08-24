@@ -32,7 +32,9 @@ export type CanonicalField =
   | 'city'
   | 'state'
   | 'phone'
-  | 'notes';
+  | 'notes'
+  | 'manual_subject'
+  | 'manual_body';
 
 // Keys are the POST-toSnakeCase form of the accepted headers (docs/09 §1) —
 // e.g. the "e-mail" alias arrives here as "e_mail".
@@ -71,6 +73,8 @@ const ALIASES: Record<string, CanonicalField> = {
   note: 'notes',
   comments: 'notes',
   comment: 'notes',
+  manual_subject: 'manual_subject',
+  manual_body: 'manual_body',
 };
 
 export interface ParsedRow {

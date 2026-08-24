@@ -117,6 +117,12 @@ CREATE TABLE campaigns (
   sequence_id        bigint REFERENCES sequences(id),
   tier_effort_config jsonb NOT NULL DEFAULT '{"A":"human_written","B":"template_researched","C":"template_auto"}',
   ramp_config        jsonb NOT NULL DEFAULT '{"ramp_days":7,"ramp_daily_enroll_cap":20}',
+  variable_overrides jsonb NOT NULL DEFAULT '{}',
+  resolved_variables jsonb NOT NULL DEFAULT '{}',
+  auto_observation_field text,
+  auto_observation_rules jsonb NOT NULL DEFAULT '{}',
+  first_activated_at timestamptz,
+  ramp_stages        jsonb NOT NULL,
   recycled_from_campaign_id bigint REFERENCES campaigns(id),   -- set for Pass-2 recycle campaigns
   created_at         timestamptz NOT NULL DEFAULT now()
 );
@@ -170,6 +176,15 @@ Migration `0015` converts future snoozes on replied enrollments into `legacy_sno
 It deliberately preserves existing snoozes on active enrollments, where they retain their old
 scheduler meaning.
 
+### `manual_campaign_drafts`
+
+Migration `0016` stores campaign-scoped Step-1 drafts separately from lead profile data. Only one
+unsent draft may exist per `(lead_id, campaign_id, step_no)`. Status is `needs_review`, `ready`, or
+`sent`; successful sending links the draft to its append-only event and message ID. The same
+migration adds sequence defaults, campaign overrides/frozen snapshots, Auto Observation rules,
+first activation, and staged ramp configuration. A database trigger freezes those campaign fields
+after first activation.
+
 ## 3. Supporting tables
 
 ### `sequences`, `sequence_steps`, `step_variants`
@@ -181,6 +196,7 @@ CREATE TABLE sequences (
   stop_on_reply         bool NOT NULL DEFAULT true, -- constrained true since 0013
   stop_on_hard_bounce   bool NOT NULL DEFAULT true,
   stop_on_unsubscribe   bool NOT NULL DEFAULT true,
+  variable_defaults     jsonb NOT NULL DEFAULT '{}',
   archived              bool NOT NULL DEFAULT false,
   created_at            timestamptz NOT NULL DEFAULT now()
 );

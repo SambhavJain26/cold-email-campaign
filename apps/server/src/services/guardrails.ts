@@ -25,6 +25,12 @@ export interface RampShape {
   ramp_daily_enroll_cap: number;
 }
 
+export interface RampStageShape {
+  start_day: number;
+  end_day: number;
+  cap: number;
+}
+
 /** Message describing the violation, or null when the value is permitted. */
 export function checkMailboxDailyCap(
   dailyCap: number | undefined,
@@ -53,6 +59,32 @@ export function checkRamp(ramp: RampShape | undefined, limits: LaunchLimits): st
       `ramp_days ${ramp.ramp_days} is below the required staged-enrollment window of ` +
       `${limits.minRampDays} days. Lower min_ramp_days in Settings to allow a shorter ramp.`
     );
+  }
+  return null;
+}
+
+export function checkRampStages(
+  stages: RampStageShape[] | undefined,
+  limits: LaunchLimits,
+): string | null {
+  if (stages === undefined) return null;
+  if (stages.length === 0) {
+    return limits.minRampDays > 0 ? 'a staged ramp is required by the global guardrail' : null;
+  }
+  const sorted = [...stages].sort((a, b) => a.start_day - b.start_day);
+  let expected = 1;
+  for (const stage of sorted) {
+    if (stage.start_day !== expected || stage.end_day < stage.start_day) {
+      return 'ramp stages must cover every day from 1 with no overlaps or gaps';
+    }
+    if (stage.cap > limits.maxRampDailyEnrollCap) {
+      return `ramp cap ${stage.cap} exceeds the launch guardrail of ${limits.maxRampDailyEnrollCap}`;
+    }
+    expected = stage.end_day + 1;
+  }
+  const finalDay = sorted.at(-1)!.end_day;
+  if (limits.minRampDays > 0 && finalDay < limits.minRampDays) {
+    return `final ramp day ${finalDay} is below the required staged-enrollment window of ${limits.minRampDays} days`;
   }
   return null;
 }

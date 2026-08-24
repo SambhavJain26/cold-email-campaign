@@ -1,9 +1,23 @@
 import { useState } from 'react';
 import { FileUp } from 'lucide-react';
 import { toast } from 'sonner';
-import { IMPORT_ROW_FLAGS, type ImportRowFlag, type ImportCountsDto } from '@coldemail/shared';
+import {
+  IMPORT_ROW_FLAGS,
+  type CommitImportResponse,
+  type ImportRowFlag,
+  type ImportCountsDto,
+} from '@coldemail/shared';
 import { AppApiError } from '@/api/client';
 import { Button } from '@/components/ui/button';
+import { Checkbox } from '@/components/ui/checkbox';
+import { Label } from '@/components/ui/label';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 import {
   Dialog,
   DialogContent,
@@ -12,6 +26,8 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import { useCommitImport, useUploadImport } from '@/api/mutations/imports';
+import { useCampaigns } from '@/api/queries/campaigns';
+import { useImportDraftPreview } from '@/api/queries/imports';
 
 const MAX_BYTES = 10 * 1024 * 1024; // ingest cap (docs/09)
 
@@ -21,6 +37,12 @@ interface PreviewState {
   importId: number;
   counts: ImportCountsDto;
   samples: Samples;
+  draftCounts: {
+    new_leads: number;
+    existing_leads: number;
+    valid_drafts: number;
+    invalid_drafts: number;
+  };
 }
 
 const FLAG_COPY: Record<ImportRowFlag, { label: string; hint: string }> = {
@@ -49,16 +71,22 @@ export function ImportWizard({
   const upload = useUploadImport();
   const commit = useCommitImport();
   const [preview, setPreview] = useState<PreviewState | null>(null);
-  const [imported, setImported] = useState<number | null>(null);
+  const [result, setResult] = useState<CommitImportResponse | null>(null);
   const [uploadError, setUploadError] = useState<string | null>(null);
   const [expanded, setExpanded] = useState<ImportRowFlag | null>(null);
+  const [draftCampaignId, setDraftCampaignId] = useState<number | undefined>();
+  const [replaceDrafts, setReplaceDrafts] = useState(false);
+  const campaigns = useCampaigns();
+  const draftPreview = useImportDraftPreview(preview?.importId, draftCampaignId);
 
   const handleOpenChange = (next: boolean) => {
     if (!next) {
       setPreview(null);
-      setImported(null);
+      setResult(null);
       setUploadError(null);
       setExpanded(null);
+      setDraftCampaignId(undefined);
+      setReplaceDrafts(false);
     }
     onOpenChange(next);
   };
@@ -72,7 +100,12 @@ export function ImportWizard({
     }
     upload.mutate(file, {
       onSuccess: (result) =>
-        setPreview({ importId: result.import_id, counts: result.counts, samples: result.samples }),
+        setPreview({
+          importId: result.import_id,
+          counts: result.counts,
+          samples: result.samples,
+          draftCounts: result.draft_counts,
+        }),
       onError: (error) => {
         if (error instanceof AppApiError && error.code === 'import_too_large') {
           setUploadError('The server refused the file: too large (10 MB / 50k rows).');
@@ -84,11 +117,20 @@ export function ImportWizard({
   const doCommit = (mode: 'drop_flagged' | 'import_all') => {
     if (!preview) return;
     commit.mutate(
-      { importId: preview.importId, body: { mode } },
       {
-        onSuccess: ({ imported: count }) => {
-          setImported(count);
-          toast.success(`${count} leads imported`);
+        importId: preview.importId,
+        body: {
+          mode,
+          ...(draftCampaignId !== undefined && { draft_campaign_id: draftCampaignId }),
+          replace_existing_drafts: replaceDrafts,
+        },
+      },
+      {
+        onSuccess: (commitResult) => {
+          setResult(commitResult);
+          toast.success(
+            `${commitResult.leads_created} leads and ${commitResult.drafts_created + commitResult.drafts_replaced} drafts saved`,
+          );
         },
       },
     );
@@ -109,7 +151,7 @@ export function ImportWizard({
         </DialogHeader>
 
         {/* Step 1 — Upload */}
-        {!preview && imported === null && (
+        {!preview && result === null && (
           <div className="space-y-3">
             <label
               className="flex cursor-pointer flex-col items-center gap-2 rounded-lg border border-dashed border-border p-8 text-center hover:bg-accent/30"
@@ -138,7 +180,7 @@ export function ImportWizard({
         )}
 
         {/* Step 2 — Preview (the walkthrough panel verbatim) */}
-        {preview && counts && imported === null && (
+        {preview && counts && result === null && (
           <div className="space-y-3">
             <ul className="divide-y divide-border rounded-lg border border-border text-sm">
               {IMPORT_ROW_FLAGS.map((flag) => {
@@ -190,13 +232,66 @@ export function ImportWizard({
               Role-based + invalid addresses bounce more and hurt deliverability — dropping flagged
               rows is the safe default.
             </p>
+            {(preview.draftCounts.valid_drafts > 0 || preview.draftCounts.invalid_drafts > 0) && (
+              <section className="space-y-3 rounded-lg border border-info/40 bg-info/5 p-3">
+                <div>
+                  <p className="text-sm font-medium">Manual drafts detected</p>
+                  <p className="text-xs text-muted-foreground">
+                    {preview.draftCounts.valid_drafts} valid · {preview.draftCounts.invalid_drafts}{' '}
+                    incomplete. Drafts are Step 1 only and never enroll or send automatically.
+                  </p>
+                </div>
+                <Select
+                  value={draftCampaignId ? String(draftCampaignId) : ''}
+                  onValueChange={(value) => setDraftCampaignId(Number(value))}
+                >
+                  <SelectTrigger aria-label="Draft target campaign">
+                    <SelectValue placeholder="Select one target campaign…" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {(campaigns.data?.items ?? []).map((campaign) => (
+                      <SelectItem key={campaign.id} value={String(campaign.id)}>
+                        {campaign.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                {draftPreview.data && (
+                  <p className="text-xs text-muted-foreground">
+                    {draftPreview.data.new_leads} new leads · {draftPreview.data.existing_leads}{' '}
+                    existing leads · {draftPreview.data.valid_drafts} valid drafts ·{' '}
+                    {draftPreview.data.invalid_drafts} invalid ·{' '}
+                    {draftPreview.data.existing_draft_conflicts} existing-draft conflicts
+                  </p>
+                )}
+                <div className="flex items-center gap-2">
+                  <Checkbox
+                    id="replace-imported-drafts"
+                    checked={replaceDrafts}
+                    onCheckedChange={(checked) => setReplaceDrafts(checked === true)}
+                  />
+                  <Label htmlFor="replace-imported-drafts" className="text-xs font-normal">
+                    Replace existing unsent drafts (default is skip)
+                  </Label>
+                </div>
+              </section>
+            )}
             <div className="flex gap-2">
-              <Button disabled={commit.isPending} onClick={() => doCommit('drop_flagged')}>
+              <Button
+                disabled={
+                  commit.isPending ||
+                  (preview.draftCounts.valid_drafts > 0 && draftCampaignId === undefined)
+                }
+                onClick={() => doCommit('drop_flagged')}
+              >
                 Drop flagged & import {counts.ok}
               </Button>
               <Button
                 variant="outline"
-                disabled={commit.isPending}
+                disabled={
+                  commit.isPending ||
+                  (preview.draftCounts.valid_drafts > 0 && draftCampaignId === undefined)
+                }
                 onClick={() => doCommit('import_all')}
               >
                 Import all incl. role-based ({importAllCount})
@@ -206,14 +301,32 @@ export function ImportWizard({
         )}
 
         {/* Step 3 — Result */}
-        {imported !== null && (
+        {result !== null && (
           <div className="space-y-3 py-2 text-center">
             <p className="text-2xl font-semibold tabular-nums" data-testid="import-result">
-              {imported}
+              {result.leads_created}
             </p>
             <p className="text-sm text-muted-foreground">
               leads imported — untiered (decision R). Tier them before enrolling.
             </p>
+            <dl className="grid grid-cols-2 gap-2 rounded-lg border border-border p-3 text-left text-sm sm:grid-cols-3">
+              <div>
+                <dt className="text-muted-foreground">Drafts created</dt>
+                <dd className="font-semibold tabular-nums">{result.drafts_created}</dd>
+              </div>
+              <div>
+                <dt className="text-muted-foreground">Drafts replaced</dt>
+                <dd className="font-semibold tabular-nums">{result.drafts_replaced}</dd>
+              </div>
+              <div>
+                <dt className="text-muted-foreground">Drafts skipped</dt>
+                <dd className="font-semibold tabular-nums">{result.drafts_skipped}</dd>
+              </div>
+              <div>
+                <dt className="text-muted-foreground">Invalid drafts</dt>
+                <dd className="font-semibold tabular-nums">{result.invalid_drafts}</dd>
+              </div>
+            </dl>
             <Button onClick={() => handleOpenChange(false)}>Go tier them</Button>
           </div>
         )}

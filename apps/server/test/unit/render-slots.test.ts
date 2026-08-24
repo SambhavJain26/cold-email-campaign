@@ -47,6 +47,30 @@ describe('template_auto (Mode 2b)', () => {
   it('no table at all → null (fatal downstream if the tag has no fallback)', () => {
     expect(resolveObservation(lead, ctx({})).value).toBeNull();
   });
+
+  it('matches a selected custom field after trimming and case-folding', () => {
+    const r = resolveObservation(
+      { ...lead, state: null },
+      ctx({
+        autoObservationField: 'industry',
+        customFields: { industry: '  SaaS  ' },
+        autoObservations: {
+          saas: 'noticed your product-led motion',
+          default: 'noticed your recent growth',
+        },
+      }),
+    );
+    expect(r.value).toBe('noticed your product-led motion');
+  });
+
+  it('uses the required default when the chosen field is blank or unmatched', () => {
+    const config = ctx({
+      autoObservationField: 'industry',
+      customFields: { industry: 'services' },
+      autoObservations: { saas: 'SaaS match', default: 'default observation' },
+    });
+    expect(resolveObservation(lead, config).value).toBe('default observation');
+  });
 });
 
 describe('template_researched (Mode 2a)', () => {
