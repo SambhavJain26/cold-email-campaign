@@ -13,6 +13,9 @@ This manual explains the complete operator-facing application: what every screen
 each action, what the system does automatically, and which safeguards or edge cases matter. It is a
 product-use guide, not legal advice and not a promise of email deliverability.
 
+For simpler explanations, worked examples, and candid notes about current UI limitations, also
+read [User Manual Companion: Plain-Language Answers and Product Notes](20-user-manual-questions.md).
+
 The screenshots use the application's built-in representative dataset so controls can be shown
 without changing production. Names, dates, addresses, counts, and `MOCK` status in the images are
 examples. Two screenshots predate the final OAuth/footer refinement; explicit callouts beside those
