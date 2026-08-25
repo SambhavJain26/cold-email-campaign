@@ -61,7 +61,20 @@ WHERE campaign_id = $1 GROUP BY current_state;
 
 ## 4. Analytics groupings (walkthrough §13)
 
-**13a — per variant:** join `events sent` → `attributes->>'variant_id'` → aggregate sent count / reply / positive / meetings per variant of a given step. Meetings attribute to the variant of the **step-1 send** of that enrollment (the opener determines the cohort — matches walkthrough's A/Z framing).
+**13a — per variant at any selected step:** join selected-step `sent` events through
+`attributes->>'variant_id'` and build one enrollment cohort per variant.
+
+- **Direct response:** sent/delivered at that step; a reply counts only when the persisted
+  `human_reply.step_no` points to that step's sent message. Its denominator is `delivered OR direct
+  reply`, so a reply received before delayed delivery confirmation cannot produce an impossible
+  rate.
+- **Eventual outcome:** denominator is every distinct enrollment that received the selected
+  variant. Any human reply after that send, including a thread match to a later step, counts toward
+  eventual reply/positive results; meetings are distinct enrollments with a later
+  `meeting_booked` event.
+- Both views resolve the latest `sentiment_tagged` value. Erased leads are excluded. Bespoke and
+  inactive historical variants remain visible, but bespoke rows are excluded from winner selection.
+  Winner order is eventual meetings, then eventual positive rate; an exact tie is reported as a tie.
 
 **13b — per step:** delivered / distinct positive repliers / positive% per `step_no` (the "kill Step 3" table). Uses `stepReplyRate` with the `reply_sentiment` CTE filtered to positive.
 

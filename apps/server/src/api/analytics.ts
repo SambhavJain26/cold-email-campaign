@@ -117,10 +117,9 @@ export async function analyticsRoutes(app: FastifyInstance, services: AppService
       const stepEntry = nested.steps.find((s) => s.step.stepNo === req.query.step_no);
       if (!stepEntry) throw AppError.notFound('step');
       const stats = new Map(
-        (await metrics.variantAnalytics({ campaignId: req.query.campaign_id })).map((v) => [
-          v.variantId,
-          v,
-        ]),
+        (
+          await metrics.variantAnalytics({ campaignId: req.query.campaign_id }, req.query.step_no)
+        ).map((v) => [v.variantId, v]),
       );
       const variants = [...stepEntry.variants];
       for (const variantId of stats.keys()) {
@@ -128,6 +127,9 @@ export async function analyticsRoutes(app: FastifyInstance, services: AppService
         const historical = await getVariantById(db, variantId);
         if (historical?.stepId === stepEntry.step.id) variants.push(historical);
       }
+      const activeAutomated = variants.filter(
+        (variant) => variant.active && variant.attributes.bespoke !== true,
+      ).length;
       return {
         items: variants.map((v) => {
           const s = stats.get(v.id);
@@ -141,11 +143,30 @@ export async function analyticsRoutes(app: FastifyInstance, services: AppService
                 : `Manual · enrollment ${enrollment}`
               : v.label,
             subject_template: v.subjectTemplate,
-            deactivatable: !bespoke,
-            sent: s?.sent ?? 0,
-            reply_rate: s?.replyRate ?? pct(0, 0),
-            positive_rate: s?.positiveRate ?? pct(0, 0),
-            meetings: s?.meetings ?? 0,
+            active: v.active,
+            bespoke,
+            deactivatable: !bespoke && v.active && activeAutomated > 1,
+            direct: {
+              sent: s?.direct.sent ?? 0,
+              delivered: s?.direct.delivered ?? 0,
+              contacted: s?.direct.contacted ?? 0,
+              replies: s?.direct.replies ?? 0,
+              positive_replies: s?.direct.positiveReplies ?? 0,
+              reply_rate: s?.direct.replyRate ?? pct(0, 0),
+              positive_rate: s?.direct.positiveRate ?? pct(0, 0),
+            },
+            eventual: {
+              cohort: s?.eventual.cohort ?? 0,
+              replies: s?.eventual.replies ?? 0,
+              positive_replies: s?.eventual.positiveReplies ?? 0,
+              meetings: s?.eventual.meetings ?? 0,
+              reply_rate: s?.eventual.replyRate ?? pct(0, 0),
+              positive_rate: s?.eventual.positiveRate ?? pct(0, 0),
+            },
+            sent: s?.direct.sent ?? 0,
+            reply_rate: s?.eventual.replyRate ?? pct(0, 0),
+            positive_rate: s?.eventual.positiveRate ?? pct(0, 0),
+            meetings: s?.eventual.meetings ?? 0,
           };
         }),
       };
@@ -156,8 +177,18 @@ export async function analyticsRoutes(app: FastifyInstance, services: AppService
     '/step-variants/:id/deactivate',
     { schema: { params: idParamSchema, response: { 200: okResponseSchema } } },
     async (req) => {
-      const found = await deactivateVariant(db, req.params.id);
-      if (!found) throw AppError.notFound('variant');
+      const result = await deactivateVariant(db, req.params.id);
+      if (result === 'not_found') throw AppError.notFound('variant');
+      if (result === 'bespoke') {
+        throw new AppError('conflict', 409, 'manual/bespoke variants cannot be deactivated');
+      }
+      if (result === 'last_active') {
+        throw new AppError(
+          'conflict',
+          409,
+          'the final active variant for a step cannot be deactivated',
+        );
+      }
       return { ok: true } as const;
     },
   );

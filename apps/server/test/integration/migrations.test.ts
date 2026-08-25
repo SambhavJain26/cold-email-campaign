@@ -3,7 +3,7 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import type { Pool } from 'pg';
 import { loadMigrations, migrateDown, migrateUp, migrationStatus } from '../../src/db/migrate';
-import { getTestPool, MIGRATIONS_DIR } from '../helpers/db';
+import { getTestPool, MIGRATIONS_DIR, resetCoreTables } from '../helpers/db';
 
 describe('migration runner', () => {
   let pool: Pool;
@@ -38,6 +38,73 @@ describe('migration runner', () => {
     expect(reapplied).toEqual([latest]);
     const afterUp = await migrationStatus(pool, MIGRATIONS_DIR);
     expect(afterUp.every((s) => s.applied)).toBe(true);
+  });
+
+  it('backfills legacy single-source campaign and enrollment provenance', async () => {
+    const latest = names.at(-1)!;
+    expect(latest).toBe('0017_multi_source_recycling');
+    await migrateDown(pool, MIGRATIONS_DIR, 1);
+    const source = (
+      await pool.query(
+        `INSERT INTO campaigns (name, status) VALUES ('legacy source', 'completed') RETURNING id`,
+      )
+    ).rows[0].id as number;
+    const target = (
+      await pool.query(
+        `INSERT INTO campaigns (name, status, recycled_from_campaign_id)
+         VALUES ('legacy target', 'draft', $1) RETURNING id`,
+        [source],
+      )
+    ).rows[0].id as number;
+    const lead = (
+      await pool.query(
+        `INSERT INTO leads (email, tier) VALUES ('legacy-backfill@test.dev', 'B') RETURNING id`,
+      )
+    ).rows[0].id as number;
+    const sourceEnrollment = (
+      await pool.query(
+        `INSERT INTO enrollments
+           (lead_id, campaign_id, current_state, personalization_mode, enrolled_at, terminal_at)
+         VALUES ($1, $2, 'COMPLETED', 'template_researched', now() - interval '100 days',
+                 now() - interval '70 days') RETURNING id`,
+        [lead, source],
+      )
+    ).rows[0].id as number;
+    const targetEnrollment = (
+      await pool.query(
+        `INSERT INTO enrollments
+           (lead_id, campaign_id, current_state, personalization_mode, enrolled_at)
+         VALUES ($1, $2, 'NEW', 'template_researched', now()) RETURNING id`,
+        [lead, target],
+      )
+    ).rows[0].id as number;
+
+    expect(await migrateUp(pool, MIGRATIONS_DIR)).toEqual([latest]);
+    expect(
+      (
+        await pool.query(
+          `SELECT target_campaign_id, source_campaign_id FROM campaign_recycle_sources
+           WHERE target_campaign_id = $1`,
+          [target],
+        )
+      ).rows,
+    ).toEqual([{ target_campaign_id: target, source_campaign_id: source }]);
+    expect(
+      (
+        await pool.query(
+          `SELECT target_enrollment_id, source_campaign_id, source_enrollment_id
+           FROM recycle_enrollment_sources WHERE target_enrollment_id = $1`,
+          [targetEnrollment],
+        )
+      ).rows,
+    ).toEqual([
+      {
+        target_enrollment_id: targetEnrollment,
+        source_campaign_id: source,
+        source_enrollment_id: sourceEnrollment,
+      },
+    ]);
+    await resetCoreTables(pool);
   });
 
   it('is idempotent — up on an up-to-date DB is a no-op', async () => {

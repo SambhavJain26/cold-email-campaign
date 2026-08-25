@@ -1,5 +1,22 @@
 # Local canary runbook (B8.3-local) — two-week validation on throwaway Gmail
 
+## 2026-08-25 ten-workstream implementation — Stage 3 verified locally
+
+The operator explicitly continued the implementation after Stage 2. Stage 3 is complete locally.
+Variant analytics now work for every sequence step and separate replies matched to that step's sent
+message from later outcomes in the same enrollment cohort. Effective operator sentiment tags and
+distinct meetings are included; historical and bespoke rows remain visible, while bespoke rows and
+the final active automated variant cannot be deactivated. Cold Storage can preview and atomically
+combine two or more source campaigns, rechecks all eligibility at confirmation, skips content
+conflicts, deduplicates leads, and records both campaign- and enrollment-level provenance.
+
+No production campaign was activated, no production lead was enrolled, no email was sent, and
+production and Oracle were not changed. Migration `0017_multi_source_recycling` passed
+apply/down/apply. Verified gates: typecheck, lint, format; unit **341**; web **56**; API **122**;
+integration **166**; affected mock-browser E2E **6**. The event-backed populated test cohort
+returned `checked 5 enrollments — 0 diff(s)` and self-check reported no invariant violations.
+Stage 4 and the final complete serial gate remain; this stage is not deployed.
+
 ## 2026-08-25 ten-workstream implementation — Stage 2 verified locally
 
 The operator explicitly stopped the current implementation run after Stage 2. Stage 2 is complete
@@ -14,7 +31,7 @@ apply/down/apply on the disposable test database. Verified gates: typecheck, lin
 **341**; web **55**; API **119**; integration **162**; GreenMail **29**; locked golden exactly
 **47**; mock-browser E2E **52**; real-backend E2E **1**. The event-backed populated test cohort
 returned `checked 5 enrollments — 0 diff(s)` and self-check reported no invariant violations.
-Stages 3–4 are deferred until the operator explicitly continues; this stage is not deployed.
+Stages 3–4 remained separately gated at this checkpoint; this stage was not deployed.
 
 ## 2026-08-25 ten-workstream implementation — Stage 1 verified locally
 

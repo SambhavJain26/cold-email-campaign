@@ -45,7 +45,9 @@ Three steps in a dialog: **Upload** (drag/drop CSV, client-side 10 MB check) →
 ## 6. 🚀 Campaigns `/campaigns`, detail `/campaigns/:id` (§Stage 5, §Stage 9)
 
 **Data:** campaigns CRUD, capacity, outcomes, cold-storage, recycle.
-**List:** name, status, sequence, enrolled/contacted, progress bar, Pass-2 badge when `recycled_from_campaign_id`.
+**List:** name, status, sequence, enrolled/contacted, progress bar, and a recycled-source badge when
+campaign provenance exists. Detail shows every source name with its distinct contributed-lead
+count; the deprecated single-source field is not the display source of truth.
 **Detail regions:** (a) capacity meter with activation-day/current-stage details + **[Enroll next N]**; (b) enrollment breakdown; (c) completion panel; (d) draft-only editor for tier effort, staged ramp, Auto Observation field/rules, and sequence-variable overrides. First activation freezes configuration and records the permanent ramp start; pause/resume does not unlock or restart it.
 **Edge:** enroll into `draft` campaign → blocked with "Activate first"; sequence missing → blocked.
 
@@ -58,14 +60,28 @@ Three steps in a dialog: **Upload** (drag/drop CSV, client-side 10 MB check) →
 
 ## 8. 📈 Analytics `/analytics` (§13)
 
-Tabs: **Variants** (13a): table per step-1 variant — sent, reply%, pos%, meetings; winner row highlighted (max meetings, tie → pos%); small-sample caption when sent < 300/variant; **[Deactivate A, route all to B]** → `POST step-variants/:id/deactivate` + confirm dialog. **Steps** (13b): delivered/pos-replies/pos% per step with verdict chips (WEAK when pos% < 0.5% and delivered ≥ 200) + "(positives sum to N ✓)" footer + **[Remove step]** deep-link to builder. **Tiers** (13c): the tier table + insights block + **[Promote N engaged Tier-C → Tier B]** → bulk-tier with server-provided lead set. **Health** (13d): 5 sparklines with current values + threshold ✅/⚠️, watch-rules status list.
+Tabs: **Variants** (13a): sequence-step selector plus separate **Direct response** and **Eventual
+outcome** tables. Direct follows the persisted replied-to step; eventual follows the whole variant
+cohort through later replies and meetings. The recommended winner uses eventual meetings then
+eventual positive rate and reports exact ties. The 300-send warning remains. Inactive history and
+manual/bespoke variants stay visible, but bespoke rows are read-only and the final active automated
+variant cannot be deactivated. **Steps** (13b): delivered/pos-replies/pos% per step with verdict
+chips (WEAK when pos% < 0.5% and delivered ≥ 200) + "(positives sum to N ✓)" footer + **[Remove
+step]** deep-link to builder. **Tiers** (13c): the tier table + insights block + **[Promote N
+engaged Tier-C → Tier B]** → bulk-tier with server-provided lead set. **Health** (13d): 5
+sparklines with current values + threshold ✅/⚠️, watch-rules status list.
 All tables show the reconciliation footers ("meetings sum to 17 ✓") — computed client-side from the same response, rendering ✗ if they ever don't (a free UI-level self-check).
 
 ## 9. ♻️ Cold Storage `/cold-storage` (§Stage 9)
 
 **Data:** paginated `GET /cold-storage`, recycle mutation.
 **Regions:** guidance card (large-market copy, earliest-recycle date, pass history); table: lead, completed date, earliest recycle, eligible ✓/✗-in-N-days.
-**Recycle flow:** **[Recycle into campaign…]** → dialog: pick/create target draft campaign → warns if target sequence shares content hashes ("identical to Pass 1 — change the message first", from 409 `recycle_sequence_conflict`) → confirm → enroll result summary.
+**Recycle flow:** **[Recycle into campaign…]** → select at least two source campaigns and one draft
+target → run a read-only eligibility preview. The preview shows unique leads, cross-source
+duplicates, rest/nurture/suppression/recontact/existing-target/content-conflict exclusions, eligible
+count, and per-source contributions. Final confirmation recomputes all rules in one serializable
+transaction; each eligible lead is enrolled once, content conflicts are skipped (never resent), and
+the target remains draft. The result repeats the recomputed totals and full source provenance.
 
 ## 10. ⚙️ Settings `/settings` (§Stage 0 rules)
 

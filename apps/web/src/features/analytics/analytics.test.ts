@@ -80,7 +80,26 @@ describe('13a winner', () => {
     variant_id: label.charCodeAt(0),
     label,
     subject_template: 's',
+    active: true,
+    bespoke: false,
     deactivatable: true,
+    direct: {
+      sent: 200,
+      delivered: 200,
+      contacted: 200,
+      replies: 10,
+      positive_replies: positive,
+      reply_rate: m(10, 200, 5),
+      positive_rate: m(positive, 200, positive),
+    },
+    eventual: {
+      cohort: 200,
+      replies: 10,
+      positive_replies: positive,
+      meetings,
+      reply_rate: m(10, 200, 5),
+      positive_rate: m(positive, 200, positive),
+    },
     sent: 200,
     reply_rate: m(10, 200, 5),
     positive_rate: m(positive, 200, positive),
@@ -97,6 +116,13 @@ describe('13a winner', () => {
 
   it('sums meetings across variants', () => {
     expect(variantsMeetings([variant('A', 3, 4), variant('B', 8, 2)])).toBe(11);
+  });
+
+  it('reports an honest tie and excludes bespoke manual sends', () => {
+    expect(winningVariant([variant('A', 5, 4), variant('B', 5, 4)])).toBeNull();
+    expect(
+      winningVariant([{ ...variant('M', 99, 99), bespoke: true }, variant('A', 1, 1)])?.label,
+    ).toBe('A');
   });
 });
 

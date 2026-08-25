@@ -1,7 +1,7 @@
 import type { FastifyError, FastifyInstance } from 'fastify';
 import { CsvContractError, ImportTooLargeError } from '../../ingest/parse';
 import { SequenceEditConflictError } from '../../db/repos/sequencesRepo';
-import { CapacityExceededError, RecycleSequenceConflictError } from '../../services/enrollment';
+import { CapacityExceededError } from '../../services/enrollment';
 import { FatalChecksError, MailboxUnhealthyError } from '../../services/manualCompose';
 import { AppError, toEnvelope } from '../errors';
 import { RequestValidationError } from './zodCompilers';
@@ -43,11 +43,6 @@ export function registerErrorHandling(app: FastifyInstance): void {
       return reply
         .status(409)
         .send(toEnvelope('capacity_exceeded', err.message, { suggested: err.suggested }));
-    }
-    if (err instanceof RecycleSequenceConflictError) {
-      return reply
-        .status(409)
-        .send(toEnvelope('recycle_sequence_conflict', err.message, { step_nos: err.stepNos }));
     }
     if (err instanceof MailboxUnhealthyError) {
       return reply.status(409).send(toEnvelope('mailbox_unhealthy', err.message));

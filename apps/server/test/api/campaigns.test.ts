@@ -71,6 +71,7 @@ describe('B6.6 campaigns', () => {
       sequence_id: seqId,
       enrolled_count: 0,
       contacted_count: 0,
+      recycle_sources: [],
       recycled_from_campaign_id: null,
     });
     expect(c.ramp_config).toEqual({ ramp_days: 7, ramp_daily_enroll_cap: 20 });
@@ -337,7 +338,7 @@ describe('B6.6 campaigns', () => {
     });
   });
 
-  it('cold storage + recycle: rest gate, hash guard 409, draft-only 409, success path', async () => {
+  it('cold storage + recycle: rest gate, conflict skip, draft-only 409, success path', async () => {
     // rest the two COMPLETED leads past the 60-day gate — anchored to the
     // VIRTUAL clock (the API compares against services.clock, not now())
     await h.pool.query(
@@ -398,14 +399,36 @@ describe('B6.6 campaigns', () => {
         payload: { name: 'Pass 2 (conflict)', sequence_id: seqId, acknowledge_tier_a_manual: true },
       })
     ).json();
+    const shortPreview = await h.inject({
+      method: 'POST',
+      url: `/api/v1/campaigns/${conflictTarget.id}/recycle/preview`,
+      payload: { source_campaign_ids: [campaignId] },
+    });
+    expect(shortPreview.statusCode).toBe(400);
+    const preview = await h.inject({
+      method: 'POST',
+      url: `/api/v1/campaigns/${conflictTarget.id}/recycle/preview`,
+      payload: { source_campaign_ids: [campaignId, activeTarget.id] },
+    });
+    expect(preview.statusCode).toBe(200);
+    expect(preview.json().breakdown).toMatchObject({
+      unique_leads: 2,
+      prior_content_conflicts: 1,
+      eligible: 1,
+    });
+    expect(preview.json().sources).toHaveLength(2);
     const conflicted = await h.inject({
       method: 'POST',
       url: `/api/v1/campaigns/${conflictTarget.id}/recycle`,
       payload: { source_campaign_id: campaignId },
     });
-    expect(conflicted.statusCode).toBe(409);
-    expect(conflicted.json().error.code).toBe('recycle_sequence_conflict');
-    expect(conflicted.json().error.details.step_nos).toEqual([1]);
+    expect(conflicted.statusCode).toBe(200);
+    expect(conflicted.json().enrolled).toBe(1);
+    expect(conflicted.json().breakdown.prior_content_conflicts).toBe(1);
+    expect(conflicted.json().skipped).toContainEqual({
+      reason: 'content_hash_conflict',
+      count: 1,
+    });
 
     // fresh templates → success; enrolled×N; recycled_from tagged
     const freshSeqId = (
@@ -434,6 +457,13 @@ describe('B6.6 campaigns', () => {
     const tagged = (await h.inject({ method: 'GET', url: '/api/v1/campaigns' })).json();
     const t = tagged.items.find((c: { id: number }) => c.id === target.id);
     expect(t.recycled_from_campaign_id).toBe(campaignId);
+    expect(t.recycle_sources).toEqual([
+      {
+        campaign_id: campaignId,
+        name: 'Spring Outreach',
+        contributed_leads: 2,
+      },
+    ]);
   });
 
   it('deletes only unreferenced campaigns with a typed name confirmation', async () => {

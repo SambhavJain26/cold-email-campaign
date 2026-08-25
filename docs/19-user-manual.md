@@ -1026,12 +1026,21 @@ Analytics is scoped to the selected campaign and contains four tabs.
 
 ### 13.1 Variants
 
-Compares step-1 opener variants by sent count, reply rate, positive rate, and meetings. The winner
-is selected primarily by meetings, then positive rate for a tie. Under 300 sends per variant is
-marked a small sample.
+Choose any sequence step from the step selector. The screen separates two questions:
+
+- **Direct response:** how many messages at the selected step were sent/delivered, and how many
+  replies directly referenced that step's message. A reply received before delayed delivery
+  confirmation still counts as contacted, so the rate cannot exceed 100% for that reason.
+- **Eventual outcome:** among all enrollments that received the selected variant, how many later
+  replied, became positive, or booked a meeting—even when the reply referenced a later step.
+
+The recommended winner uses eventual meetings first and eventual positive rate second. If both are
+equal, the screen reports a tie instead of choosing arbitrarily. Under 300 sends per automated
+variant is marked a small sample.
 
 **Deactivate variant** retires a losing active variant for future sends. Historical sends remain
-visible. Manual/bespoke variants are read-only.
+visible. Manual/bespoke variants are read-only, and the system refuses to deactivate the final
+active automated variant for a step.
 
 ### 13.2 Steps
 
@@ -1083,16 +1092,21 @@ Each row shows completion time, earliest recycle date, and eligibility. The wait
 ### Recycle into campaign
 
 1. Create a **draft** target campaign using a genuinely different sequence/angle.
-2. Select the completed source campaign in the global selector.
-3. Choose **Recycle into campaign**.
-4. Select the draft target and confirm.
+2. Choose **Recycle into campaign** from Cold Storage.
+3. Select at least two completed source campaigns and one draft target.
+4. Choose **Preview eligibility**. Review unique leads, cross-source duplicates, rest-period,
+   nurture, suppression/recontact, existing-target, and prior-content exclusions plus per-source
+   contributions.
+5. Choose **Confirm recycle** only after the preview makes sense.
 
-The system enrolls only rested, eligible leads. The original enrollments remain completed. The
-target receives a Pass-2 reference.
+Confirmation recomputes every rule, so a lead who becomes suppressed after preview is safely
+skipped. Each eligible lead appears only once in the target even if present in multiple sources.
+The original enrollments and event history remain untouched, the target stays draft, and every
+qualifying source relationship is recorded.
 
-If any target active-variant content hash matches content a lead already received, the entire
-recycle is refused and offending step numbers are shown. Change the message; do not try to bypass
-the guard.
+If target active-variant content matches content a lead already received, that lead is skipped and
+reported as a prior-content conflict; the duplicate message is never resent. Other currently
+eligible leads can still commit atomically.
 
 Prior human repliers and suppressed leads are not ordinary cold-storage candidates.
 

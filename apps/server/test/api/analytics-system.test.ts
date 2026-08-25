@@ -134,6 +134,8 @@ describe('B6.9 analytics + B6.12 system', () => {
     expect(a.sent).toBe(1);
     expect(a.reply_rate.numerator).toBe(1);
     expect(a.meetings).toBe(1);
+    expect(a.direct).toMatchObject({ sent: 1, delivered: 1, contacted: 1, replies: 1 });
+    expect(a.eventual).toMatchObject({ cohort: 1, replies: 1, meetings: 1 });
     expect(b.sent).toBe(1);
     expect(b.reply_rate.numerator).toBe(0);
   });
@@ -147,6 +149,11 @@ describe('B6.9 analytics + B6.12 system', () => {
     const seq = (await h.inject({ method: 'GET', url: '/api/v1/sequences' })).json().items[0];
     const a = seq.steps[0].variants.find((v: { id: number }) => v.id === variantIds[0]);
     expect(a.active).toBe(false);
+    const finalActive = await h.inject({
+      method: 'POST',
+      url: `/api/v1/step-variants/${variantIds[1]}/deactivate`,
+    });
+    expect(finalActive.statusCode).toBe(409);
     expect(
       (await h.inject({ method: 'POST', url: '/api/v1/step-variants/999/deactivate' })).statusCode,
     ).toBe(404);

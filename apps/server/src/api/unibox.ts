@@ -124,7 +124,7 @@ function toUniboxItemDto(row: UniboxRow): UniboxItemDto {
 
 export async function uniboxRoutes(app: FastifyInstance, services: AppServices): Promise<void> {
   const r = app.withTypeProvider<ZodTypeProvider>();
-  const { db, clock, store, scheduler, renderer, sequences } = services;
+  const { db, clock, store, scheduler, renderer } = services;
 
   r.get(
     '/reminders',
@@ -511,7 +511,7 @@ export async function uniboxRoutes(app: FastifyInstance, services: AppServices):
       let result;
       try {
         result = await manualSend(
-          { db, clock, scheduler, renderer, store, sequences },
+          { db, clock, scheduler, renderer },
           {
             leadId: req.body.lead_id,
             campaignId: req.body.campaign_id,

@@ -91,9 +91,12 @@ export default function CampaignDetailPage() {
       <div className="flex flex-wrap items-center gap-3">
         <h1 className="text-lg font-semibold">{campaign.name}</h1>
         <CampaignStatusBadge status={campaign.status} />
-        {campaign.recycled_from_campaign_id !== null && (
+        {campaign.recycle_sources.length > 0 && (
           <Badge variant="outline" className="text-[10px]">
-            Pass 2 · recycled from #{campaign.recycled_from_campaign_id}
+            Recycled from{' '}
+            {campaign.recycle_sources
+              .map((source) => `${source.name} (${source.contributed_leads})`)
+              .join(', ')}
           </Badge>
         )}
         <div className="ml-auto flex gap-2">

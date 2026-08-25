@@ -40,7 +40,31 @@ export const variantAnalyticsRowSchema = z
     variant_id: z.number().int(),
     label: z.string(),
     subject_template: z.string(),
+    active: z.boolean(),
+    bespoke: z.boolean(),
     deactivatable: z.boolean(),
+    direct: z
+      .object({
+        sent: z.number().int(),
+        delivered: z.number().int(),
+        contacted: z.number().int(),
+        replies: z.number().int(),
+        positive_replies: z.number().int(),
+        reply_rate: metricSchema,
+        positive_rate: metricSchema,
+      })
+      .strict(),
+    eventual: z
+      .object({
+        cohort: z.number().int(),
+        replies: z.number().int(),
+        positive_replies: z.number().int(),
+        meetings: z.number().int(),
+        reply_rate: metricSchema,
+        positive_rate: metricSchema,
+      })
+      .strict(),
+    /** Compatibility aliases for pre-Stage-3 clients. */
     sent: z.number().int(),
     reply_rate: metricSchema,
     positive_rate: metricSchema,

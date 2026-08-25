@@ -29,6 +29,7 @@ import {
   rebuildBodySchema,
   reconnectMailboxBodySchema,
   recycleBodySchema,
+  recyclePreviewBodySchema,
   resumeMailboxBodySchema,
   sequenceWriteBodySchema,
   snoozeBodySchema,
@@ -785,6 +786,7 @@ export const handlers: RequestHandler[] = [
         variable_overrides: body.variable_overrides ?? {},
         resolved_variables: {},
         auto_observation: body.auto_observation ?? { field: null, rules: {} },
+        recycle_sources: [],
         recycled_from_campaign_id: null,
         enrolled_count: 0,
         contacted_count: 0,
@@ -878,6 +880,37 @@ export const handlers: RequestHandler[] = [
     }),
   ),
   http.post(
+    `${BASE}/campaigns/:id/recycle/preview`,
+    authed(async ({ request, params }) => {
+      const target = db.campaigns.find((campaign) => campaign.id === Number(params.id));
+      if (!target) return notFound('campaign');
+      const body = await parseBody(request, recyclePreviewBodySchema);
+      if (body instanceof Response) return body;
+      if (target.status !== 'draft')
+        return err('conflict', 'recycle target must be a draft campaign', 409);
+      return HttpResponse.json({
+        breakdown: {
+          unique_leads: 284,
+          duplicates: 36,
+          rest_period_failures: 42,
+          nurture_exclusions: 10,
+          suppression_recontact_blocks: 8,
+          existing_target_enrollments: 4,
+          prior_content_conflicts: 12,
+          eligible: 208,
+        },
+        sources: body.source_campaign_ids.map((sourceId, index) => ({
+          source_campaign_id: sourceId,
+          name:
+            db.campaigns.find((campaign) => campaign.id === sourceId)?.name ??
+            `Campaign ${sourceId}`,
+          candidates: index === 0 ? 180 : 140,
+          eligible: index === 0 ? 124 : 108,
+        })),
+      });
+    }),
+  ),
+  http.post(
     `${BASE}/campaigns/:id/recycle`,
     authed(async ({ request, params }) => {
       const target = db.campaigns.find((c) => c.id === Number(params.id));
@@ -886,22 +919,37 @@ export const handlers: RequestHandler[] = [
       if (body instanceof Response) return body;
       if (target.status !== 'draft')
         return err('conflict', 'recycle target must be a draft campaign', 409);
-      // Decision Q: the cohort already received sequence 1's templates, so
-      // recycling them into it would re-send identical content — the hash guard
-      // blocks the WHOLE action and names the offending steps.
-      if (target.sequence_id === 1) {
-        return err(
-          'recycle_sequence_conflict',
-          'target sequence would re-send content these leads already received',
-          409,
-          { step_nos: [1, 2, 3, 4] },
-        );
-      }
-      target.recycled_from_campaign_id = body.source_campaign_id;
+      const sourceIds =
+        'source_campaign_ids' in body ? body.source_campaign_ids : [body.source_campaign_id];
+      target.recycle_sources = sourceIds.map((sourceId) => ({
+        campaign_id: sourceId,
+        name:
+          db.campaigns.find((campaign) => campaign.id === sourceId)?.name ?? `Campaign ${sourceId}`,
+        contributed_leads: 120,
+      }));
+      target.recycled_from_campaign_id = sourceIds.length === 1 ? sourceIds[0]! : null;
       target.enrolled_count += 120;
       return HttpResponse.json({
         enrolled: 120,
         skipped: [{ reason: 'resting', count: 660 }],
+        breakdown: {
+          unique_leads: 284,
+          duplicates: 36,
+          rest_period_failures: 42,
+          nurture_exclusions: 10,
+          suppression_recontact_blocks: 8,
+          existing_target_enrollments: 4,
+          prior_content_conflicts: 12,
+          eligible: 120,
+        },
+        sources: sourceIds.map((sourceId, index) => ({
+          source_campaign_id: sourceId,
+          name:
+            db.campaigns.find((campaign) => campaign.id === sourceId)?.name ??
+            `Campaign ${sourceId}`,
+          candidates: index === 0 ? 180 : 140,
+          eligible: index === 0 ? 70 : 50,
+        })),
       });
     }),
   ),
@@ -1205,32 +1253,71 @@ export const handlers: RequestHandler[] = [
   ),
   http.get(
     `${BASE}/analytics/variants`,
-    authed(() =>
-      HttpResponse.json({
-        items: [
-          {
-            variant_id: 1,
-            label: 'A',
-            subject_template: 'Quick question about {{company}}',
-            deactivatable: true,
-            sent: 443,
-            reply_rate: { numerator: 40, denominator: 434, value: 9.2 },
-            positive_rate: { numerator: 16, denominator: 434, value: 3.7 },
-            meetings: 10,
-          },
-          {
-            variant_id: 2,
-            label: 'B',
-            subject_template: '{{first_name|Hi}} — idea for {{company}}',
-            deactivatable: true,
-            sent: 442,
-            reply_rate: { numerator: 32, denominator: 433, value: 7.4 },
-            positive_rate: { numerator: 12, denominator: 433, value: 2.8 },
-            meetings: 7,
-          },
-        ],
-      }),
-    ),
+    authed(({ request }) => {
+      const stepNo = Number(new URL(request.url).searchParams.get('step_no') ?? 1);
+      const makeMetric = (numerator: number, denominator: number) => ({
+        numerator,
+        denominator,
+        value: denominator === 0 ? null : Math.round((numerator / denominator) * 1000) / 10,
+      });
+      const variants =
+        db.sequences[0]?.steps.find((step) => step.step_no === stepNo)?.variants ?? [];
+      const activeCount = variants.filter((variant) => variant.active).length;
+      const profiles = [
+        {
+          sent: 443,
+          delivered: 434,
+          directReplies: 40,
+          directPositive: 16,
+          eventualReplies: 52,
+          eventualPositive: 21,
+          meetings: 10,
+        },
+        {
+          sent: 442,
+          delivered: 433,
+          directReplies: 32,
+          directPositive: 12,
+          eventualReplies: 45,
+          eventualPositive: 18,
+          meetings: 7,
+        },
+      ];
+      return HttpResponse.json({
+        items: variants.map((variant, index) => {
+          const profile = profiles[index] ?? profiles[0]!;
+          return {
+            variant_id: variant.id,
+            label: variant.label,
+            subject_template: variant.subject_template,
+            active: variant.active,
+            bespoke: false,
+            deactivatable: variant.active && activeCount > 1,
+            direct: {
+              sent: profile.sent,
+              delivered: profile.delivered,
+              contacted: profile.delivered,
+              replies: profile.directReplies,
+              positive_replies: profile.directPositive,
+              reply_rate: makeMetric(profile.directReplies, profile.delivered),
+              positive_rate: makeMetric(profile.directPositive, profile.delivered),
+            },
+            eventual: {
+              cohort: profile.sent,
+              replies: profile.eventualReplies,
+              positive_replies: profile.eventualPositive,
+              meetings: profile.meetings,
+              reply_rate: makeMetric(profile.eventualReplies, profile.sent),
+              positive_rate: makeMetric(profile.eventualPositive, profile.sent),
+            },
+            sent: profile.sent,
+            reply_rate: makeMetric(profile.eventualReplies, profile.sent),
+            positive_rate: makeMetric(profile.eventualPositive, profile.sent),
+            meetings: profile.meetings,
+          };
+        }),
+      });
+    }),
   ),
   http.get(
     `${BASE}/analytics/steps`,
@@ -1274,6 +1361,11 @@ export const handlers: RequestHandler[] = [
         .flatMap((s) => s.variants)
         .find((v) => v.id === Number(params.id));
       if (!variant) return notFound('variant');
+      const step = db.sequences
+        .flatMap((sequence) => sequence.steps)
+        .find((candidate) => candidate.variants.some((entry) => entry.id === variant.id));
+      if ((step?.variants.filter((entry) => entry.active).length ?? 0) <= 1)
+        return err('conflict', 'the final active automated variant cannot be deactivated', 409);
       variant.active = false;
       return HttpResponse.json({ ok: true });
     }),

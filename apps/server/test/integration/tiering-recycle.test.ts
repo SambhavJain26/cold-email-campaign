@@ -8,9 +8,8 @@ import { EventStore } from '../../src/services/eventStore';
 import { VirtualClock } from '../../src/clock/virtual';
 import { StaticSequenceProvider } from '../../src/scheduler/staticSequenceProvider';
 import { bulkTier } from '../../src/services/tiering';
-import { coldStorage, recycle, RecycleSequenceConflictError } from '../../src/services/enrollment';
+import { coldStorage, recycle } from '../../src/services/enrollment';
 import { listDue } from '../../src/db/repos/enrollmentsRepo';
-import { testSequence, testStep, testVariant } from '../helpers/sequences';
 import { TEST_DATABASE_URL, resetCoreTables, seedMailboxes } from '../helpers/db';
 
 const NOW = new Date('2026-03-02T15:00:00Z');
@@ -110,8 +109,20 @@ describe('cold storage + recycle (B5.7)', () => {
     sequences = new StaticSequenceProvider();
     await resetCoreTables(pool);
     await seedMailboxes(pool, 1);
+    await pool.query(`INSERT INTO sequences (name) VALUES ('fresh pass sequence')`);
     await pool.query(
-      `INSERT INTO campaigns (name, status) VALUES ('pass1', 'completed'), ('pass2', 'draft')`,
+      `INSERT INTO sequence_steps (sequence_id, step_no, wait_days, in_thread)
+       VALUES (1, 1, 0, false), (1, 2, 3, true)`,
+    );
+    await pool.query(
+      `INSERT INTO step_variants
+         (step_id, label, subject_template, body_template, content_hash)
+       VALUES (1, 'A', 'Fresh subject', 'Fresh body', 'fresh1'),
+              (2, 'A', 'Fresh follow-up', 'Fresh follow-up body', 'fresh2')`,
+    );
+    await pool.query(
+      `INSERT INTO campaigns (name, status, sequence_id)
+       VALUES ('pass1', 'completed', NULL), ('pass2', 'draft', 1)`,
     );
     await pool.query(
       `INSERT INTO leads (email, tier, is_suppressed) VALUES
@@ -147,39 +158,16 @@ describe('cold storage + recycle (B5.7)', () => {
     expect(items[0]!.earliestRecycleAt.getTime()).toBe(daysAgo(61).getTime() + 60 * 86_400_000);
   });
 
-  it('hash conflict blocks the WHOLE action, listing offending steps', async () => {
-    // Target sequence still contains the old step-1 content (hash h1).
-    sequences.register(TARGET, {
-      id: 9,
-      steps: [testStep(1, 0, { contentHash: 'h1' }), testStep(2, 3, { contentHash: 'x2' })],
-    });
-    await expect(recycle(deps(), TARGET, SOURCE)).rejects.toThrow(RecycleSequenceConflictError);
-    await expect(recycle(deps(), TARGET, SOURCE)).rejects.toThrow(/step\(s\) 1/);
+  it('hash conflicts are skipped and never re-enrolled', async () => {
+    await pool.query(`UPDATE step_variants SET content_hash = 'h1' WHERE step_id = 1`);
+    const result = await recycle(deps(), TARGET, SOURCE);
+    expect(result.enrolled).toBe(0);
+    expect(result.skipped).toContainEqual({ reason: 'content_hash_conflict', count: 1 });
     const count = await pool.query(`SELECT count(*)::int n FROM enrollments WHERE campaign_id = 2`);
-    expect(count.rows[0].n).toBe(0); // nothing partially enrolled
+    expect(count.rows[0].n).toBe(0);
   });
 
   it('changed sequence passes: rested, non-nurture leads enroll fresh; old pass untouched', async () => {
-    // NB: testSequence's default hashes are h1,h2… which would collide with
-    // the received 'h1' — a changed sequence means fresh hashes.
-    sequences.register(TARGET, {
-      id: 9,
-      steps: [
-        {
-          stepNo: 1,
-          waitDays: 0,
-          inThread: false,
-          variants: [testVariant(91, { contentHash: 'fresh1' })],
-        },
-        {
-          stepNo: 2,
-          waitDays: 3,
-          inThread: true,
-          variants: [testVariant(92, { contentHash: 'fresh2' })],
-        },
-      ],
-    });
-
     const r = await recycle(deps(), TARGET, SOURCE);
     expect(r.enrolled).toBe(1);
     expect(r.leadIds).toEqual([1]); // rested + not suppressed + not nurture + not gated
@@ -201,22 +189,10 @@ describe('cold storage + recycle (B5.7)', () => {
 
   it('refuses a non-draft target', async () => {
     await pool.query(`UPDATE campaigns SET status = 'active' WHERE id = 2`);
-    sequences.register(TARGET, testSequence(9, [0]));
     await expect(recycle(deps(), TARGET, SOURCE)).rejects.toThrow(/draft/);
   });
 
   it('listDue ignores draft campaigns — the recycle target stays silent until activated', async () => {
-    sequences.register(TARGET, {
-      id: 9,
-      steps: [
-        {
-          stepNo: 1,
-          waitDays: 0,
-          inThread: false,
-          variants: [testVariant(91, { contentHash: 'fresh1' })],
-        },
-      ],
-    });
     await recycle(deps(), TARGET, SOURCE);
 
     expect(await listDue(db, clock.now())).toHaveLength(0); // target is draft

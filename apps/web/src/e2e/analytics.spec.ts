@@ -13,12 +13,19 @@ test('13a variants: the golden split, winner on meetings, deactivate flow', asyn
   await page.getByRole('link', { name: 'Analytics' }).click();
 
   await expect(page.getByTestId('variant-row-A')).toContainText('443');
-  await expect(page.getByTestId('variant-row-A')).toContainText('10'); // meetings
+  await expect(page.getByRole('region', { name: 'Eventual outcome' })).toContainText('10');
   await expect(page.getByTestId('variant-row-B')).toContainText('442');
-  await expect(page.getByTestId('variants-verdict')).toContainText('Variant A wins on meetings');
+  await expect(page.getByTestId('variants-verdict')).toContainText(
+    'Variant A leads on eventual meetings',
+  );
 
-  await page.getByRole('button', { name: 'Deactivate B, route all to A' }).click();
-  await expect(page.getByRole('dialog')).toContainText('retired, never deleted');
+  await page
+    .getByRole('region', { name: 'Eventual outcome' })
+    .getByRole('row')
+    .filter({ hasText: 'B' })
+    .getByRole('button', { name: 'Deactivate' })
+    .click();
+  await expect(page.getByRole('dialog')).toContainText('Historical results remain visible');
   await page.getByRole('button', { name: 'Deactivate', exact: true }).click();
   await expect(page.getByText('Variant B deactivated')).toBeVisible();
 });
@@ -76,9 +83,7 @@ test('13d health: sparklines with thresholds and the watch-rule status', async (
   await expect(page.getByTestId('watch-rules')).toContainText('healthy. No action needed.');
 });
 
-test('cold storage lists rested leads and the recycle guard blocks identical content', async ({
-  page,
-}) => {
+test('cold storage previews multi-source exclusions before confirmation', async ({ page }) => {
   await login(page);
   await page.getByRole('link', { name: 'Cold Storage' }).click();
   await expect(page.getByText(/of \d+ finished leads are ready/)).toBeVisible();
@@ -94,13 +99,16 @@ test('cold storage lists rested leads and the recycle guard blocks identical con
 
   await page.getByRole('link', { name: 'Cold Storage' }).click();
   await page.getByRole('button', { name: 'Recycle into campaign…' }).click();
+  await page.getByText('Manual Send Fixture', { exact: true }).click();
   await page.getByLabel('Target campaign (draft only)').click();
   await page.getByRole('option', { name: 'Pass 2 — same message' }).click();
-  await page.getByRole('button', { name: 'Recycle', exact: true }).click();
+  await page.getByRole('button', { name: 'Preview eligibility' }).click();
 
-  // 409 recycle_sequence_conflict → the whole action is refused, steps named.
-  await expect(page.getByTestId('recycle-conflict')).toContainText('identical to Pass 1');
-  await expect(page.getByTestId('recycle-conflict')).toContainText('1, 2, 3, 4');
+  const preview = page.getByTestId('recycle-preview');
+  await expect(preview).toContainText('Final confirmation');
+  await expect(preview).toContainText('Cross-source duplicates');
+  await expect(preview).toContainText('Prior-content conflicts');
+  await expect(preview).toContainText('Per-source contribution');
 });
 
 test('recycling into a campaign with a new sequence succeeds', async ({ page }) => {
@@ -128,10 +136,14 @@ test('recycling into a campaign with a new sequence succeeds', async ({ page }) 
 
   await page.getByRole('link', { name: 'Cold Storage' }).click();
   await page.getByRole('button', { name: 'Recycle into campaign…' }).click();
+  await page.getByText('Manual Send Fixture', { exact: true }).click();
   await page.getByLabel('Target campaign (draft only)').click();
   await page.getByRole('option', { name: 'Pass 2 — new angle' }).click();
-  await page.getByRole('button', { name: 'Recycle', exact: true }).click();
+  await page.getByRole('button', { name: 'Preview eligibility' }).click();
+  await page.getByRole('button', { name: 'Confirm recycle' }).click();
 
-  await expect(page.getByTestId('recycle-result')).toContainText('Enrolled 120 leads');
-  await expect(page.getByTestId('recycle-result')).toContainText('Skipped 660 — resting');
+  await expect(page.getByTestId('recycle-result')).toContainText(
+    'Enrolled 120 unique eligible leads',
+  );
+  await expect(page.getByTestId('recycle-result')).toContainText('Still resting');
 });

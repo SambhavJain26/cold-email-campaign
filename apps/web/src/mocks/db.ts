@@ -263,6 +263,7 @@ function buildCampaigns(): CampaignDto[] {
       variable_overrides: {},
       resolved_variables: {},
       auto_observation: { field: null, rules: {} },
+      recycle_sources: [],
     },
     {
       id: 2,
@@ -280,6 +281,7 @@ function buildCampaigns(): CampaignDto[] {
       variable_overrides: {},
       resolved_variables: {},
       auto_observation: { field: null, rules: {} },
+      recycle_sources: [],
       recycled_from_campaign_id: null,
       enrolled_count: 1,
       contacted_count: 0,

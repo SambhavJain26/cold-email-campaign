@@ -4,10 +4,12 @@ import {
   bigint,
   bigserial,
   boolean,
+  check,
   index,
   integer,
   jsonb,
   pgTable,
+  primaryKey,
   text,
   timestamp,
   uniqueIndex,
@@ -118,6 +120,43 @@ export const enrollments = pgTable(
     index('enr_mailbox')
       .on(t.assignedMailboxId)
       .where(sql`${t.currentState} = 'ACTIVE'`),
+  ],
+);
+
+export const campaignRecycleSources = pgTable(
+  'campaign_recycle_sources',
+  {
+    targetCampaignId: bigint('target_campaign_id', { mode: 'number' })
+      .notNull()
+      .references(() => campaigns.id, { onDelete: 'cascade' }),
+    sourceCampaignId: bigint('source_campaign_id', { mode: 'number' })
+      .notNull()
+      .references(() => campaigns.id, { onDelete: 'cascade' }),
+    selectedAt: tz('selected_at').notNull().defaultNow(),
+  },
+  (t) => [
+    primaryKey({ columns: [t.targetCampaignId, t.sourceCampaignId] }),
+    check('campaign_recycle_sources_distinct', sql`${t.targetCampaignId} <> ${t.sourceCampaignId}`),
+  ],
+);
+
+export const recycleEnrollmentSources = pgTable(
+  'recycle_enrollment_sources',
+  {
+    targetEnrollmentId: bigint('target_enrollment_id', { mode: 'number' })
+      .notNull()
+      .references(() => enrollments.id, { onDelete: 'cascade' }),
+    sourceCampaignId: bigint('source_campaign_id', { mode: 'number' })
+      .notNull()
+      .references(() => campaigns.id, { onDelete: 'cascade' }),
+    sourceEnrollmentId: bigint('source_enrollment_id', { mode: 'number' })
+      .notNull()
+      .references(() => enrollments.id, { onDelete: 'cascade' }),
+    createdAt: tz('created_at').notNull().defaultNow(),
+  },
+  (t) => [
+    primaryKey({ columns: [t.targetEnrollmentId, t.sourceEnrollmentId] }),
+    index('recycle_enrollment_sources_campaign').on(t.sourceCampaignId, t.targetEnrollmentId),
   ],
 );
 

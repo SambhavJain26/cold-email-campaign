@@ -115,15 +115,28 @@ export class MetricsEngine {
     }));
   }
 
-  /** Per-variant table (13a) — cohort = the opener's variant. */
-  async variantAnalytics(scope: MetricScope = {}) {
-    const rows = await q.variantStats(this.db, scope);
+  /** Direct and eventual per-variant outcomes for a selected sequence step. */
+  async variantAnalytics(scope: MetricScope = {}, stepNo = 1) {
+    const rows = await q.variantStats(this.db, scope, stepNo);
     return rows.map((r) => ({
       variantId: r.variant_id,
-      sent: r.sent,
-      replyRate: pct(r.repliers, r.contacted),
-      positiveRate: pct(r.positive_repliers, r.contacted),
-      meetings: r.meetings,
+      direct: {
+        sent: r.sent,
+        delivered: r.direct_delivered,
+        contacted: r.direct_contacted,
+        replies: r.direct_repliers,
+        positiveReplies: r.direct_positive_repliers,
+        replyRate: pct(r.direct_repliers, r.direct_contacted),
+        positiveRate: pct(r.direct_positive_repliers, r.direct_contacted),
+      },
+      eventual: {
+        cohort: r.cohort,
+        replies: r.eventual_repliers,
+        positiveReplies: r.eventual_positive_repliers,
+        meetings: r.meetings,
+        replyRate: pct(r.eventual_repliers, r.cohort),
+        positiveRate: pct(r.eventual_positive_repliers, r.cohort),
+      },
     }));
   }
 

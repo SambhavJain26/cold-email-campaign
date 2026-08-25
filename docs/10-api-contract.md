@@ -15,7 +15,7 @@ Shapes below in TS notation. `Metric = { numerator: number, denominator: number 
 
 ## Error codes (closed set)
 
-`unauthorized` 401 · `forbidden` 403 · `not_found` 404 · `validation` 400 · `conflict` 409 · `rate_limited` 429 · `capacity_exceeded` 409 · `recycle_sequence_conflict` 409 · `import_too_large` 413 · `mailbox_unhealthy` 409 · `sequence_invalid` 422 · `internal` 500
+`unauthorized` 401 · `forbidden` 403 · `not_found` 404 · `validation` 400 · `conflict` 409 · `rate_limited` 429 · `capacity_exceeded` 409 · `import_too_large` 413 · `mailbox_unhealthy` 409 · `sequence_invalid` 422 · `internal` 500. `recycle_sequence_conflict` remains a deprecated client-code compatibility value; current recycling reports content conflicts in its preview/commit breakdown instead of failing the whole action.
 
 ---
 
@@ -75,7 +75,8 @@ Shapes below in TS notation. `Metric = { numerator: number, denominator: number 
 | GET `/campaigns/:id/capacity` | → capacity plus `ramp_day`, current `ramp_stage`, `enrolled_today`, and remaining stage allowance |
 | POST `/campaigns/:id/enroll` | `{count} \| {lead_ids, force?, allow_recontact?}` → `{enrolled, skipped: {reason, count}[]}`. Count enrollment excludes prior human repliers. Explicit recontact requires `allow_recontact:true`, completed reply disposition, and an elapsed `not_now` date; suppression is never overrideable. |
 | GET `/campaigns/:id/outcomes` | → `{UNSUBSCRIBED, BOUNCED, REPLIED: {positive, neutral}, COMPLETED, ACTIVE, NEW, total}` (Stage-9 completion panel) |
-| POST `/campaigns/:id/recycle` | `{source_campaign_id}` → same shape as enroll |
+| POST `/campaigns/:id/recycle/preview` | `{source_campaign_ids:[at least two unique ids]}` → read-only `{breakdown, sources}` with unique leads, duplicates, every exclusion category, eligible count, and per-source candidate/eligible counts |
+| POST `/campaigns/:id/recycle` | `{source_campaign_ids:[at least two unique ids]}` → recomputed atomic `{enrolled, skipped, breakdown, sources}`. Legacy `{source_campaign_id}` remains accepted. Conflicting content is skipped and reported; source enrollments/history stay untouched. |
 | GET `/cold-storage?source_campaign_id=&page=&per_page=` | → `{items: {lead, completed_at, earliest_recycle_at, eligible: boolean}[], total, page, per_page}` |
 
 ## Unibox
@@ -105,8 +106,8 @@ Shapes below in TS notation. `Metric = { numerator: number, denominator: number 
 | | |
 |---|---|
 | GET `/analytics/overview?campaign_id=` | → `{progress: {contacted, total, pct}, reply_rate: Metric, positive_rate: Metric, meetings: {count, per_100}, hard_bounce_rate: Metric, soft_bounce_rate: Metric, unsubscribe_rate: Metric, capacity: Capacity, watch_flags: string[]}` |
-| GET `/analytics/variants?sequence_id=&step_no=1` | → per-variant `{variant_id, label, subject_template, sent, reply_rate, positive_rate, meetings}` (13a) |
-| POST `/step-variants/:id/deactivate` | → `{ok}` ("route all to B") |
+| GET `/analytics/variants?campaign_id=&step_no=` | → every automated, inactive historical, and sent bespoke variant for the selected step. Explicit `direct` metrics use replies whose persisted thread match points to that step; `eventual` metrics follow the complete enrollment cohort through later replies/meetings. Legacy top-level fields remain aliases. |
+| POST `/step-variants/:id/deactivate` | → `{ok}`; transactionally refuses bespoke variants and the final active automated variant for that step. Historical results remain visible. |
 | GET `/analytics/steps?sequence_id=` | → `{items: {step_no, delivered, positive_replies, positive_rate}[]}` (13b) — also accepts `?campaign_id=` (aggregates across a sequence's campaigns; the executable form since B6.13 — the golden campaign has no DB sequence) |
 | GET `/analytics/tiers?campaign_id=` | → per-tier `{tier, contacted, reply_rate, positive_rate, meetings, mode}` + `{promotable: {tier_c_engaged: number}}` (13c) |
 | GET `/analytics/health-trend?days=30&campaign_id?=` | → `{items: DailySeries[], totals, watch_flags: {rule, message}[]}` (13d — executable form per B6.13) |

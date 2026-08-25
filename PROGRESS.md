@@ -4,10 +4,10 @@
 
 **Legend:** `[ ]` not started · `[~]` in progress · `[x]` done · `[!]` blocked (note why in the log)
 
-**Current focus:** → **2026-08-25 ten-workstream implementation paused after Stage 2 by operator.**
-Stages 1–2 are complete locally. Do not begin Stage 3 analytics/recycling or Stage 4 mobile work
-until the operator explicitly continues. No campaign activation, enrollment, send, Oracle change,
-or production deploy is authorized by the implementation plan.
+**Current focus:** → **2026-08-25 ten-workstream implementation Stage 4.** Stages 1–3 are complete
+locally; the responsive/mobile redesign and final complete gate remain. No campaign activation,
+production enrollment, send, Oracle change, or production deploy is authorized by the
+implementation plan.
 
 > **⚠️ Superseded framing (corrected 2026-08-09).** This line previously read "No code work is outstanding" and "everything left in B8 … is *operations*, not code." **That was wrong.** Operating the canary against a real provider exposed genuine **code** defects — the reply/send race (finding 15), whole-mailbox history ingestion (16), plain-text-only mail (19), and a class of backend-implemented/UI-invisible gaps (3–9). All were fixed on `b8.3-local-canary`. Treat [docs/17](docs/17-local-canary-runbook.md) as the authoritative status record, not this header.
 
@@ -50,6 +50,17 @@ ramps are complete locally. Migration `0016` passed apply/down/apply; type/lint/
 web 55, API 119, integration 162, GreenMail 29, golden exactly 47, mock E2E 52, and real-backend
 E2E 1 are green. The populated event-backed test DB returned `checked 5 enrollments — 0 diff(s)`;
 self-check is clean. Stages 3–4 are deferred; production and Oracle are unchanged.
+
+**2026-08-25 implementation Stage 3:** every sequence step now has explicit Direct response and
+Eventual outcome variant analytics; effective sentiment changes and distinct meetings follow the
+correct enrollment cohort; bespoke/history rows remain read-only; and the final active automated
+variant is transactionally protected. Cold Storage now previews and atomically combines two or
+more source campaigns, rechecks every eligibility rule at commit, skips prior-content conflicts,
+and stores campaign- plus enrollment-level provenance. Migration `0017` passed apply/down/apply;
+type/lint/format, unit 341, web 56, integration 166, API 122, and six affected mock-browser
+journeys are green. The populated event-backed test DB returned `checked 5 enrollments — 0
+diff(s)` and self-check is clean. Stage 4 and the final complete gate remain; production and Oracle
+are unchanged.
 
 ---
 

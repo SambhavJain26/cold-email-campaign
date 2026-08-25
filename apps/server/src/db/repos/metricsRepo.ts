@@ -34,7 +34,7 @@ async function all<T>(db: DbLike, q: SQL): Promise<T[]> {
 function replySentimentCte(scope: MetricScope): SQL {
   return sql`
     reply_sentiment AS (
-      SELECT hr.id, hr.lead_id, hr.enrollment_id, hr.campaign_id, hr.step_no,
+      SELECT hr.id, hr.lead_id, hr.enrollment_id, hr.campaign_id, hr.step_no, hr.occurred_at,
              COALESCE(
                (SELECT st.sentiment FROM events st
                  WHERE st.type = 'sentiment_tagged'
@@ -181,42 +181,78 @@ export async function tierStats(db: DbLike, scope: MetricScope): Promise<TierSta
 export interface VariantStatsRow {
   variant_id: number | null;
   sent: number;
-  contacted: number;
-  repliers: number;
-  positive_repliers: number;
+  direct_delivered: number;
+  direct_contacted: number;
+  direct_repliers: number;
+  direct_positive_repliers: number;
+  cohort: number;
+  eventual_repliers: number;
+  eventual_positive_repliers: number;
   meetings: number;
 }
 
 /**
- * Per-variant (walkthrough 13a): the opener's variant defines the cohort —
- * every enrollment is attributed to the variant of its FIRST step-1 send.
+ * Per-variant analytics for any selected step. The human_reply event's step_no
+ * is the classifier's persisted thread match, so it is the authoritative
+ * direct-response attribution. Eventual outcomes use the enrollment cohort.
  */
-export async function variantStats(db: DbLike, scope: MetricScope): Promise<VariantStatsRow[]> {
+export async function variantStats(
+  db: DbLike,
+  scope: MetricScope,
+  stepNo: number,
+): Promise<VariantStatsRow[]> {
   return all<VariantStatsRow>(
     db,
     sql`WITH ${replySentimentCte(scope)},
-      opener AS (
-        SELECT DISTINCT ON (e.enrollment_id) e.enrollment_id, e.lead_id,
-               (e.attributes->>'variant_id')::bigint variant_id
+      cohort AS (
+        SELECT e.enrollment_id, e.lead_id,
+               (e.attributes->>'variant_id')::bigint variant_id,
+               min(e.occurred_at) first_sent_at,
+               count(*)::int sent
         FROM events e
-        WHERE e.type = 'sent' AND e.step_no = 1${evFilter('e', scope)}
-        ORDER BY e.enrollment_id, e.id),
-      d AS (SELECT DISTINCT e.enrollment_id FROM events e
-            WHERE e.type = 'delivered'${evFilter('e', scope)}),
-      m AS (SELECT e.enrollment_id, count(*)::int meetings FROM events e
-            WHERE e.type = 'meeting_booked'${evFilter('e', scope)} GROUP BY 1)
-      SELECT o.variant_id,
-             count(*)::int sent,
-             count(d.enrollment_id)::int contacted,
-             count(DISTINCT rs.lead_id)::int repliers,
-             count(DISTINCT rs.lead_id) FILTER (WHERE rs.sentiment = 'positive')::int positive_repliers,
-             COALESCE(sum(m.meetings), 0)::int meetings
-      FROM opener o
-      LEFT JOIN d ON d.enrollment_id = o.enrollment_id
-      LEFT JOIN reply_sentiment rs ON rs.enrollment_id = o.enrollment_id
-      LEFT JOIN m ON m.enrollment_id = o.enrollment_id
-      GROUP BY o.variant_id
-      ORDER BY o.variant_id NULLS LAST`,
+        WHERE e.type = 'sent' AND e.step_no = ${stepNo}${evFilter('e', scope)}
+        GROUP BY e.enrollment_id, e.lead_id, (e.attributes->>'variant_id')::bigint),
+      delivered AS (
+        SELECT DISTINCT c.enrollment_id, c.variant_id
+        FROM cohort c JOIN events e ON e.enrollment_id = c.enrollment_id
+        WHERE e.type = 'delivered' AND e.step_no = ${stepNo}
+          AND e.occurred_at >= c.first_sent_at${evFilter('e', scope)}),
+      direct_reply AS (
+        SELECT c.enrollment_id, c.variant_id,
+               bool_or(rs.sentiment = 'positive') positive
+        FROM cohort c JOIN reply_sentiment rs ON rs.enrollment_id = c.enrollment_id
+        WHERE rs.step_no = ${stepNo} AND rs.occurred_at >= c.first_sent_at
+        GROUP BY c.enrollment_id, c.variant_id),
+      eventual_reply AS (
+        SELECT c.enrollment_id, c.variant_id,
+               bool_or(rs.sentiment = 'positive') positive
+        FROM cohort c JOIN reply_sentiment rs ON rs.enrollment_id = c.enrollment_id
+        WHERE rs.occurred_at >= c.first_sent_at
+        GROUP BY c.enrollment_id, c.variant_id),
+      meeting AS (
+        SELECT DISTINCT c.enrollment_id, c.variant_id
+        FROM cohort c JOIN events e ON e.enrollment_id = c.enrollment_id
+        WHERE e.type = 'meeting_booked' AND e.occurred_at >= c.first_sent_at${evFilter('e', scope)})
+      SELECT c.variant_id,
+             sum(c.sent)::int sent,
+             count(DISTINCT d.enrollment_id)::int direct_delivered,
+             count(DISTINCT c.enrollment_id) FILTER (
+               WHERE d.enrollment_id IS NOT NULL OR dr.enrollment_id IS NOT NULL
+             )::int direct_contacted,
+             count(DISTINCT dr.enrollment_id)::int direct_repliers,
+             count(DISTINCT dr.enrollment_id) FILTER (WHERE dr.positive)::int
+               direct_positive_repliers,
+             count(DISTINCT c.enrollment_id)::int cohort,
+             count(DISTINCT er.enrollment_id)::int eventual_repliers,
+             count(DISTINCT er.enrollment_id) FILTER (WHERE er.positive)::int
+               eventual_positive_repliers,
+             count(DISTINCT m.enrollment_id)::int meetings
+      FROM cohort c
+      LEFT JOIN delivered d ON d.enrollment_id = c.enrollment_id AND d.variant_id = c.variant_id
+      LEFT JOIN direct_reply dr ON dr.enrollment_id = c.enrollment_id AND dr.variant_id = c.variant_id
+      LEFT JOIN eventual_reply er ON er.enrollment_id = c.enrollment_id AND er.variant_id = c.variant_id
+      LEFT JOIN meeting m ON m.enrollment_id = c.enrollment_id AND m.variant_id = c.variant_id
+      GROUP BY c.variant_id ORDER BY c.variant_id NULLS LAST`,
   );
 }
 

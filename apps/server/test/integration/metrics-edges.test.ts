@@ -155,11 +155,11 @@ describe('metrics edge cases', () => {
     const rows = await metrics.variantAnalytics();
     const v1 = rows.find((r) => r.variantId === 1)!;
     const v2 = rows.find((r) => r.variantId === 2)!;
-    expect(v1.sent).toBe(1);
-    expect(v1.replyRate.numerator).toBe(1); // lead 3 replied
-    expect(v1.meetings).toBe(0);
-    expect(v2.meetings).toBe(1); // lead 6
-    expect(v2.positiveRate.numerator).toBe(1);
+    expect(v1.direct.sent).toBe(1);
+    expect(v1.direct.replyRate.numerator).toBe(1); // lead 3 replied
+    expect(v1.eventual.meetings).toBe(0);
+    expect(v2.eventual.meetings).toBe(1); // lead 6
+    expect(v2.eventual.positiveRate.numerator).toBe(1);
   });
 
   it('asOf gives point-in-time values (before lead 6 was tagged positive)', async () => {

@@ -1,3 +1,4 @@
+import { useMemo, useState } from 'react';
 import { Trophy } from 'lucide-react';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
@@ -9,6 +10,14 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
+import {
+  Select,
+  SelectContent,
+  SelectGroup,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 import { Skeleton } from '@/components/ui/skeleton';
 import {
   Table,
@@ -20,13 +29,12 @@ import {
 } from '@/components/ui/table';
 import { EmptyState } from '@/components/shared/empty-state';
 import { useVariantAnalytics } from '@/api/queries/analytics';
+import { useSequences } from '@/api/queries/sequences';
 import { useDeactivateVariant } from '@/api/mutations/campaigns';
 import { variantsMeetings, winningVariant } from './reconciliation';
 
 const SMALL_SAMPLE = 300;
 
-/** F7.1 — 13a variant comparison. The endpoint is sequence-scoped (not campaign-
- *  scoped), so the sequence is chosen here — defaulting to the campaign's own. */
 export function VariantsTab({
   campaignId,
   campaignSequenceId,
@@ -34,7 +42,16 @@ export function VariantsTab({
   campaignId: number;
   campaignSequenceId: number | null;
 }) {
-  const { data, isPending, isError, refetch } = useVariantAnalytics(campaignId, 1);
+  const sequences = useSequences();
+  const sequence = sequences.data?.items.find((item) => item.id === campaignSequenceId);
+  const stepNumbers = useMemo(
+    () => sequence?.steps.map((step) => step.step_no).toSorted((a, b) => a - b) ?? [1],
+    [sequence],
+  );
+  const [stepNo, setStepNo] = useState(1);
+  const selectedStepNo = stepNumbers.includes(stepNo) ? stepNo : (stepNumbers[0] ?? 1);
+
+  const { data, isPending, isError, refetch } = useVariantAnalytics(campaignId, selectedStepNo);
   const deactivate = useDeactivateVariant();
   const [confirmId, setConfirmId] = useState<number | null>(null);
 
@@ -46,110 +63,180 @@ export function VariantsTab({
       />
     );
   }
-  if (isPending) return <Skeleton className="h-40 w-full" />;
-  if (isError) {
+  if (isPending || sequences.isPending) return <Skeleton className="h-40 w-full" />;
+  if (isError || sequences.isError) {
     return (
       <EmptyState title="Failed to load variants" actionLabel="Retry" onAction={() => refetch()} />
     );
   }
 
   const rows = data.items;
-  const comparableRows = rows.filter((row) => row.deactivatable);
+  const comparableRows = rows.filter((row) => !row.bespoke);
   const winner = winningVariant(comparableRows);
-  const smallSample = rows.some((row) => row.sent < SMALL_SAMPLE);
-  const loser = comparableRows.find((row) => row.variant_id !== winner?.variant_id);
+  const tied = comparableRows.length > 1 && winner === null;
+  const smallSample = comparableRows.some((row) => row.eventual.cohort < SMALL_SAMPLE);
   const confirmTarget = rows.find((row) => row.variant_id === confirmId);
 
   return (
-    <div className="space-y-3">
-      <p className="text-xs text-muted-foreground">Step-1 openers for this campaign.</p>
-
-      <div className="overflow-x-auto rounded-lg border border-border">
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead className="text-xs">Variant</TableHead>
-              <TableHead className="text-xs">Subject</TableHead>
-              <TableHead className="text-right text-xs">Sent</TableHead>
-              <TableHead className="text-right text-xs">Reply</TableHead>
-              <TableHead className="text-right text-xs">Positive</TableHead>
-              <TableHead className="text-right text-xs">Meetings</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {rows.map((row) => (
-              <TableRow
-                key={row.variant_id}
-                data-testid={`variant-row-${row.label}`}
-                className={row.variant_id === winner?.variant_id ? 'bg-success/10' : undefined}
-              >
-                <TableCell className="py-1.5 text-sm font-medium">
-                  {row.variant_id === winner?.variant_id && (
-                    <Trophy className="mr-1 inline size-3.5 text-success" aria-label="winner" />
-                  )}
-                  {row.label}
-                  {!row.deactivatable && (
-                    <span className="ml-1 text-xs font-normal text-muted-foreground">
-                      (read-only)
-                    </span>
-                  )}
-                </TableCell>
-                <TableCell className="py-1.5 font-mono text-xs text-muted-foreground">
-                  {row.subject_template}
-                </TableCell>
-                <TableCell className="py-1.5 text-right text-sm tabular-nums">{row.sent}</TableCell>
-                <TableCell
-                  className="py-1.5 text-right text-sm tabular-nums"
-                  title={`${row.reply_rate.numerator} / ${row.reply_rate.denominator} = ${row.reply_rate.value}%`}
-                >
-                  {row.reply_rate.value}%
-                </TableCell>
-                <TableCell
-                  className="py-1.5 text-right text-sm tabular-nums"
-                  title={`${row.positive_rate.numerator} / ${row.positive_rate.denominator} = ${row.positive_rate.value}%`}
-                >
-                  {row.positive_rate.value}%
-                </TableCell>
-                <TableCell className="py-1.5 text-right text-sm font-medium tabular-nums">
-                  {row.meetings}
-                </TableCell>
-              </TableRow>
-            ))}
-          </TableBody>
-        </Table>
+    <div className="flex flex-col gap-5">
+      <div className="flex flex-wrap items-end justify-between gap-3">
+        <div>
+          <p className="text-sm font-medium">Variant performance by step</p>
+          <p className="text-xs text-muted-foreground">
+            Direct response follows the replied-to message. Eventual outcome follows the whole
+            enrollment after receiving the variant.
+          </p>
+        </div>
+        <div className="flex items-center gap-2">
+          <label htmlFor="variant-step" className="text-xs font-medium">
+            Sequence step
+          </label>
+          <Select
+            value={String(selectedStepNo)}
+            onValueChange={(value) => setStepNo(Number(value))}
+          >
+            <SelectTrigger id="variant-step" className="w-32">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectGroup>
+                {stepNumbers.map((value) => (
+                  <SelectItem key={value} value={String(value)}>
+                    Step {value}
+                  </SelectItem>
+                ))}
+              </SelectGroup>
+            </SelectContent>
+          </Select>
+        </div>
       </div>
 
-      {winner && (
-        <div className="space-y-1 text-xs" data-testid="variants-verdict">
-          <p>
-            🏆 Variant {winner.label} wins on meetings ({winner.meetings}) — the metric that matters
-            more than raw replies.
+      <section aria-labelledby="direct-heading" className="flex flex-col gap-2">
+        <div>
+          <h2 id="direct-heading" className="text-sm font-semibold">
+            Direct response
+          </h2>
+          <p className="text-xs text-muted-foreground">
+            Replies that directly reference a message sent at Step {selectedStepNo}.
           </p>
-          <p className="text-muted-foreground">
-            Meetings sum to {variantsMeetings(rows)} across these variants — counted only for leads
-            who received one of these step-1 openers.
-          </p>
-          {smallSample && (
-            <p className="text-warning" data-testid="small-sample">
-              ⚠️ Under {SMALL_SAMPLE} sends per variant — trust big gaps, not small wobbles.
-            </p>
-          )}
         </div>
-      )}
+        <div className="overflow-x-auto rounded-lg border border-border">
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Variant</TableHead>
+                <TableHead>Subject</TableHead>
+                <TableHead className="text-right">Sent</TableHead>
+                <TableHead className="text-right">Delivered</TableHead>
+                <TableHead className="text-right">Reply</TableHead>
+                <TableHead className="text-right">Positive</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {rows.map((row) => (
+                <TableRow key={row.variant_id} data-testid={`variant-row-${row.label}`}>
+                  <TableCell className="font-medium">
+                    {row.label}
+                    {row.bespoke ? ' · manual' : row.active ? '' : ' · inactive'}
+                  </TableCell>
+                  <TableCell className="font-mono text-xs text-muted-foreground">
+                    {row.subject_template}
+                  </TableCell>
+                  <TableCell className="text-right">{row.direct.sent}</TableCell>
+                  <TableCell className="text-right">{row.direct.delivered}</TableCell>
+                  <TableCell className="text-right">{row.direct.reply_rate.value}%</TableCell>
+                  <TableCell className="text-right">{row.direct.positive_rate.value}%</TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        </div>
+      </section>
 
-      {winner && loser && (
-        <Button variant="outline" size="sm" onClick={() => setConfirmId(loser.variant_id)}>
-          Deactivate {loser.label}, route all to {winner.label}
-        </Button>
-      )}
+      <section aria-labelledby="eventual-heading" className="flex flex-col gap-2">
+        <div>
+          <h2 id="eventual-heading" className="text-sm font-semibold">
+            Eventual outcome
+          </h2>
+          <p className="text-xs text-muted-foreground">
+            Any later reply or meeting from enrollments that received this Step {selectedStepNo}{' '}
+            variant.
+          </p>
+        </div>
+        <div className="overflow-x-auto rounded-lg border border-border">
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Variant</TableHead>
+                <TableHead className="text-right">Cohort</TableHead>
+                <TableHead className="text-right">Reply</TableHead>
+                <TableHead className="text-right">Positive</TableHead>
+                <TableHead className="text-right">Meetings</TableHead>
+                <TableHead className="text-right">Action</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {rows.map((row) => (
+                <TableRow
+                  key={row.variant_id}
+                  className={row.variant_id === winner?.variant_id ? 'bg-success/10' : undefined}
+                >
+                  <TableCell className="font-medium">
+                    {row.variant_id === winner?.variant_id && (
+                      <Trophy className="mr-1 inline size-3.5 text-success" aria-label="winner" />
+                    )}
+                    {row.label}
+                    {row.bespoke && ' · read-only'}
+                  </TableCell>
+                  <TableCell className="text-right">{row.eventual.cohort}</TableCell>
+                  <TableCell className="text-right">{row.eventual.reply_rate.value}%</TableCell>
+                  <TableCell className="text-right">{row.eventual.positive_rate.value}%</TableCell>
+                  <TableCell className="text-right font-medium">{row.eventual.meetings}</TableCell>
+                  <TableCell className="text-right">
+                    {row.deactivatable && (
+                      <Button
+                        variant="outline"
+                        size="xs"
+                        onClick={() => setConfirmId(row.variant_id)}
+                      >
+                        Deactivate
+                      </Button>
+                    )}
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        </div>
+      </section>
+
+      <div className="flex flex-col gap-1 text-xs" data-testid="variants-verdict">
+        {winner ? (
+          <p>
+            Variant {winner.label} leads on eventual meetings ({winner.eventual.meetings}), then
+            eventual positive rate ({winner.eventual.positive_rate.value}%).
+          </p>
+        ) : tied ? (
+          <p>No winner yet: the leading variants are tied on meetings and positive rate.</p>
+        ) : null}
+        <p className="text-muted-foreground">
+          These Step {selectedStepNo} cohorts account for {variantsMeetings(rows)} eventual
+          meetings.
+        </p>
+        {smallSample && (
+          <p className="text-warning" data-testid="small-sample">
+            Under {SMALL_SAMPLE} sends per automated variant — trust big gaps, not small wobbles.
+          </p>
+        )}
+      </div>
 
       <Dialog open={confirmId !== null} onOpenChange={(open) => !open && setConfirmId(null)}>
         <DialogContent>
           <DialogHeader>
             <DialogTitle>Deactivate variant {confirmTarget?.label}?</DialogTitle>
             <DialogDescription>
-              New sends stop using it. Already-sent messages keep their history, and the variant row
-              is retired, never deleted.
+              Future sends stop using it. Historical results remain visible. The server refuses to
+              deactivate the final active automated variant for a step.
             </DialogDescription>
           </DialogHeader>
           <DialogFooter>
@@ -176,4 +263,3 @@ export function VariantsTab({
     </div>
   );
 }
-import { useState } from 'react';

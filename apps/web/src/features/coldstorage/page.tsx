@@ -54,8 +54,10 @@ export default function ColdStoragePage() {
     .filter((row) => !row.eligible)
     .map((row) => row.earliest_recycle_at)
     .sort()[0];
-  const passes = (campaigns.data?.items ?? []).filter(
-    (c) => c.recycled_from_campaign_id === sourceCampaignId,
+  const passes = (campaigns.data?.items ?? []).filter((campaign) =>
+    campaign.recycle_sources.some(
+      (sourceCampaign) => sourceCampaign.campaign_id === sourceCampaignId,
+    ),
   );
 
   return (
@@ -65,7 +67,7 @@ export default function ColdStoragePage() {
           <h1 className="text-lg font-semibold">Cold Storage</h1>
           {source && <span className="text-sm text-muted-foreground">· from {source.name}</span>}
         </div>
-        <Button size="sm" disabled={eligible.length === 0} onClick={() => setDialogOpen(true)}>
+        <Button size="sm" onClick={() => setDialogOpen(true)}>
           <Recycle className="size-4" /> Recycle into campaign…
         </Button>
       </div>
@@ -161,6 +163,7 @@ export default function ColdStoragePage() {
       )}
 
       <RecycleDialog
+        key={sourceCampaignId}
         sourceCampaignId={sourceCampaignId}
         open={dialogOpen}
         onOpenChange={setDialogOpen}

@@ -84,61 +84,73 @@ export class EventStore {
    */
   async append(evs: readonly DomainEvent[], opts: AppendOptions = {}): Promise<number[]> {
     if (evs.length === 0) return [];
-    return this.db.transaction(async (tx) => {
-      // Rebuild takes this exclusively; appends share it.
-      await acquireRebuildLockShared(tx);
+    return this.db.transaction((tx) => this.appendInTransaction(tx, evs, opts));
+  }
 
-      const settings = await getSettings(tx);
-      const enrollmentIds = [
-        ...new Set(
-          evs
-            .map((e) => ('enrollmentId' in e ? e.enrollmentId : undefined))
-            .filter((v): v is number => v !== undefined),
-        ),
-      ].sort((a, b) => a - b); // stable order avoids deadlocks between concurrent appends
-      for (const eid of enrollmentIds) {
-        await lockEnrollment(tx, eid);
+  /**
+   * Caller-owned transaction variant for workflows that must create an
+   * enrollment and its first ledger fact atomically. The caller must not do
+   * any externally visible work inside that transaction.
+   */
+  async appendInTransaction(
+    tx: Tx,
+    evs: readonly DomainEvent[],
+    opts: AppendOptions = {},
+  ): Promise<number[]> {
+    if (evs.length === 0) return [];
+    // Rebuild takes this exclusively; appends share it.
+    await acquireRebuildLockShared(tx);
+
+    const settings = await getSettings(tx);
+    const enrollmentIds = [
+      ...new Set(
+        evs
+          .map((e) => ('enrollmentId' in e ? e.enrollmentId : undefined))
+          .filter((v): v is number => v !== undefined),
+      ),
+    ].sort((a, b) => a - b); // stable order avoids deadlocks between concurrent appends
+    for (const eid of enrollmentIds) {
+      await lockEnrollment(tx, eid);
+    }
+
+    // Serialize BEFORE inserting facts. Poller and scheduler therefore cannot
+    // both observe an enrollment as active and append contradictory outcomes.
+    const ids = await insertEvents(tx, evs);
+
+    const byEnrollment = await listByEnrollments(tx, enrollmentIds);
+    const terminalIds = new Set<number>();
+    for (const eid of enrollmentIds) {
+      const history = byEnrollment.get(eid) ?? [];
+      const campaignId = history[0]?.campaignId;
+      if (campaignId === undefined) throw new Error(`enrollment ${eid} has no campaign history`);
+      const snapshot = foldEvents(
+        history,
+        await this.shapeForCampaign(tx, campaignId, settings.softRetryMax),
+      );
+      await writeProjection(tx, eid, snapshot);
+      if (snapshot.state !== 'NEW' && snapshot.state !== 'ACTIVE') terminalIds.add(eid);
+    }
+
+    // Scheduling patches (docs/02 §3): same tx, after the fold so a
+    // terminal outcome always wins over a stale nextSendAt.
+    for (const p of opts.patches ?? []) {
+      const patch = terminalIds.has(p.enrollmentId) ? { ...p, nextSendAt: undefined } : p;
+      await patchScheduling(tx, p.enrollmentId, patch);
+    }
+
+    // Suppression side effects (docs/04 §3) — same transaction, so an
+    // unsubscribe can never land without its suppression row.
+    for (const e of evs) {
+      if (e.type === 'hard_bounce') {
+        await suppressLead(tx, e.leadId, 'hard_bounce', e.occurredAt);
+      } else if (e.type === 'unsubscribe' && settings.suppressUnsubs) {
+        await suppressLead(tx, e.leadId, 'unsubscribed', e.occurredAt);
       }
+    }
 
-      // Serialize BEFORE inserting facts. Poller and scheduler therefore cannot
-      // both observe an enrollment as active and append contradictory outcomes.
-      const ids = await insertEvents(tx, evs);
+    if (opts.txWork) await opts.txWork(tx, ids);
 
-      const byEnrollment = await listByEnrollments(tx, enrollmentIds);
-      const terminalIds = new Set<number>();
-      for (const eid of enrollmentIds) {
-        const history = byEnrollment.get(eid) ?? [];
-        const campaignId = history[0]?.campaignId;
-        if (campaignId === undefined) throw new Error(`enrollment ${eid} has no campaign history`);
-        const snapshot = foldEvents(
-          history,
-          await this.shapeForCampaign(tx, campaignId, settings.softRetryMax),
-        );
-        await writeProjection(tx, eid, snapshot);
-        if (snapshot.state !== 'NEW' && snapshot.state !== 'ACTIVE') terminalIds.add(eid);
-      }
-
-      // Scheduling patches (docs/02 §3): same tx, after the fold so a
-      // terminal outcome always wins over a stale nextSendAt.
-      for (const p of opts.patches ?? []) {
-        const patch = terminalIds.has(p.enrollmentId) ? { ...p, nextSendAt: undefined } : p;
-        await patchScheduling(tx, p.enrollmentId, patch);
-      }
-
-      // Suppression side effects (docs/04 §3) — same transaction, so an
-      // unsubscribe can never land without its suppression row.
-      for (const e of evs) {
-        if (e.type === 'hard_bounce') {
-          await suppressLead(tx, e.leadId, 'hard_bounce', e.occurredAt);
-        } else if (e.type === 'unsubscribe' && settings.suppressUnsubs) {
-          await suppressLead(tx, e.leadId, 'unsubscribed', e.occurredAt);
-        }
-      }
-
-      if (opts.txWork) await opts.txWork(tx, ids);
-
-      return ids;
-    });
+    return ids;
   }
 
   /**

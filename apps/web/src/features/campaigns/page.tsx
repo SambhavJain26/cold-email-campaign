@@ -114,9 +114,10 @@ export default function CampaignsPage() {
                       >
                         {campaign.name}
                       </Link>
-                      {campaign.recycled_from_campaign_id !== null && (
+                      {campaign.recycle_sources.length > 0 && (
                         <Badge variant="outline" className="ml-2 text-[10px]">
-                          Pass 2 · recycled from #{campaign.recycled_from_campaign_id}
+                          Recycled from {campaign.recycle_sources.length} campaign
+                          {campaign.recycle_sources.length === 1 ? '' : 's'}
                         </Badge>
                       )}
                     </TableCell>

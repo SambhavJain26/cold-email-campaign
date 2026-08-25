@@ -12,12 +12,13 @@ Spaceship production infrastructure is live, but the project remains in **pre-pr
 commissioning**:
 
 - **Approved build scope — the only feature work authorized:** the completed 2026-08-15 list (public unsubscribe/one-click, launch guardrails, domain-readiness preflight, per-folder polling, and single-lead creation) plus the operator-approved 2026-08-20 pre-domain safety backlog: mandatory reply stopping; reply dispositions and conservative suppression; guarded cross-campaign recontact; broader opt-out phrases; findings #20–25; alert history and mailbox filters; arbitrary custom-field editing; copy-risk rubric improvements; local verification; and runbook/documentation reconciliation. Outside that list, the rule is unchanged: testing, verification, diagnosis, and documentation only.
-- **2026-08-25 implementation status:** the operator stopped the current run after Stage 2.
-  Stages 1–2 are complete locally: operational pagination; due-step Manual Compose; in-app
-  reminders; verified timezone/folder controls; imported manual drafts; Auto Observation and
-  namespaced sequence variables; and the activation-based staged ramp. Do not begin Stage 3
-  analytics/recycling or Stage 4 mobile redesign until the operator explicitly continues. This
-  does not authorize deployment, activation, enrollment, or any send.
+- **2026-08-25 implementation status:** the operator explicitly continued the run. Stages 1–3 are
+  complete locally: operational pagination; due-step Manual Compose; in-app reminders; verified
+  timezone/folder controls; imported manual drafts; Auto Observation and namespaced sequence
+  variables; activation-based staged ramps; later-step direct/eventual variant analytics; and
+  atomic multi-source cold-storage recycling with durable provenance. Stage 4 responsive/mobile
+  work is authorized and remains. This does not authorize deployment, activation, production
+  enrollment, or any send.
 - The operator-approved Spaceship deployment, subpath support, sender-domain unsubscribe routing,
   and individual Google Workspace OAuth implementation are complete. Do not extend production
   scope or change DNS/Caddy/mailboxes outside the approved commissioning steps without fresh

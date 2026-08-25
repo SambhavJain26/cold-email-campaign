@@ -3,6 +3,8 @@ import {
   campaignSchema,
   enrollResponseSchema,
   okResponseSchema,
+  recycleCommitResponseSchema,
+  recyclePreviewResponseSchema,
   type CreateCampaignBody,
   type PatchCampaignBody,
 } from '@coldemail/shared';
@@ -56,16 +58,32 @@ export function useRecycle() {
   return useMutation({
     mutationFn: ({
       targetCampaignId,
-      sourceCampaignId,
+      sourceCampaignIds,
     }: {
       targetCampaignId: number;
-      sourceCampaignId: number;
+      sourceCampaignIds: number[];
     }) =>
-      apiFetch(`/campaigns/${targetCampaignId}/recycle`, enrollResponseSchema, {
+      apiFetch(`/campaigns/${targetCampaignId}/recycle`, recycleCommitResponseSchema, {
         method: 'POST',
-        body: { source_campaign_id: sourceCampaignId },
+        body: { source_campaign_ids: sourceCampaignIds },
       }),
     onSuccess: () => invalidateOperational(qc),
+  });
+}
+
+export function useRecyclePreview() {
+  return useMutation({
+    mutationFn: ({
+      targetCampaignId,
+      sourceCampaignIds,
+    }: {
+      targetCampaignId: number;
+      sourceCampaignIds: number[];
+    }) =>
+      apiFetch(`/campaigns/${targetCampaignId}/recycle/preview`, recyclePreviewResponseSchema, {
+        method: 'POST',
+        body: { source_campaign_ids: sourceCampaignIds },
+      }),
   });
 }
 

@@ -23,7 +23,8 @@ export function getTestPool(): Pool {
  */
 export async function resetCoreTables(pool: Pool): Promise<void> {
   await pool.query(
-    `TRUNCATE events, enrollments, suppressions, manual_campaign_drafts, campaigns, leads,
+    `TRUNCATE events, recycle_enrollment_sources, campaign_recycle_sources,
+             enrollments, suppressions, manual_campaign_drafts, campaigns, leads,
              incoming_messages, sent_messages, mailbox_secrets, mailboxes,
              step_variants, sequence_steps, sequences, import_rows, imports,
              operator, alerts, send_blocker_episodes, unsubscribe_tokens,

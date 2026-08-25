@@ -18,6 +18,9 @@ import {
   pageQuerySchema,
   patchCampaignBodySchema,
   recycleBodySchema,
+  recycleCommitResponseSchema,
+  recyclePreviewBodySchema,
+  recyclePreviewResponseSchema,
   type CampaignDto,
 } from '@coldemail/shared';
 import type { AppServices } from '../composition';
@@ -38,21 +41,32 @@ import {
   type CampaignCounts,
   type CampaignRow,
 } from '../db/repos/campaignsRepo';
+import { recycleSourcesByTargetIds, type RecycleSourceSummary } from '../db/repos/recyclingRepo';
 import { getSequenceNested } from '../db/repos/sequencesRepo';
 import {
   capacityToday,
   coldStorage,
   enroll,
   enrollByIds,
-  recycle,
   type EnrollResult,
 } from '../services/enrollment';
+import {
+  commitRecycle,
+  previewRecycle,
+  RecycleValidationError,
+  type RecycleBreakdown,
+  type RecycleSourceContribution,
+} from '../services/recycling';
 import { getSettings } from '../db/repos/settingsRepo';
 import { checkRamp, checkRampStages } from '../services/guardrails';
 import { AppError } from './errors';
 import type { ZodTypeProvider } from './plugins/zodCompilers';
 
-function toCampaignDto(row: CampaignRow, counts: CampaignCounts): CampaignDto {
+function toCampaignDto(
+  row: CampaignRow,
+  counts: CampaignCounts,
+  recycleSources: RecycleSourceSummary[] = [],
+): CampaignDto {
   return {
     id: row.id,
     name: row.name,
@@ -65,10 +79,36 @@ function toCampaignDto(row: CampaignRow, counts: CampaignCounts): CampaignDto {
     variable_overrides: variableOverridesOf(row),
     resolved_variables: resolvedVariablesOf(row),
     auto_observation: autoObservationConfigOf(row),
-    recycled_from_campaign_id: row.recycledFromCampaignId,
+    recycle_sources: recycleSources.map((source) => ({
+      campaign_id: source.campaignId,
+      name: source.name,
+      contributed_leads: source.contributedLeads,
+    })),
+    recycled_from_campaign_id: recycleSources.length === 1 ? recycleSources[0]!.campaignId : null,
     enrolled_count: counts.enrolledCount,
     contacted_count: counts.contactedCount,
     manual_only_count: counts.manualOnlyCount,
+  };
+}
+
+function toRecyclePreview(breakdown: RecycleBreakdown, sources: RecycleSourceContribution[]) {
+  return {
+    breakdown: {
+      unique_leads: breakdown.uniqueLeads,
+      duplicates: breakdown.duplicates,
+      rest_period_failures: breakdown.restPeriodFailures,
+      nurture_exclusions: breakdown.nurtureExclusions,
+      suppression_recontact_blocks: breakdown.suppressionRecontactBlocks,
+      existing_target_enrollments: breakdown.existingTargetEnrollments,
+      prior_content_conflicts: breakdown.priorContentConflicts,
+      eligible: breakdown.eligible,
+    },
+    sources: sources.map((source) => ({
+      source_campaign_id: source.sourceCampaignId,
+      name: source.name,
+      candidates: source.candidates,
+      eligible: source.eligible,
+    })),
   };
 }
 
@@ -140,8 +180,14 @@ export async function campaignsRoutes(app: FastifyInstance, services: AppService
     async (req) => {
       const { page, per_page } = req.query;
       const { items, total } = await listCampaigns(db, page, per_page);
+      const sources = await recycleSourcesByTargetIds(
+        db,
+        items.map((item) => item.campaign.id),
+      );
       return {
-        items: items.map((i) => toCampaignDto(i.campaign, i.counts)),
+        items: items.map((i) =>
+          toCampaignDto(i.campaign, i.counts, sources.get(i.campaign.id) ?? []),
+        ),
         total,
         page,
         per_page,
@@ -181,7 +227,7 @@ export async function campaignsRoutes(app: FastifyInstance, services: AppService
         variableOverrides: req.body.variable_overrides,
         autoObservation: req.body.auto_observation,
       });
-      return toCampaignDto(row, { enrolledCount: 0, contactedCount: 0, manualOnlyCount: 0 });
+      return toCampaignDto(row, { enrolledCount: 0, contactedCount: 0, manualOnlyCount: 0 }, []);
     },
   );
 
@@ -227,7 +273,8 @@ export async function campaignsRoutes(app: FastifyInstance, services: AppService
             ? clock.now()
             : undefined,
       });
-      return toCampaignDto(row!, await campaignCounts(db, req.params.id));
+      const sources = (await recycleSourcesByTargetIds(db, [req.params.id])).get(req.params.id);
+      return toCampaignDto(row!, await campaignCounts(db, req.params.id), sources ?? []);
     },
   );
 
@@ -325,29 +372,59 @@ export async function campaignsRoutes(app: FastifyInstance, services: AppService
   );
 
   r.post(
+    '/campaigns/:id/recycle/preview',
+    {
+      schema: {
+        params: idParamSchema,
+        body: recyclePreviewBodySchema,
+        response: { 200: recyclePreviewResponseSchema },
+      },
+    },
+    async (req) => {
+      await requireCampaign(req.params.id);
+      try {
+        const result = await previewRecycle(
+          { db, clock },
+          req.params.id,
+          req.body.source_campaign_ids,
+        );
+        return toRecyclePreview(result.breakdown, result.sources);
+      } catch (error) {
+        if (error instanceof RecycleValidationError) {
+          throw new AppError('conflict', 409, error.message);
+        }
+        throw error;
+      }
+    },
+  );
+
+  r.post(
     '/campaigns/:id/recycle',
     {
       schema: {
         params: idParamSchema,
         body: recycleBodySchema,
-        response: { 200: enrollResponseSchema },
+        response: { 200: recycleCommitResponseSchema },
       },
     },
     async (req) => {
       await requireCampaign(req.params.id);
-      if (!(await getCampaign(db, req.body.source_campaign_id))) {
-        throw AppError.notFound('source campaign');
-      }
+      const sourceIds =
+        'source_campaign_ids' in req.body
+          ? req.body.source_campaign_ids
+          : [req.body.source_campaign_id];
       try {
-        return toEnrollResponse(
-          await recycle(enrollDeps, req.params.id, req.body.source_campaign_id),
-        );
-      } catch (err) {
-        // non-draft target refusal is a state conflict (typed errors pass through)
-        if (err instanceof Error && err.message.includes('recycle targets a draft campaign')) {
-          throw new AppError('conflict', 409, err.message);
+        const result = await commitRecycle({ db, store, clock }, req.params.id, sourceIds);
+        return {
+          ...toRecyclePreview(result.breakdown, result.sources),
+          enrolled: result.enrolled,
+          skipped: result.skipped,
+        };
+      } catch (error) {
+        if (error instanceof RecycleValidationError) {
+          throw new AppError('conflict', 409, error.message);
         }
-        throw err;
+        throw error;
       }
     },
   );

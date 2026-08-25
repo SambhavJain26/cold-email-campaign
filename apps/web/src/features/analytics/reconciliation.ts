@@ -43,16 +43,28 @@ export function tiersReconciliation(
 }
 
 export function variantsMeetings(rows: VariantAnalyticsRow[]): number {
-  return rows.reduce((total, row) => total + row.meetings, 0);
+  return rows.reduce((total, row) => total + row.eventual.meetings, 0);
 }
 
-/** 13a's winner: most meetings, ties broken on positive rate (docs/12 §8). */
+/** Eventual winner; an exact meetings/positive-rate tie has no honest winner. */
 export function winningVariant(rows: VariantAnalyticsRow[]): VariantAnalyticsRow | null {
-  if (rows.length === 0) return null;
-  return rows.reduce((best, row) => {
-    if (row.meetings !== best.meetings) return row.meetings > best.meetings ? row : best;
-    return row.positive_rate.value > best.positive_rate.value ? row : best;
-  });
+  const ranked = rows
+    .filter((row) => !row.bespoke)
+    .sort(
+      (a, b) =>
+        b.eventual.meetings - a.eventual.meetings ||
+        b.eventual.positive_rate.value - a.eventual.positive_rate.value,
+    );
+  const [best, second] = ranked;
+  if (!best) return null;
+  if (
+    second &&
+    best.eventual.meetings === second.eventual.meetings &&
+    best.eventual.positive_rate.value === second.eventual.positive_rate.value
+  ) {
+    return null;
+  }
+  return best;
 }
 
 export type StepVerdict = 'weak' | 'strong' | 'keep' | 'small_sample';

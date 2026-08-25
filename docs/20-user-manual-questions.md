@@ -637,9 +637,11 @@ after it has been recorded.
 
 ### 5.3 How to identify the best variant
 
-Open Analytics, select the campaign, and use the **Variants** tab. It shows sent volume, reply
-rate, positive rate, and meetings for the opener variants. The application recommends waiting for
-roughly 300 sends per variant before declaring a winner, because tiny samples are unstable.
+Open Analytics, select the campaign, use the **Variants** tab, and choose the sequence step. The
+**Direct response** table attributes replies that actually referenced that step. The **Eventual
+outcome** table follows every enrollment that received the variant through later replies and
+meetings. The application recommends waiting for roughly 300 sends per automated variant before
+declaring a winner, because tiny samples are unstable.
 
 Practical example:
 
@@ -652,11 +654,9 @@ Do not choose only from raw reply rate. A provocative subject can produce more n
 Prefer the metric closest to the business outcome—usually meetings first, then positive rate—and
 also inspect bounce/unsubscribe quality.
 
-Current limitation: the Variants tab is hard-wired to **step 1 opener cohorts**. It attributes the
-enrollment's later result to the first step-1 variant and does not provide a UI selector for
-comparing variants inside Step 2 or Step 3. The Steps tab gives aggregate performance by step, but
-not later-step variant-versus-variant analysis. A step selector on variant analytics is a sensible
-**new feature**.
+The winner recommendation uses eventual meetings, then eventual positive rate. It reports an exact
+tie instead of choosing arbitrarily. Historical/deactivated variants remain visible;
+manual/bespoke rows are read-only and excluded from the recommendation.
 
 ## 6. Unibox, reply detection, outcomes, sentiment, sequence stopping, and snooze
 
@@ -787,21 +787,14 @@ treated as approval to send.
 
 ### 7.3 Can two source campaigns be recycled into one target campaign?
 
-**Not safely through the current intended workflow.** A target campaign stores one
-`recycled_from_campaign_id`, and the UI recycles one source campaign at a time. Although the
-backend can prevent duplicate enrollment and duplicate content in several cases, doing the
-operation twice would overwrite the target's single provenance field. You would lose a truthful
-record of both sources.
+**Yes.** Choose **Recycle into campaign**, select at least two completed source campaigns and one
+draft target, then run the read-only preview. It reports cross-source duplicates, every exclusion
+category, eligible unique leads, and per-source candidate/eligible contributions.
 
-Today, use a separate draft target for each source campaign.
-
-A proper multi-source recycle is a reasonable **new feature**. It should include:
-
-- a many-to-many source history rather than one source ID,
-- a preview showing duplicates across both source campaigns,
-- rest-period and prior-reply checks per lead,
-- content-hash checks against everything each lead received, and
-- a combined eligibility/skipped summary before committing.
+On confirmation, the server recomputes the same rules in one transaction. A lead found in two
+sources gets one target enrollment plus two provenance links. Content conflicts are skipped rather
+than resent; source enrollments and events remain untouched. If eligibility changes between preview
+and confirmation, the commit uses the safer current result.
 
 ## 8. Bounce auto-pause and the difference between hard and soft bounces
 
@@ -1015,17 +1008,16 @@ implementation, accessibility, and browser-testing phase.
 
 ## 11. Implementation status from these questions
 
-Stages 1–2 of the approved improvement plan are now complete locally and are not deployed. The
-operator explicitly deferred Stages 3–4 until a later session.
+Stages 1–3 of the approved improvement plan are complete locally and are not deployed. The operator
+explicitly continued the work; Stage 4 responsive/mobile implementation and the final complete gate
+remain.
 
-| Priority | Improvement | Why |
-| --- | --- | --- |
 | Status | Improvement | Notes |
 | --- | --- | --- |
 | Complete locally | Unibox/System pagination, due-step Manual Compose, reminders, safe timezone/folder controls | Stage 1; not deployed |
 | Complete locally | Imported manual drafts, Auto Observation rules, sequence variables, activation-based staged ramp | Stage 2; not deployed |
-| Deferred | Later-step direct/eventual variant analytics and multi-source recycling | Stage 3; wait for explicit continuation |
-| Deferred | Phone-responsive navigation and complete mobile redesign | Stage 4; wait for explicit continuation |
+| Complete locally | Later-step direct/eventual variant analytics and multi-source recycling | Stage 3; not deployed |
+| In progress | Phone-responsive navigation and complete mobile redesign | Stage 4; not deployed |
 
 ## 12. Question coverage map
 

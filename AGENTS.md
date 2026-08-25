@@ -28,13 +28,13 @@ commissioning** until the operator completes the handoffs below:
   20–25; alert history and mailbox filters; arbitrary custom-field editing; copy-risk rubric
   improvements; local verification; and runbook/documentation reconciliation. Outside that list,
   work is limited to testing, verification, diagnosis, and documentation.
-- The operator approved the 2026-08-25 ten-workstream implementation, then explicitly stopped the
-  current run after Stage 2. Stages 1–2 are complete locally: operational pagination; due-step
-  Manual Compose; in-app reminders; verified timezone/folder controls; imported manual drafts;
-  Auto Observation/sequence variables; and the staged activation ramp. **Do not begin Stage 3
-  analytics/recycling or Stage 4 mobile redesign until the operator explicitly continues the work.**
-  Deployment remains separately gated, and implementation must not activate campaigns, enroll
-  leads, or send mail.
+- The operator explicitly continued the 2026-08-25 ten-workstream implementation. Stages 1–3 are
+  complete locally: operational pagination; due-step Manual Compose; in-app reminders; verified
+  timezone/folder controls; imported manual drafts; Auto Observation/sequence variables; staged
+  activation ramps; later-step direct/eventual variant analytics; and atomic multi-source cold-
+  storage recycling with durable provenance. Stage 4 responsive/mobile work is authorized and is
+  the only remaining implementation stage. Deployment remains separately gated, and implementation
+  must not activate campaigns, enroll production leads, or send mail.
 - The approved Spaceship deployment, subpath support, sender-domain unsubscribe routing, and
   per-mailbox Google Workspace OAuth implementation are complete on `b8.3-local-canary`. Do not
   extend production scope, change DNS/Caddy, or configure a real mailbox beyond the approved

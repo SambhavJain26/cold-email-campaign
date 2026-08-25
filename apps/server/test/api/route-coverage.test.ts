@@ -56,6 +56,7 @@ const CONTRACT_ROUTES = [
   'GET /api/v1/campaigns/:id/capacity',
   'POST /api/v1/campaigns/:id/enroll',
   'GET /api/v1/campaigns/:id/outcomes',
+  'POST /api/v1/campaigns/:id/recycle/preview',
   'POST /api/v1/campaigns/:id/recycle',
   'GET /api/v1/cold-storage',
   'GET /api/v1/unibox',

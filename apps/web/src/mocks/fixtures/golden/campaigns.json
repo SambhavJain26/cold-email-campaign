@@ -25,6 +25,7 @@
       "variable_overrides": {},
       "resolved_variables": {},
       "auto_observation": { "field": null, "rules": {} },
+      "recycle_sources": [],
       "recycled_from_campaign_id": null,
       "enrolled_count": 885,
       "contacted_count": 867,

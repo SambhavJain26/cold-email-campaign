@@ -234,8 +234,6 @@ describe('manual compose (B4.10)', () => {
       manualSend(
         {
           ...deps(),
-          store: services.store,
-          sequences: services.sequences,
         },
         sendInput,
       ),
@@ -245,8 +243,6 @@ describe('manual compose (B4.10)', () => {
     const result = await manualSend(
       {
         ...deps(),
-        store: services.store,
-        sequences: services.sequences,
       },
       sendInput,
     );

@@ -59,6 +59,14 @@ export const autoObservationConfigSchema = z
   })
   .strict();
 
+export const campaignRecycleSourceSchema = z
+  .object({
+    campaign_id: z.number().int(),
+    name: z.string(),
+    contributed_leads: z.number().int().min(0),
+  })
+  .strict();
+
 export const campaignSchema = z
   .object({
     id: z.number().int(),
@@ -72,6 +80,7 @@ export const campaignSchema = z
     variable_overrides: sequenceVariablesSchema,
     resolved_variables: sequenceVariablesSchema,
     auto_observation: autoObservationConfigSchema,
+    recycle_sources: z.array(campaignRecycleSourceSchema),
     recycled_from_campaign_id: z.number().int().nullable(),
     enrolled_count: z.number().int().min(0),
     contacted_count: z.number().int().min(0),
@@ -171,9 +180,60 @@ export const outcomesResponseSchema = z
 
 export type OutcomesResponse = z.infer<typeof outcomesResponseSchema>;
 
-export const recycleBodySchema = z
+const legacyRecycleBodySchema = z
   .object({ source_campaign_id: z.number().int().positive() })
   .strict();
+
+export const multiSourceRecycleBodySchema = z
+  .object({ source_campaign_ids: z.array(z.number().int().positive()).min(2) })
+  .strict()
+  .superRefine((value, ctx) => {
+    if (new Set(value.source_campaign_ids).size !== value.source_campaign_ids.length) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['source_campaign_ids'],
+        message: 'source campaign ids must be unique',
+      });
+    }
+  });
+
+export const recycleBodySchema = z.union([legacyRecycleBodySchema, multiSourceRecycleBodySchema]);
+
+export const recyclePreviewBodySchema = multiSourceRecycleBodySchema;
+
+export const recycleBreakdownSchema = z
+  .object({
+    unique_leads: z.number().int().min(0),
+    duplicates: z.number().int().min(0),
+    rest_period_failures: z.number().int().min(0),
+    nurture_exclusions: z.number().int().min(0),
+    suppression_recontact_blocks: z.number().int().min(0),
+    existing_target_enrollments: z.number().int().min(0),
+    prior_content_conflicts: z.number().int().min(0),
+    eligible: z.number().int().min(0),
+  })
+  .strict();
+
+export const recycleSourceContributionSchema = z
+  .object({
+    source_campaign_id: z.number().int(),
+    name: z.string(),
+    candidates: z.number().int().min(0),
+    eligible: z.number().int().min(0),
+  })
+  .strict();
+
+export const recyclePreviewResponseSchema = z
+  .object({
+    breakdown: recycleBreakdownSchema,
+    sources: z.array(recycleSourceContributionSchema),
+  })
+  .strict();
+
+export const recycleCommitResponseSchema = recyclePreviewResponseSchema.extend({
+  enrolled: z.number().int().min(0),
+  skipped: z.array(z.object({ reason: z.string(), count: z.number().int().min(1) }).strict()),
+});
 
 export const coldStorageQuerySchema = pageQuerySchema.extend({
   source_campaign_id: z.coerce.number().int().positive(),

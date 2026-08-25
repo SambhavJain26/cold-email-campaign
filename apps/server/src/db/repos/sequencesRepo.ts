@@ -430,14 +430,36 @@ export async function updateSequenceReplaceSet(
   });
 }
 
-/** POST /step-variants/:id/deactivate ("route all to B") + retire path. */
-export async function deactivateVariant(db: DbLike, variantId: number): Promise<boolean> {
-  const rows = await db
-    .update(stepVariants)
-    .set({ active: false })
-    .where(eq(stepVariants.id, variantId))
-    .returning({ id: stepVariants.id });
-  return rows.length > 0;
+export type DeactivateVariantResult = 'deactivated' | 'not_found' | 'bespoke' | 'last_active';
+
+/** Transactional guard: a step must always retain one automated variant. */
+export async function deactivateVariant(
+  db: Db,
+  variantId: number,
+): Promise<DeactivateVariantResult> {
+  return db.transaction(async (tx) => {
+    const locked = await tx.execute(sql`
+      SELECT v.id, v.active, v.attributes
+      FROM step_variants v
+      WHERE v.step_id = (SELECT step_id FROM step_variants WHERE id = ${variantId})
+      ORDER BY v.id
+      FOR UPDATE`);
+    const rows = locked.rows as Array<{
+      id: number;
+      active: boolean;
+      attributes: Record<string, unknown>;
+    }>;
+    const target = rows.find((row) => Number(row.id) === variantId);
+    if (!target) return 'not_found';
+    if (target.attributes.bespoke === true) return 'bespoke';
+    if (!target.active) return 'deactivated';
+    const activeAutomated = rows.filter(
+      (row) => row.active && row.attributes.bespoke !== true,
+    ).length;
+    if (activeAutomated <= 1) return 'last_active';
+    await tx.update(stepVariants).set({ active: false }).where(eq(stepVariants.id, variantId));
+    return 'deactivated';
+  });
 }
 
 /**

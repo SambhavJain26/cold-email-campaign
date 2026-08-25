@@ -123,8 +123,32 @@ CREATE TABLE campaigns (
   auto_observation_rules jsonb NOT NULL DEFAULT '{}',
   first_activated_at timestamptz,
   ramp_stages        jsonb NOT NULL,
-  recycled_from_campaign_id bigint REFERENCES campaigns(id),   -- set for Pass-2 recycle campaigns
+  recycled_from_campaign_id bigint REFERENCES campaigns(id),   -- deprecated single-source compatibility
   created_at         timestamptz NOT NULL DEFAULT now()
+);
+```
+
+Migration `0017` makes recycle provenance many-to-many while retaining the legacy campaign column
+for rollback/API compatibility. `campaign_recycle_sources` preserves every selected source;
+`recycle_enrollment_sources` records every qualifying source enrollment for each newly created
+target enrollment. A lead present in two sources therefore has one target enrollment and two
+provenance links. Existing single-source campaigns and matching enrollments are backfilled.
+
+```sql
+CREATE TABLE campaign_recycle_sources (
+  target_campaign_id bigint NOT NULL REFERENCES campaigns(id) ON DELETE CASCADE,
+  source_campaign_id bigint NOT NULL REFERENCES campaigns(id) ON DELETE CASCADE,
+  selected_at timestamptz NOT NULL DEFAULT now(),
+  PRIMARY KEY (target_campaign_id, source_campaign_id),
+  CHECK (target_campaign_id <> source_campaign_id)
+);
+
+CREATE TABLE recycle_enrollment_sources (
+  target_enrollment_id bigint NOT NULL REFERENCES enrollments(id) ON DELETE CASCADE,
+  source_campaign_id bigint NOT NULL REFERENCES campaigns(id) ON DELETE CASCADE,
+  source_enrollment_id bigint NOT NULL REFERENCES enrollments(id) ON DELETE CASCADE,
+  created_at timestamptz NOT NULL DEFAULT now(),
+  PRIMARY KEY (target_enrollment_id, source_enrollment_id)
 );
 ```
 
@@ -371,7 +395,10 @@ CREATE INDEX alerts_unacked ON alerts (created_at DESC) WHERE acknowledged_at IS
 
 Seeds (migration `0002_seed`): `settings` row, `compliance_settings` row. The `operator` row is NOT seeded in SQL — it needs an argon2id hash of `OPERATOR_INITIAL_PASSWORD`, so `ensureOperator` creates it at first boot (B6.1); the table itself lands in `0007_operator`.
 
-**Cold Storage is a query, not a table** (plan §4.2): enrollments `COMPLETED` joined to non-suppressed leads, with `terminal_at + rest_days` computing earliest-recycle.
+**Cold Storage is a query, not a lead-copy table** (plan §4.2): source enrollments `COMPLETED`
+joined to leads, with `terminal_at + rest_days` computing earliest recycle. The two provenance
+tables above record a recycle action and its source relationships; they never replace or rewrite
+the source enrollment.
 
 ## 4. Append-only enforcement (plan Stage 1)
 

@@ -67,9 +67,16 @@ Removal (false positives only): decision U — typed-confirmation, audit alert.
 ## 6. Cold storage & recycling (walkthrough Stage 9, plan Stage 5)
 
 - **Cold storage view** = query: enrollments `COMPLETED`, lead not suppressed; per lead: earliest-recycle date = `terminal_at + settings.cold_storage_rest_days` (default 60).
-- **Recycle action:** `POST /campaigns/:id/recycle { source_campaign_id }` on a *draft* campaign: selects that source's cold-storage leads past their rest date and enrolls them (fresh enrollments; the old ones stay COMPLETED — per-campaign state machine is exactly what makes this work).
-- **No-identical-resend guard (decision Q), enforced at enrollment:** block if any active variant `content_hash` in the target sequence ∈ that lead's received hashes (`sent_messages.content_hash`). API returns `recycle_sequence_conflict` listing the offending steps → the UI message "Do NOT resend the same emails" becomes a hard rule, not advice.
-- Recycled enrollments tagged via `campaigns.recycled_from_campaign_id` (drives the "Recycled — Pass 2" label).
+- **Recycle action:** preview then commit two or more source campaigns into one *draft* target.
+  Leads are deduplicated across sources; confirmation recomputes rest, nurture, suppression,
+  recontact, existing-target, and content-hash checks before inserting anything. The legacy
+  single-source request remains accepted. Old enrollments stay COMPLETED and historical events are
+  untouched.
+- **No-identical-resend guard (decision Q), enforced per lead at commit:** if any active target
+  variant `content_hash` exists in that lead's `sent_messages.content_hash`, skip and report that
+  lead. Other eligible leads still commit atomically; duplicate content is never resent.
+- Provenance lives in `campaign_recycle_sources` and `recycle_enrollment_sources`. The legacy
+  `campaigns.recycled_from_campaign_id` is populated only when provenance has exactly one source.
 
 ## 7. Tests (B5)
 
