@@ -27,6 +27,7 @@ const GLYPH: Record<Sentiment, string> = { positive: '🟢', neutral: '⚪', neg
 export default function UniboxPage() {
   const [view, setView] = useState<'human' | 'auto_reply' | 'reminders'>('human');
   const [page, setPage] = useState(1);
+  const [perPage, setPerPage] = useState(25);
   const [reminderView, setReminderView] = useState<'due_today' | 'upcoming' | 'overdue'>(
     'due_today',
   );
@@ -43,12 +44,12 @@ export default function UniboxPage() {
   const { data, isPending, isError, refetch } = useUnibox({
     bucket,
     page,
-    per_page: 50,
+    per_page: perPage,
     sentiment: view === 'human' ? sentiment : undefined,
     unhandled: view === 'human' && unhandledOnly ? true : undefined,
     mailbox_id: mailboxId === 'all' ? undefined : Number(mailboxId),
   });
-  const reminders = useReminders({ page, per_page: 50, view: reminderView, status: 'open' });
+  const reminders = useReminders({ page, per_page: perPage, view: reminderView, status: 'open' });
   const patchReminder = usePatchReminder();
 
   const switchBucket = (next: string) => {
@@ -74,7 +75,7 @@ export default function UniboxPage() {
       </div>
 
       <div className="space-y-3">
-        <div className="max-w-full overflow-x-auto">
+        <div className="max-w-full overflow-x-auto overflow-y-hidden">
           <div
             className="flex min-w-max gap-1 rounded-lg bg-muted p-[3px]"
             role="tablist"
@@ -251,6 +252,11 @@ export default function UniboxPage() {
               perPage={reminders.data.per_page}
               total={reminders.data.total}
               onPageChange={setPage}
+              onPerPageChange={(nextPerPage) => {
+                setPerPage(nextPerPage);
+                setPage(1);
+              }}
+              paginationLabel="Reminders pagination"
             />
           </div>
         )
@@ -285,6 +291,13 @@ export default function UniboxPage() {
             perPage={data.per_page}
             total={data.total}
             onPageChange={setPage}
+            onPerPageChange={(nextPerPage) => {
+              setPerPage(nextPerPage);
+              setPage(1);
+            }}
+            paginationLabel={
+              view === 'human' ? 'Human replies pagination' : 'Auto-replies pagination'
+            }
           />
         </div>
       )}

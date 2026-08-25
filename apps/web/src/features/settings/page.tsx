@@ -55,7 +55,7 @@ export default function SettingsPage() {
     <div className="max-w-3xl space-y-4 p-4 sm:p-6">
       <h1 className="text-lg font-semibold">Settings</h1>
       <Tabs value={tab} onValueChange={onTabChange}>
-        <div className="max-w-full overflow-x-auto">
+        <div className="max-w-full overflow-x-auto overflow-y-hidden">
           <TabsList className="min-w-max">
             <TabsTrigger value="rules">Rules</TabsTrigger>
             <TabsTrigger value="compliance">Compliance</TabsTrigger>

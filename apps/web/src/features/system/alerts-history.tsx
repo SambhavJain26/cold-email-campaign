@@ -23,7 +23,8 @@ const KIND_LABEL: Record<string, string> = {
 export function AlertsHistory() {
   const [unackedOnly, setUnackedOnly] = useState(false);
   const [page, setPage] = useState(1);
-  const alerts = useAlerts(unackedOnly, page, 50);
+  const [perPage, setPerPage] = useState(25);
+  const alerts = useAlerts(unackedOnly, page, perPage);
   const ack = useAckAlert();
 
   return (
@@ -69,6 +70,11 @@ export function AlertsHistory() {
             perPage: alerts.data.per_page,
             total: alerts.data.total,
             onPageChange: setPage,
+            onPerPageChange: (nextPerPage) => {
+              setPerPage(nextPerPage);
+              setPage(1);
+            },
+            paginationLabel: 'Alerts history pagination',
           }}
           columns={[
             {

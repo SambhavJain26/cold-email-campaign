@@ -395,7 +395,9 @@ Filters:
 - **Suppressed only:** shows leads that cannot receive email.
 - **Campaign context:** when the global campaign selector is set, the list is campaign-filtered.
 
-Filters reset pagination and selection.
+Filters reset pagination and selection. Long operational lists default to 25 rows. Use **Rows per
+page** below the list to choose 25, 50, or 100; changing it returns to page 1. The footer always
+shows the current range and total, even when every item fits on one page.
 
 On phones, the table becomes cards and the filters move into a **Filters** drawer. The same lead
 data, selection, actions, active-filter count, and numbered pagination remain available; there is

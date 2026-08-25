@@ -44,7 +44,7 @@ export default function AnalyticsPage() {
       </div>
 
       <Tabs value={tab} onValueChange={setTab}>
-        <div className="max-w-full overflow-x-auto">
+        <div className="max-w-full overflow-x-auto overflow-y-hidden">
           <TabsList className="min-w-max">
             <TabsTrigger value="variants">Variants</TabsTrigger>
             <TabsTrigger value="steps">Steps</TabsTrigger>

@@ -16,6 +16,15 @@ test('reply-detection shows all four classifier buckets and filters', async ({ p
   const stray = page.getByTestId('incoming-row-901');
   await expect(stray).toContainText('unrelated');
   await expect(stray).toContainText('unmatched');
+  const rowsPerPage = page.getByRole('combobox', {
+    name: 'Reply detection pagination rows per page',
+  });
+  await expect(rowsPerPage).toContainText('25');
+  const replyPagination = page.getByRole('navigation', { name: 'Reply detection pagination' });
+  await expect(replyPagination.locator('..')).toContainText(/1–\d+ of \d+/);
+  await rowsPerPage.click();
+  await page.getByRole('option', { name: '50' }).click();
+  await expect(rowsPerPage).toContainText('50');
 
   // Filtering to bounce leaves only the DSN row.
   await page.getByRole('button', { name: 'bounce', exact: true }).click();

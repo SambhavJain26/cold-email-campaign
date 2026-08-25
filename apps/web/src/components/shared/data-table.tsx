@@ -27,6 +27,9 @@ export interface DataTablePagination {
   perPage: number;
   total: number;
   onPageChange: (page: number) => void;
+  onPerPageChange?: (perPage: number) => void;
+  pageSizeOptions?: readonly number[];
+  paginationLabel?: string;
 }
 
 /** Dense table with sticky header + contract-shaped pagination (docs/11 §5).

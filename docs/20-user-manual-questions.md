@@ -937,20 +937,22 @@ for diagnosis and perform a write rebuild only through the controlled runbook.
 
 ### 10.3 Do long lists have pages today?
 
-Yes. The requested operational pagination is now implemented locally.
+Yes. Operational pagination is implemented and verified locally. The long working lists default to 25 rows and let you
+choose 25, 50, or 100 from **Rows per page**.
 
 | Screen | Current behavior |
 | --- | --- |
-| Leads | Already paginated at 50 rows with page controls. |
+| Leads | Defaults to 25 rows; 25/50/100 selector and page controls. |
 | Import history | Paginated. |
-| Unibox | Human, OOO, and Reminder views show 50 per page. |
-| System > Reply Detection | Shows 100 per page. |
-| System > Alerts history | Shows 50 per page, including acknowledged history. |
-| Cold storage | Shows 50 per page from the standard list envelope. |
+| Unibox | Human, OOO, and Reminder views default to 25; 25/50/100 selector. |
+| System > Reply Detection | Defaults to 25; 25/50/100 selector. |
+| System > Alerts history | Defaults to 25, including acknowledged history; 25/50/100 selector. |
+| Cold storage | Defaults to 25 from the standard list envelope; 25/50/100 selector. |
 | Mailboxes/campaigns/sequences | Currently load their full operational lists. |
 
-The shared control shows the current range and total, numbered pages on wider screens, and
-Previous/Next on phones. Filters are preserved across pages and changing a filter resets to page 1.
+The shared control always shows the current range and total, numbered pages on wider screens, and
+Previous/Next on phones. Filters are preserved across pages; changing a filter or page size resets
+to page 1.
 
 ### 10.4 Should the left navigation stay fixed?
 

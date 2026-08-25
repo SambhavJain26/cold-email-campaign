@@ -33,6 +33,7 @@ export default function LeadsPage() {
   const navigate = useNavigate();
   const campaignId = useCampaignParam();
   const [page, setPage] = useState(1);
+  const [perPage, setPerPage] = useState(25);
   const [tier, setTier] = useState<string>(ANY);
   const [state, setState] = useState<string>(ANY);
   const [search, setSearch] = useState('');
@@ -46,7 +47,7 @@ export default function LeadsPage() {
 
   const query: LeadsQuery = {
     page,
-    per_page: 50,
+    per_page: perPage,
     tier: tier === ANY ? undefined : tier,
     state: state === ANY ? undefined : state,
     campaign_id: campaignId,
@@ -277,6 +278,12 @@ export default function LeadsPage() {
           perPage: data.per_page,
           total: data.total,
           onPageChange: setPage,
+          onPerPageChange: (nextPerPage) => {
+            setPerPage(nextPerPage);
+            setPage(1);
+            clearSelection();
+          },
+          paginationLabel: 'Leads pagination',
         }}
         mobileCard={(lead) => (
           <article className="space-y-3 rounded-lg border border-border bg-card p-4">

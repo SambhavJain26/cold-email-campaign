@@ -31,9 +31,10 @@ export function ReplyDetectionTable() {
   const [classification, setClassification] = useState<IncomingClass | undefined>(undefined);
   const [mailboxId, setMailboxId] = useState<string>('all');
   const [page, setPage] = useState(1);
+  const [perPage, setPerPage] = useState(25);
   const mailboxes = useMailboxes();
   const { data, isPending, isError, refetch } = useIncomingMessages({
-    per_page: 100,
+    per_page: perPage,
     page,
     classification,
     mailbox_id: mailboxId === 'all' ? undefined : Number(mailboxId),
@@ -119,6 +120,11 @@ export function ReplyDetectionTable() {
             perPage: data.per_page,
             total: data.total,
             onPageChange: setPage,
+            onPerPageChange: (nextPerPage) => {
+              setPerPage(nextPerPage);
+              setPage(1);
+            },
+            paginationLabel: 'Reply detection pagination',
           }}
           columns={[
             {

@@ -58,7 +58,7 @@ count; the deprecated single-source field is not the display source of truth.
 
 ## 7. 💬 Unibox `/unibox` (§Stage 6)
 
-**Data:** `GET /unibox` (poll 60 s), tabs `human` / `auto_reply` / `reminders`; mailbox and sentiment filters; **Needs outcome** filters replies without a disposition. Each tab is independently paginated at 50 rows and resets to page 1 when a filter changes.
+**Data:** `GET /unibox` (poll 60 s), tabs `human` / `auto_reply` / `reminders`; mailbox and sentiment filters; **Needs outcome** filters replies without a disposition. Each tab defaults to 25 rows, offers 25/50/100 rows per page, and resets to page 1 when a filter or page size changes.
 **Card per item:** every human reply shows the mandatory stopped-sequence caption and an outcome selector. `not_now` requires a future date and creates an in-app reminder; not-interested, wrong-person and explicit opt-out indicate global suppression. Sentiment remains a separate analytics tag. Meeting, reminder and thread actions remain available. Reminders can be filtered by Due today, Upcoming, or Overdue and completed/dismissed without restarting a sequence or authorizing contact.
 **Auto-reply tab:** OOO items, caption "NOT counted as a reply. Sequence continues normally."
 **Edge:** `tag_only` mode (settings) adds an explicit **[Unsubscribe lead]** button on negative-tagged cards → `POST enrollments/:id/unsubscribe`. Empty state: "No replies yet — they'll appear here the moment the poller sees them."

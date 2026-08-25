@@ -17,6 +17,28 @@ test('rules tab saves the full row and clears the dirty flag', async ({ page }) 
   await expect(pct).toHaveValue('8');
 });
 
+test('settings tabs have no stray vertical scrollbar and timezone wheel scrolls the list', async ({
+  page,
+}) => {
+  await login(page);
+  await page.getByRole('link', { name: 'Settings' }).click();
+
+  const tabsOverflow = page.getByRole('tablist').locator('..');
+  await expect
+    .poll(() => tabsOverflow.evaluate((element) => getComputedStyle(element).overflowY))
+    .toBe('hidden');
+
+  await page.getByRole('combobox', { name: 'Default timezone' }).click();
+  const timezoneList = page.locator('[data-slot="command-list"]');
+  await expect(timezoneList).toBeVisible();
+  const initialScrollTop = await timezoneList.evaluate((element) => element.scrollTop);
+  await page.getByPlaceholder('Search timezones…').hover();
+  await page.mouse.wheel(0, 500);
+  await expect
+    .poll(() => timezoneList.evaluate((element) => element.scrollTop))
+    .toBeGreaterThan(initialScrollTop);
+});
+
 test('dirty-state guard blocks tab switch until confirmed', async ({ page }) => {
   await login(page);
   await page.getByRole('link', { name: 'Settings' }).click();

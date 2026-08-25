@@ -201,6 +201,26 @@ describe('DataTable', () => {
     );
     expect(screen.queryByRole('button', { name: 'Next' })).not.toBeInTheDocument();
   });
+
+  it('keeps the range and page-size selector visible when one page suffices', () => {
+    render(
+      <DataTable
+        columns={columns}
+        rows={rows}
+        rowKey={(r) => r.id}
+        pagination={{
+          page: 1,
+          perPage: 25,
+          total: 2,
+          onPageChange: vi.fn(),
+          onPerPageChange: vi.fn(),
+        }}
+      />,
+    );
+
+    expect(screen.getByText('1–2 of 2')).toBeInTheDocument();
+    expect(screen.getByRole('combobox', { name: 'Rows per page' })).toHaveTextContent('25');
+  });
 });
 
 describe('ConfirmTypedDialog', () => {

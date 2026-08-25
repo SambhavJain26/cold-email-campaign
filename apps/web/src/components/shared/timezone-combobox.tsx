@@ -73,9 +73,19 @@ export function TimezoneCombobox({
         </Button>
       </PopoverTrigger>
       <PopoverContent className="w-(--radix-popover-trigger-width) p-0" align="start">
-        <Command>
+        <Command
+          onWheel={(event) => {
+            const list = event.currentTarget.querySelector<HTMLElement>(
+              '[data-slot="command-list"]',
+            );
+            if (!list || event.deltaY === 0) return;
+            list.scrollTop += event.deltaY;
+            event.preventDefault();
+            event.stopPropagation();
+          }}
+        >
           <CommandInput placeholder="Search timezones…" />
-          <CommandList>
+          <CommandList className="overscroll-contain">
             <CommandEmpty>No timezone found.</CommandEmpty>
             <CommandGroup>
               {zones.map((zone) => (

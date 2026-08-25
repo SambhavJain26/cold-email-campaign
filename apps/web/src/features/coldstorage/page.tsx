@@ -21,8 +21,13 @@ export default function ColdStoragePage() {
   const sourceCampaignId = selected ?? campaigns.data?.items[0]?.id;
   const source = campaigns.data?.items.find((c) => c.id === sourceCampaignId);
   const [pagination, setPagination] = useState({ sourceCampaignId, page: 1 });
+  const [perPage, setPerPage] = useState(25);
   const page = pagination.sourceCampaignId === sourceCampaignId ? pagination.page : 1;
-  const { data, isPending, isError, refetch } = useColdStorage(sourceCampaignId ?? 0, page, 50);
+  const { data, isPending, isError, refetch } = useColdStorage(
+    sourceCampaignId ?? 0,
+    page,
+    perPage,
+  );
   const [dialogOpen, setDialogOpen] = useState(false);
 
   if (campaigns.isPending || isPending) return <Skeleton className="m-6 h-64" />;
@@ -107,6 +112,11 @@ export default function ColdStoragePage() {
             perPage: data.per_page,
             total: data.total,
             onPageChange: (nextPage) => setPagination({ sourceCampaignId, page: nextPage }),
+            onPerPageChange: (nextPerPage) => {
+              setPerPage(nextPerPage);
+              setPagination({ sourceCampaignId, page: 1 });
+            },
+            paginationLabel: 'Cold storage pagination',
           }}
           columns={[
             { key: 'lead', header: 'Lead', cell: (row) => row.lead.email },

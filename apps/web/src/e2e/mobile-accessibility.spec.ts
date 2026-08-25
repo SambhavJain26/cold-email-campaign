@@ -78,10 +78,10 @@ test('phone filters, pagination, dialogs, forms, cards, and details remain usabl
   await page.keyboard.press('Escape');
   await expect(filters).toBeFocused();
 
-  const pagination = page.getByRole('navigation', { name: 'pagination' });
+  const pagination = page.getByRole('navigation', { name: 'Leads pagination' });
   await expect(pagination).toBeVisible();
   await pagination.getByLabel('Next').click();
-  await expect(page.getByText(/51–100 of/)).toBeVisible();
+  await expect(page.getByText(/26–50 of/)).toBeVisible();
 
   await page.getByRole('button', { name: 'Import CSV' }).click();
   const importDialog = page.getByRole('dialog');
