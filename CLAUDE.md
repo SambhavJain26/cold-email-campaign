@@ -60,6 +60,9 @@ Treat the runbook as the **durable status record** — task chips and chat summa
 - Fast iteration: `npx vitest run --project unit`.
 - Important gates: `npm run typecheck`, `npm run lint`, `npm run format:check`, `npm run test:golden`, `npm run test:mail`, and the relevant API/integration/web suites.
 - Projection drift check — use this exact command: `npx tsx apps/server/src/services/rebuildCli.ts --dry-run` (exit 1 on drift). Verify **zero diffs** after any change affecting events or projections.
+- The 2026-08-25 frontend-only pagination/settings UX hotfix passed type/lint/format, web 57,
+  mock E2E 60, real-backend E2E 1, and a production Vite build. It changed no event, projection,
+  migration, scheduler, or mail-transport behavior.
 
 ## Production deployments
 
@@ -73,7 +76,7 @@ rollback/canary environment.
 - Stack: `docker-compose.spaceship.yml` with `.env.prod`
 - UI: `https://sambhavpmtech.com/email-campaign/`
 - Internal gateway: `127.0.0.1:18080`; host Caddy alone owns public 80/443
-- Deployed branch/commit: `b8.3-local-canary` at `f273109`
+- Deployed branch/commit: `b8.3-local-canary` at `f58b977`
 
 The private repository currently has no GitHub deploy credential on the VPS. Until a read-only
 deploy key is deliberately installed, transfer a reviewed `git bundle`, fetch the pinned branch
@@ -127,16 +130,17 @@ After an authorized deploy, verify container health, `https://localhost/health`,
 - **Final canary wrap completed 2026-08-21:** the bounded owner-address catch-up scenario accepted four sends in two paced waves (two per mailbox, 925-second same-mailbox gap) after 10,833 seconds of app downtime and emitted `catchup_backlog`. The campaign was paused at the bound. Accelerated settings were restored, both mailboxes are healthy at cap 5 with no resume cap, and both Gmail test campaigns are paused.
 - **Oracle rollback canary:** `4e9e125` plus its documentation-only wrap; both campaigns remain
   paused. Health, self-check, backup, and `checked 24 enrollments — 0 diff(s)` are clean.
-- **Spaceship production:** deployed 2026-08-22 and advanced to `f273109` on 2026-08-25. It has one
+- **Spaceship production:** deployed 2026-08-22 and advanced to the verified pagination/settings
+  UX hotfix `f58b977` on 2026-08-25. It has one
   `google_oauth` mailbox in `ok` state and zero campaigns/leads/enrollments, active campaigns, or
   sendable enrollments. DNS, TLS, the `/email-campaign/` SPA/API subpath, outreach
   redirects, and the two isolated unsubscribe hosts are live. Containers and health are green;
   self-check and zero-drift pass; a custom-format dump passed listing and the scratch restore drill;
   Spaceship AutoBackup is active on trial with a five-backup limit. The portfolio remained online.
-- **Still open, deliberately:** connect and test one Workspace mailbox, then obtain separate
-  authorization for the one-message owner-address send/reply/unsubscribe canary. The business
-  address, sender-domain unsubscribe template, and production Internal Google OAuth credentials
-  are configured; no mailbox exists yet.
+- **Still open, deliberately:** obtain separate authorization for the one-message owner-address
+  send/reply/unsubscribe canary. The business address, sender-domain unsubscribe template,
+  production Internal Google OAuth credentials, and one account-matched OAuth mailbox are
+  configured.
   Finding #12 still needs warmed-domain evidence; provider DSN/OOO fixture capture remains deferred.
 
 **Build history:** M0 (docs), **B0–B7** (foundation → event log → metrics → mock transport/scheduler/poller → render → ingest → API layer → hardening/ops), **F0–F8** (full web track) and **B8.1–B8.2** (live `SmtpImapTransport` + the `MAIL_TRANSPORT` flag swap) are complete — **M1 proven core** ✅, **M2 operable workflow** ✅, **M3 full product (offline)** ✅. A post-M3 audit against docs/14/15 + the decision register (2026-07-25) closed the four specified-but-unbuilt items — decision E, `provider_blocked`, runtime mailbox poll registration, the password-reset CLI (sweep facts below). **Check [PROGRESS.md](PROGRESS.md) for the current task pointer before starting work** — but note its "no code work is outstanding" framing predates the 2026-08-09 correction.

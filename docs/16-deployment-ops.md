@@ -3,8 +3,9 @@
 Single always-on VPS (finalized decision). Docker Compose primary; systemd alternative. Implemented
 in B7 and cut over to Spaceship production on 2026-08-22.
 
-**Production status (2026-08-25):** the ten-workstream implementation through Stage 4 is deployed
-from `b8.3-local-canary` commit `f273109`. The complete serial gate, pre-deploy backup, migrations,
+**Production status (2026-08-25):** the ten-workstream implementation through Stage 4 and the
+pagination/settings UX hotfix are deployed from `b8.3-local-canary` commit `f58b977`. The complete
+serial gate, proportional hotfix gate, pre-deploy backup, migrations,
 container health, public routes, self-check, zero-drift dry-run, dormant send state, and post-deploy
 backup all pass. Oracle remains paused and unchanged.
 
@@ -153,7 +154,7 @@ Remaining for a full **M3** close: the real-backend walkthrough replay (§5, `e2
 ## 8. Spaceship shared-VPS production — deployed 2026-08-22, Stage 4 rollout 2026-08-25
 
 Production is live at `https://sambhavpmtech.com/email-campaign/` on the existing Spaceship VM.
-The portfolio at `sambhavbuilds.com` remained online throughout. Code is pinned to `f273109` on
+The portfolio at `sambhavbuilds.com` remained online throughout. Code is pinned to `f58b977` on
 `b8.3-local-canary`; `main` was not merged. Oracle remains paused and unchanged as the temporary
 rollback environment.
 
@@ -180,6 +181,14 @@ enrollments — 0 diff(s)`. Production contains one `google_oauth` mailbox in `o
 campaigns, leads, enrollments, active campaigns, or sendable enrollments. The post-deploy dump
 `coldemail-20260825-113839.dump` is 292,812 bytes and passed `pg_restore --list`. No campaign was
 activated, no lead was enrolled, and no mail was sent.
+
+The later operator-approved UX hotfix fast-forwarded the same branch to `f58b977`. It adds visible
+25/50/100 page-size controls to the long operational lists, removes the tab-strip scrollbar arrows,
+and fixes timezone mouse-wheel scrolling. Type/lint/format, web 57, mock-browser E2E 60,
+real-backend E2E 1, and the production Vite build passed. Post-deploy containers, health, public
+routing, migrations through `0017`, self-check, dormant send state, and zero projection drift all
+passed. Dump `coldemail-20260825-121851.dump` is 294,643 bytes and passed `pg_restore --list`.
+Oracle, `main`, DNS, Caddy, campaign state, and mailbox configuration were unchanged.
 
 ### Unsubscribe URL and Gmail one-click — deployed, commissioning pending
 

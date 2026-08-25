@@ -5,7 +5,8 @@
 **Legend:** `[ ]` not started · `[~]` in progress · `[x]` done · `[!]` blocked (note why in the log)
 
 **Current focus:** → **Stages 1–4 are deployed; pre-prospect commissioning remains.** The final
-serial gate and production rollout are complete at `f273109`. No campaign activation, production
+serial gate and production rollout are complete; production is pinned to the verified UX hotfix
+`f58b977`. No campaign activation, production
 enrollment, outbound send, or Oracle change was performed. Every future activation, enrollment,
 or owner/prospect send remains separately approval-gated.
 
@@ -84,6 +85,16 @@ returned `checked 0 enrollments — 0 diff(s)`. The database has one healthy Goo
 zero campaigns, leads, enrollments, active campaigns, or sendable enrollments. No campaign was
 activated, no lead was enrolled, and no email was sent. Post-deploy dump
 `coldemail-20260825-113839.dump` is 292,812 bytes and passed `pg_restore --list`.
+
+**2026-08-25 pagination/settings UX hotfix:** after explicit operator approval, long working lists
+now default to 25 rows and expose 25/50/100 page sizes while preserving filters; the accidental
+vertical tab-strip scrollbar/arrows are removed; and timezone results scroll normally with the
+mouse wheel. The proportional frontend gate passed type/lint/format, web 57, mock E2E 60,
+real-backend E2E 1, and a production Vite build. Spaceship fast-forwarded by reviewed bundle to
+`f58b977`; `main`, Oracle, DNS, Caddy, campaigns, leads, enrollments, and mail state were untouched.
+All containers and public routes pass, migrations remain applied through `0017`, self-check is
+clean, production reports `checked 0 enrollments — 0 diff(s)`, and post-deploy dump
+`coldemail-20260825-121851.dump` (294,643 bytes) passed `pg_restore --list`.
 
 ---
 

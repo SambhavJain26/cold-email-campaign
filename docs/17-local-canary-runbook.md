@@ -1,5 +1,33 @@
 # Local canary runbook (B8.3-local) — two-week validation on throwaway Gmail
 
+## 2026-08-25 pagination/settings UX hotfix — verified and deployed
+
+After explicit operator approval, Spaceship production was fast-forwarded by reviewed Git bundle
+from the Stage 4 rollout to `f58b977`; `main` was not merged and Oracle was not changed. The fix
+makes Leads, all Unibox views, Alerts History, Reply Detection, and Cold Storage default to 25
+items with operator-selectable 25/50/100 page sizes. It also removes the accidental vertical
+tab-strip scrollbar/arrows and makes the timezone result list respond to mouse-wheel scrolling.
+
+Verified evidence:
+
+- the frontend-only proportional gate passed typecheck, lint, formatting, web **57**,
+  mock-browser E2E **60**, real-backend E2E **1**, and the production Vite build;
+- a fresh pre-deploy dump and post-deploy dump both passed `pg_restore --list`;
+- all four containers are running and app/db health is green; migrations remain applied through
+  `0017_multi_source_recycling`;
+- the SPA, login, direct Settings route, health endpoint, outreach redirects, unsubscribe-host
+  isolation, and portfolio route matrix pass;
+- the served production asset contains the new page-size, pagination-label, and timezone-wheel
+  code; self-check reports no invariant violations and production reports
+  `checked 0 enrollments — 0 diff(s)`;
+- production still contains one `google_oauth` mailbox in `ok` state and zero campaigns, leads,
+  enrollments, active campaigns, or active enrollments;
+- post-deploy dump `coldemail-20260825-121851.dump` is 294,643 bytes and passed
+  `pg_restore --list`; the postal address and sender-domain unsubscribe template remain configured.
+
+No campaign was activated, no lead was enrolled, and no email was sent. DNS, host Caddy, OAuth
+credentials, live mailbox configuration, Oracle, and `main` were not changed.
+
 ## 2026-08-25 ten-workstream production rollout — verified
 
 After explicit operator deployment approval, Spaceship production was fast-forwarded by reviewed

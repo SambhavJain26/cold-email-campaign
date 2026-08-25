@@ -7,7 +7,7 @@
 **Manual version:** 2026-08-25, for branch `b8.3-local-canary`
 
 **Reconciled through:** the verified and deployed ten-workstream implementation through Stage 4.
-Spaceship production is pinned to application commit `f273109`.
+Spaceship production is pinned to application commit `f58b977`.
 
 This manual explains the complete operator-facing application: what every screen does, how to use
 each action, what the system does automatically, and which safeguards or edge cases matter. It is a
@@ -243,25 +243,22 @@ Recommended order:
 
 ### 5.1 Current Spaceship commissioning snapshot
 
-As of 2026-08-23, the production application, DNS/TLS routes, isolated unsubscribe hosts, logical
+As of 2026-08-25, the production application, DNS/TLS routes, isolated unsubscribe hosts, logical
 backups, restore drill, Spaceship AutoBackup, Internal Google OAuth client credentials, business
-postal address, and `https://unsubscribe.{sender_domain}` template are configured. The production
-database still has no mailboxes, campaigns, leads, or enrollments, so it cannot send.
+postal address, and `https://unsubscribe.{sender_domain}` template are configured. One Workspace
+mailbox is connected through Google OAuth and is healthy, but production still has no campaigns,
+leads, or enrollments, so it has no work to send.
 
 Before prospect outreach, the remaining application commissioning sequence is:
 
-1. Add one Workspace outreach inbox as a Google OAuth mailbox.
-2. Choose **Connect Google** and authorize the exact Workspace account. A consumer `@gmail.com`
-   account cannot be the sender for the production Internal OAuth client; it can be the controlled
-   recipient.
-3. Run **Test Connection** and confirm both SMTP and IMAP pass, `INBOX` and `[Gmail]/Spam` are
-   configured, and a successful poll appears.
-4. Review the mailbox's conservative cap, recipient-local window, weekdays, and the global launch
+1. Run **Test Connection** on the connected OAuth mailbox and confirm both SMTP and IMAP pass,
+   `INBOX` and `[Gmail]/Spam` are configured, and a successful poll appears.
+2. Review the mailbox's conservative cap, recipient-local window, weekdays, and the global launch
    guardrails. A value below a ceiling is permitted, not proven safe.
-5. After separate approval for that one send, complete the single owner-address
+3. After separate approval for that one send, complete the single owner-address
    send/reply/unsubscribe canary. Verify received DKIM, reply stopping, the body link, supported
    one-click POST, global suppression, clean self-check/projection drift, and a fresh backup.
-6. Finish inbox warming and every lead/legal/copy item in section 21 before importing or contacting
+4. Finish inbox warming and every lead/legal/copy item in section 21 before importing or contacting
    prospects.
 
 Oracle remains paused as the rollback canary. Do not use or delete it during ordinary production

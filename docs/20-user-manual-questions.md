@@ -937,7 +937,7 @@ for diagnosis and perform a write rebuild only through the controlled runbook.
 
 ### 10.3 Do long lists have pages today?
 
-Yes. Operational pagination is implemented and verified locally. The long working lists default to 25 rows and let you
+Yes. Operational pagination is deployed. The long working lists default to 25 rows and let you
 choose 25, 50, or 100 from **Rows per page**.
 
 | Screen | Current behavior |
@@ -993,8 +993,9 @@ accessibility scans including color contrast.
 ## 11. Implementation status from these questions
 
 Stages 1–4 of the approved improvement plan are complete, verified, and deployed to Spaceship at
-application commit `f273109`. The final complete serial gate, migration replay, populated
-projection check, self-check, and scratch restore drill all pass. The production rollout also
+application commit `f58b977`. The final complete serial gate, proportional pagination/settings
+hotfix gate, migration replay, populated projection check, self-check, and scratch restore drill all
+pass. The production rollout also
 passed migrations, health, public routing, dormant-send-state, zero-drift, and backup checks.
 
 | Status | Improvement | Notes |
