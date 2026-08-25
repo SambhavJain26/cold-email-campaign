@@ -112,8 +112,8 @@ export function SequenceBuilder({ sequence }: { sequence?: SequenceDto }) {
   };
 
   return (
-    <div className="space-y-4 p-6 pb-24">
-      <div className="flex items-center justify-between gap-4">
+    <div className="space-y-4 p-4 pb-0 sm:p-6 sm:pb-0">
+      <div className="flex flex-col items-stretch justify-between gap-4 sm:flex-row sm:items-center">
         <div className="flex-1 space-y-1.5">
           <Label htmlFor="sequence-name" className="text-xs">
             Sequence name
@@ -225,8 +225,8 @@ export function SequenceBuilder({ sequence }: { sequence?: SequenceDto }) {
         <PreviewPanel sequenceId={sequence?.id ?? null} target={target} dirty={dirty} />
       </div>
 
-      <div className="fixed inset-x-0 bottom-0 z-10 border-t border-border bg-background/95 px-6 py-3 backdrop-blur">
-        <div className="flex items-center justify-end gap-3">
+      <div className="sticky bottom-0 z-10 -mx-4 border-t border-border bg-background/95 px-4 py-3 backdrop-blur sm:-mx-6 sm:px-6">
+        <div className="flex flex-wrap items-center justify-end gap-3">
           {blockers.length > 0 && (
             <span className="text-xs text-muted-foreground" data-testid="save-blockers">
               {blockers[0]}

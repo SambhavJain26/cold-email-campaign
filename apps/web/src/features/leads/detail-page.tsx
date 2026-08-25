@@ -56,8 +56,8 @@ export default function LeadDetailPage() {
   }
 
   return (
-    <div className="max-w-3xl space-y-4 p-6">
-      <div className="flex items-center gap-3">
+    <div className="max-w-3xl space-y-4 p-4 sm:p-6">
+      <div className="flex flex-wrap items-center gap-3">
         <Button variant="ghost" size="icon-sm" asChild>
           <Link to="/leads" aria-label="Back to leads">
             <ArrowLeft className="size-4" />
@@ -69,7 +69,7 @@ export default function LeadDetailPage() {
           </h1>
           <p className="text-sm text-muted-foreground">{lead.email}</p>
         </div>
-        <div className="ml-auto flex items-center gap-2">
+        <div className="flex w-full flex-wrap items-center gap-2 sm:ml-auto sm:w-auto">
           <TierBadge tier={lead.tier} />
           {lead.latest_enrollment && <StateBadge state={lead.latest_enrollment.current_state} />}
           <Button size="sm" variant="destructive" onClick={() => setEraseOpen(true)}>
@@ -80,14 +80,14 @@ export default function LeadDetailPage() {
 
       {lead.is_suppressed && (
         <div
-          className="flex items-center justify-between rounded-lg border border-destructive/50 bg-destructive/10 px-4 py-2 text-sm"
+          className="flex flex-col items-start justify-between gap-2 rounded-lg border border-destructive/50 bg-destructive/10 px-4 py-2 text-sm sm:flex-row sm:items-center"
           data-testid="suppression-banner"
         >
           <p className="text-destructive">
             🚫 Suppressed — this lead opted out and is excluded from every campaign, permanently.
           </p>
           <button
-            className="text-destructive underline-offset-2 hover:underline"
+            className="min-h-11 shrink-0 text-destructive underline-offset-2 hover:underline"
             onClick={() => setConfirmOpen(true)}
           >
             Remove suppression
@@ -272,8 +272,12 @@ function EditCard({ lead }: { lead: LeadDto & { notes: string | null } }) {
             </Button>
           </div>
           {customFields.map((field) => (
-            <div key={field.id} className="grid grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto] gap-2">
+            <div
+              key={field.id}
+              className="grid grid-cols-[minmax(0,1fr)_auto] gap-2 sm:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto]"
+            >
               <Input
+                className="col-span-2 sm:col-span-1"
                 aria-label="Custom field name"
                 placeholder="field_name"
                 value={field.key}
@@ -329,7 +333,7 @@ function EditCard({ lead }: { lead: LeadDto & { notes: string | null } }) {
             onChange={(e) => setNotes(e.target.value)}
           />
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
           <Button size="sm" disabled={!dirty || invalidFields || patch.isPending} onClick={save}>
             Save
           </Button>

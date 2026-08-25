@@ -87,7 +87,7 @@ export default function CampaignDetailPage() {
     );
 
   return (
-    <div className="space-y-4 p-6">
+    <div className="space-y-4 p-4 sm:p-6">
       <div className="flex flex-wrap items-center gap-3">
         <h1 className="text-lg font-semibold">{campaign.name}</h1>
         <CampaignStatusBadge status={campaign.status} />
@@ -99,7 +99,7 @@ export default function CampaignDetailPage() {
               .join(', ')}
           </Badge>
         )}
-        <div className="ml-auto flex gap-2">
+        <div className="flex w-full flex-wrap gap-2 sm:ml-auto sm:w-auto">
           {campaign.status === 'draft' && (
             <Button size="sm" onClick={() => setStatus('active')}>
               Activate

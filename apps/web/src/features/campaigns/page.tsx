@@ -6,14 +6,7 @@ import type { CampaignDto } from '@coldemail/shared';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '@/components/ui/table';
+import { DataTable, type DataTableColumn } from '@/components/shared/data-table';
 import { CatchupBanner } from '@/components/shared/catchup-banner';
 import { EmptyState } from '@/components/shared/empty-state';
 import { ProgressBar } from '@/components/shared/progress-bar';
@@ -69,10 +62,92 @@ export default function CampaignsPage() {
   const campaigns = data.items;
   const sequenceName = (id: number | null) =>
     id === null ? null : (sequences.data?.items.find((s) => s.id === id)?.name ?? `#${id}`);
+  const columns: Array<DataTableColumn<CampaignDto>> = [
+    {
+      key: 'name',
+      header: 'Name',
+      cell: (campaign) => (
+        <div>
+          <Link to={`/campaigns/${campaign.id}`} className="font-medium hover:underline">
+            {campaign.name}
+          </Link>
+          {campaign.recycle_sources.length > 0 && (
+            <Badge variant="outline" className="ml-2 text-[10px]">
+              Recycled from {campaign.recycle_sources.length} campaign
+              {campaign.recycle_sources.length === 1 ? '' : 's'}
+            </Badge>
+          )}
+        </div>
+      ),
+    },
+    {
+      key: 'status',
+      header: 'Status',
+      cell: (campaign) => <CampaignStatusBadge status={campaign.status} />,
+    },
+    {
+      key: 'sequence',
+      header: 'Sequence',
+      cell: (campaign) => (
+        <span className="text-xs text-muted-foreground">
+          {sequenceName(campaign.sequence_id) ?? (
+            <span className="text-destructive">none — cannot send</span>
+          )}
+        </span>
+      ),
+    },
+    {
+      key: 'enrolled',
+      header: 'Enrolled',
+      align: 'right',
+      cell: (campaign) => campaign.enrolled_count,
+    },
+    {
+      key: 'contacted',
+      header: 'Contacted',
+      align: 'right',
+      cell: (campaign) => campaign.contacted_count,
+    },
+    {
+      key: 'progress',
+      header: 'Progress',
+      cell: (campaign) => (
+        <ProgressBar
+          value={campaign.contacted_count}
+          max={campaign.enrolled_count === 0 ? null : campaign.enrolled_count}
+        />
+      ),
+    },
+    {
+      key: 'actions',
+      header: 'Actions',
+      align: 'right',
+      cell: (campaign) => {
+        const action = primaryAction(campaign);
+        return action ? (
+          <Button
+            variant="ghost"
+            size="xs"
+            disabled={patch.isPending}
+            onClick={() =>
+              patch.mutate(
+                { id: campaign.id, body: { status: action.status } },
+                { onSuccess: () => toast.success(`${campaign.name} → ${action.status}`) },
+              )
+            }
+          >
+            {action.label}
+          </Button>
+        ) : (
+          <span className="text-muted-foreground">—</span>
+        );
+      },
+    },
+  ];
 
   return (
-    <div className="space-y-4 p-6">
-      <div className="flex items-center justify-between">
+    <div className="space-y-4 p-4 sm:p-6">
+      <div className="flex flex-wrap items-center justify-between gap-3">
         <h1 className="text-lg font-semibold">Campaigns</h1>
         <Button size="sm" onClick={() => setDialogOpen(true)}>
           <Plus className="size-4" /> New Campaign
@@ -89,84 +164,12 @@ export default function CampaignsPage() {
           onAction={() => setDialogOpen(true)}
         />
       ) : (
-        <div className="overflow-x-auto rounded-lg border border-border">
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead className="text-xs">Name</TableHead>
-                <TableHead className="text-xs">Status</TableHead>
-                <TableHead className="text-xs">Sequence</TableHead>
-                <TableHead className="text-right text-xs">Enrolled</TableHead>
-                <TableHead className="text-right text-xs">Contacted</TableHead>
-                <TableHead className="w-48 text-xs">Progress</TableHead>
-                <TableHead className="text-right text-xs">Actions</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {campaigns.map((campaign) => {
-                const action = primaryAction(campaign);
-                return (
-                  <TableRow key={campaign.id} data-testid={`campaign-row-${campaign.id}`}>
-                    <TableCell className="py-1.5">
-                      <Link
-                        to={`/campaigns/${campaign.id}`}
-                        className="text-sm font-medium hover:underline"
-                      >
-                        {campaign.name}
-                      </Link>
-                      {campaign.recycle_sources.length > 0 && (
-                        <Badge variant="outline" className="ml-2 text-[10px]">
-                          Recycled from {campaign.recycle_sources.length} campaign
-                          {campaign.recycle_sources.length === 1 ? '' : 's'}
-                        </Badge>
-                      )}
-                    </TableCell>
-                    <TableCell className="py-1.5">
-                      <CampaignStatusBadge status={campaign.status} />
-                    </TableCell>
-                    <TableCell className="py-1.5 text-xs text-muted-foreground">
-                      {sequenceName(campaign.sequence_id) ?? (
-                        <span className="text-destructive">none — cannot send</span>
-                      )}
-                    </TableCell>
-                    <TableCell className="py-1.5 text-right text-sm tabular-nums">
-                      {campaign.enrolled_count}
-                    </TableCell>
-                    <TableCell className="py-1.5 text-right text-sm tabular-nums">
-                      {campaign.contacted_count}
-                    </TableCell>
-                    <TableCell className="py-1.5">
-                      <ProgressBar
-                        value={campaign.contacted_count}
-                        max={campaign.enrolled_count === 0 ? null : campaign.enrolled_count}
-                      />
-                    </TableCell>
-                    <TableCell className="py-1.5 text-right">
-                      {action && (
-                        <Button
-                          variant="ghost"
-                          size="xs"
-                          disabled={patch.isPending}
-                          onClick={() =>
-                            patch.mutate(
-                              { id: campaign.id, body: { status: action.status } },
-                              {
-                                onSuccess: () =>
-                                  toast.success(`${campaign.name} → ${action.status}`),
-                              },
-                            )
-                          }
-                        >
-                          {action.label}
-                        </Button>
-                      )}
-                    </TableCell>
-                  </TableRow>
-                );
-              })}
-            </TableBody>
-          </Table>
-        </div>
+        <DataTable
+          columns={columns}
+          rows={campaigns}
+          rowKey={(campaign) => campaign.id}
+          rowTestId={(campaign) => `campaign-row-${campaign.id}`}
+        />
       )}
 
       <CampaignDialog open={dialogOpen} onOpenChange={setDialogOpen} />

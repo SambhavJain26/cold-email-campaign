@@ -142,7 +142,7 @@ export function RulesTab({
         <CardHeader>
           <CardTitle className="text-sm">Bounce auto-pause</CardTitle>
         </CardHeader>
-        <CardContent className="grid grid-cols-2 gap-3 sm:grid-cols-3">
+        <CardContent className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
           {num('pause_min_sends', 'Min sends before rules', 'Volume gate — no pausing below this.')}
           {num('pause_hard_pct', 'Hard-bounce % threshold', '1–20. Percentage-window rule.')}
           {num('pause_window_sends', '% window size (sends)', 'Last-N sends the % is taken over.')}
@@ -156,7 +156,7 @@ export function RulesTab({
         <CardHeader>
           <CardTitle className="text-sm">Timing</CardTitle>
         </CardHeader>
-        <CardContent className="grid grid-cols-2 gap-3 sm:grid-cols-3">
+        <CardContent className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
           {num('scheduler_tick_minutes', 'Scheduler tick (min)', 'How often the send loop runs.')}
           {num('poll_interval_minutes', 'IMAP poll (min)', 'Reply/bounce detection cadence.')}
           {num('stale_poll_hours', 'Stale poll (h)', 'No successful poll for this long → flagged.')}
@@ -199,7 +199,7 @@ export function RulesTab({
             first-day volume. A configuration inside these limits is permitted, not safe — warming
             and authentication are still separate work.
           </p>
-          <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
+          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
             {num(
               'max_mailbox_daily_cap',
               'Max mailbox daily cap',

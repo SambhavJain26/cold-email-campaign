@@ -1,5 +1,28 @@
 # Local canary runbook (B8.3-local) — two-week validation on throwaway Gmail
 
+## 2026-08-25 ten-workstream implementation — Stage 4 verified locally
+
+The responsive/mobile redesign is complete locally without changing the established desktop visual
+language. The application shell uses `100dvh`, a viewport-fixed desktop sidebar, independent main
+scrolling, and a compact phone top bar with a focus-restoring ten-section Sheet. Operational
+collections share desktop tables and phone cards; complex filters move into phone Sheets; dialogs
+and forms fit dynamic phone viewports; charts provide accessible summaries; touch targets are at
+least 44 px; and reduced-motion, keyboard, focus, Escape, and screen-reader behavior are covered.
+The user manual contains refreshed desktop screenshots 01–18 and mobile screenshots 19–23.
+
+The complete serial local gate passed: typecheck, lint, and format; unit **341**; web **56**;
+integration **166**; API **122**; GreenMail SMTP/IMAP **29**; locked golden exactly **47**;
+mock-browser E2E **59**; real-backend E2E **1**. Migration `0017_multi_source_recycling` passed
+apply/down/apply. The event-backed populated test cohort returned `checked 5 enrollments — 0
+diff(s)` and self-check reported no invariant violations. A custom-format local test dump passed
+`pg_restore --list`, restored into an explicitly named scratch database, and passed projection
+rebuild, a five-enrollment zero-drift dry-run, and self-check; the scratch database and dump were
+removed.
+
+Stages 1–4 are now complete locally. No production campaign was activated, no production lead was
+enrolled, no email was sent, and Spaceship and Oracle were not changed. This candidate is not
+deployed; deployment still requires separate explicit approval.
+
 ## 2026-08-25 ten-workstream implementation — Stage 3 verified locally
 
 The operator explicitly continued the implementation after Stage 2. Stage 3 is complete locally.

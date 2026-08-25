@@ -4,10 +4,11 @@
 
 **Legend:** `[ ]` not started · `[~]` in progress · `[x]` done · `[!]` blocked (note why in the log)
 
-**Current focus:** → **2026-08-25 ten-workstream implementation Stage 4.** Stages 1–3 are complete
-locally; the responsive/mobile redesign and final complete gate remain. No campaign activation,
+**Current focus:** → **Ten-workstream implementation complete locally; deployment remains
+separately gated.** Stages 1–4 and the final serial gate are complete. No campaign activation,
 production enrollment, send, Oracle change, or production deploy is authorized by the
-implementation plan.
+implementation plan. [docs/21-stage-4-completion-handoff.md](docs/21-stage-4-completion-handoff.md)
+preserves the completed verification and delivery procedure.
 
 > **⚠️ Superseded framing (corrected 2026-08-09).** This line previously read "No code work is outstanding" and "everything left in B8 … is *operations*, not code." **That was wrong.** Operating the canary against a real provider exposed genuine **code** defects — the reply/send race (finding 15), whole-mailbox history ingestion (16), plain-text-only mail (19), and a class of backend-implemented/UI-invisible gaps (3–9). All were fixed on `b8.3-local-canary`. Treat [docs/17](docs/17-local-canary-runbook.md) as the authoritative status record, not this header.
 
@@ -61,6 +62,20 @@ type/lint/format, unit 341, web 56, integration 166, API 122, and six affected m
 journeys are green. The populated event-backed test DB returned `checked 5 enrollments — 0
 diff(s)` and self-check is clean. Stage 4 and the final complete gate remain; production and Oracle
 are unchanged.
+
+**2026-08-25 implementation Stage 4:** the complete application is responsive without changing
+its desktop visual language. Desktop uses a viewport-fixed sidebar and independently scrolling
+main region; phones use a compact top bar and focus-restoring ten-section Sheet navigation.
+Operational tables become shared phone cards, dense filters use mobile Sheets, dialogs/forms fit
+small dynamic viewports, Manual Compose preserves unsaved text through keyboard-size changes,
+charts have accessible summaries, touch targets are at least 44 px, and reduced motion is honored.
+Desktop screenshots 01–18 were refreshed and mobile screenshots 19–23 were added to the manual.
+The final gate passed: type/lint/format; unit 341; web 56; integration 166; API 122; GreenMail 29;
+golden exactly 47; mock E2E 59; real-backend E2E 1. Migration 0017 passed apply/down/apply; the
+populated test database returned `checked 5 enrollments — 0 diff(s)` with clean self-check; and a
+custom-format dump passed catalog validation, scratch restore, rebuild, zero-drift dry-run, and
+self-check. Production and Oracle are unchanged; no campaign was activated, no production lead was
+enrolled, and no email was sent.
 
 ---
 

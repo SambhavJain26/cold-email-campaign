@@ -45,7 +45,11 @@ export function CampaignSelector() {
         setSearchParams(next, { replace: true });
       }}
     >
-      <SelectTrigger size="sm" className="w-56" aria-label="Campaign">
+      <SelectTrigger
+        size="sm"
+        className="min-h-11 min-w-0 flex-1 sm:w-56 sm:flex-none md:min-h-8"
+        aria-label="Campaign"
+      >
         <SelectValue placeholder={items.length === 0 ? 'No campaigns' : 'Select campaign…'} />
       </SelectTrigger>
       <SelectContent>

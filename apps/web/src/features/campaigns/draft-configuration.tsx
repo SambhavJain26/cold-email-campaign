@@ -104,7 +104,7 @@ export function DraftConfigurationEditor({ campaign }: { campaign: CampaignDto }
       <div className="space-y-2">
         <Label className="text-xs">Ramp stages: start day, end day, new-enrollment cap</Label>
         {stages.map((stage, index) => (
-          <div key={index} className="grid grid-cols-3 gap-2">
+          <div key={index} className="grid gap-2 sm:grid-cols-3">
             {(['start_day', 'end_day', 'cap'] as const).map((field) => (
               <Input
                 key={field}
@@ -135,7 +135,7 @@ export function DraftConfigurationEditor({ campaign }: { campaign: CampaignDto }
           placeholder="state, city, industry…"
         />
         {rules.map((rule, index) => (
-          <div key={index} className="grid grid-cols-2 gap-2">
+          <div key={index} className="grid gap-2 sm:grid-cols-2">
             <Input
               aria-label={`Draft observation key ${index + 1}`}
               value={rule.key}
@@ -173,7 +173,7 @@ export function DraftConfigurationEditor({ campaign }: { campaign: CampaignDto }
       <div className="space-y-2">
         <Label className="text-xs">Sequence variable overrides</Label>
         {overrides.map((item, index) => (
-          <div key={index} className="grid grid-cols-2 gap-2">
+          <div key={index} className="grid gap-2 sm:grid-cols-2">
             <Input
               aria-label={`Draft variable key ${index + 1}`}
               value={item.key}

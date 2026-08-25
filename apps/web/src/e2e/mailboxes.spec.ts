@@ -11,7 +11,7 @@ test('table shows all mailboxes with chips and the capacity total', async ({ pag
   await expect(table.getByText('sales1@coldmail-domain1.com')).toBeVisible();
   await expect(table.getByText('sales4@coldmail-domain2.com')).toBeVisible();
   await expect(page.getByTestId('total-capacity')).toHaveText('120');
-  await expect(page.getByText('🟢').first()).toBeVisible();
+  await expect(table.getByText('🟢').first()).toBeVisible();
   await expect(page.getByTestId('volume-chart')).toBeVisible();
 });
 
@@ -34,7 +34,7 @@ test('add mailbox: dialog validates, saves, and the totals move', async ({ page 
   await page.getByLabel('App password', { exact: true }).fill('app-password-123');
   await page.getByRole('button', { name: 'Add mailbox' }).click();
 
-  await expect(page.getByText('sales5@coldmail-domain3.com')).toBeVisible();
+  await expect(page.getByRole('table').getByText('sales5@coldmail-domain3.com')).toBeVisible();
   await expect(page.getByTestId('total-capacity')).toHaveText('150');
 });
 

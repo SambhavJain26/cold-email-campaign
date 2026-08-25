@@ -3,6 +3,12 @@
 Single always-on VPS (finalized decision). Docker Compose primary; systemd alternative. Implemented
 in B7 and cut over to Spaceship production on 2026-08-22.
 
+**Local candidate status (2026-08-25):** the ten-workstream implementation through Stage 4 and its
+complete serial gate are verified on `b8.3-local-canary`. The candidate includes later-step
+direct/eventual analytics, multi-source recycling, and the responsive/mobile redesign. It is **not
+deployed**. Spaceship remains at verified commit `680f47e`, Oracle remains paused and unchanged,
+and any deployment requires separate explicit approval plus the pre-deploy backup and checks below.
+
 ---
 
 ## 1. Environment variables (complete list — zod-validated at boot, 02 §5)

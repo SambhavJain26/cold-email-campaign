@@ -2,7 +2,12 @@
 
 Every screen: purpose, data (endpoints from [10-api-contract.md](10-api-contract.md)), regions, interactions, and edge states. Walkthrough section references in parentheses. Build order/tasks: [15-build-stages-frontend.md](15-build-stages-frontend.md).
 
-Common to all screens: skeleton loading, inline error+retry, campaign selector in top bar scopes campaign-aware screens, alerts bell global.
+Common to all screens: skeleton loading, inline error+retry, campaign selector in top bar scopes
+campaign-aware screens, alerts bell global. Desktop/tablet collections remain semantic tables;
+phones receive stacked cards and mobile filter Sheets with the same query, actions, empty/error
+states, and pagination. The desktop sidebar is viewport-fixed; phones use a ten-section drawer.
+Dialogs become full-screen or near-full-screen on phones, and no operational screen requires
+page-level horizontal scrolling.
 
 ---
 

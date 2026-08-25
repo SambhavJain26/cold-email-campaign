@@ -1,15 +1,9 @@
 import { toast } from 'sonner';
+import type { TierAnalyticsRow } from '@coldemail/shared';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '@/components/ui/table';
 import { EmptyState } from '@/components/shared/empty-state';
+import { DataTable, type DataTableColumn } from '@/components/shared/data-table';
 import { TierBadge } from '@/components/shared/tier-badge';
 import { useTierAnalytics } from '@/api/queries/analytics';
 import { useBulkTier } from '@/api/mutations/leads';
@@ -49,53 +43,56 @@ export function TiersTab({
   );
   const totalMeetings = checks[0]!.sum;
   const promotable = data.promotable.tier_c_engaged;
+  const columns: Array<DataTableColumn<TierAnalyticsRow>> = [
+    { key: 'tier', header: 'Tier', cell: (row) => <TierBadge tier={row.tier} /> },
+    { key: 'contacted', header: 'Contacted', align: 'right', cell: (row) => row.contacted },
+    {
+      key: 'reply',
+      header: 'Reply',
+      align: 'right',
+      cell: (row) => (
+        <span
+          title={`${row.reply_rate.numerator} / ${row.reply_rate.denominator} = ${row.reply_rate.value}%`}
+        >
+          {row.reply_rate.value}%
+        </span>
+      ),
+    },
+    {
+      key: 'positive',
+      header: 'Positive',
+      align: 'right',
+      cell: (row) => (
+        <span
+          title={`${row.positive_rate.numerator} / ${row.positive_rate.denominator} = ${row.positive_rate.value}%`}
+        >
+          {row.positive_rate.value}%
+        </span>
+      ),
+    },
+    {
+      key: 'meetings',
+      header: 'Meetings',
+      align: 'right',
+      cell: (row) => <span className="font-medium">{row.meetings}</span>,
+    },
+    {
+      key: 'mode',
+      header: 'Effort mode',
+      cell: (row) => (
+        <span className="text-xs text-muted-foreground">{MODE_LABEL[row.mode] ?? row.mode}</span>
+      ),
+    },
+  ];
 
   return (
     <div className="space-y-3">
-      <div className="overflow-x-auto rounded-lg border border-border">
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead className="text-xs">Tier</TableHead>
-              <TableHead className="text-right text-xs">Contacted</TableHead>
-              <TableHead className="text-right text-xs">Reply</TableHead>
-              <TableHead className="text-right text-xs">Positive</TableHead>
-              <TableHead className="text-right text-xs">Meetings</TableHead>
-              <TableHead className="text-xs">Effort mode</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {rows.map((row) => (
-              <TableRow key={row.tier ?? 'untiered'} data-testid={`tier-row-${row.tier ?? 'none'}`}>
-                <TableCell className="py-1.5">
-                  <TierBadge tier={row.tier} />
-                </TableCell>
-                <TableCell className="py-1.5 text-right text-sm tabular-nums">
-                  {row.contacted}
-                </TableCell>
-                <TableCell
-                  className="py-1.5 text-right text-sm tabular-nums"
-                  title={`${row.reply_rate.numerator} / ${row.reply_rate.denominator} = ${row.reply_rate.value}%`}
-                >
-                  {row.reply_rate.value}%
-                </TableCell>
-                <TableCell
-                  className="py-1.5 text-right text-sm tabular-nums"
-                  title={`${row.positive_rate.numerator} / ${row.positive_rate.denominator} = ${row.positive_rate.value}%`}
-                >
-                  {row.positive_rate.value}%
-                </TableCell>
-                <TableCell className="py-1.5 text-right text-sm font-medium tabular-nums">
-                  {row.meetings}
-                </TableCell>
-                <TableCell className="py-1.5 text-xs text-muted-foreground">
-                  {MODE_LABEL[row.mode] ?? row.mode}
-                </TableCell>
-              </TableRow>
-            ))}
-          </TableBody>
-        </Table>
-      </div>
+      <DataTable
+        columns={columns}
+        rows={rows}
+        rowKey={(row) => row.tier ?? 'untiered'}
+        rowTestId={(row) => `tier-row-${row.tier ?? 'none'}`}
+      />
 
       <p className="text-xs text-muted-foreground" data-testid="tiers-reconciliation">
         {checks

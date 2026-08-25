@@ -83,7 +83,23 @@ export function JobStatus() {
         </Alert>
       ))}
 
-      <div className="overflow-x-auto rounded-lg border border-border">
+      <div className="space-y-2 md:hidden" data-testid="poller-freshness-mobile">
+        {data.pollers.map((poller) => (
+          <div key={poller.mailbox_id} className="rounded-lg border border-border bg-card p-4">
+            <p className="break-all text-sm font-medium">{poller.mailbox_address}</p>
+            <p className="text-xs text-muted-foreground">Mailbox #{poller.mailbox_id}</p>
+            <dl className="mt-3 flex items-center justify-between gap-3 text-xs">
+              <dt className="text-muted-foreground">Last successful poll</dt>
+              <dd className="text-right">
+                {poller.last_successful_poll_at
+                  ? formatRelativeTime(poller.last_successful_poll_at)
+                  : 'never'}
+              </dd>
+            </dl>
+          </div>
+        ))}
+      </div>
+      <div className="hidden overflow-x-auto rounded-lg border border-border md:block">
         <table className="w-full text-sm">
           <thead>
             <tr className="border-b border-border text-left text-xs text-muted-foreground">

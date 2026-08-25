@@ -85,9 +85,9 @@ export default function OverviewPage() {
     outcomes.data.NEW === 0;
 
   return (
-    <div className="space-y-4 p-6">
-      <div className="flex items-center justify-between">
-        <div className="flex items-baseline gap-2">
+    <div className="space-y-4 p-4 sm:p-6">
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <div className="flex min-w-0 flex-wrap items-baseline gap-2">
           <h1 className="text-lg font-semibold">Overview</h1>
           {campaign && <span className="text-sm text-muted-foreground">· {campaign.name}</span>}
         </div>

@@ -194,7 +194,7 @@ export function MailboxDialog({
           </DialogDescription>
         </DialogHeader>
         <form onSubmit={handleSubmit(onSubmit)} className="space-y-3" noValidate>
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid gap-3 sm:grid-cols-2">
             <div className="col-span-2 space-y-1">
               <Label htmlFor="mb-auth-type">Authentication</Label>
               <select
@@ -282,7 +282,7 @@ export function MailboxDialog({
                 <p className="text-xs text-destructive">{errors.timezone.message}</p>
               )}
             </div>
-            <div className="col-span-2 grid grid-cols-2 gap-3">
+            <div className="grid gap-3 sm:col-span-2 sm:grid-cols-2">
               <div className="space-y-1">
                 <Label htmlFor="mb-window-start">Send window start</Label>
                 <Input id="mb-window-start" type="time" {...register('send_window.start')} />

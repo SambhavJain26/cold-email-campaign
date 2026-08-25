@@ -15,8 +15,9 @@ test('operator journey: leads → sequence → campaign → enroll → unibox �
 
   // 1 — Leads: the golden cohort is present in the table.
   await page.getByRole('link', { name: 'Leads' }).click();
-  await expect(page.getByRole('table')).toBeVisible();
-  await expect(page.getByText('mike.rodriguez1@example.com')).toBeVisible();
+  const leadsTable = page.getByRole('table');
+  await expect(leadsTable).toBeVisible();
+  await expect(leadsTable.getByText('mike.rodriguez1@example.com')).toBeVisible();
 
   // 2 — Sequences: the fixture sequence is inspectable end to end.
   await page.getByRole('link', { name: 'Sequences' }).click();
@@ -44,7 +45,7 @@ test('operator journey: leads → sequence → campaign → enroll → unibox �
 
   // 7 — Analytics: the 13a–13c reconciliation footers all close.
   await page.getByRole('link', { name: 'Analytics' }).click();
-  await expect(page.getByTestId('variants-verdict')).toContainText('wins on meetings');
+  await expect(page.getByTestId('variants-verdict')).toContainText('leads on eventual meetings');
   await page.getByRole('tab', { name: 'Steps' }).click();
   // 29 after the positive tag above — the per-step sum moves WITH the campaign
   // total, so the self-check stays green (not a stale 28 ✗).

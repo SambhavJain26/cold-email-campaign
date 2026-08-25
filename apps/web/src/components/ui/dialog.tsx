@@ -10,8 +10,24 @@ import { Button } from '@/components/ui/button';
 // asChild anchors lose their node). Every wrapper over a Radix primitive is a
 // forwardRef — same fix as ui/input, ui/textarea, ui/button (F1 lesson).
 
-function Dialog({ ...props }: React.ComponentProps<typeof DialogPrimitive.Root>) {
-  return <DialogPrimitive.Root data-slot="dialog" {...props} />;
+function Dialog({ open, ...props }: React.ComponentProps<typeof DialogPrimitive.Root>) {
+  const previousOpen = React.useRef(false);
+  const returnFocusTo = React.useRef<HTMLElement | null>(null);
+
+  React.useEffect(() => {
+    if (open && !previousOpen.current) {
+      returnFocusTo.current =
+        document.activeElement instanceof HTMLElement ? document.activeElement : null;
+    }
+    if (!open && previousOpen.current) {
+      window.requestAnimationFrame(() => {
+        if (returnFocusTo.current?.isConnected) returnFocusTo.current.focus();
+      });
+    }
+    previousOpen.current = Boolean(open);
+  }, [open]);
+
+  return <DialogPrimitive.Root data-slot="dialog" open={open} {...props} />;
 }
 
 const DialogTrigger = React.forwardRef<
@@ -56,7 +72,7 @@ const DialogContent = React.forwardRef<
       ref={ref}
       data-slot="dialog-content"
       className={cn(
-        'fixed top-[50%] left-[50%] z-50 grid w-full max-w-[calc(100%-2rem)] translate-x-[-50%] translate-y-[-50%] gap-4 rounded-lg border bg-background p-6 shadow-lg duration-200 outline-none data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=closed]:zoom-out-95 data-[state=open]:animate-in data-[state=open]:fade-in-0 data-[state=open]:zoom-in-95 sm:max-w-lg',
+        'fixed inset-0 z-50 grid h-[100dvh] w-full max-w-none content-start gap-4 overflow-y-auto border-0 bg-background p-4 shadow-lg duration-200 outline-none data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:animate-in data-[state=open]:fade-in-0 sm:inset-auto sm:top-[50%] sm:left-[50%] sm:h-auto sm:max-h-[90dvh] sm:max-w-lg sm:translate-x-[-50%] sm:translate-y-[-50%] sm:rounded-lg sm:border sm:p-6 sm:data-[state=closed]:zoom-out-95 sm:data-[state=open]:zoom-in-95',
         className,
       )}
       {...props}
@@ -97,7 +113,10 @@ function DialogFooter({
   return (
     <div
       data-slot="dialog-footer"
-      className={cn('flex flex-col-reverse gap-2 sm:flex-row sm:justify-end', className)}
+      className={cn(
+        'sticky bottom-0 z-10 -mx-4 -mb-4 flex flex-col-reverse gap-2 border-t border-border bg-background p-4 sm:static sm:mx-0 sm:mb-0 sm:flex-row sm:justify-end sm:border-0 sm:bg-transparent sm:p-0',
+        className,
+      )}
       {...props}
     >
       {children}

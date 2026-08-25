@@ -96,15 +96,22 @@ export function HealthTab({ campaignId }: { campaignId: number }) {
         {rows.map((row) => (
           <div
             key={row.label}
-            className="flex items-center gap-4 border-b border-border/60 px-4 py-2 last:border-b-0"
+            className="grid grid-cols-[1fr_auto] items-center gap-x-3 gap-y-2 border-b border-border/60 px-4 py-3 last:border-b-0 sm:grid-cols-[10rem_10rem_auto_auto_1fr]"
           >
-            <span className="w-40 text-xs text-muted-foreground">{row.label}</span>
-            <div className="h-8 w-40">
-              <Sparkline data={row.series} />
+            <span className="text-xs text-muted-foreground">{row.label}</span>
+            <span className="text-right text-sm font-semibold tabular-nums sm:col-start-3 sm:row-start-1">
+              {row.value}
+            </span>
+            <div className="col-span-2 h-8 min-w-0 sm:col-span-1 sm:col-start-2 sm:row-start-1">
+              <Sparkline
+                data={row.series}
+                label={`${row.label} daily trend over ${row.series.length} days: ${row.series.join(', ')}`}
+              />
             </div>
-            <span className="text-sm font-semibold tabular-nums">{row.value}</span>
             {row.status && <span>{row.status}</span>}
-            <span className="ml-auto text-xs text-muted-foreground tabular-nums">{row.detail}</span>
+            <span className="col-span-2 text-xs text-muted-foreground tabular-nums sm:col-span-1 sm:ml-auto">
+              {row.detail}
+            </span>
           </div>
         ))}
       </div>

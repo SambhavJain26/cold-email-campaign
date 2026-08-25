@@ -43,7 +43,13 @@ Rules: features may import `components/*`, `api/*`, `lib`; never each other. All
 /system (reply-detection debug + job status)
 ```
 
-`AppShell` = fixed side nav (the walkthrough's 9 entries + System), top bar with campaign selector (global context: most screens are campaign-scoped; stored in URL `?campaign=`), AlertsBell (poll 30 s; unacked count badge; panel lists alerts with per-kind rendering). Auth guard: root loader calls `/auth/me`; 401 anywhere → redirect `/login` (handled centrally in `client.ts`).
+`AppShell` uses `100dvh`: at ≥768 px the ten-section sidebar remains inside the viewport while
+`main` scrolls independently; below 768 px the sidebar becomes a left Sheet opened from the compact
+top bar. Both forms preserve `?campaign=` context. The drawer carries active state, transport,
+alerts, and all sections, closes after navigation, and restores trigger focus. A skip link and
+semantic `header`/`nav`/`main` landmarks support keyboard and screen-reader use. The top bar retains
+the campaign selector and alerts. Auth guard: root loader calls `/auth/me`; 401 anywhere → redirect
+`/login` (handled centrally in `client.ts`).
 
 ## 3. Server-state conventions (decision T)
 
@@ -64,11 +70,19 @@ Rules: features may import `components/*`, `api/*`, `lib`; never each other. All
 - Tailwind + shadcn defaults, dark-mode-first (dashboard tool); accent color per state: green (positive/ok), amber (warning/paused), red (negative/failed), blue (info/nurture) — matching the walkthrough's 🟢🟡⚪🔵 tier glyphs (`TierBadge` renders those exact glyphs).
 - Numbers are the product: `MetricStat` always renders `numerator / denominator = value%` on hover (title attr) with the headline value large — the spec's reconciliation transparency, in the UI.
 - Tables: dense rows, sticky header, right-aligned numerics, tabular-nums. The shared collection
-  component accepts a phone-card renderer and numbered pagination with a visible range/total;
+  component automatically renders phone cards (or accepts a purpose-built card renderer) and
+  numbered pagination with a visible range/total;
   filters own the page state and reset it to 1 whenever their result set changes.
-- Charts: Recharts — `Sparkline` (tiny area, no axes) for 13d; bar/line only in Analytics. No pie charts.
+- Complex filters use a shared mobile Sheet with active-filter count. Dialogs occupy the phone
+  viewport with independently scrollable content and sticky actions; touch targets are at least
+  44 px. Dense forms collapse to one column.
+- Charts: Recharts — `Sparkline` (tiny area, no axes) for 13d; bar/line only in Analytics. No pie
+  charts. Phone charts abbreviate dates and provide textual value summaries.
 
 ## 6. Testing
 
 - Component tests: Vitest + Testing Library for interactive pieces (CapacityMeter math display, Unibox card actions, import wizard steps, sequence builder validation).
 - E2E: Playwright — the walkthrough replay spec (docs/13 §5) is the flagship; runs against mock mode per-PR and real mode nightly/at milestones.
+- Responsive/a11y E2E is parameterized at 320/375/390/430/768 px and checks no horizontal
+  overflow, drawer/filter/dialog focus, pagination, cards, viewport-resize draft preservation,
+  reduced motion, 44 px targets, and representative `@axe-core/playwright` scans.

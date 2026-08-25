@@ -18,6 +18,8 @@ export interface DataTableColumn<T> {
   /** Right-align numerics (docs/11 §5). */
   align?: 'left' | 'right';
   className?: string;
+  /** Hide low-value detail from the generated phone card. */
+  hideOnMobile?: boolean;
 }
 
 export interface DataTablePagination {
@@ -55,19 +57,63 @@ export function DataTable<T>({
   }
   return (
     <div className={cn('space-y-2', className)}>
-      {mobileCard && (
-        <div className="space-y-2 md:hidden">
-          {rows.map((row) => (
-            <div key={rowKey(row)}>{mobileCard(row)}</div>
-          ))}
-        </div>
-      )}
-      <div
-        className={cn(
-          'overflow-x-auto rounded-lg border border-border',
-          mobileCard && 'hidden md:block',
-        )}
-      >
+      <div className="space-y-2 md:hidden" data-testid="mobile-card-list">
+        {rows.map((row) => {
+          const content = mobileCard ? (
+            mobileCard(row)
+          ) : (
+            <dl className="space-y-2">
+              {columns
+                .filter((column) => !column.hideOnMobile)
+                .map((column, index) => (
+                  <div
+                    key={column.key}
+                    className={cn(
+                      index === 0
+                        ? 'border-b border-border/70 pb-2 font-medium'
+                        : 'flex min-w-0 items-start justify-between gap-3',
+                    )}
+                  >
+                    {index > 0 && (
+                      <dt className="shrink-0 text-xs text-muted-foreground">{column.header}</dt>
+                    )}
+                    <dd className={cn('min-w-0 text-sm', index > 0 && 'text-right')}>
+                      {column.cell(row)}
+                    </dd>
+                  </div>
+                ))}
+            </dl>
+          );
+          return (
+            <div
+              key={rowKey(row)}
+              onClick={onRowClick && !mobileCard ? () => onRowClick(row) : undefined}
+              onKeyDown={
+                onRowClick && !mobileCard
+                  ? (event) => {
+                      if (event.key === 'Enter' || event.key === ' ') {
+                        event.preventDefault();
+                        onRowClick(row);
+                      }
+                    }
+                  : undefined
+              }
+              role={onRowClick && !mobileCard ? 'button' : undefined}
+              tabIndex={onRowClick && !mobileCard ? 0 : undefined}
+              className={cn(
+                'min-w-0',
+                !mobileCard && 'rounded-lg border border-border bg-card p-4 shadow-xs',
+                onRowClick &&
+                  !mobileCard &&
+                  'cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
+              )}
+            >
+              {content}
+            </div>
+          );
+        })}
+      </div>
+      <div className="hidden overflow-x-auto rounded-lg border border-border md:block">
         <Table>
           <TableHeader className="sticky top-0 bg-card">
             <TableRow>

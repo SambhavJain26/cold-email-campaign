@@ -131,10 +131,41 @@
     @apply border-border outline-ring/50;
   }
   body {
-    @apply bg-background text-foreground;
+    @apply overflow-x-hidden bg-background text-foreground;
   }
   /* Numbers are the product (docs/11 §5): numeric tables read in tabular figures. */
   table {
     font-variant-numeric: tabular-nums;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    scroll-behavior: auto !important;
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+@media (max-width: 767px) {
+  [data-slot='button'],
+  [data-slot='select-trigger'],
+  [data-slot='input'],
+  [data-slot='textarea'],
+  [data-slot='command-item'] {
+    min-height: 44px !important;
+  }
+
+  button,
+  [role='button'] {
+    min-width: 44px;
+    min-height: 44px !important;
+  }
+
+  [data-slot='dialog-content'] {
+    max-width: none;
   }
 }

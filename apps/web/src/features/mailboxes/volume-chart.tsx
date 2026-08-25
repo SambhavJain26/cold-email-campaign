@@ -67,7 +67,13 @@ export function VolumeChart({ mailboxes }: { mailboxes: MailboxDto[] }) {
           <ResponsiveContainer width="100%" height="100%">
             <LineChart data={rows} margin={{ top: 4, right: 8, bottom: 0, left: -16 }}>
               <CartesianGrid strokeDasharray="3 3" stroke="var(--color-border)" />
-              <XAxis dataKey="date" tick={{ fontSize: 10 }} tickLine={false} minTickGap={32} />
+              <XAxis
+                dataKey="date"
+                tick={{ fontSize: 10 }}
+                tickLine={false}
+                minTickGap={32}
+                tickFormatter={(value: string) => value.slice(5)}
+              />
               <YAxis tick={{ fontSize: 10 }} tickLine={false} allowDecimals={false} />
               <Tooltip
                 contentStyle={{
@@ -91,6 +97,27 @@ export function VolumeChart({ mailboxes }: { mailboxes: MailboxDto[] }) {
             </LineChart>
           </ResponsiveContainer>
         </div>
+        <details className="text-xs text-muted-foreground">
+          <summary className="min-h-11 cursor-pointer py-3 font-medium text-foreground">
+            View accessible chart values
+          </summary>
+          <div className="max-h-48 overflow-y-auto rounded-md border border-border p-3">
+            {rows.length === 0 ? (
+              <p>No sends in this period.</p>
+            ) : (
+              <ul className="space-y-1">
+                {rows.map((row) => (
+                  <li key={String(row.date)}>
+                    <span className="font-medium">{row.date}:</span>{' '}
+                    {mailboxIds
+                      .map((id) => `${label(id)} ${Number(row[`m${id}`] ?? 0)} sends`)
+                      .join(' · ')}
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
+        </details>
       </CardContent>
     </Card>
   );

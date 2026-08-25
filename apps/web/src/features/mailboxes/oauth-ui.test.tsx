@@ -63,8 +63,8 @@ describe('Google OAuth mailbox UI', () => {
         <MailboxesPage />
       </QueryClientProvider>,
     );
-    expect(screen.getByRole('button', { name: 'Connect Google' })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Disconnect' })).toBeInTheDocument();
-    expect(screen.getByText('setup required')).toBeInTheDocument();
+    expect(screen.getAllByRole('button', { name: 'Connect Google' })).toHaveLength(2);
+    expect(screen.getAllByRole('button', { name: 'Disconnect' })).toHaveLength(2);
+    expect(screen.getAllByText('setup required')).toHaveLength(2);
   });
 });

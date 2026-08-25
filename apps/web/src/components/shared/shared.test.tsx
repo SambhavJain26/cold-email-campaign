@@ -153,8 +153,10 @@ describe('DataTable', () => {
 
   it('renders rows and right-aligns numerics', () => {
     render(<DataTable columns={columns} rows={rows} rowKey={(r) => r.id} />);
-    expect(screen.getByText('a@example.com')).toBeInTheDocument();
-    expect(screen.getByText('12').className).toContain('text-right');
+    expect(screen.getAllByText('a@example.com')).toHaveLength(2);
+    expect(screen.getAllByText('12').every((cell) => cell.className.includes('text-right'))).toBe(
+      true,
+    );
   });
 
   it('renders the empty state when there are no rows', () => {

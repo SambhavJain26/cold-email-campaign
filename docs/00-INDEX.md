@@ -31,6 +31,7 @@ Progress is tracked in [PROGRESS.md](../PROGRESS.md) at the repo root.
 | 18 | [18-incident-response-runbook.md](18-incident-response-runbook.md) | Mailbox, bounce, complaint, pause, unsubscribe-outage, and erasure-restore response | Operations |
 | 19 | [19-user-manual.md](19-user-manual.md) | Complete operator guide to every screen, workflow, automatic behavior, safety rule, and edge case | First use + daily operations |
 | 20 | [20-user-manual-questions.md](20-user-manual-questions.md) | Plain-language answers about CSVs, campaigns, personalization, replies, analytics, safety controls, and proposed UI improvements | User-manual companion |
+| 21 | [21-stage-4-completion-handoff.md](21-stage-4-completion-handoff.md) | Exact paused Stage 4 state, remaining verification, documentation, commit, and push procedure | Resume the paused Stage 4 run |
 
 ## Reading order
 

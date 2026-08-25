@@ -82,7 +82,7 @@ export function AlertsBell() {
           )}
         </Button>
       </PopoverTrigger>
-      <PopoverContent align="end" className="w-96 p-0">
+      <PopoverContent align="end" className="w-[min(24rem,calc(100vw-1rem))] p-0">
         <div className="border-b border-border px-3 py-2 text-sm font-medium">Alerts</div>
         {alerts.length === 0 ? (
           <p className="p-4 text-sm text-muted-foreground">Nothing needs attention.</p>

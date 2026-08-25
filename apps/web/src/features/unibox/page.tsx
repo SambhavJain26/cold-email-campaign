@@ -11,9 +11,9 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { EmptyState } from '@/components/shared/empty-state';
 import { CollectionPagination } from '@/components/shared/collection-pagination';
+import { ResponsiveFilters } from '@/components/shared/responsive-filters';
 import { useReminders, useUnibox } from '@/api/queries/unibox';
 import { usePatchReminder } from '@/api/mutations/unibox';
 import { useSettings } from '@/api/queries/settings';
@@ -59,7 +59,7 @@ export default function UniboxPage() {
   };
 
   return (
-    <div className="space-y-4 p-6">
+    <div className="space-y-4 p-4 sm:p-6">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <h1 className="text-lg font-semibold">Unibox</h1>
@@ -73,72 +73,106 @@ export default function UniboxPage() {
         )}
       </div>
 
-      <div className="flex flex-wrap items-center gap-4">
-        <Tabs value={view} onValueChange={switchBucket}>
-          <TabsList>
-            <TabsTrigger value="human">Human replies</TabsTrigger>
-            <TabsTrigger value="auto_reply">Auto-replies (OOO)</TabsTrigger>
-            <TabsTrigger value="reminders">
+      <div className="space-y-3">
+        <div className="max-w-full overflow-x-auto">
+          <div
+            className="flex min-w-max gap-1 rounded-lg bg-muted p-[3px]"
+            role="tablist"
+            aria-label="Unibox view"
+          >
+            <Button
+              role="tab"
+              size="sm"
+              variant={view === 'human' ? 'secondary' : 'ghost'}
+              aria-selected={view === 'human'}
+              onClick={() => switchBucket('human')}
+            >
+              Human replies
+            </Button>
+            <Button
+              role="tab"
+              size="sm"
+              variant={view === 'auto_reply' ? 'secondary' : 'ghost'}
+              aria-selected={view === 'auto_reply'}
+              onClick={() => switchBucket('auto_reply')}
+            >
+              Auto-replies (OOO)
+            </Button>
+            <Button
+              role="tab"
+              size="sm"
+              variant={view === 'reminders' ? 'secondary' : 'ghost'}
+              aria-selected={view === 'reminders'}
+              onClick={() => switchBucket('reminders')}
+            >
               Reminders
               {(reminders.data?.open_count ?? 0) > 0 ? ` (${reminders.data!.open_count})` : ''}
-            </TabsTrigger>
-          </TabsList>
-        </Tabs>
+            </Button>
+          </div>
+        </div>
 
         {view !== 'reminders' && (
-          <Select
-            value={mailboxId}
-            onValueChange={(value) => {
-              setMailboxId(value);
-              setPage(1);
-            }}
+          <ResponsiveFilters
+            title="Reply filters"
+            activeCount={
+              Number(mailboxId !== 'all') + Number(sentiment !== undefined) + Number(unhandledOnly)
+            }
+            description="Filter replies by mailbox, sentiment, and whether an outcome is still needed."
           >
-            <SelectTrigger size="sm" className="w-60" aria-label="Filter by mailbox">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">All mailboxes</SelectItem>
-              {(mailboxes.data?.items ?? []).map((mailbox) => (
-                <SelectItem key={mailbox.id} value={String(mailbox.id)}>
-                  {mailbox.from_address}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        )}
+            <Select
+              value={mailboxId}
+              onValueChange={(value) => {
+                setMailboxId(value);
+                setPage(1);
+              }}
+            >
+              <SelectTrigger size="sm" className="w-60" aria-label="Filter by mailbox">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All mailboxes</SelectItem>
+                {(mailboxes.data?.items ?? []).map((mailbox) => (
+                  <SelectItem key={mailbox.id} value={String(mailbox.id)}>
+                    {mailbox.from_address}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
 
-        {view === 'human' && (
-          <>
-            <div className="flex gap-1" role="group" aria-label="Filter by sentiment">
-              {SENTIMENTS.map((value) => (
-                <Button
-                  key={value}
-                  variant={sentiment === value ? 'default' : 'outline'}
-                  size="xs"
-                  aria-pressed={sentiment === value}
-                  onClick={() => {
-                    setSentiment(sentiment === value ? undefined : value);
-                    setPage(1);
-                  }}
-                >
-                  {GLYPH[value]} {value}
-                </Button>
-              ))}
-            </div>
-            <div className="flex items-center gap-2">
-              <Switch
-                id="unhandled-only"
-                checked={unhandledOnly}
-                onCheckedChange={(checked) => {
-                  setUnhandledOnly(checked);
-                  setPage(1);
-                }}
-              />
-              <Label htmlFor="unhandled-only" className="text-xs">
-                Needs outcome
-              </Label>
-            </div>
-          </>
+            {view === 'human' && (
+              <>
+                <div className="flex gap-1" role="group" aria-label="Filter by sentiment">
+                  {SENTIMENTS.map((value) => (
+                    <Button
+                      key={value}
+                      variant={sentiment === value ? 'default' : 'outline'}
+                      size="xs"
+                      aria-pressed={sentiment === value}
+                      onClick={() => {
+                        setSentiment(sentiment === value ? undefined : value);
+                        setPage(1);
+                      }}
+                    >
+                      {GLYPH[value]} {value}
+                    </Button>
+                  ))}
+                </div>
+                <div className="flex items-center gap-2">
+                  <Switch
+                    id="unhandled-only"
+                    checked={unhandledOnly}
+                    onCheckedChange={(checked) => {
+                      setUnhandledOnly(checked);
+                      setPage(1);
+                    }}
+                  />
+                  <Label htmlFor="unhandled-only" className="text-xs">
+                    Needs outcome
+                  </Label>
+                </div>
+              </>
+            )}
+          </ResponsiveFilters>
         )}
       </div>
 

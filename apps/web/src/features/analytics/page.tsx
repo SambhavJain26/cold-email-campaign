@@ -37,19 +37,21 @@ export default function AnalyticsPage() {
   const campaignContacted = overview.data?.progress.contacted ?? null;
 
   return (
-    <div className="space-y-4 p-6">
+    <div className="space-y-4 p-4 sm:p-6">
       <div className="flex items-baseline gap-2">
         <h1 className="text-lg font-semibold">Analytics</h1>
         {campaign && <span className="text-sm text-muted-foreground">· {campaign.name}</span>}
       </div>
 
       <Tabs value={tab} onValueChange={setTab}>
-        <TabsList>
-          <TabsTrigger value="variants">Variants</TabsTrigger>
-          <TabsTrigger value="steps">Steps</TabsTrigger>
-          <TabsTrigger value="tiers">Tiers</TabsTrigger>
-          <TabsTrigger value="health">Health</TabsTrigger>
-        </TabsList>
+        <div className="max-w-full overflow-x-auto">
+          <TabsList className="min-w-max">
+            <TabsTrigger value="variants">Variants</TabsTrigger>
+            <TabsTrigger value="steps">Steps</TabsTrigger>
+            <TabsTrigger value="tiers">Tiers</TabsTrigger>
+            <TabsTrigger value="health">Health</TabsTrigger>
+          </TabsList>
+        </div>
 
         <TabsContent value="variants" className="pt-4">
           <VariantsTab campaignId={campaignId} campaignSequenceId={campaign?.sequence_id ?? null} />

@@ -6,15 +6,8 @@ import type { SequenceDto } from '@coldemail/shared';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '@/components/ui/table';
 import { EmptyState } from '@/components/shared/empty-state';
+import { DataTable, type DataTableColumn } from '@/components/shared/data-table';
 import { useCampaigns } from '@/api/queries/campaigns';
 import { useSequences } from '@/api/queries/sequences';
 import { useDeleteSequence } from '@/api/mutations/sequences';
@@ -61,10 +54,86 @@ export default function SequencesPage() {
   }
 
   const sequences = data.items;
+  const columns: Array<DataTableColumn<SequenceDto>> = [
+    {
+      key: 'name',
+      header: 'Name',
+      cell: (sequence) => (
+        <Link to={`/sequences/${sequence.id}`} className="font-medium hover:underline">
+          {sequence.name}
+        </Link>
+      ),
+    },
+    { key: 'steps', header: 'Steps', align: 'right', cell: (sequence) => sequence.steps.length },
+    { key: 'variants', header: 'Active variants', align: 'right', cell: activeVariantCount },
+    {
+      key: 'waits',
+      header: 'Waits',
+      cell: (sequence) => (
+        <span className="text-xs text-muted-foreground tabular-nums">{waitPattern(sequence)}</span>
+      ),
+    },
+    {
+      key: 'stops',
+      header: 'Stop conditions',
+      cell: (sequence) => (
+        <div className="flex flex-wrap justify-end gap-1 md:justify-start">
+          {sequence.stop_on_reply && (
+            <Badge variant="secondary" className="text-[10px]">
+              reply
+            </Badge>
+          )}
+          <Badge variant="secondary" className="text-[10px]">
+            hard bounce / STOP
+          </Badge>
+        </div>
+      ),
+    },
+    {
+      key: 'used',
+      header: 'Used by',
+      cell: (sequence) => {
+        const users = (campaigns.data?.items ?? []).filter(
+          (campaign) => campaign.sequence_id === sequence.id,
+        );
+        return users.length === 0 ? (
+          <span className="text-xs text-muted-foreground">—</span>
+        ) : (
+          <div className="flex flex-wrap justify-end gap-1 md:justify-start">
+            {users.map((campaign) => (
+              <Badge
+                key={campaign.id}
+                variant="outline"
+                className="text-[10px]"
+                title={`status: ${campaign.status}`}
+              >
+                {campaign.name}
+              </Badge>
+            ))}
+          </div>
+        );
+      },
+    },
+    {
+      key: 'actions',
+      header: 'Actions',
+      align: 'right',
+      cell: (sequence) => (
+        <div className="flex flex-wrap justify-end gap-1">
+          <Button variant="ghost" size="xs" asChild>
+            <Link to={`/sequences/${sequence.id}`}>Open</Link>
+          </Button>
+          <Button variant="ghost" size="xs" onClick={() => setDeleteId(sequence.id)}>
+            Delete
+          </Button>
+        </div>
+      ),
+    },
+  ];
 
   return (
-    <div className="space-y-4 p-6">
-      <div className="flex items-center justify-between">
+    <div className="space-y-4 p-4 sm:p-6">
+      <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <h1 className="text-lg font-semibold">Sequences</h1>
           <p className="text-xs text-muted-foreground">All campaigns</p>
@@ -82,87 +151,12 @@ export default function SequencesPage() {
           onAction={() => navigate('/sequences/new')}
         />
       ) : (
-        <div className="overflow-x-auto rounded-lg border border-border">
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead className="text-xs">Name</TableHead>
-                <TableHead className="text-right text-xs">Steps</TableHead>
-                <TableHead className="text-right text-xs">Active variants</TableHead>
-                <TableHead className="text-xs">Waits</TableHead>
-                <TableHead className="text-xs">Stop conditions</TableHead>
-                <TableHead className="text-xs">Used by</TableHead>
-                <TableHead className="text-right text-xs">Actions</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {sequences.map((sequence) => {
-                const users = (campaigns.data?.items ?? []).filter(
-                  (c) => c.sequence_id === sequence.id,
-                );
-                return (
-                  <TableRow key={sequence.id} data-testid={`sequence-row-${sequence.id}`}>
-                    <TableCell className="py-1.5">
-                      <Link
-                        to={`/sequences/${sequence.id}`}
-                        className="text-sm font-medium hover:underline"
-                      >
-                        {sequence.name}
-                      </Link>
-                    </TableCell>
-                    <TableCell className="py-1.5 text-right text-sm tabular-nums">
-                      {sequence.steps.length}
-                    </TableCell>
-                    <TableCell className="py-1.5 text-right text-sm tabular-nums">
-                      {activeVariantCount(sequence)}
-                    </TableCell>
-                    <TableCell className="py-1.5 text-xs text-muted-foreground tabular-nums">
-                      {waitPattern(sequence)}
-                    </TableCell>
-                    <TableCell className="py-1.5">
-                      <div className="flex flex-wrap gap-1">
-                        {sequence.stop_on_reply && (
-                          <Badge variant="secondary" className="text-[10px]">
-                            reply
-                          </Badge>
-                        )}
-                        <Badge variant="secondary" className="text-[10px]">
-                          hard bounce / STOP
-                        </Badge>
-                      </div>
-                    </TableCell>
-                    <TableCell className="py-1.5">
-                      {users.length === 0 ? (
-                        <span className="text-xs text-muted-foreground">—</span>
-                      ) : (
-                        <div className="flex flex-wrap gap-1">
-                          {users.map((c) => (
-                            <Badge
-                              key={c.id}
-                              variant="outline"
-                              className="text-[10px]"
-                              title={`status: ${c.status}`}
-                            >
-                              {c.name}
-                            </Badge>
-                          ))}
-                        </div>
-                      )}
-                    </TableCell>
-                    <TableCell className="py-1.5 text-right">
-                      <Button variant="ghost" size="xs" asChild>
-                        <Link to={`/sequences/${sequence.id}`}>Open</Link>
-                      </Button>
-                      <Button variant="ghost" size="xs" onClick={() => setDeleteId(sequence.id)}>
-                        Delete
-                      </Button>
-                    </TableCell>
-                  </TableRow>
-                );
-              })}
-            </TableBody>
-          </Table>
-        </div>
+        <DataTable
+          columns={columns}
+          rows={sequences}
+          rowKey={(sequence) => sequence.id}
+          rowTestId={(sequence) => `sequence-row-${sequence.id}`}
+        />
       )}
       {deleteId !== null &&
         (() => {

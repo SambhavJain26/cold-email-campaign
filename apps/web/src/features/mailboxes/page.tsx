@@ -4,16 +4,8 @@ import { toast } from 'sonner';
 import type { MailboxDto } from '@coldemail/shared';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableFooter,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '@/components/ui/table';
 import { EmptyState } from '@/components/shared/empty-state';
+import { DataTable, type DataTableColumn } from '@/components/shared/data-table';
 import { formatRelativeTime } from '@/lib/format';
 import { useMailboxes } from '@/api/queries/mailboxes';
 import {
@@ -59,10 +51,139 @@ export default function MailboxesPage() {
 
   const mailboxes = data.items;
   const totalCapacity = mailboxes.reduce((sum, m) => sum + m.effective_cap, 0);
+  const columns: Array<DataTableColumn<MailboxDto>> = [
+    {
+      key: 'address',
+      header: 'Address',
+      cell: (mailbox) => (
+        <div className="min-w-0">
+          <p className="truncate font-medium">{mailbox.from_address}</p>
+          <p className="truncate text-xs text-muted-foreground">{mailbox.display_name}</p>
+          <p className="text-[11px] text-muted-foreground">
+            {mailbox.auth_type === 'google_oauth'
+              ? mailbox.oauth_connected
+                ? 'Google OAuth connected'
+                : 'Google OAuth'
+              : 'App password'}
+          </p>
+        </div>
+      ),
+    },
+    {
+      key: 'status',
+      header: 'Status',
+      cell: (mailbox) => <MailboxStatusChip status={mailbox.status} />,
+    },
+    {
+      key: 'sent',
+      header: 'Sent today',
+      align: 'right',
+      cell: (mailbox) => `${mailbox.sent_today}/${mailbox.effective_cap}`,
+    },
+    {
+      key: 'average',
+      header: '7-day avg',
+      align: 'right',
+      cell: (mailbox) => mailbox.seven_day_avg.toFixed(1),
+    },
+    {
+      key: 'bounce',
+      header: 'Hard-bnc %',
+      align: 'right',
+      cell: (mailbox) => `${mailbox.hard_bounce_pct.toFixed(1)}%`,
+    },
+    {
+      key: 'poll',
+      header: 'Last poll',
+      cell: (mailbox) => (
+        <span className="text-xs text-muted-foreground">
+          {mailbox.last_successful_poll_at
+            ? formatRelativeTime(mailbox.last_successful_poll_at)
+            : 'never'}
+        </span>
+      ),
+    },
+    {
+      key: 'actions',
+      header: 'Actions',
+      align: 'right',
+      cell: (mailbox) => (
+        <div className="flex flex-wrap justify-end gap-1">
+          <Button
+            variant="ghost"
+            size="xs"
+            onClick={() => {
+              setEditing(mailbox);
+              setDialogOpen(true);
+            }}
+          >
+            Edit
+          </Button>
+          {mailbox.auth_type === 'google_oauth' &&
+            (!mailbox.oauth_connected || mailbox.status === 'auth_failed') && (
+              <Button
+                variant="outline"
+                size="xs"
+                disabled={startGoogle.isPending}
+                onClick={() => startGoogle.mutate(mailbox.id)}
+              >
+                {mailbox.oauth_connected ? 'Reconnect Google' : 'Connect Google'}
+              </Button>
+            )}
+          {mailbox.auth_type === 'google_oauth' && mailbox.oauth_connected && (
+            <Button
+              variant="ghost"
+              size="xs"
+              disabled={disconnectGoogle.isPending}
+              onClick={() => {
+                if (!window.confirm(`Disconnect Google authorization for ${mailbox.from_address}?`))
+                  return;
+                disconnectGoogle.mutate(mailbox.id, {
+                  onSuccess: () => toast.success('Google authorization disconnected'),
+                });
+              }}
+            >
+              Disconnect
+            </Button>
+          )}
+          {mailbox.status === 'paused' ? (
+            <Button
+              variant="ghost"
+              size="xs"
+              disabled={resume.isPending}
+              onClick={() =>
+                resume.mutate(
+                  { id: mailbox.id },
+                  { onSuccess: () => toast.success('Mailbox resumed') },
+                )
+              }
+            >
+              Resume
+            </Button>
+          ) : (
+            mailbox.status === 'ok' && (
+              <Button
+                variant="ghost"
+                size="xs"
+                disabled={pause.isPending}
+                onClick={() =>
+                  pause.mutate(mailbox.id, {
+                    onSuccess: () => toast.success('Mailbox paused'),
+                  })
+                }
+              >
+                Pause
+              </Button>
+            )
+          )}
+        </div>
+      ),
+    },
+  ];
 
   return (
-    <div className="space-y-4 p-6">
-      <div className="flex items-center justify-between">
+    <div className="space-y-4 p-4 sm:p-6">
+      <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <h1 className="text-lg font-semibold">Mailboxes</h1>
           <p className="text-xs text-muted-foreground">All campaigns</p>
@@ -80,142 +201,12 @@ export default function MailboxesPage() {
 
       <FailurePanels mailboxes={mailboxes} />
 
-      <div className="overflow-x-auto rounded-lg border border-border">
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead className="text-xs">Address</TableHead>
-              <TableHead className="text-xs">Status</TableHead>
-              <TableHead className="text-right text-xs">Sent today</TableHead>
-              <TableHead className="text-right text-xs">7-day avg</TableHead>
-              <TableHead className="text-right text-xs">Hard-bnc %</TableHead>
-              <TableHead className="text-xs">Last poll</TableHead>
-              <TableHead className="text-right text-xs">Actions</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {mailboxes.map((mailbox) => (
-              <TableRow key={mailbox.id}>
-                <TableCell className="py-1.5">
-                  <p className="text-sm font-medium">{mailbox.from_address}</p>
-                  <p className="text-xs text-muted-foreground">{mailbox.display_name}</p>
-                  <p className="text-[11px] text-muted-foreground">
-                    {mailbox.auth_type === 'google_oauth'
-                      ? mailbox.oauth_connected
-                        ? 'Google OAuth connected'
-                        : 'Google OAuth'
-                      : 'App password'}
-                  </p>
-                </TableCell>
-                <TableCell className="py-1.5">
-                  <MailboxStatusChip status={mailbox.status} />
-                </TableCell>
-                <TableCell className="py-1.5 text-right text-sm tabular-nums">
-                  {mailbox.sent_today}/{mailbox.effective_cap}
-                </TableCell>
-                <TableCell className="py-1.5 text-right text-sm tabular-nums">
-                  {mailbox.seven_day_avg.toFixed(1)}
-                </TableCell>
-                <TableCell className="py-1.5 text-right text-sm tabular-nums">
-                  {mailbox.hard_bounce_pct.toFixed(1)}%
-                </TableCell>
-                <TableCell className="py-1.5 text-xs text-muted-foreground">
-                  {mailbox.last_successful_poll_at
-                    ? formatRelativeTime(mailbox.last_successful_poll_at)
-                    : 'never'}
-                </TableCell>
-                <TableCell className="py-1.5 text-right">
-                  <div className="flex justify-end gap-1">
-                    <Button
-                      variant="ghost"
-                      size="xs"
-                      onClick={() => {
-                        setEditing(mailbox);
-                        setDialogOpen(true);
-                      }}
-                    >
-                      Edit
-                    </Button>
-                    {mailbox.auth_type === 'google_oauth' &&
-                      (!mailbox.oauth_connected || mailbox.status === 'auth_failed') && (
-                        <Button
-                          variant="outline"
-                          size="xs"
-                          disabled={startGoogle.isPending}
-                          onClick={() => startGoogle.mutate(mailbox.id)}
-                        >
-                          {mailbox.oauth_connected ? 'Reconnect Google' : 'Connect Google'}
-                        </Button>
-                      )}
-                    {mailbox.auth_type === 'google_oauth' && mailbox.oauth_connected && (
-                      <Button
-                        variant="ghost"
-                        size="xs"
-                        disabled={disconnectGoogle.isPending}
-                        onClick={() => {
-                          if (
-                            !window.confirm(
-                              `Disconnect Google authorization for ${mailbox.from_address}?`,
-                            )
-                          )
-                            return;
-                          disconnectGoogle.mutate(mailbox.id, {
-                            onSuccess: () => toast.success('Google authorization disconnected'),
-                          });
-                        }}
-                      >
-                        Disconnect
-                      </Button>
-                    )}
-                    {mailbox.status === 'paused' ? (
-                      <Button
-                        variant="ghost"
-                        size="xs"
-                        disabled={resume.isPending}
-                        onClick={() =>
-                          resume.mutate(
-                            { id: mailbox.id },
-                            { onSuccess: () => toast.success('Mailbox resumed') },
-                          )
-                        }
-                      >
-                        Resume
-                      </Button>
-                    ) : (
-                      mailbox.status === 'ok' && (
-                        <Button
-                          variant="ghost"
-                          size="xs"
-                          disabled={pause.isPending}
-                          onClick={() =>
-                            pause.mutate(mailbox.id, {
-                              onSuccess: () => toast.success('Mailbox paused'),
-                            })
-                          }
-                        >
-                          Pause
-                        </Button>
-                      )
-                    )}
-                  </div>
-                </TableCell>
-              </TableRow>
-            ))}
-          </TableBody>
-          <TableFooter>
-            <TableRow>
-              <TableCell className="text-xs font-medium">TOTAL DAILY CAPACITY</TableCell>
-              <TableCell />
-              <TableCell
-                className="text-right text-sm font-semibold tabular-nums"
-                data-testid="total-capacity"
-              >
-                {totalCapacity}
-              </TableCell>
-              <TableCell colSpan={4} />
-            </TableRow>
-          </TableFooter>
-        </Table>
+      <DataTable columns={columns} rows={mailboxes} rowKey={(mailbox) => mailbox.id} />
+      <div className="flex items-center justify-between rounded-lg border border-border bg-card px-4 py-3 text-sm">
+        <span className="font-medium">Total daily capacity</span>
+        <span className="font-semibold tabular-nums" data-testid="total-capacity">
+          {totalCapacity}
+        </span>
       </div>
 
       <VolumeChart mailboxes={mailboxes} />

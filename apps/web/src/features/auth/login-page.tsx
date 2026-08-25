@@ -6,7 +6,7 @@ import { loginBodySchema, type LoginBody } from '@coldemail/shared';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
+import { Field, FieldError, FieldGroup, FieldLabel } from '@/components/ui/field';
 import { AppApiError } from '@/api/client';
 import { useLogin } from '@/api/mutations/auth';
 
@@ -37,42 +37,49 @@ export default function LoginPage() {
   };
 
   return (
-    <div className="flex min-h-screen items-center justify-center">
-      <Card className="w-full max-w-sm">
+    <main className="flex min-h-[100dvh] items-center justify-center p-4 sm:p-6">
+      <Card className="w-full max-w-sm shadow-sm">
         <CardHeader>
           <CardTitle>Cold Email Campaign</CardTitle>
           <CardDescription>Sign in to the operator console</CardDescription>
         </CardHeader>
         <CardContent>
-          <form onSubmit={handleSubmit(onSubmit)} className="space-y-4" noValidate>
-            <div className="space-y-2">
-              <Label htmlFor="email">Email</Label>
-              <Input id="email" type="email" autoComplete="username" {...register('email')} />
-              {errors.email && <p className="text-xs text-destructive">{errors.email.message}</p>}
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="password">Password</Label>
-              <Input
-                id="password"
-                type="password"
-                autoComplete="current-password"
-                {...register('password')}
-              />
-              {errors.password && (
-                <p className="text-xs text-destructive">{errors.password.message}</p>
+          <form onSubmit={handleSubmit(onSubmit)} noValidate>
+            <FieldGroup className="gap-4">
+              <Field data-invalid={Boolean(errors.email)}>
+                <FieldLabel htmlFor="email">Email</FieldLabel>
+                <Input
+                  id="email"
+                  type="email"
+                  autoComplete="username"
+                  aria-invalid={Boolean(errors.email)}
+                  {...register('email')}
+                />
+                <FieldError>{errors.email?.message}</FieldError>
+              </Field>
+              <Field data-invalid={Boolean(errors.password)}>
+                <FieldLabel htmlFor="password">Password</FieldLabel>
+                <Input
+                  id="password"
+                  type="password"
+                  autoComplete="current-password"
+                  aria-invalid={Boolean(errors.password)}
+                  {...register('password')}
+                />
+                <FieldError>{errors.password?.message}</FieldError>
+              </Field>
+              {login.isError && (
+                <p className="text-sm text-destructive" role="alert">
+                  {login.error.message}
+                </p>
               )}
-            </div>
-            {login.isError && (
-              <p className="text-sm text-destructive" role="alert">
-                {login.error.message}
-              </p>
-            )}
-            <Button type="submit" className="w-full" disabled={login.isPending}>
-              {login.isPending ? 'Signing in…' : 'Sign in'}
-            </Button>
+              <Button type="submit" className="min-h-11 w-full" disabled={login.isPending}>
+                {login.isPending ? 'Signing in…' : 'Sign in'}
+              </Button>
+            </FieldGroup>
           </form>
         </CardContent>
       </Card>
-    </div>
+    </main>
   );
 }

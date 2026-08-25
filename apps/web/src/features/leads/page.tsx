@@ -1,6 +1,6 @@
 import { useDeferredValue, useState } from 'react';
 import { Plus, Upload } from 'lucide-react';
-import { useNavigate } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { ENROLLMENT_STATES, type LeadDto, type LeadTier } from '@coldemail/shared';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
@@ -16,6 +16,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Switch } from '@/components/ui/switch';
 import { DataTable, type DataTableColumn } from '@/components/shared/data-table';
 import { EmptyState } from '@/components/shared/empty-state';
+import { ResponsiveFilters } from '@/components/shared/responsive-filters';
 import { StateBadge } from '@/components/shared/state-badge';
 import { TierBadge } from '@/components/shared/tier-badge';
 import { useCampaignParam } from '@/components/layout/campaign-selector';
@@ -150,10 +151,10 @@ export default function LeadsPage() {
   }
 
   return (
-    <div className="space-y-4 p-6">
-      <div className="flex items-center justify-between">
+    <div className="space-y-4 p-4 sm:p-6">
+      <div className="flex flex-wrap items-center justify-between gap-3">
         <h1 className="text-lg font-semibold">Leads</h1>
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
           <Button size="sm" variant="outline" onClick={() => setAddOpen(true)}>
             <Plus className="size-4" /> Add lead
           </Button>
@@ -181,7 +182,15 @@ export default function LeadsPage() {
         </div>
       )}
 
-      <div className="flex flex-wrap items-center gap-2">
+      <ResponsiveFilters
+        activeCount={
+          Number(tier !== ANY) +
+          Number(state !== ANY) +
+          Number(search !== '') +
+          Number(suppressedOnly)
+        }
+        description="Filter by tier, enrollment state, search text, or suppression status."
+      >
         <Select value={tier} onValueChange={(v) => setFilter(() => setTier(v))}>
           <SelectTrigger size="sm" className="w-32" aria-label="Tier filter">
             <SelectValue />
@@ -222,7 +231,7 @@ export default function LeadsPage() {
           />
           Suppressed only
         </label>
-      </div>
+      </ResponsiveFilters>
 
       {(selected.size > 0 || allMatching) && (
         <BulkTierBar
@@ -269,6 +278,51 @@ export default function LeadsPage() {
           total: data.total,
           onPageChange: setPage,
         }}
+        mobileCard={(lead) => (
+          <article className="space-y-3 rounded-lg border border-border bg-card p-4">
+            <div className="flex min-w-0 items-start gap-3">
+              <span onClick={(event) => event.stopPropagation()}>
+                <Checkbox
+                  aria-label={`Select ${lead.email}`}
+                  checked={allMatching || selected.has(lead.id)}
+                  onCheckedChange={(checked) => {
+                    setAllMatching(false);
+                    setSelected((previous) => {
+                      const next = new Set(previous);
+                      if (checked === true) next.add(lead.id);
+                      else next.delete(lead.id);
+                      return next;
+                    });
+                  }}
+                />
+              </span>
+              <div className="min-w-0 flex-1">
+                <Link
+                  to={`/leads/${lead.id}`}
+                  className="inline-flex min-h-11 items-center break-all text-sm font-medium underline-offset-2 hover:underline"
+                >
+                  {lead.email}
+                </Link>
+                <p className="text-xs text-muted-foreground">
+                  {[lead.first_name, lead.last_name].filter(Boolean).join(' ') || 'No name'}
+                  {lead.company ? ` · ${lead.company}` : ''}
+                </p>
+              </div>
+              {lead.is_suppressed && <span title="Suppressed">🚫</span>}
+            </div>
+            <div className="flex flex-wrap items-center gap-2">
+              <TierBadge tier={lead.tier} />
+              {lead.latest_enrollment && (
+                <StateBadge state={lead.latest_enrollment.current_state} />
+              )}
+              {[lead.city, lead.state].filter(Boolean).length > 0 && (
+                <span className="text-xs text-muted-foreground">
+                  {[lead.city, lead.state].filter(Boolean).join(', ')}
+                </span>
+              )}
+            </div>
+          </article>
+        )}
         emptyTitle="No leads match this filter"
       />
 

@@ -4,23 +4,23 @@
 
 **Application model:** single-operator, self-hosted cold-email campaign console
 
-**Manual version:** 2026-08-23, for branch `b8.3-local-canary`
+**Manual version:** 2026-08-25, for branch `b8.3-local-canary`
 
-**Reconciled through:** deployed application commit `680f47e` and the verified production records
-through `4cd572b`
+**Reconciled through:** the locally verified ten-workstream implementation through Stage 4. The
+currently deployed production application remains at commit `680f47e` until a separate deployment
+is approved.
 
 This manual explains the complete operator-facing application: what every screen does, how to use
 each action, what the system does automatically, and which safeguards or edge cases matter. It is a
 product-use guide, not legal advice and not a promise of email deliverability.
 
-For simpler explanations, worked examples, and candid notes about current UI limitations, also
+For simpler explanations, worked examples, and product-design context, also
 read [User Manual Companion: Plain-Language Answers and Product Notes](20-user-manual-questions.md).
 
 The screenshots use the application's built-in representative dataset so controls can be shown
 without changing production. Names, dates, addresses, counts, and `MOCK` status in the images are
-examples. Two screenshots predate the final OAuth/footer refinement; explicit callouts beside those
-images describe the current controls. Follow the written rules and the values displayed in your
-live session.
+examples. They were recaptured after the Stage 4 responsive redesign. Follow the written rules and
+the values displayed in your live session.
 
 > **Current-environment warning:** Spaceship is the production deployment at
 > `https://sambhavpmtech.com/email-campaign/`. Oracle remains a paused rollback canary. A green
@@ -273,6 +273,17 @@ commissioning.
 The left navigation contains: **Overview, Leads, Mailboxes, Sequences, Campaigns, Unibox,
 Analytics, Cold Storage, Settings,** and **System**.
 
+On desktop and tablet, this navigation remains visible while the page content scrolls
+independently. On screens narrower than 768 px, use the menu button in the top bar. It opens the
+same ten sections in a focus-trapped drawer and closes after navigation. The campaign selector,
+alerts, transport status, and sign-out remain available on phones.
+
+![Phone navigation drawer showing all application sections, transport state, and alerts](images/user-manual/19-mobile-navigation.png)
+
+Press **Tab** from the top of a page to reveal **Skip to main content**. This bypasses repeated
+navigation for keyboard users. Escape closes open drawers and dialogs and returns focus to the
+control that opened them.
+
 ### Campaign selector
 
 The top-left selector establishes global campaign context. The selection is stored as
@@ -387,6 +398,14 @@ Filters:
 
 Filters reset pagination and selection.
 
+On phones, the table becomes cards and the filters move into a **Filters** drawer. The same lead
+data, selection, actions, active-filter count, and numbered pagination remain available; there is
+no sideways page scrolling.
+
+![Phone Leads view showing tier summary, filter control, and lead cards](images/user-manual/20-mobile-leads.png)
+
+![Phone filter drawer showing the same lead filters without shrinking the list](images/user-manual/21-mobile-filters.png)
+
 ### 8.2 Add one lead
 
 Choose **Add lead**, enter the email and any available first name, company, city, and state, then
@@ -409,6 +428,11 @@ This action is intentionally not a shortcut around list safety.
 Choose **Import CSV** and drop or select a file.
 
 ![CSV import dialog and file requirements](images/user-manual/03-import-csv.png)
+
+On a phone the import wizard fills the usable viewport and scrolls internally, so its controls do
+not disappear behind the browser or on-screen keyboard.
+
+![Phone CSV import wizard](images/user-manual/22-mobile-import.png)
 
 Requirements:
 
@@ -943,13 +967,14 @@ can overlap, and offers **Recycle cold storage** or **Import fresh leads**.
 
 Unibox is the operator's reply work queue across campaigns.
 
-![Unibox showing reply filters, stopped sequences, outcomes, sentiment, meeting, and snooze controls](images/user-manual/11-unibox.png)
+![Unibox showing reply filters, stopped sequences, outcomes, sentiment, meetings, and reminders](images/user-manual/11-unibox.png)
 
 ### 12.1 Filters and tabs
 
 - **Human replies:** real responses that stop the sequence.
 - **Auto-replies (OOO):** automatic responses that do not count as human engagement and normally
   allow the sequence to continue.
+- **Reminders:** operator follow-up tasks grouped into Due today, Upcoming, and Overdue.
 - **Mailbox filter:** restricts the feed to one receiving mailbox.
 - **Sentiment filters:** positive, neutral, negative.
 - **Needs outcome:** human replies without a saved disposition.
@@ -1003,11 +1028,17 @@ suppress. Save both the appropriate outcome and sentiment.
 **Mark meeting booked** appends a durable meeting event and updates campaign analytics. It does not
 change terminal state.
 
-### 12.7 Snooze
+### 12.7 Reminders
 
-Snooze stores a scheduling hold until a selected date and does not append a business event. A
-human reply already stops the sequence, so snooze does not restart or override reply stopping. It
-is useful only where an active scheduling context still exists.
+Human-reply Snooze was replaced with explicit in-app reminders. Create a reminder from a reply by
+choosing a calendar date and optional note. Saving **Not now** automatically creates or updates a
+reminder for its do-not-contact date.
+
+Reminders do not send a message, restart a sequence, or grant permission to contact. Completing or
+dismissing one only clears the operator task. The separate do-not-contact date and global
+suppression rules still decide whether future contact is permitted. Older replied-enrollment
+Snooze dates are migrated into reminders; legacy active-enrollment scheduling holds retain their
+old scheduler meaning, but the Unibox no longer creates them.
 
 ### 12.8 Automatic versus tag-only opt-out detection
 
@@ -1023,6 +1054,11 @@ compliance responsibility on the operator.
 Analytics is scoped to the selected campaign and contains four tabs.
 
 ![Analytics variant comparison showing sends, reply and positive rates, meetings, and winner guidance](images/user-manual/12-analytics.png)
+
+On phones, every analytics table becomes a stacked card, tabs remain scrollable, and chart values
+have an accessible text view.
+
+![Phone variant analytics showing Direct response cards and the start of Eventual outcome](images/user-manual/23-mobile-analytics.png)
 
 ### 13.1 Variants
 

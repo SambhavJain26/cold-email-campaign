@@ -1,16 +1,10 @@
 import { Link } from 'react-router-dom';
+import type { StepAnalyticsRow } from '@coldemail/shared';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '@/components/ui/table';
 import { EmptyState } from '@/components/shared/empty-state';
+import { DataTable, type DataTableColumn } from '@/components/shared/data-table';
 import { useStepAnalytics } from '@/api/queries/analytics';
 import { stepsReconciliation, stepVerdict, type StepVerdict } from './reconciliation';
 
@@ -49,49 +43,53 @@ export function StepsTab({
   const bestRate = rows.reduce((best, row) => Math.max(best, row.positive_rate.value), 0);
   const reconciliation = stepsReconciliation(rows, campaignPositives);
   const weakest = rows.find((row) => stepVerdict(row, bestRate) === 'weak');
+  const columns: Array<DataTableColumn<StepAnalyticsRow>> = [
+    {
+      key: 'step',
+      header: 'Step',
+      cell: (row) => <span className="font-medium">Step {row.step_no}</span>,
+    },
+    { key: 'delivered', header: 'Delivered', align: 'right', cell: (row) => row.delivered },
+    {
+      key: 'positive',
+      header: 'Positive replies',
+      align: 'right',
+      cell: (row) => row.positive_replies,
+    },
+    {
+      key: 'rate',
+      header: 'Positive %',
+      align: 'right',
+      cell: (row) => (
+        <span
+          title={`${row.positive_rate.numerator} / ${row.positive_rate.denominator} = ${row.positive_rate.value}%`}
+        >
+          {row.positive_rate.value}%
+        </span>
+      ),
+    },
+    {
+      key: 'verdict',
+      header: 'Verdict',
+      cell: (row) => {
+        const verdict = VERDICT[stepVerdict(row, bestRate)];
+        return (
+          <Badge variant="outline" className={`border-transparent ${verdict.className}`}>
+            {verdict.label}
+          </Badge>
+        );
+      },
+    },
+  ];
 
   return (
     <div className="space-y-3">
-      <div className="overflow-x-auto rounded-lg border border-border">
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead className="text-xs">Step</TableHead>
-              <TableHead className="text-right text-xs">Delivered</TableHead>
-              <TableHead className="text-right text-xs">Positive replies</TableHead>
-              <TableHead className="text-right text-xs">Positive %</TableHead>
-              <TableHead className="text-xs">Verdict</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {rows.map((row) => {
-              const verdict = VERDICT[stepVerdict(row, bestRate)];
-              return (
-                <TableRow key={row.step_no} data-testid={`step-row-${row.step_no}`}>
-                  <TableCell className="py-1.5 text-sm font-medium">Step {row.step_no}</TableCell>
-                  <TableCell className="py-1.5 text-right text-sm tabular-nums">
-                    {row.delivered}
-                  </TableCell>
-                  <TableCell className="py-1.5 text-right text-sm tabular-nums">
-                    {row.positive_replies}
-                  </TableCell>
-                  <TableCell
-                    className="py-1.5 text-right text-sm tabular-nums"
-                    title={`${row.positive_rate.numerator} / ${row.positive_rate.denominator} = ${row.positive_rate.value}%`}
-                  >
-                    {row.positive_rate.value}%
-                  </TableCell>
-                  <TableCell className="py-1.5">
-                    <Badge variant="outline" className={`border-transparent ${verdict.className}`}>
-                      {verdict.label}
-                    </Badge>
-                  </TableCell>
-                </TableRow>
-              );
-            })}
-          </TableBody>
-        </Table>
-      </div>
+      <DataTable
+        columns={columns}
+        rows={rows}
+        rowKey={(row) => row.step_no}
+        rowTestId={(row) => `step-row-${row.step_no}`}
+      />
 
       <p className="text-xs text-muted-foreground" data-testid="steps-reconciliation">
         (positives sum to {reconciliation.sum}

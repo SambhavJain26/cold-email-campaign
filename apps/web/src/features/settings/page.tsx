@@ -52,14 +52,16 @@ export default function SettingsPage() {
   }
 
   return (
-    <div className="max-w-3xl space-y-4 p-6">
+    <div className="max-w-3xl space-y-4 p-4 sm:p-6">
       <h1 className="text-lg font-semibold">Settings</h1>
       <Tabs value={tab} onValueChange={onTabChange}>
-        <TabsList>
-          <TabsTrigger value="rules">Rules</TabsTrigger>
-          <TabsTrigger value="compliance">Compliance</TabsTrigger>
-          <TabsTrigger value="account">Account</TabsTrigger>
-        </TabsList>
+        <div className="max-w-full overflow-x-auto">
+          <TabsList className="min-w-max">
+            <TabsTrigger value="rules">Rules</TabsTrigger>
+            <TabsTrigger value="compliance">Compliance</TabsTrigger>
+            <TabsTrigger value="account">Account</TabsTrigger>
+          </TabsList>
+        </div>
         <TabsContent value="rules" className="pt-3">
           <RulesTab settings={settings.data} onDirtyChange={setDirty('rules')} />
         </TabsContent>

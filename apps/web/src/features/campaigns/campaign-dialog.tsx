@@ -248,7 +248,7 @@ export function CampaignDialog({
               The calendar starts once, on first activation. Pausing does not restart it.
             </p>
             {[0, 1, 2, 3, 4].map((index) => (
-              <div key={index} className="grid grid-cols-3 gap-2">
+              <div key={index} className="grid gap-2 sm:grid-cols-3">
                 <Input
                   aria-label={`Ramp stage ${index + 1} start day`}
                   type="number"
@@ -280,7 +280,7 @@ export function CampaignDialog({
               onChange={(event) => setAutoField(event.target.value)}
             />
             {autoRules.map((rule, index) => (
-              <div key={index} className="grid grid-cols-2 gap-2">
+              <div key={index} className="grid gap-2 sm:grid-cols-2">
                 <Input
                   aria-label={`Observation rule key ${index + 1}`}
                   placeholder={index === 0 ? 'default' : 'Exact field value'}
@@ -342,7 +342,7 @@ export function CampaignDialog({
           <fieldset className="space-y-3 rounded-lg border border-border p-3">
             <legend className="px-1 text-xs font-medium">Campaign variable overrides</legend>
             {overrides.map((entry, index) => (
-              <div key={index} className="grid grid-cols-2 gap-2">
+              <div key={index} className="grid gap-2 sm:grid-cols-2">
                 <Input
                   aria-label={`Campaign variable key ${index + 1}`}
                   placeholder="offer_name"

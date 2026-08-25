@@ -730,23 +730,16 @@ detected cannot be recalled, which is why frequent IMAP polling and stale-poll p
 An out-of-office auto-reply does not count as human engagement, so the sequence continues
 normally.
 
-### 6.5 What Snooze currently does—and why it is confusing
+### 6.5 Reminders replaced reply Snooze
 
-The button writes a `snoozed_until` scheduling date that makes the scheduler ignore an active
-enrollment until that date.
+This correction is now implemented locally. Human-reply cards no longer offer the misleading
+Snooze action. They can create one or more in-app reminders with a calendar date and optional note;
+**Not now** automatically creates or updates one for the do-not-contact date.
 
-However, Unibox presents Snooze on a **human reply**, and a human reply has already moved that
-enrollment to terminal `REPLIED`. Terminal enrollments do not resume their remaining automated
-steps. Therefore, in the current reply workflow, Snooze has essentially no useful effect.
-
-This is a **recommended product correction**. The better choices are:
-
-- remove Snooze from human reply cards, or
-- redesign it as an operator reminder such as **Remind me to follow up on 15 September**, without
-  pretending it will restart the old sequence.
-
-For a `Not now` reply, use the reply outcome and its **Do not contact before** date. That is the
-actual recontact guard.
+A reminder is only an operator task. It does not restart the stopped enrollment, send anything, or
+authorize recontact. Completing it does not erase the **Do not contact before** guard. The Unibox
+Reminders view groups open work into Due today, Upcoming, and Overdue and allows completion or
+dismissal.
 
 ## 7. Cold storage, recycling, and combining old campaigns
 
@@ -944,51 +937,39 @@ for diagnosis and perform a write rebuild only through the controlled runbook.
 
 ### 10.3 Do long lists have pages today?
 
-The answer depends on the screen.
+Yes. The requested operational pagination is now implemented locally.
 
 | Screen | Current behavior |
 | --- | --- |
 | Leads | Already paginated at 50 rows with page controls. |
 | Import history | Paginated. |
-| Unibox | Backend supports pages, but UI requests the first 50 and has no next-page controls. Replies after the first 50 can therefore be hidden by the current UI filter. |
-| System > Reply Detection | Backend supports pages, but UI requests the first 100 and has no page controls. |
-| System > Alerts history | API is paginated, but UI has no page controls and uses the default first page. |
-| Cold storage | Returned as one unpaginated list. |
+| Unibox | Human, OOO, and Reminder views show 50 per page. |
+| System > Reply Detection | Shows 100 per page. |
+| System > Alerts history | Shows 50 per page, including acknowledged history. |
+| Cold storage | Shows 50 per page from the standard list envelope. |
 | Mailboxes/campaigns/sequences | Currently load their full operational lists. |
 
-So your request is valid and, for Unibox/System feeds, important—not merely cosmetic.
-
-**Recommended feature:** use one reusable pagination component with total count, current page,
-page size, Previous/Next, and filters preserved while changing pages. For constantly changing
-reply/alert feeds, cursor-based **Load more** can be more stable than numbered pages, but a
-Gmail-style page design is completely reasonable.
+The shared control shows the current range and total, numbered pages on wider screens, and
+Previous/Next on phones. Filters are preserved across pages and changing a filter resets to page 1.
 
 ### 10.4 Should the left navigation stay fixed?
 
-Yes. On desktop, the sidebar should remain visible while the main content area scrolls. This makes
-long lead, analytics, and system pages easier to navigate.
-
-Recommended behavior:
+Yes. This is now implemented locally:
 
 - Desktop: sticky/fixed-height sidebar with its own overflow only if the navigation itself is too
   tall; main content scrolls independently.
-- Tablet/phone: do not reserve permanent sidebar width. Replace it with a hamburger drawer or a
-  compact bottom navigation for the highest-frequency areas.
+- Tablet/phone: no permanent sidebar width; a compact top bar opens the complete navigation in a
+  left-side drawer.
 - Preserve keyboard focus, screen-reader labels, and a visible active-page state.
 
-This is a **new layout improvement**; the current sidebar is not implemented as a persistent
-desktop rail.
+The drawer closes after navigation and restores focus to the menu button. Campaign context remains
+in the URL across both desktop and phone navigation.
 
 ### 10.5 Full phone redesign
 
-Agreed: the application is currently desktop-first. Some elements wrap or scroll horizontally,
-but a permanently wide sidebar, dense tables, wide dialogs, filters, charts, and small actions make
-the application impractical on a phone. Making tables merely horizontally scrollable would not be
-a complete mobile design.
+The complete responsive redesign is now implemented locally. It includes:
 
-A proper responsive redesign should include:
-
-1. A compact top bar and drawer/bottom navigation instead of the desktop sidebar.
+1. A compact top bar and navigation drawer instead of the desktop sidebar.
 2. Card/list presentations for Leads, Mailboxes, Unibox, Campaigns, and Alerts instead of forcing
    every desktop table onto a narrow screen.
 3. Full-screen mobile dialogs for import, campaign creation, sequence editing, and manual compose.
@@ -1002,22 +983,24 @@ A proper responsive redesign should include:
 9. Testing at common widths such as 320, 375, 390, 430, and 768 px, including on-screen keyboard
    behavior in the manual composer.
 
-This can remain the same web application; a separate native mobile app is not required. It is a
-meaningful cross-application project rather than one CSS tweak and should receive its own design,
-implementation, accessibility, and browser-testing phase.
+It remains the same web application; no separate native app is required. Parameterized Playwright
+tests cover 320, 375, 390, 430, and 768 px, reduced motion, focus/Escape behavior, touch sizing,
+unsaved Manual Compose text during keyboard-sized viewport changes, page overflow, and axe
+accessibility scans including color contrast.
 
 ## 11. Implementation status from these questions
 
-Stages 1–3 of the approved improvement plan are complete locally and are not deployed. The operator
-explicitly continued the work; Stage 4 responsive/mobile implementation and the final complete gate
-remain.
+Stages 1–4 of the approved improvement plan are complete locally and are not deployed. The final
+complete serial gate, migration replay, populated projection check, self-check, and scratch restore
+drill all pass. The local candidate is ready for review/deployment only after separate deployment
+approval.
 
 | Status | Improvement | Notes |
 | --- | --- | --- |
 | Complete locally | Unibox/System pagination, due-step Manual Compose, reminders, safe timezone/folder controls | Stage 1; not deployed |
 | Complete locally | Imported manual drafts, Auto Observation rules, sequence variables, activation-based staged ramp | Stage 2; not deployed |
 | Complete locally | Later-step direct/eventual variant analytics and multi-source recycling | Stage 3; not deployed |
-| In progress | Phone-responsive navigation and complete mobile redesign | Stage 4; not deployed |
+| Complete locally | Phone-responsive navigation and complete mobile redesign | Stage 4; not deployed |
 
 ## 12. Question coverage map
 

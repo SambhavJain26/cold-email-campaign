@@ -88,7 +88,7 @@ export function AddLeadDialog({
         </DialogHeader>
         <form onSubmit={handleSubmit(onSubmit)} className="space-y-3" noValidate>
           {field('email', 'Email')}
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid gap-3 sm:grid-cols-2">
             {field('first_name', 'First name')}
             {field('company', 'Company')}
             {field('city', 'City')}

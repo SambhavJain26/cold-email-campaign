@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { EmptyState } from '@/components/shared/empty-state';
 import { DataTable } from '@/components/shared/data-table';
+import { ResponsiveFilters } from '@/components/shared/responsive-filters';
 import { formatDateTime } from '@/lib/format';
 import { useIncomingMessages } from '@/api/queries/system';
 import { useMailboxes } from '@/api/queries/mailboxes';
@@ -48,10 +49,10 @@ export function ReplyDetectionTable() {
         </p>
       </div>
 
-      <div
-        className="flex flex-wrap items-center gap-2"
-        role="group"
-        aria-label="Reply detection filters"
+      <ResponsiveFilters
+        title="Message filters"
+        activeCount={Number(mailboxId !== 'all') + Number(classification !== undefined)}
+        description="Filter processed messages by mailbox and detected classification."
       >
         <Select
           value={mailboxId}
@@ -96,7 +97,7 @@ export function ReplyDetectionTable() {
             {CLASS_LABEL[value].label}
           </Button>
         ))}
-      </div>
+      </ResponsiveFilters>
 
       {isPending ? (
         <Skeleton className="h-40 w-full" />

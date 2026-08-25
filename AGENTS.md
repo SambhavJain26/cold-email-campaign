@@ -28,13 +28,13 @@ commissioning** until the operator completes the handoffs below:
   20–25; alert history and mailbox filters; arbitrary custom-field editing; copy-risk rubric
   improvements; local verification; and runbook/documentation reconciliation. Outside that list,
   work is limited to testing, verification, diagnosis, and documentation.
-- The operator explicitly continued the 2026-08-25 ten-workstream implementation. Stages 1–3 are
-  complete locally: operational pagination; due-step Manual Compose; in-app reminders; verified
+- The operator-approved 2026-08-25 ten-workstream implementation is complete locally through
+  Stages 1–4: operational pagination; due-step Manual Compose; in-app reminders; verified
   timezone/folder controls; imported manual drafts; Auto Observation/sequence variables; staged
-  activation ramps; later-step direct/eventual variant analytics; and atomic multi-source cold-
-  storage recycling with durable provenance. Stage 4 responsive/mobile work is authorized and is
-  the only remaining implementation stage. Deployment remains separately gated, and implementation
-  must not activate campaigns, enroll production leads, or send mail.
+  activation ramps; later-step direct/eventual variant analytics; atomic multi-source cold-storage
+  recycling with durable provenance; and the responsive/mobile redesign. The complete local gate
+  is verified. Deployment remains separately gated, and no campaign activation, production
+  enrollment, or send is authorized.
 - The approved Spaceship deployment, subpath support, sender-domain unsubscribe routing, and
   per-mailbox Google Workspace OAuth implementation are complete on `b8.3-local-canary`. Do not
   extend production scope, change DNS/Caddy, or configure a real mailbox beyond the approved
@@ -83,6 +83,10 @@ commissioning** until the operator completes the handoffs below:
 - Complete serial local gate passed 2026-08-22: type/lint/format; unit 338; web 55;
   integration 159; API 116; GreenMail 29; golden exactly 47; mock E2E 51; real-backend E2E 1;
   populated test DB `checked 5 enrollments — 0 diff(s)`; self-check clean.
+- Complete Stage 4 serial local gate passed 2026-08-25: type/lint/format; unit 341; web 56;
+  integration 166; API 122; GreenMail 29; golden exactly 47; mock E2E 59; real-backend E2E 1;
+  migration 0017 apply/down/apply; populated test DB `checked 5 enrollments — 0 diff(s)`;
+  self-check clean; custom-format dump catalog and scratch restore/rebuild/dry-run/self-check pass.
 
 ## Production deployments
 

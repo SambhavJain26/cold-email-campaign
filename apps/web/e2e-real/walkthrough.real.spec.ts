@@ -97,7 +97,7 @@ test('real backend: import → enroll → advance → reply/STOP → tag → met
   await page.getByRole('button', { name: 'Go tier them' }).click(); // closes the wizard dialog
 
   // Leads landed and are visible in the table.
-  await expect(page.getByText('alice@acme.test')).toBeVisible();
+  await expect(page.getByRole('table').getByText('alice@acme.test')).toBeVisible();
 
   // 4 — Tier the untiered cohort, then create + activate the campaign.
   await api(page, 'post', '/api/v1/leads/bulk-tier', {

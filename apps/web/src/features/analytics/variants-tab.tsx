@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react';
 import { Trophy } from 'lucide-react';
 import { toast } from 'sonner';
+import type { VariantAnalyticsRow } from '@coldemail/shared';
 import { Button } from '@/components/ui/button';
 import {
   Dialog,
@@ -19,15 +20,8 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { Skeleton } from '@/components/ui/skeleton';
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '@/components/ui/table';
 import { EmptyState } from '@/components/shared/empty-state';
+import { DataTable, type DataTableColumn } from '@/components/shared/data-table';
 import { useVariantAnalytics } from '@/api/queries/analytics';
 import { useSequences } from '@/api/queries/sequences';
 import { useDeactivateVariant } from '@/api/mutations/campaigns';
@@ -76,6 +70,88 @@ export function VariantsTab({
   const tied = comparableRows.length > 1 && winner === null;
   const smallSample = comparableRows.some((row) => row.eventual.cohort < SMALL_SAMPLE);
   const confirmTarget = rows.find((row) => row.variant_id === confirmId);
+  const directColumns: Array<DataTableColumn<VariantAnalyticsRow>> = [
+    {
+      key: 'variant',
+      header: 'Variant',
+      cell: (row) => (
+        <span className="font-medium">
+          {row.label}
+          {row.bespoke ? ' · manual' : row.active ? '' : ' · inactive'}
+        </span>
+      ),
+    },
+    {
+      key: 'subject',
+      header: 'Subject',
+      cell: (row) => (
+        <span className="break-words font-mono text-xs text-muted-foreground">
+          {row.subject_template}
+        </span>
+      ),
+    },
+    { key: 'sent', header: 'Sent', align: 'right', cell: (row) => row.direct.sent },
+    { key: 'delivered', header: 'Delivered', align: 'right', cell: (row) => row.direct.delivered },
+    {
+      key: 'reply',
+      header: 'Reply',
+      align: 'right',
+      cell: (row) => `${row.direct.reply_rate.value}%`,
+    },
+    {
+      key: 'positive',
+      header: 'Positive',
+      align: 'right',
+      cell: (row) => `${row.direct.positive_rate.value}%`,
+    },
+  ];
+  const eventualColumns: Array<DataTableColumn<VariantAnalyticsRow>> = [
+    {
+      key: 'variant',
+      header: 'Variant',
+      cell: (row) => (
+        <span className="font-medium">
+          {row.variant_id === winner?.variant_id && (
+            <Trophy className="mr-1 inline size-3.5 text-success" aria-label="winner" />
+          )}
+          {row.label}
+          {row.bespoke && ' · read-only'}
+        </span>
+      ),
+    },
+    { key: 'cohort', header: 'Cohort', align: 'right', cell: (row) => row.eventual.cohort },
+    {
+      key: 'reply',
+      header: 'Reply',
+      align: 'right',
+      cell: (row) => `${row.eventual.reply_rate.value}%`,
+    },
+    {
+      key: 'positive',
+      header: 'Positive',
+      align: 'right',
+      cell: (row) => `${row.eventual.positive_rate.value}%`,
+    },
+    {
+      key: 'meetings',
+      header: 'Meetings',
+      align: 'right',
+      cell: (row) => <span className="font-medium">{row.eventual.meetings}</span>,
+    },
+    {
+      key: 'action',
+      header: 'Action',
+      align: 'right',
+      cell: (row) =>
+        row.deactivatable ? (
+          <Button variant="outline" size="xs" onClick={() => setConfirmId(row.variant_id)}>
+            Deactivate
+          </Button>
+        ) : (
+          <span className="text-muted-foreground">—</span>
+        ),
+    },
+  ];
 
   return (
     <div className="flex flex-col gap-5">
@@ -120,37 +196,12 @@ export function VariantsTab({
             Replies that directly reference a message sent at Step {selectedStepNo}.
           </p>
         </div>
-        <div className="overflow-x-auto rounded-lg border border-border">
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Variant</TableHead>
-                <TableHead>Subject</TableHead>
-                <TableHead className="text-right">Sent</TableHead>
-                <TableHead className="text-right">Delivered</TableHead>
-                <TableHead className="text-right">Reply</TableHead>
-                <TableHead className="text-right">Positive</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {rows.map((row) => (
-                <TableRow key={row.variant_id} data-testid={`variant-row-${row.label}`}>
-                  <TableCell className="font-medium">
-                    {row.label}
-                    {row.bespoke ? ' · manual' : row.active ? '' : ' · inactive'}
-                  </TableCell>
-                  <TableCell className="font-mono text-xs text-muted-foreground">
-                    {row.subject_template}
-                  </TableCell>
-                  <TableCell className="text-right">{row.direct.sent}</TableCell>
-                  <TableCell className="text-right">{row.direct.delivered}</TableCell>
-                  <TableCell className="text-right">{row.direct.reply_rate.value}%</TableCell>
-                  <TableCell className="text-right">{row.direct.positive_rate.value}%</TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-        </div>
+        <DataTable
+          columns={directColumns}
+          rows={rows}
+          rowKey={(row) => row.variant_id}
+          rowTestId={(row) => `variant-row-${row.label}`}
+        />
       </section>
 
       <section aria-labelledby="eventual-heading" className="flex flex-col gap-2">
@@ -163,51 +214,7 @@ export function VariantsTab({
             variant.
           </p>
         </div>
-        <div className="overflow-x-auto rounded-lg border border-border">
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Variant</TableHead>
-                <TableHead className="text-right">Cohort</TableHead>
-                <TableHead className="text-right">Reply</TableHead>
-                <TableHead className="text-right">Positive</TableHead>
-                <TableHead className="text-right">Meetings</TableHead>
-                <TableHead className="text-right">Action</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {rows.map((row) => (
-                <TableRow
-                  key={row.variant_id}
-                  className={row.variant_id === winner?.variant_id ? 'bg-success/10' : undefined}
-                >
-                  <TableCell className="font-medium">
-                    {row.variant_id === winner?.variant_id && (
-                      <Trophy className="mr-1 inline size-3.5 text-success" aria-label="winner" />
-                    )}
-                    {row.label}
-                    {row.bespoke && ' · read-only'}
-                  </TableCell>
-                  <TableCell className="text-right">{row.eventual.cohort}</TableCell>
-                  <TableCell className="text-right">{row.eventual.reply_rate.value}%</TableCell>
-                  <TableCell className="text-right">{row.eventual.positive_rate.value}%</TableCell>
-                  <TableCell className="text-right font-medium">{row.eventual.meetings}</TableCell>
-                  <TableCell className="text-right">
-                    {row.deactivatable && (
-                      <Button
-                        variant="outline"
-                        size="xs"
-                        onClick={() => setConfirmId(row.variant_id)}
-                      >
-                        Deactivate
-                      </Button>
-                    )}
-                  </TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-        </div>
+        <DataTable columns={eventualColumns} rows={rows} rowKey={(row) => row.variant_id} />
       </section>
 
       <div className="flex flex-col gap-1 text-xs" data-testid="variants-verdict">
