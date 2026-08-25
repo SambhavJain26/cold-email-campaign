@@ -1,5 +1,32 @@
 # Local canary runbook (B8.3-local) — two-week validation on throwaway Gmail
 
+## 2026-08-25 ten-workstream production rollout — verified
+
+After explicit operator deployment approval, Spaceship production was fast-forwarded by reviewed
+Git bundle from `4cd572b9` to the complete Stage 4 commit `f273109`; `main` was not merged and Oracle
+was not changed. A pre-deploy custom-format dump passed `pg_restore --list`. The app, gateway, and
+backup images were rebuilt and recreated while the existing Postgres container remained healthy.
+
+Verified post-deploy evidence:
+
+- migrations `0015_operational_workflows`, `0016_personalization_ramp_drafts`, and
+  `0017_multi_source_recycling` are applied;
+- db and app containers are healthy; backup and gateway are running; only
+  `127.0.0.1:18080` is published by the stack;
+- internal health returns `{ok:true,db:true}`; self-check reports no invariant violations; the
+  production projection dry-run reports `checked 0 enrollments — 0 diff(s)`;
+- `/email-campaign/`, login, and a direct SPA campaign route return 200; the bare app path
+  canonicalizes with 308; other outreach-domain paths redirect 308 to the portfolio; both
+  unsubscribe-host roots return 404; the portfolio returns 200;
+- production contains one `google_oauth` mailbox in `ok` state and zero campaigns, leads,
+  enrollments, active campaigns, or sendable enrollments;
+- post-deploy dump `coldemail-20260825-113839.dump` is 292,812 bytes and passed
+  `pg_restore --list`.
+
+No campaign was activated, no lead was enrolled, and no email was sent. The production Gmail body
+link and RFC 8058 one-click behavior remain unproven until a separately approved owner-address
+canary. Oracle remains the paused rollback environment.
+
 ## 2026-08-25 ten-workstream implementation — Stage 4 verified locally
 
 The responsive/mobile redesign is complete locally without changing the established desktop visual
@@ -19,9 +46,9 @@ diff(s)` and self-check reported no invariant violations. A custom-format local 
 rebuild, a five-enrollment zero-drift dry-run, and self-check; the scratch database and dump were
 removed.
 
-Stages 1–4 are now complete locally. No production campaign was activated, no production lead was
-enrolled, no email was sent, and Spaceship and Oracle were not changed. This candidate is not
-deployed; deployment still requires separate explicit approval.
+Stages 1–4 were completed and verified locally at this checkpoint. They were subsequently deployed
+to Spaceship under the separately approved rollout recorded above. No campaign was activated, no
+lead was enrolled, and no email was sent; Oracle was not changed.
 
 ## 2026-08-25 ten-workstream implementation — Stage 3 verified locally
 

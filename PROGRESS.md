@@ -4,11 +4,10 @@
 
 **Legend:** `[ ]` not started · `[~]` in progress · `[x]` done · `[!]` blocked (note why in the log)
 
-**Current focus:** → **Ten-workstream implementation complete locally; deployment remains
-separately gated.** Stages 1–4 and the final serial gate are complete. No campaign activation,
-production enrollment, send, Oracle change, or production deploy is authorized by the
-implementation plan. [docs/21-stage-4-completion-handoff.md](docs/21-stage-4-completion-handoff.md)
-preserves the completed verification and delivery procedure.
+**Current focus:** → **Stages 1–4 are deployed; pre-prospect commissioning remains.** The final
+serial gate and production rollout are complete at `f273109`. No campaign activation, production
+enrollment, outbound send, or Oracle change was performed. Every future activation, enrollment,
+or owner/prospect send remains separately approval-gated.
 
 > **⚠️ Superseded framing (corrected 2026-08-09).** This line previously read "No code work is outstanding" and "everything left in B8 … is *operations*, not code." **That was wrong.** Operating the canary against a real provider exposed genuine **code** defects — the reply/send race (finding 15), whole-mailbox history ingestion (16), plain-text-only mail (19), and a class of backend-implemented/UI-invisible gaps (3–9). All were fixed on `b8.3-local-canary`. Treat [docs/17](docs/17-local-canary-runbook.md) as the authoritative status record, not this header.
 
@@ -76,6 +75,15 @@ populated test database returned `checked 5 enrollments — 0 diff(s)` with clea
 custom-format dump passed catalog validation, scratch restore, rebuild, zero-drift dry-run, and
 self-check. Production and Oracle are unchanged; no campaign was activated, no production lead was
 enrolled, and no email was sent.
+
+**2026-08-25 Stage 1–4 production rollout:** after explicit operator approval, Spaceship was
+fast-forwarded by reviewed bundle and deployed at `f273109`; `main` and Oracle were untouched.
+Migrations `0015`–`0017` are applied. All four containers are running, app/db health is green, the
+public SPA/direct-route/redirect/unsubscribe-host matrix passes, self-check is clean, and production
+returned `checked 0 enrollments — 0 diff(s)`. The database has one healthy Google OAuth mailbox but
+zero campaigns, leads, enrollments, active campaigns, or sendable enrollments. No campaign was
+activated, no lead was enrolled, and no email was sent. Post-deploy dump
+`coldemail-20260825-113839.dump` is 292,812 bytes and passed `pg_restore --list`.
 
 ---
 

@@ -4,9 +4,10 @@
 
 **Branch:** `b8.3-local-canary`
 
-**Last committed stage:** Stage 3 at `8930060` (`feat: add stage 3 analytics and recycling`)
+**Stage commits:** Stage 3 `8930060`; Stage 4 `f273109`
 
-**Status:** procedure completed successfully; retained as the exact verification and delivery record
+**Status:** procedure completed successfully; Stage 4 was subsequently deployed to Spaceship on
+2026-08-25 after separate explicit approval
 
 **Purpose:** preserve how Stage 4 was completed without requiring a later reconstruction
 
@@ -24,8 +25,9 @@ Do not:
 - change DNS, Caddy, OAuth credentials, mailboxes, or live application state;
 - merge or push to `main`.
 
-Deployment remains separately approval-gated. The local Docker Postgres and GreenMail containers
-are disposable test infrastructure, not production services.
+Deployment was separately approval-gated at this checkpoint. It was subsequently approved and
+completed as recorded in docs/17. The local Docker Postgres and GreenMail containers are disposable
+test infrastructure, not production services.
 
 ## 2. Current implementation state
 
@@ -245,6 +247,10 @@ not merely the failing test.
 
 ## 6. Reconcile durable documentation
 
+> Historical checkpoint: the instructions in this section describe the local completion boundary
+> before the separately approved 2026-08-25 Spaceship rollout. They were completed as written; the
+> later deployment evidence is in docs/17.
+
 Only after every remaining acceptance result is verified, update these files with evidence from
 the actual completed run:
 
@@ -373,8 +379,10 @@ The final report should state:
 - scratch restore-drill result;
 - documentation and screenshots updated;
 - branch pushed and synchronized;
-- no production/Oracle deployment, live campaign change, enrollment, or email send occurred;
-- deployment still requires separate explicit approval.
+- no production/Oracle deployment, live campaign change, enrollment, or email send occurred during
+  this local completion procedure;
+- production deployment was still separately approval-gated at this checkpoint and was approved
+  later.
 
 ## 10. Blocker policy
 
@@ -387,6 +395,6 @@ If any required assertion fails:
 - do not expand into production diagnosis or infrastructure changes;
 - record the exact failing command, output summary, affected files, and safest next action.
 
-Sections 4–8 are retained as the exact procedure that completed this stage. All assertions passed;
-the remaining boundary is a separately approved production deployment, which this procedure did
-not authorize or perform.
+Sections 4–8 are retained as the exact procedure that completed this stage. All assertions passed.
+This procedure did not itself authorize or perform deployment; the later, separately approved
+Spaceship rollout is recorded in docs/17.

@@ -12,25 +12,26 @@ Spaceship production infrastructure is live, but the project remains in **pre-pr
 commissioning**:
 
 - **Approved build scope — the only feature work authorized:** the completed 2026-08-15 list (public unsubscribe/one-click, launch guardrails, domain-readiness preflight, per-folder polling, and single-lead creation) plus the operator-approved 2026-08-20 pre-domain safety backlog: mandatory reply stopping; reply dispositions and conservative suppression; guarded cross-campaign recontact; broader opt-out phrases; findings #20–25; alert history and mailbox filters; arbitrary custom-field editing; copy-risk rubric improvements; local verification; and runbook/documentation reconciliation. Outside that list, the rule is unchanged: testing, verification, diagnosis, and documentation only.
-- **2026-08-25 implementation status:** the operator-approved ten-workstream run is complete
-  locally through Stages 1–4: operational pagination; due-step Manual Compose; in-app reminders;
+- **2026-08-25 implementation status:** the operator-approved ten-workstream run is complete and
+  deployed through Stages 1–4: operational pagination; due-step Manual Compose; in-app reminders;
   verified timezone/folder controls; imported manual drafts; Auto Observation and namespaced
   sequence variables; activation-based staged ramps; later-step direct/eventual variant analytics;
   atomic multi-source cold-storage recycling with durable provenance; and the responsive/mobile
-  redesign. The complete serial gate and restore drill pass. This does not authorize deployment,
-  activation, production enrollment, or any send.
+  redesign. The complete serial gate and restore drill pass, and Spaceship is pinned to the Stage 4
+  commit. This does not authorize activation, production enrollment, or any send.
 - The operator-approved Spaceship deployment, subpath support, sender-domain unsubscribe routing,
   and individual Google Workspace OAuth implementation are complete. Do not extend production
   scope or change DNS/Caddy/mailboxes outside the approved commissioning steps without fresh
   authorization.
-- The public unsubscribe hosts are live, but production remains **dormant** while
-  `unsubscribe_base_url` is empty: no link or header is emitted and the footer falls back to
-  reply-`STOP`. Gmail one-click still needs the separately approved owner-address canary.
+- The public unsubscribe hosts, business postal address, and sender-domain unsubscribe template are
+  configured. The production Gmail body link and one-click behavior still need the separately
+  approved owner-address canary.
 - Do not start a real cohort or send new external campaign mail without explicit approval for that specific send. This covers sending mail, activating or resuming a campaign, enrolling leads, altering live campaign state, and contacting prospects — each needs its own approval.
 - The approved, controlled Gmail acceptance batch is complete. The test campaign is paused; do not resume it or create additional test sends without new, per-send operator approval. Read the runbook for the authoritative recipient, outcome, and verification record.
 - The deployed production facts and remaining operator handoffs are recorded in
-  [docs/16-deployment-ops.md](docs/16-deployment-ops.md) §8 and docs/17. Do not call OAuth
-  configured, compliance complete, or one-click proven until those live checks actually pass.
+  [docs/16-deployment-ops.md](docs/16-deployment-ops.md) §8 and docs/17. The OAuth client, one
+  account-matched OAuth mailbox, business address, and unsubscribe template are configured; do not
+  call the production body link or one-click behavior proven until that live canary passes.
 - **Never ask the operator to paste passwords, app passwords, `SECRET_KEY`/`SESSION_KEY`, or `.env`/`.env.prod` contents.** App passwords are typed into the Mailboxes screen and sealed with libsodium; secrets never belong in chat, logs, or the repo.
 - Do not deploy unless the operator explicitly authorizes it (see Production deployments below).
 
@@ -72,7 +73,7 @@ rollback/canary environment.
 - Stack: `docker-compose.spaceship.yml` with `.env.prod`
 - UI: `https://sambhavpmtech.com/email-campaign/`
 - Internal gateway: `127.0.0.1:18080`; host Caddy alone owns public 80/443
-- Deployed branch/commit: `b8.3-local-canary` at `680f47e`
+- Deployed branch/commit: `b8.3-local-canary` at `f273109`
 
 The private repository currently has no GitHub deploy credential on the VPS. Until a read-only
 deploy key is deliberately installed, transfer a reviewed `git bundle`, fetch the pinned branch
@@ -81,7 +82,8 @@ explicit authorization:
 
 ```sh
 cd /opt/email-campaign
-sudo docker compose -f docker-compose.spaceship.yml --env-file .env.prod up -d --build
+sudo docker compose -f docker-compose.spaceship.yml --env-file .env.prod build
+sudo docker compose -f docker-compose.spaceship.yml --env-file .env.prod up -d
 ```
 
 Verify containers, public health/routing, projection dry-run, self-check, and a validated backup.
@@ -125,8 +127,9 @@ After an authorized deploy, verify container health, `https://localhost/health`,
 - **Final canary wrap completed 2026-08-21:** the bounded owner-address catch-up scenario accepted four sends in two paced waves (two per mailbox, 925-second same-mailbox gap) after 10,833 seconds of app downtime and emitted `catchup_backlog`. The campaign was paused at the bound. Accelerated settings were restored, both mailboxes are healthy at cap 5 with no resume cap, and both Gmail test campaigns are paused.
 - **Oracle rollback canary:** `4e9e125` plus its documentation-only wrap; both campaigns remain
   paused. Health, self-check, backup, and `checked 24 enrollments — 0 diff(s)` are clean.
-- **Spaceship production:** deployed 2026-08-22 and advanced to `680f47e` with a clean database and zero
-  mailboxes/campaigns/leads/enrollments. DNS, TLS, the `/email-campaign/` SPA/API subpath, outreach
+- **Spaceship production:** deployed 2026-08-22 and advanced to `f273109` on 2026-08-25. It has one
+  `google_oauth` mailbox in `ok` state and zero campaigns/leads/enrollments, active campaigns, or
+  sendable enrollments. DNS, TLS, the `/email-campaign/` SPA/API subpath, outreach
   redirects, and the two isolated unsubscribe hosts are live. Containers and health are green;
   self-check and zero-drift pass; a custom-format dump passed listing and the scratch restore drill;
   Spaceship AutoBackup is active on trial with a five-backup limit. The portfolio remained online.

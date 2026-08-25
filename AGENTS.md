@@ -28,13 +28,13 @@ commissioning** until the operator completes the handoffs below:
   20–25; alert history and mailbox filters; arbitrary custom-field editing; copy-risk rubric
   improvements; local verification; and runbook/documentation reconciliation. Outside that list,
   work is limited to testing, verification, diagnosis, and documentation.
-- The operator-approved 2026-08-25 ten-workstream implementation is complete locally through
+- The operator-approved 2026-08-25 ten-workstream implementation is complete and deployed through
   Stages 1–4: operational pagination; due-step Manual Compose; in-app reminders; verified
   timezone/folder controls; imported manual drafts; Auto Observation/sequence variables; staged
   activation ramps; later-step direct/eventual variant analytics; atomic multi-source cold-storage
   recycling with durable provenance; and the responsive/mobile redesign. The complete local gate
-  is verified. Deployment remains separately gated, and no campaign activation, production
-  enrollment, or send is authorized.
+  is verified, and Spaceship was advanced to the pinned Stage 4 commit on 2026-08-25. No campaign
+  activation, production enrollment, or send is authorized.
 - The approved Spaceship deployment, subpath support, sender-domain unsubscribe routing, and
   per-mailbox Google Workspace OAuth implementation are complete on `b8.3-local-canary`. Do not
   extend production scope, change DNS/Caddy, or configure a real mailbox beyond the approved
@@ -47,10 +47,10 @@ commissioning** until the operator completes the handoffs below:
   to test behavior.
 - The controlled Gmail acceptance batch is complete and the test campaign is **paused**. Do not
   resume it or create another test send without new per-send approval.
-- The two unsubscribe hosts are publicly reachable, but production `unsubscribe_base_url` remains
-  empty until the operator saves `https://unsubscribe.{sender_domain}` with the business postal
-  address. Empty still means no body link or headers and a reply-`STOP` footer. Do not claim Gmail
-  one-click is verified until the separately approved owner-address canary proves it.
+- The two unsubscribe hosts, business postal address, and
+  `https://unsubscribe.{sender_domain}` template are configured. Do not claim the production Gmail
+  body link or RFC 8058 one-click behavior is verified until a separately approved owner-address
+  canary proves it.
 - Work on the current `b8.3-local-canary` branch. Do not branch off, push to `main`, or merge to
   `main` without explicit authorization. Make surgical edits, preserve unrelated dirty-worktree
   changes, and commit each completed task on the current branch.
@@ -99,7 +99,7 @@ temporary rollback/canary environment.
 - App: `/opt/email-campaign`; stack: `docker-compose.spaceship.yml` with `.env.prod`
 - Public UI: `https://sambhavpmtech.com/email-campaign/`
 - Internal gateway: `127.0.0.1:18080`; host Caddy is the only public 80/443 listener
-- Deployed branch/commit: `b8.3-local-canary` at `680f47e`
+- Deployed branch/commit: `b8.3-local-canary` at `f273109`
 
 The repository is private and the VPS currently has no GitHub deploy credential. Until a read-only
 deploy key is deliberately installed, transfer a reviewed `git bundle`, fetch the pinned branch
@@ -108,7 +108,8 @@ After explicit deploy authorization and a verified fast-forward, run:
 
 ```sh
 cd /opt/email-campaign
-sudo docker compose -f docker-compose.spaceship.yml --env-file .env.prod up -d --build
+sudo docker compose -f docker-compose.spaceship.yml --env-file .env.prod build
+sudo docker compose -f docker-compose.spaceship.yml --env-file .env.prod up -d
 ```
 
 Then verify container health, public HTTPS/redirect routing, a zero-drift projection dry run,
@@ -140,20 +141,23 @@ and password rotation.
 
 ## Live deployment state
 
-Spaceship production was deployed on 2026-08-22 and advanced to `680f47e` with a clean database. DNS and TLS
+Spaceship production was deployed on 2026-08-22 and advanced to the complete Stage 4 commit
+`f273109` on 2026-08-25. DNS and TLS
 are live for the two outreach domains and their unsubscribe subdomains. The route matrix is
 verified: `/email-campaign/` and direct SPA routes return 200; the bare app path canonicalizes;
 normal outreach-domain traffic redirects 308 to `https://sambhavbuilds.com/`; unsubscribe hosts
 serve only `/u/*` and return 404 elsewhere. The portfolio remains HTTP 200.
 
 - db/app/gateway/backup containers are healthy; only `127.0.0.1:18080` is published
-- production has zero mailboxes, campaigns, leads, and enrollments, so it cannot send
+- production has one `google_oauth` mailbox in `ok` state, but zero campaigns, leads,
+  enrollments, active campaigns, or sendable enrollments, so no message can be scheduled
 - health and database checks pass; self-check is clean; projection dry-run is `0 diff(s)`
-- a fresh custom-format dump passed `pg_restore --list`; a scratch restore, rebuild, dry-run, and
-  self-check all passed; Spaceship AutoBackup is active on trial with a five-backup limit
+- post-deploy migrations through `0017` are applied; a fresh custom-format dump passed
+  `pg_restore --list`; the earlier scratch restore and the current local Stage 4 restore drill
+  passed; Spaceship AutoBackup is active on trial with a five-backup limit
 - production Google OAuth credentials are configured on the VPS; never print or copy them
-- the business postal address and unsubscribe template are configured; the first OAuth mailbox
-  connection and bounded owner-address send/reply/unsubscribe canary remain operator-gated
+- the business postal address and unsubscribe template are configured; the bounded owner-address
+  send/reply/unsubscribe canary remains separately operator-gated
 
 The Oracle bounded catch-up/never-burst canary passed on 2026-08-20 UTC and remains paused. The
 accelerated settings were restored before the final deployment. Oracle is deployed on

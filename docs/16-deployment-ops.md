@@ -3,11 +3,10 @@
 Single always-on VPS (finalized decision). Docker Compose primary; systemd alternative. Implemented
 in B7 and cut over to Spaceship production on 2026-08-22.
 
-**Local candidate status (2026-08-25):** the ten-workstream implementation through Stage 4 and its
-complete serial gate are verified on `b8.3-local-canary`. The candidate includes later-step
-direct/eventual analytics, multi-source recycling, and the responsive/mobile redesign. It is **not
-deployed**. Spaceship remains at verified commit `680f47e`, Oracle remains paused and unchanged,
-and any deployment requires separate explicit approval plus the pre-deploy backup and checks below.
+**Production status (2026-08-25):** the ten-workstream implementation through Stage 4 is deployed
+from `b8.3-local-canary` commit `f273109`. The complete serial gate, pre-deploy backup, migrations,
+container health, public routes, self-check, zero-drift dry-run, dormant send state, and post-deploy
+backup all pass. Oracle remains paused and unchanged.
 
 ---
 
@@ -59,9 +58,10 @@ and restore after personal-data erasure.
 
 - **First deploy:** `cp .env.prod.example .env.prod`, generate `SECRET_KEY`/`SESSION_KEY`, set `POSTGRES_PASSWORD`/`OPERATOR_*`/`DOMAIN`, then `docker compose -f docker-compose.prod.yml --env-file .env.prod up -d --build`.
 - **Spaceship deploy/update:** from `/opt/email-campaign`, run
-  `docker compose -f docker-compose.spaceship.yml --env-file .env.prod up -d --build`; validate a
-  candidate host Caddyfile before atomic reload. Never print `.env.prod`, resolved Compose output,
-  container environment, or the backup sidecar crontab.
+  `docker compose -f docker-compose.spaceship.yml --env-file .env.prod build` and then
+  `docker compose -f docker-compose.spaceship.yml --env-file .env.prod up -d`; validate a candidate
+  host Caddyfile before atomic reload. Never print `.env.prod`, resolved Compose output, container
+  environment, or the backup sidecar crontab.
 - **Spaceship source update:** the GitHub repository is private and the VPS currently has no deploy
   credential. Until a read-only deploy key is deliberately installed, transfer a reviewed
   `git bundle`, fetch the pinned branch from it, and fast-forward locally. Do not pretend
@@ -150,10 +150,10 @@ Full stack built and brought up from a clean state (`docker compose -f docker-co
 
 Remaining for a full **M3** close: the real-backend walkthrough replay (§5, `e2e/walkthrough.spec.ts` — Playwright web ⇄ real server + MockTransport + `advance-clock`), which the frontend track deferred here from F8.
 
-## 8. Spaceship shared-VPS production — deployed 2026-08-22
+## 8. Spaceship shared-VPS production — deployed 2026-08-22, Stage 4 rollout 2026-08-25
 
 Production is live at `https://sambhavpmtech.com/email-campaign/` on the existing Spaceship VM.
-The portfolio at `sambhavbuilds.com` remained online throughout. Code is pinned to `680f47e` on
+The portfolio at `sambhavbuilds.com` remained online throughout. Code is pinned to `f273109` on
 `b8.3-local-canary`; `main` was not merged. Oracle remains paused and unchanged as the temporary
 rollback environment.
 
@@ -172,12 +172,20 @@ rollback environment.
 - **VM recovery:** Spaceship AutoBackup is active on its seven-day trial with a five-backup limit.
   It complements rather than replaces the logical PostgreSQL dumps and eventual independent copy.
 
+The 2026-08-25 rollout used a reviewed Git bundle because the VPS has no GitHub deploy credential.
+The app, gateway, and backup images were rebuilt, then the stack was recreated without replacing
+Postgres. Migrations through `0017_multi_source_recycling` are applied. The app and database are
+healthy; self-check reports no invariant violations; the production dry-run reports `checked 0
+enrollments — 0 diff(s)`. Production contains one `google_oauth` mailbox in `ok` state and zero
+campaigns, leads, enrollments, active campaigns, or sendable enrollments. The post-deploy dump
+`coldemail-20260825-113839.dump` is 292,812 bytes and passed `pg_restore --list`. No campaign was
+activated, no lead was enrolled, and no mail was sent.
+
 ### Unsubscribe URL and Gmail one-click — deployed, commissioning pending
 
-The hash-only token implementation and both public hosts are deployed. Production still has an
-empty `unsubscribe_base_url`, so no link or headers are emitted until the operator saves the valid
-business postal address and `https://unsubscribe.{sender_domain}`. After that, mail from each
-sender domain resolves to its matching unsubscribe host. `GET` confirms without unsubscribing;
+The hash-only token implementation and both public hosts are deployed. The valid business postal
+address and `https://unsubscribe.{sender_domain}` template are configured, so mail from each sender
+domain resolves to its matching unsubscribe host. `GET` confirms without unsubscribing;
 `POST` creates permanent global suppression; invalid/expired tokens reveal no recipient data.
 Reply `STOP` remains the fallback. The first owner-address link and RFC 8058 one-click proof needs
 separate send authorization.

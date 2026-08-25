@@ -990,17 +990,17 @@ accessibility scans including color contrast.
 
 ## 11. Implementation status from these questions
 
-Stages 1–4 of the approved improvement plan are complete locally and are not deployed. The final
-complete serial gate, migration replay, populated projection check, self-check, and scratch restore
-drill all pass. The local candidate is ready for review/deployment only after separate deployment
-approval.
+Stages 1–4 of the approved improvement plan are complete, verified, and deployed to Spaceship at
+application commit `f273109`. The final complete serial gate, migration replay, populated
+projection check, self-check, and scratch restore drill all pass. The production rollout also
+passed migrations, health, public routing, dormant-send-state, zero-drift, and backup checks.
 
 | Status | Improvement | Notes |
 | --- | --- | --- |
-| Complete locally | Unibox/System pagination, due-step Manual Compose, reminders, safe timezone/folder controls | Stage 1; not deployed |
-| Complete locally | Imported manual drafts, Auto Observation rules, sequence variables, activation-based staged ramp | Stage 2; not deployed |
-| Complete locally | Later-step direct/eventual variant analytics and multi-source recycling | Stage 3; not deployed |
-| Complete locally | Phone-responsive navigation and complete mobile redesign | Stage 4; not deployed |
+| Deployed | Unibox/System pagination, due-step Manual Compose, reminders, safe timezone/folder controls | Stage 1 |
+| Deployed | Imported manual drafts, Auto Observation rules, sequence variables, activation-based staged ramp | Stage 2 |
+| Deployed | Later-step direct/eventual variant analytics and multi-source recycling | Stage 3 |
+| Deployed | Phone-responsive navigation and complete mobile redesign | Stage 4 |
 
 ## 12. Question coverage map
 

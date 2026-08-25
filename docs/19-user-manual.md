@@ -6,9 +6,8 @@
 
 **Manual version:** 2026-08-25, for branch `b8.3-local-canary`
 
-**Reconciled through:** the locally verified ten-workstream implementation through Stage 4. The
-currently deployed production application remains at commit `680f47e` until a separate deployment
-is approved.
+**Reconciled through:** the verified and deployed ten-workstream implementation through Stage 4.
+Spaceship production is pinned to application commit `f273109`.
 
 This manual explains the complete operator-facing application: what every screen does, how to use
 each action, what the system does automatically, and which safeguards or edge cases matter. It is a
