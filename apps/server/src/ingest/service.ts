@@ -3,6 +3,7 @@
 // `invalid` and `suppressed` rows are NEVER imported under either mode;
 // `import_all` only additionally admits `role_based`.
 import type { Db } from '../db/client';
+import type { Clock } from '../clock';
 import {
   backfillLeadIds,
   createImport,
@@ -24,9 +25,19 @@ import { suppressedAmong } from '../db/repos/suppressionsRepo';
 import type { ImportCounts } from '../db/schema';
 import { flagRows, normalizeEmail } from './hygiene';
 import { parseCsv, type CanonicalField, type ParsedRow } from './parse';
+import type { SequenceProvider } from '../scheduler/types';
+import {
+  allocateExactPools,
+  poolEligibility,
+  PoolAllocationError,
+  type PoolAllocationRequest,
+} from '../services/campaignPools';
+import { getCampaign } from '../db/repos/campaignsRepo';
 
 export interface IngestDeps {
   db: Db;
+  clock?: Clock;
+  sequences?: SequenceProvider;
 }
 
 export type CommitMode = 'drop_flagged' | 'import_all';
@@ -128,6 +139,8 @@ export interface CommitResult {
   draftsReplaced: number;
   draftsSkipped: number;
   invalidDrafts: number;
+  allocationsCreated: number;
+  remainingGlobal: number;
 }
 
 export async function commitImport(
@@ -137,6 +150,7 @@ export async function commitImport(
     mode: CommitMode;
     draftCampaignId?: number;
     replaceExistingDrafts?: boolean;
+    allocations?: readonly PoolAllocationRequest[];
   },
 ): Promise<CommitResult> {
   const { db } = deps;
@@ -144,128 +158,296 @@ export async function commitImport(
   if (!imp) throw new Error(`import ${input.importId} not found`);
   if (imp.committed) throw new Error(`import ${input.importId} already committed`);
 
-  return db.transaction(async (tx) => {
-    const admitted: ImportRowFlag[] =
-      input.mode === 'import_all'
-        ? ['ok', 'missing_first_name', 'role_based']
-        : ['ok', 'missing_first_name'];
-    const rows = await listRowsByFlags(tx, input.importId, admitted);
-    const allRows = await listRowsByFlags(tx, input.importId, [
-      'ok',
-      'missing_first_name',
-      'role_based',
-      'invalid',
-      'duplicate',
-      'suppressed',
-    ]);
+  return db.transaction(
+    async (tx) => {
+      const admitted: ImportRowFlag[] =
+        input.mode === 'import_all'
+          ? ['ok', 'missing_first_name', 'role_based']
+          : ['ok', 'missing_first_name'];
+      const rows = await listRowsByFlags(tx, input.importId, admitted);
+      const allRows = await listRowsByFlags(tx, input.importId, [
+        'ok',
+        'missing_first_name',
+        'role_based',
+        'invalid',
+        'duplicate',
+        'suppressed',
+      ]);
 
-    // Compliance re-check at commit time: an address suppressed AFTER the
-    // preview must still never be imported (docs/09 §2 #4).
-    const nowSuppressed = await suppressedAmong(
-      tx,
-      allRows.flatMap((row) => (row.emailNormalized ? [row.emailNormalized] : [])),
-    );
-
-    const toInsert: Array<{ rowId: number; lead: NewImportedLead }> = [];
-    for (const r of rows) {
-      const email = r.emailNormalized!;
-      if (nowSuppressed.has(email)) continue;
-      const rawRow = r.raw as {
-        fields: Partial<Record<CanonicalField, string>>;
-        custom_fields: Record<string, string>;
-      };
-      const f = rawRow.fields;
-      const { manual_subject: _subject, manual_body: _body, ...leadFields } = f;
-      toInsert.push({
-        rowId: r.id,
-        lead: {
-          email,
-          firstName: leadFields.first_name ?? null,
-          lastName: leadFields.last_name ?? null,
-          company: leadFields.company ?? null,
-          website: leadFields.website ?? null,
-          city: leadFields.city ?? null,
-          state: leadFields.state ?? null,
-          phone: leadFields.phone ?? null,
-          notes: leadFields.notes ?? null,
-          customFields: rawRow.custom_fields ?? {},
-          importId: input.importId,
-        },
-      });
-    }
-
-    const insertedByEmail = await insertImportedLeads(
-      tx,
-      toInsert.map((t) => t.lead),
-    );
-    const leadMap = await leadsByEmails(
-      tx,
-      allRows.flatMap((row) => (row.emailNormalized ? [row.emailNormalized] : [])),
-    );
-    const insertedRowIds = new Set(
-      toInsert.filter(({ lead }) => insertedByEmail.has(lead.email)).map(({ rowId }) => rowId),
-    );
-    const pairs = allRows.flatMap((row) => {
-      const leadId = row.emailNormalized ? leadMap.get(row.emailNormalized)?.id : undefined;
-      const fields = (row.raw as { fields: Partial<Record<CanonicalField, string>> }).fields;
-      const carriesDraft = Boolean(fields.manual_subject || fields.manual_body);
-      const wasInserted = insertedRowIds.has(row.id);
-      return leadId === undefined || (!wasInserted && !carriesDraft)
-        ? []
-        : [{ rowId: row.id, leadId }];
-    });
-    await backfillLeadIds(tx, pairs);
-
-    const draftRows = allRows.filter((row) => {
-      const fields = (row.raw as { fields: Partial<Record<CanonicalField, string>> }).fields;
-      return Boolean(fields.manual_subject || fields.manual_body);
-    });
-    const invalidDrafts = draftRows.filter((row) => {
-      const fields = (row.raw as { fields: Partial<Record<CanonicalField, string>> }).fields;
-      return !fields.manual_subject || !fields.manual_body;
-    }).length;
-    const validDraftRows = draftRows.filter((row) => {
-      const fields = (row.raw as { fields: Partial<Record<CanonicalField, string>> }).fields;
-      const lead = row.emailNormalized ? leadMap.get(row.emailNormalized) : undefined;
-      return (
-        Boolean(fields.manual_subject && fields.manual_body) &&
-        Boolean(lead && !lead.isSuppressed && !lead.isErased) &&
-        !nowSuppressed.has(row.emailNormalized!)
+      // Compliance re-check at commit time: an address suppressed AFTER the
+      // preview must still never be imported (docs/09 §2 #4).
+      const nowSuppressed = await suppressedAmong(
+        tx,
+        allRows.flatMap((row) => (row.emailNormalized ? [row.emailNormalized] : [])),
       );
-    });
-    if (validDraftRows.length > 0 && input.draftCampaignId === undefined) {
-      throw new Error('select one target campaign before committing imported manual drafts');
-    }
 
-    let draftsCreated = 0;
-    let draftsReplaced = 0;
-    let draftsSkipped = draftRows.length - invalidDrafts - validDraftRows.length;
-    for (const row of validDraftRows) {
-      const fields = (row.raw as { fields: Partial<Record<CanonicalField, string>> }).fields;
-      const lead = leadMap.get(row.emailNormalized!)!;
-      const result = await createOrReplaceManualDraft(tx, {
-        leadId: lead.id,
-        campaignId: input.draftCampaignId!,
-        sourceImportId: input.importId,
-        subject: fields.manual_subject!,
-        body: fields.manual_body!,
-        replace: input.replaceExistingDrafts ?? false,
+      const toInsert: Array<{ rowId: number; lead: NewImportedLead }> = [];
+      for (const r of rows) {
+        const email = r.emailNormalized!;
+        if (nowSuppressed.has(email)) continue;
+        const rawRow = r.raw as {
+          fields: Partial<Record<CanonicalField, string>>;
+          custom_fields: Record<string, string>;
+        };
+        const f = rawRow.fields;
+        const { manual_subject: _subject, manual_body: _body, ...leadFields } = f;
+        toInsert.push({
+          rowId: r.id,
+          lead: {
+            email,
+            firstName: leadFields.first_name ?? null,
+            lastName: leadFields.last_name ?? null,
+            company: leadFields.company ?? null,
+            website: leadFields.website ?? null,
+            city: leadFields.city ?? null,
+            state: leadFields.state ?? null,
+            phone: leadFields.phone ?? null,
+            notes: leadFields.notes ?? null,
+            customFields: rawRow.custom_fields ?? {},
+            importId: input.importId,
+          },
+        });
+      }
+
+      const insertedByEmail = await insertImportedLeads(
+        tx,
+        toInsert.map((t) => t.lead),
+      );
+      const leadMap = await leadsByEmails(
+        tx,
+        allRows.flatMap((row) => (row.emailNormalized ? [row.emailNormalized] : [])),
+      );
+      const insertedRowIds = new Set(
+        toInsert.filter(({ lead }) => insertedByEmail.has(lead.email)).map(({ rowId }) => rowId),
+      );
+      const pairs = allRows.flatMap((row) => {
+        const leadId = row.emailNormalized ? leadMap.get(row.emailNormalized)?.id : undefined;
+        const fields = (row.raw as { fields: Partial<Record<CanonicalField, string>> }).fields;
+        const carriesDraft = Boolean(fields.manual_subject || fields.manual_body);
+        const wasInserted = insertedRowIds.has(row.id);
+        const carriesAllocation = (input.allocations?.length ?? 0) > 0;
+        return leadId === undefined || (!wasInserted && !carriesDraft && !carriesAllocation)
+          ? []
+          : [{ rowId: row.id, leadId }];
       });
-      if (result === 'created') draftsCreated += 1;
-      else if (result === 'replaced') draftsReplaced += 1;
-      else draftsSkipped += 1;
-    }
+      await backfillLeadIds(tx, pairs);
 
-    await markCommitted(tx, input.importId, input.mode);
-    return {
-      inserted: insertedByEmail.size,
-      skipped: rows.length - insertedByEmail.size,
-      draftsCreated,
-      draftsReplaced,
-      draftsSkipped,
-      invalidDrafts,
-    };
+      const draftRows = allRows.filter((row) => {
+        const fields = (row.raw as { fields: Partial<Record<CanonicalField, string>> }).fields;
+        return Boolean(fields.manual_subject || fields.manual_body);
+      });
+      const invalidDrafts = draftRows.filter((row) => {
+        const fields = (row.raw as { fields: Partial<Record<CanonicalField, string>> }).fields;
+        return !fields.manual_subject || !fields.manual_body;
+      }).length;
+      const validDraftRows = draftRows.filter((row) => {
+        const fields = (row.raw as { fields: Partial<Record<CanonicalField, string>> }).fields;
+        const lead = row.emailNormalized ? leadMap.get(row.emailNormalized) : undefined;
+        return (
+          Boolean(fields.manual_subject && fields.manual_body) &&
+          Boolean(lead && !lead.isSuppressed && !lead.isErased) &&
+          !nowSuppressed.has(row.emailNormalized!)
+        );
+      });
+      if (validDraftRows.length > 0 && input.draftCampaignId === undefined) {
+        throw new Error('select one target campaign before committing imported manual drafts');
+      }
+
+      let draftsCreated = 0;
+      let draftsReplaced = 0;
+      let draftsSkipped = draftRows.length - invalidDrafts - validDraftRows.length;
+      for (const row of validDraftRows) {
+        const fields = (row.raw as { fields: Partial<Record<CanonicalField, string>> }).fields;
+        const lead = leadMap.get(row.emailNormalized!)!;
+        const result = await createOrReplaceManualDraft(tx, {
+          leadId: lead.id,
+          campaignId: input.draftCampaignId!,
+          sourceImportId: input.importId,
+          subject: fields.manual_subject!,
+          body: fields.manual_body!,
+          replace: input.replaceExistingDrafts ?? false,
+        });
+        if (result === 'created') draftsCreated += 1;
+        else if (result === 'replaced') draftsReplaced += 1;
+        else draftsSkipped += 1;
+      }
+
+      const allocationRequests = input.allocations ?? [];
+      let allocationsCreated = 0;
+      const admittedForAllocation = new Set<ImportRowFlag>([
+        'ok',
+        'missing_first_name',
+        ...(input.mode === 'import_all' ? (['role_based'] as ImportRowFlag[]) : []),
+        'duplicate',
+      ]);
+      const candidateLeadIds = allRows
+        .filter((row) => admittedForAllocation.has(row.flag))
+        .flatMap((row) => {
+          const leadId = row.emailNormalized ? leadMap.get(row.emailNormalized)?.id : undefined;
+          return leadId === undefined || nowSuppressed.has(row.emailNormalized!) ? [] : [leadId];
+        })
+        .filter((id, index, all) => all.indexOf(id) === index);
+      let remainingGlobal = candidateLeadIds.length;
+      if (allocationRequests.length > 0) {
+        if (!deps.clock || !deps.sequences) {
+          throw new Error('campaign allocation requires clock and sequence dependencies');
+        }
+        if (
+          validDraftRows.length > 0 &&
+          (input.draftCampaignId === undefined ||
+            !allocationRequests.some((request) => request.campaignId === input.draftCampaignId))
+        ) {
+          throw new PoolAllocationError(
+            'the imported-draft campaign must also have a campaign allocation',
+          );
+        }
+        const draftLeadIds = validDraftRows
+          .flatMap((row) => {
+            const leadId = row.emailNormalized ? leadMap.get(row.emailNormalized)?.id : undefined;
+            return leadId === undefined ? [] : [leadId];
+          })
+          .filter((id, index, all) => all.indexOf(id) === index);
+        const allocated = await allocateExactPools(tx, deps.sequences, {
+          requests: allocationRequests,
+          candidateLeadIds,
+          draftCampaignId: input.draftCampaignId,
+          draftLeadIds,
+          sourceImportId: input.importId,
+          now: deps.clock.now(),
+        });
+        allocationsCreated = allocated.allocatedLeadIds.length;
+        remainingGlobal = Math.max(0, candidateLeadIds.length - allocationsCreated);
+      }
+
+      await markCommitted(tx, input.importId, input.mode);
+      return {
+        inserted: insertedByEmail.size,
+        skipped: rows.length - insertedByEmail.size,
+        draftsCreated,
+        draftsReplaced,
+        draftsSkipped,
+        invalidDrafts,
+        allocationsCreated,
+        remainingGlobal,
+      };
+    },
+    { isolationLevel: 'serializable' },
+  );
+}
+
+export interface AllocationPreviewResult {
+  available: number;
+  existingLeads: number;
+  remainingGlobal: number;
+  exclusions: Record<string, number>;
+  campaigns: Array<{
+    campaignId: number;
+    requested: number;
+    allocatable: number;
+    draftReserved: number;
+  }>;
+}
+
+export async function previewImportAllocations(
+  deps: Required<Pick<IngestDeps, 'db' | 'clock' | 'sequences'>>,
+  input: {
+    importId: number;
+    mode: CommitMode;
+    requests: readonly PoolAllocationRequest[];
+    draftCampaignId?: number;
+  },
+): Promise<AllocationPreviewResult> {
+  const rows = await listRowsByFlags(deps.db, input.importId, [
+    'ok',
+    'missing_first_name',
+    'role_based',
+    'invalid',
+    'duplicate',
+    'suppressed',
+  ]);
+  const campaignIds = input.requests.map((request) => request.campaignId);
+  if (new Set(campaignIds).size !== campaignIds.length) {
+    throw new PoolAllocationError('each target campaign may appear only once');
+  }
+  for (const id of campaignIds) {
+    const campaign = await getCampaign(deps.db, id);
+    if (!campaign || !['draft', 'paused'].includes(campaign.status)) {
+      throw new PoolAllocationError(`campaign ${id} must be draft or paused`);
+    }
+  }
+  const hasDraftRows = rows.some((row) => {
+    const fields = (row.raw as { fields: Partial<Record<CanonicalField, string>> }).fields;
+    return Boolean(fields.manual_subject && fields.manual_body);
   });
+  if (
+    hasDraftRows &&
+    (input.draftCampaignId === undefined || !campaignIds.includes(input.draftCampaignId))
+  ) {
+    throw new PoolAllocationError('the imported-draft campaign must also have an allocation');
+  }
+
+  const emails = rows.flatMap((row) => (row.emailNormalized ? [row.emailNormalized] : []));
+  const leadMap = await leadsByEmails(deps.db, emails);
+  const admitted = new Set<ImportRowFlag>([
+    'ok',
+    'missing_first_name',
+    ...(input.mode === 'import_all' ? (['role_based'] as ImportRowFlag[]) : []),
+    'duplicate',
+  ]);
+  const candidates = rows
+    .filter((row) => admitted.has(row.flag))
+    .map((row) => {
+      const fields = (row.raw as { fields: Partial<Record<CanonicalField, string>> }).fields;
+      return {
+        key: row.emailNormalized!,
+        leadId: row.emailNormalized ? leadMap.get(row.emailNormalized)?.id : undefined,
+        isDraft: Boolean(fields.manual_subject && fields.manual_body),
+      };
+    })
+    .filter((row, index, all) => all.findIndex((other) => other.key === row.key) === index);
+
+  const used = new Set<string>();
+  const exclusions: Record<string, number> = {};
+  const campaignResults: AllocationPreviewResult['campaigns'] = [];
+  for (const request of input.requests) {
+    const remaining = candidates.filter((candidate) => !used.has(candidate.key));
+    const existingIds = remaining.flatMap((candidate) =>
+      candidate.leadId === undefined ? [] : [candidate.leadId],
+    );
+    const checked = await poolEligibility(
+      deps.db,
+      deps.sequences,
+      request.campaignId,
+      existingIds,
+      deps.clock.now(),
+    );
+    const existingEligible = new Set(checked.eligible.map((lead) => lead.id));
+    for (const reason of checked.reasons.values())
+      exclusions[reason] = (exclusions[reason] ?? 0) + 1;
+    const eligible = remaining.filter(
+      (candidate) => candidate.leadId === undefined || existingEligible.has(candidate.leadId),
+    );
+    const pinned =
+      request.campaignId === input.draftCampaignId
+        ? eligible.filter((candidate) => candidate.isDraft)
+        : [];
+    const ordered = [...pinned, ...eligible.filter((candidate) => !pinned.includes(candidate))];
+    const selected = ordered.slice(0, request.count);
+    selected.forEach((candidate) => used.add(candidate.key));
+    campaignResults.push({
+      campaignId: request.campaignId,
+      requested: request.count,
+      allocatable: selected.length,
+      draftReserved: selected.filter((candidate) => candidate.isDraft).length,
+    });
+  }
+  return {
+    available: candidates.length,
+    existingLeads: candidates.filter((candidate) => candidate.leadId !== undefined).length,
+    remainingGlobal: Math.max(0, candidates.length - used.size),
+    exclusions,
+    campaigns: campaignResults,
+  };
 }
 
 export async function previewImportDrafts(

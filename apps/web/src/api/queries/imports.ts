@@ -1,11 +1,36 @@
 import { useQuery } from '@tanstack/react-query';
-import { importDraftPreviewResponseSchema, importsListResponseSchema } from '@coldemail/shared';
+import {
+  importAllocationPreviewResponseSchema,
+  importDraftPreviewResponseSchema,
+  importsListResponseSchema,
+} from '@coldemail/shared';
 import { apiFetch } from '../client';
 
 export function useImports(page = 1) {
   return useQuery({
     queryKey: ['imports', page],
     queryFn: () => apiFetch('/imports', importsListResponseSchema, { query: { page } }),
+  });
+}
+
+export function useImportAllocationPreview(
+  importId: number | undefined,
+  body:
+    | {
+        mode: 'drop_flagged' | 'import_all';
+        draft_campaign_id?: number;
+        allocations: Array<{ campaign_id: number; count: number }>;
+      }
+    | undefined,
+) {
+  return useQuery({
+    queryKey: ['imports', importId, 'allocation-preview', body],
+    queryFn: () =>
+      apiFetch(`/imports/${importId}/allocation-preview`, importAllocationPreviewResponseSchema, {
+        method: 'POST',
+        body,
+      }),
+    enabled: importId !== undefined && body !== undefined && body.allocations.length > 0,
   });
 }
 

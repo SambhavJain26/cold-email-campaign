@@ -14,6 +14,7 @@ import type { ConfirmDeliveryJob, JobPort, SequenceProvider } from '../scheduler
 import type { AlertSink } from '../alerts/types';
 import { getSettings } from '../db/repos/settingsRepo';
 import { listMailboxesByStatus } from '../db/repos/mailboxesRepo';
+import type { AutoEnrollmentService } from '../services/autoEnrollment';
 
 export interface JobsDeps {
   connectionString: string;
@@ -24,6 +25,7 @@ export interface JobsDeps {
   sequences: SequenceProvider;
   confirmDelivery: ConfirmDeliveryDeps;
   alerts: AlertSink;
+  autoEnrollment: AutoEnrollmentService;
   /** config.BACKUP_DIR — the daily self-check flags a missing/stale dump. */
   backupDir?: string;
 }
@@ -32,6 +34,7 @@ const TICK_QUEUE = 'scheduler-tick';
 const CONFIRM_QUEUE = 'confirm-delivery';
 const SELFCHECK_QUEUE = 'self-check';
 const REBUILD_COMPARE_QUEUE = 'rebuild-compare';
+const AUTO_ENROLL_QUEUE = 'auto-enrollment-check';
 const pollQueue = (mailboxId: number) => `imap-poll-${mailboxId}`;
 
 export class Jobs implements JobPort {
@@ -63,6 +66,18 @@ export class Jobs implements JobPort {
       await scheduler.tick();
     });
     await boss.schedule(TICK_QUEUE, tickCron, undefined, { retryLimit: 1 });
+
+    // This cron only checks whether the current application-local date has
+    // been claimed. The service's durable date claim makes the actual
+    // enrollment run exactly once and catch up safely after process downtime.
+    await boss.createQueue(AUTO_ENROLL_QUEUE);
+    await boss.work(AUTO_ENROLL_QUEUE, async () => {
+      await this.deps.autoEnrollment.run('daily');
+    });
+    await boss.schedule(AUTO_ENROLL_QUEUE, tickCron, undefined, {
+      retryLimit: 3,
+      retryBackoff: true,
+    });
 
     // Delayed confirm-delivery jobs (decision N).
     await boss.createQueue(CONFIRM_QUEUE);

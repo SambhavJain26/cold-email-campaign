@@ -87,3 +87,15 @@ export function startOfLocalDay(now: Date, tz: string): Date {
   instant = localMidnightAsUTC - tzOffsetMs(new Date(instant), tz);
   return new Date(instant);
 }
+
+/** Next local midnight, including 23/25-hour DST transition days. */
+export function startOfNextLocalDay(now: Date, tz: string): Date {
+  const current = startOfLocalDay(now, tz);
+  return startOfLocalDay(new Date(current.getTime() + 36 * 60 * 60 * 1000), tz);
+}
+
+/** Calendar-day ordinal in a timezone; unlike elapsed milliseconds this is DST-safe. */
+export function localDayOrdinal(now: Date, tz: string): number {
+  const parts = localParts(now, tz);
+  return Math.floor(Date.UTC(parts.year, parts.month - 1, parts.day) / 86_400_000);
+}

@@ -36,11 +36,15 @@
   "capacity": {
     "total_daily_capacity": 120,
     "followups_due_today": 0,
+    "pending_openers_today": 0,
     "sent_so_far_today": 0,
     "room_for_new": 120,
     "ramp_cap_remaining": 5,
     "ramp_day": 1,
     "ramp_stage": { "start_day": 1, "end_day": 1, "cap": 5 },
+    "effective_daily_enroll_cap": 5,
+    "campaign_cap_remaining": 5,
+    "pool_available": null,
     "enrolled_today": 0,
     "suggested": 5
   },

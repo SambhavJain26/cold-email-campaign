@@ -40,6 +40,8 @@ export interface ScenarioConfig {
   jitterPct?: number;
   /** Campaign ramp config; scenarios default to NO ramp (unlimited enroll). */
   ramp?: { ramp_days: number; ramp_daily_enroll_cap: number };
+  /** Test-only post-ramp safety cap; production campaigns default to 15. */
+  steadyDailyEnrollCap?: number;
   /** Test-only campaign mode mapping; production defaults keep Tier A manual. */
   tierEffortConfig?: {
     A: 'human_written' | 'template_researched' | 'template_auto';
@@ -180,8 +182,9 @@ export class Scenario {
         ? [{ start_day: 1, end_day: ramp.ramp_days, cap: ramp.ramp_daily_enroll_cap }]
         : [];
     await this.pool.query(
-      `INSERT INTO campaigns (name, status, ramp_config, ramp_stages, tier_effort_config)
-       VALUES ('Scenario Campaign', 'active', $1, $2, $3)`,
+      `INSERT INTO campaigns
+         (name, status, ramp_config, ramp_stages, tier_effort_config, steady_daily_enroll_cap)
+       VALUES ('Scenario Campaign', 'active', $1, $2, $3, $4)`,
       [
         JSON.stringify(ramp),
         JSON.stringify(rampStages),
@@ -192,6 +195,7 @@ export class Scenario {
             C: 'template_auto',
           },
         ),
+        this.cfg.steadyDailyEnrollCap ?? 15,
       ],
     );
     // Settings survive resetCoreTables (single seeded row) — restore the

@@ -1,5 +1,5 @@
 // Capacity + enrollment (B3.9, docs/06 §7, walkthrough Stages 5/8).
-import type { Db } from '../db/client';
+import type { Db, DbLike, Tx } from '../db/client';
 import type { Clock } from '../clock';
 import type { LeadTier } from '@coldemail/shared';
 import type { EventStore } from './eventStore';
@@ -11,21 +11,32 @@ import {
   coldStorageRows,
   countEnrolledSince,
   countFollowupsDue,
+  countPendingOpenersDue,
   enrolledLeadIdsIn,
   insertEnrollments,
 } from '../db/repos/enrollmentsRepo';
 import { getCampaign, rampStagesOf, tierEffortOf, type RampStage } from '../db/repos/campaignsRepo';
 import {
   leadsByIds,
+  activeEnrollmentLeadIds,
   recontactStatusByLeadIds,
   selectEligibleLeads,
   type EligibleLead,
 } from '../db/repos/leadsRepo';
 import { leadsWithHashConflict } from '../db/repos/sentMessagesRepo';
 import { allContentHashes } from '../domain/sequence';
-import { startOfLocalDay } from '../scheduler/window';
+import { localDayOrdinal, startOfLocalDay, startOfNextLocalDay } from '../scheduler/window';
 import { buildEvent } from '../domain/events';
 import { commitRecycle } from './recycling';
+import {
+  availablePoolLeads,
+  availablePoolRowsForLeadIds,
+  markPoolEligibility,
+  markPoolEnrolled,
+  poolSummary,
+} from '../db/repos/campaignPoolRepo';
+import { poolEligibility } from './campaignPools';
+import { acquireEnrollmentCapacityLock } from '../db/repos/locksRepo';
 
 export interface EnrollmentDeps {
   db: Db;
@@ -38,23 +49,27 @@ export interface Capacity {
   total: number;
   sentSoFar: number;
   followupsDue: number;
+  pendingOpeners: number;
   roomForNew: number;
   rampCap: number | null; // null = campaign out of ramp window (no ramp limit)
   suggested: number;
   rampDay: number | null;
   rampStage: RampStage | null;
   enrolledToday: number;
+  effectiveDailyCap: number;
+  campaignCapRemaining: number;
+  poolAvailable: number | null;
 }
 
 export async function capacityToday(
-  deps: Pick<EnrollmentDeps, 'db' | 'clock'>,
+  deps: { db: DbLike; clock: Clock },
   campaignId: number,
 ): Promise<Capacity> {
   const { db, clock } = deps;
   const now = clock.now();
   const settings = await getSettings(db);
   const midnight = startOfLocalDay(now, settings.defaultTimezone);
-  const endOfDay = new Date(midnight.getTime() + 86_400_000);
+  const endOfDay = startOfNextLocalDay(now, settings.defaultTimezone);
 
   const boxes = await listMailboxesByStatus(db, ['ok']);
   let total = 0;
@@ -68,7 +83,8 @@ export async function capacityToday(
     );
   }
   const followupsDue = await countFollowupsDue(db, endOfDay);
-  const roomForNew = Math.max(0, total - sentSoFar - followupsDue);
+  const pendingOpeners = await countPendingOpenersDue(db, endOfDay);
+  const roomForNew = Math.max(0, total - sentSoFar - followupsDue - pendingOpeners);
 
   const campaign = await getCampaign(db, campaignId);
   if (!campaign) throw new Error(`campaign ${campaignId} not found`);
@@ -77,11 +93,9 @@ export async function capacityToday(
   const rampDay = activation
     ? Math.max(
         1,
-        Math.floor(
-          (startOfLocalDay(now, settings.defaultTimezone).getTime() -
-            startOfLocalDay(activation, settings.defaultTimezone).getTime()) /
-            86_400_000,
-        ) + 1,
+        localDayOrdinal(now, settings.defaultTimezone) -
+          localDayOrdinal(activation, settings.defaultTimezone) +
+          1,
       )
     : null;
   const rampStage =
@@ -91,17 +105,29 @@ export async function capacityToday(
           (stage) => rampDay >= stage.start_day && rampDay <= stage.end_day,
         ) ?? null);
   const rampCap = rampStage ? Math.max(0, rampStage.cap - enrolledToday) : null;
+  const effectiveDailyCap = rampStage?.cap ?? campaign.steadyDailyEnrollCap;
+  const campaignCapRemaining = Math.max(0, effectiveDailyCap - enrolledToday);
+  const pool = campaign.leadSelectionMode === 'pool' ? await poolSummary(db, campaignId) : null;
+  const suggested = Math.min(
+    roomForNew,
+    campaignCapRemaining,
+    pool ? pool.available : Number.POSITIVE_INFINITY,
+  );
 
   return {
     total,
     sentSoFar,
     followupsDue,
+    pendingOpeners,
     roomForNew,
     rampCap,
-    suggested: rampCap === null ? roomForNew : Math.min(roomForNew, rampCap),
+    suggested,
     rampDay,
     rampStage,
     enrolledToday,
+    effectiveDailyCap,
+    campaignCapRemaining,
+    poolAvailable: pool?.available ?? null,
   };
 }
 
@@ -112,9 +138,7 @@ export class CapacityExceededError extends Error {
     readonly requested: number,
     readonly suggested: number,
   ) {
-    super(
-      `enroll count ${requested} exceeds suggested capacity ${suggested} (use force to override)`,
-    );
+    super(`enroll count ${requested} exceeds the current enrollment allowance ${suggested}`);
     this.name = 'CapacityExceededError';
   }
 }
@@ -145,32 +169,66 @@ export async function enroll(
   count: number,
   opts: { tier?: LeadTier; force?: boolean } = {},
 ): Promise<EnrollResult> {
-  const { db, clock, sequences } = deps;
-  const now = clock.now();
-
-  if (!opts.force) {
-    const cap = await capacityToday(deps, campaignId);
-    if (count > cap.suggested) {
-      throw new CapacityExceededError(count, cap.suggested);
+  return deps.db.transaction(async (tx) => {
+    await acquireEnrollmentCapacityLock(tx);
+    const now = deps.clock.now();
+    const cap = await capacityToday({ db: tx, clock: deps.clock }, campaignId);
+    const allowed = opts.force ? cap.campaignCapRemaining : cap.suggested;
+    if (count > allowed) throw new CapacityExceededError(count, allowed);
+    const campaign = await getCampaign(tx, campaignId);
+    if (!campaign) throw new Error(`campaign ${campaignId} not found`);
+    const seq = await deps.sequences.sequenceFor(campaignId);
+    if (campaign.leadSelectionMode === 'pool') {
+      const summary = await poolSummary(tx, campaignId);
+      const candidates = await availablePoolLeads(tx, campaignId, summary.available);
+      const checked = await poolEligibility(
+        tx,
+        deps.sequences,
+        campaignId,
+        candidates.map((candidate) => candidate.leadId),
+        now,
+      );
+      const eligibleIds = new Set(checked.eligible.map((lead) => lead.id));
+      for (const candidate of candidates) {
+        await markPoolEligibility(
+          tx,
+          candidate.poolId,
+          checked.reasons.get(candidate.leadId) ?? null,
+          now,
+        );
+      }
+      const selected = candidates
+        .filter((candidate) => eligibleIds.has(candidate.leadId))
+        .slice(0, count);
+      const result = await enrollLeadsInTransaction(
+        deps,
+        tx,
+        campaignId,
+        selected.map((candidate) => ({ id: candidate.leadId, tier: candidate.tier })),
+        now,
+        new Map(selected.map((candidate) => [candidate.leadId, candidate.poolId])),
+      );
+      if (selected.length < count) {
+        result.skipped.push({
+          reason: 'insufficient_pooled_eligible',
+          count: count - selected.length,
+        });
+      }
+      return result;
     }
-  }
-
-  const campaign = await getCampaign(db, campaignId);
-  if (!campaign) throw new Error(`campaign ${campaignId} not found`);
-  const seq = await sequences.sequenceFor(campaignId);
-
-  const eligible = await selectEligibleLeads(
-    db,
-    campaignId,
-    allContentHashes(seq),
-    count,
-    opts.tier,
-  );
-  const result = await enrollLeads(deps, campaignId, eligible, now);
-  if (eligible.length < count) {
-    result.skipped.push({ reason: 'insufficient_eligible', count: count - eligible.length });
-  }
-  return result;
+    const eligible = await selectEligibleLeads(
+      tx,
+      campaignId,
+      allContentHashes(seq),
+      count,
+      opts.tier,
+    );
+    const result = await enrollLeadsInTransaction(deps, tx, campaignId, eligible, now);
+    if (eligible.length < count) {
+      result.skipped.push({ reason: 'insufficient_eligible', count: count - eligible.length });
+    }
+    return result;
+  });
 }
 
 /**
@@ -185,68 +243,80 @@ export async function enrollByIds(
   leadIds: number[],
   opts: { force?: boolean; allowRecontact?: boolean } = {},
 ): Promise<EnrollResult> {
-  const { db, clock, sequences } = deps;
-  const now = clock.now();
+  return deps.db.transaction(async (tx) => {
+    await acquireEnrollmentCapacityLock(tx);
+    const now = deps.clock.now();
 
-  if (!opts.force) {
-    const cap = await capacityToday(deps, campaignId);
-    if (leadIds.length > cap.suggested) {
-      throw new CapacityExceededError(leadIds.length, cap.suggested);
+    const cap = await capacityToday({ db: tx, clock: deps.clock }, campaignId);
+    const allowed = opts.force ? cap.campaignCapRemaining : cap.suggested;
+    if (leadIds.length > allowed) {
+      throw new CapacityExceededError(leadIds.length, allowed);
     }
-  }
 
-  const campaign = await getCampaign(db, campaignId);
-  if (!campaign) throw new Error(`campaign ${campaignId} not found`);
-  const seq = await sequences.sequenceFor(campaignId);
+    const campaign = await getCampaign(tx, campaignId);
+    if (!campaign) throw new Error(`campaign ${campaignId} not found`);
+    const seq = await deps.sequences.sequenceFor(campaignId);
 
-  const unique = [...new Set(leadIds)];
-  const rows = await leadsByIds(db, unique);
-  const byId = new Map(rows.map((r) => [r.id, r]));
-  const already = await enrolledLeadIdsIn(db, campaignId, unique);
-  const conflicted = await leadsWithHashConflict(db, unique, allContentHashes(seq));
-  const recontact = await recontactStatusByLeadIds(db, unique);
+    const unique = [...new Set(leadIds)];
+    const poolRows =
+      campaign.leadSelectionMode === 'pool'
+        ? await availablePoolRowsForLeadIds(tx, campaignId, unique)
+        : new Map<number, number>();
+    const rows = await leadsByIds(tx, unique);
+    const byId = new Map(rows.map((r) => [r.id, r]));
+    const already = await enrolledLeadIdsIn(tx, campaignId, unique);
+    const activeElsewhere = await activeEnrollmentLeadIds(tx, unique, campaignId);
+    const conflicted = await leadsWithHashConflict(tx, unique, allContentHashes(seq));
+    const recontact = await recontactStatusByLeadIds(tx, unique);
 
-  const skippedCounts = new Map<string, number>();
-  const skip = (reason: string) => skippedCounts.set(reason, (skippedCounts.get(reason) ?? 0) + 1);
+    const skippedCounts = new Map<string, number>();
+    const skip = (reason: string) =>
+      skippedCounts.set(reason, (skippedCounts.get(reason) ?? 0) + 1);
 
-  const eligible: EligibleLead[] = [];
-  for (const id of unique) {
-    const lead = byId.get(id);
-    if (!lead) skip('not_found');
-    else if (lead.isSuppressed) skip('suppressed');
-    else if (already.has(id)) skip('already_enrolled');
-    else if (conflicted.has(id)) skip('content_hash_conflict');
-    else if (recontact.get(id)?.hasReply && !opts.allowRecontact) skip('prior_human_reply');
-    else if (recontact.get(id)?.hasUndispositionedReply) skip('reply_needs_disposition');
-    else if ((recontact.get(id)?.blockedUntil?.getTime() ?? 0) > now.getTime())
-      skip('recontact_not_due');
-    else eligible.push({ id: lead.id, tier: lead.tier });
-  }
+    const eligible: EligibleLead[] = [];
+    for (const id of unique) {
+      const lead = byId.get(id);
+      if (!lead) skip('not_found');
+      else if (campaign.leadSelectionMode === 'pool' && !poolRows.has(id))
+        skip('not_in_campaign_pool');
+      else if (lead.isSuppressed) skip('suppressed');
+      else if (already.has(id)) skip('already_enrolled');
+      else if (activeElsewhere.has(id)) skip('active_enrollment_elsewhere');
+      else if (conflicted.has(id)) skip('content_hash_conflict');
+      else if (recontact.get(id)?.hasReply && !opts.allowRecontact) skip('prior_human_reply');
+      else if (recontact.get(id)?.hasUndispositionedReply) skip('reply_needs_disposition');
+      else if ((recontact.get(id)?.blockedUntil?.getTime() ?? 0) > now.getTime())
+        skip('recontact_not_due');
+      else eligible.push({ id: lead.id, tier: lead.tier });
+    }
 
-  const result = await enrollLeads(deps, campaignId, eligible, now);
-  result.skipped.push(
-    ...[...skippedCounts.entries()].map(([reason, count]) => ({ reason, count })),
-  );
-  return result;
+    const result = await enrollLeadsInTransaction(deps, tx, campaignId, eligible, now, poolRows);
+    result.skipped.push(
+      ...[...skippedCounts.entries()].map(([reason, count]) => ({ reason, count })),
+    );
+    return result;
+  });
 }
 
 /** Shared tail of enroll + recycle: enrollment rows + `enrolled` events + next_send_at=now. */
-async function enrollLeads(
+export async function enrollLeadsInTransaction(
   deps: EnrollmentDeps,
+  tx: Tx,
   campaignId: number,
   eligible: EligibleLead[],
   now: Date,
+  poolIdsByLead: ReadonlyMap<number, number> = new Map(),
 ): Promise<EnrollResult> {
-  const { db, store } = deps;
+  const { store } = deps;
   if (eligible.length === 0) return { enrolled: 0, leadIds: [], enrollmentIds: [], skipped: [] };
 
-  const campaign = await getCampaign(db, campaignId);
+  const campaign = await getCampaign(tx, campaignId);
   const effort = tierEffortOf(campaign!);
   const modeFor = (tier: LeadTier | null) =>
     tier === null || tier === 'nurture' ? 'template_auto' : effort[tier];
 
   const enrollmentIds = await insertEnrollments(
-    db,
+    tx,
     eligible.map((l) => ({
       leadId: l.id,
       campaignId,
@@ -256,7 +326,8 @@ async function enrollLeads(
     })),
   );
 
-  await store.append(
+  await store.appendInTransaction(
+    tx,
     eligible.map((l, i) =>
       buildEvent.enrolled({
         leadId: l.id,
@@ -267,6 +338,17 @@ async function enrollLeads(
     ),
     { patches: enrollmentIds.map((id) => ({ enrollmentId: id, nextSendAt: now })) },
   );
+
+  if (poolIdsByLead.size > 0) {
+    await markPoolEnrolled(
+      tx,
+      eligible.flatMap((lead, index) => {
+        const poolId = poolIdsByLead.get(lead.id);
+        return poolId === undefined ? [] : [{ poolId, enrollmentId: enrollmentIds[index]! }];
+      }),
+      now,
+    );
+  }
 
   return {
     enrolled: eligible.length,

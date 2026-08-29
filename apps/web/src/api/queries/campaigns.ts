@@ -4,6 +4,8 @@ import {
   capacityResponseSchema,
   coldStorageResponseSchema,
   outcomesResponseSchema,
+  campaignPoolResponseSchema,
+  autoEnrollmentRunsResponseSchema,
 } from '@coldemail/shared';
 import { apiFetch } from '../client';
 import { POLL } from '../queryClient';
@@ -38,6 +40,32 @@ export function useColdStorage(sourceCampaignId: number, page = 1, perPage = 50)
     queryFn: () =>
       apiFetch('/cold-storage', coldStorageResponseSchema, {
         query: { source_campaign_id: sourceCampaignId, page, per_page: perPage },
+      }),
+    refetchInterval: POLL.operational,
+  });
+}
+
+export function useCampaignPool(
+  campaignId: number,
+  page = 1,
+  status?: 'available' | 'enrolled' | 'released',
+) {
+  return useQuery({
+    queryKey: ['campaigns', campaignId, 'pool', page, status],
+    queryFn: () =>
+      apiFetch(`/campaigns/${campaignId}/pool`, campaignPoolResponseSchema, {
+        query: { page, per_page: 50, ...(status && { status }) },
+      }),
+    refetchInterval: POLL.operational,
+  });
+}
+
+export function useAutoEnrollmentRuns(campaignId: number, page = 1) {
+  return useQuery({
+    queryKey: ['campaigns', campaignId, 'auto-enrollment-runs', page],
+    queryFn: () =>
+      apiFetch(`/campaigns/${campaignId}/auto-enrollment/runs`, autoEnrollmentRunsResponseSchema, {
+        query: { page, per_page: 20 },
       }),
     refetchInterval: POLL.operational,
   });

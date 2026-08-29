@@ -6,6 +6,16 @@ import {
   campaignSchema,
   campaignsListResponseSchema,
   capacityResponseSchema,
+  campaignPoolQuerySchema,
+  campaignPoolResponseSchema,
+  poolAddBodySchema,
+  poolLeadIdsBodySchema,
+  poolMutationResponseSchema,
+  poolReassignBodySchema,
+  patchAutoEnrollmentBodySchema,
+  patchAutoEnrollmentResponseSchema,
+  autoEnrollmentRunsQuerySchema,
+  autoEnrollmentRunsResponseSchema,
   coldStorageQuerySchema,
   coldStorageResponseSchema,
   createCampaignBodySchema,
@@ -61,11 +71,36 @@ import { getSettings } from '../db/repos/settingsRepo';
 import { checkRamp, checkRampStages } from '../services/guardrails';
 import { AppError } from './errors';
 import type { ZodTypeProvider } from './plugins/zodCompilers';
+import {
+  listCampaignPool,
+  poolSummary,
+  type CampaignPoolSummary,
+} from '../db/repos/campaignPoolRepo';
+import {
+  lastAutoEnrollmentRunsByCampaign,
+  listAutoEnrollmentRuns,
+  type AutoEnrollmentRunRow,
+} from '../db/repos/autoEnrollmentRepo';
+import {
+  addNextGlobalPoolLeads,
+  PoolAllocationError,
+  reassignPoolLeads,
+  releaseFromPool,
+} from '../services/campaignPools';
 
 function toCampaignDto(
   row: CampaignRow,
   counts: CampaignCounts,
   recycleSources: RecycleSourceSummary[] = [],
+  pool: CampaignPoolSummary = {
+    total: 0,
+    available: 0,
+    enrolled: 0,
+    released: 0,
+    temporarilyIneligible: 0,
+    sourceImports: 0,
+  },
+  lastRun: (AutoEnrollmentRunRow & { enrolled: number }) | null = null,
 ): CampaignDto {
   return {
     id: row.id,
@@ -79,6 +114,18 @@ function toCampaignDto(
     variable_overrides: variableOverridesOf(row),
     resolved_variables: resolvedVariablesOf(row),
     auto_observation: autoObservationConfigOf(row),
+    lead_selection_mode: row.leadSelectionMode,
+    auto_enroll_enabled: row.autoEnrollEnabled,
+    steady_daily_enroll_cap: row.steadyDailyEnrollCap,
+    pool_summary: {
+      total: pool.total,
+      available: pool.available,
+      enrolled: pool.enrolled,
+      released: pool.released,
+      temporarily_ineligible: pool.temporarilyIneligible,
+      source_imports: pool.sourceImports,
+    },
+    last_auto_enrollment_run: lastRun ? toAutoRunDto(lastRun) : null,
     recycle_sources: recycleSources.map((source) => ({
       campaign_id: source.campaignId,
       name: source.name,
@@ -88,6 +135,19 @@ function toCampaignDto(
     enrolled_count: counts.enrolledCount,
     contacted_count: counts.contactedCount,
     manual_only_count: counts.manualOnlyCount,
+  };
+}
+
+function toAutoRunDto(row: AutoEnrollmentRunRow & { enrolled: number }) {
+  return {
+    id: row.id,
+    trigger: row.trigger,
+    local_date: row.localDate,
+    status: row.status,
+    enrolled: row.enrolled,
+    started_at: row.startedAt.toISOString(),
+    completed_at: row.completedAt?.toISOString() ?? null,
+    error: row.error,
   };
 }
 
@@ -184,9 +244,21 @@ export async function campaignsRoutes(app: FastifyInstance, services: AppService
         db,
         items.map((item) => item.campaign.id),
       );
+      const lastRuns = await lastAutoEnrollmentRunsByCampaign(
+        db,
+        items.map((item) => item.campaign.id),
+      );
       return {
-        items: items.map((i) =>
-          toCampaignDto(i.campaign, i.counts, sources.get(i.campaign.id) ?? []),
+        items: await Promise.all(
+          items.map(async (i) =>
+            toCampaignDto(
+              i.campaign,
+              i.counts,
+              sources.get(i.campaign.id) ?? [],
+              await poolSummary(db, i.campaign.id),
+              lastRuns.get(i.campaign.id) ?? null,
+            ),
+          ),
         ),
         total,
         page,
@@ -217,6 +289,21 @@ export async function campaignsRoutes(app: FastifyInstance, services: AppService
         minRampDays: s.minRampDays,
       });
       if (stageViolation) throw new AppError('validation', 422, stageViolation);
+      const steadyCap = req.body.steady_daily_enroll_cap ?? req.body.ramp_stages.at(-1)?.cap ?? 15;
+      if (steadyCap > s.maxRampDailyEnrollCap) {
+        throw new AppError(
+          'validation',
+          422,
+          `steady daily enrollment cap ${steadyCap} exceeds the launch guardrail of ${s.maxRampDailyEnrollCap}`,
+        );
+      }
+      if (req.body.auto_enroll_enabled === true) {
+        throw new AppError(
+          'validation',
+          422,
+          'create the campaign pool before enabling automatic enrollment',
+        );
+      }
 
       const row = await createCampaign(db, {
         name: req.body.name,
@@ -226,8 +313,15 @@ export async function campaignsRoutes(app: FastifyInstance, services: AppService
         rampStages: req.body.ramp_stages,
         variableOverrides: req.body.variable_overrides,
         autoObservation: req.body.auto_observation,
+        steadyDailyEnrollCap: steadyCap,
+        autoEnrollEnabled: false,
       });
-      return toCampaignDto(row, { enrolledCount: 0, contactedCount: 0, manualOnlyCount: 0 }, []);
+      return toCampaignDto(
+        row,
+        { enrolledCount: 0, contactedCount: 0, manualOnlyCount: 0 },
+        [],
+        await poolSummary(db, row.id),
+      );
     },
   );
 
@@ -261,6 +355,26 @@ export async function campaignsRoutes(app: FastifyInstance, services: AppService
           autoObservation: req.body.auto_observation,
         });
       }
+      if (req.body.steady_daily_enroll_cap !== undefined) {
+        const settings = await getSettings(db);
+        if (req.body.steady_daily_enroll_cap > settings.maxRampDailyEnrollCap) {
+          throw new AppError(
+            'validation',
+            422,
+            'steady daily enrollment cap exceeds the global guardrail',
+          );
+        }
+        if (
+          existing.firstActivatedAt !== null &&
+          req.body.steady_daily_enroll_cap > existing.steadyDailyEnrollCap
+        ) {
+          throw new AppError(
+            'conflict',
+            409,
+            'steady daily enrollment cap can only be lowered after first activation',
+          );
+        }
+      }
       const row = await patchCampaign(db, req.params.id, {
         name: req.body.name,
         status: req.body.status,
@@ -272,9 +386,30 @@ export async function campaignsRoutes(app: FastifyInstance, services: AppService
           existing.firstActivatedAt === null && req.body.status === 'active'
             ? clock.now()
             : undefined,
+        steadyDailyEnrollCap: req.body.steady_daily_enroll_cap,
       });
+      if (
+        row!.status === 'active' &&
+        row!.autoEnrollEnabled &&
+        req.body.status === 'active' &&
+        existing.status !== 'active'
+      ) {
+        await services.autoEnrollment.run(
+          existing.firstActivatedAt === null ? 'activation' : 'resume',
+          [row!.id],
+        );
+      }
       const sources = (await recycleSourcesByTargetIds(db, [req.params.id])).get(req.params.id);
-      return toCampaignDto(row!, await campaignCounts(db, req.params.id), sources ?? []);
+      const lastRun = (await lastAutoEnrollmentRunsByCampaign(db, [req.params.id])).get(
+        req.params.id,
+      );
+      return toCampaignDto(
+        row!,
+        await campaignCounts(db, req.params.id),
+        sources ?? [],
+        await poolSummary(db, req.params.id),
+        lastRun ?? null,
+      );
     },
   );
 
@@ -309,13 +444,230 @@ export async function campaignsRoutes(app: FastifyInstance, services: AppService
       return {
         total_daily_capacity: cap.total,
         followups_due_today: cap.followupsDue,
+        pending_openers_today: cap.pendingOpeners,
         sent_so_far_today: cap.sentSoFar,
         room_for_new: cap.roomForNew,
         ramp_cap_remaining: cap.rampCap,
         ramp_day: cap.rampDay,
         ramp_stage: cap.rampStage,
+        effective_daily_enroll_cap: cap.effectiveDailyCap,
+        campaign_cap_remaining: cap.campaignCapRemaining,
+        pool_available: cap.poolAvailable,
         enrolled_today: cap.enrolledToday,
         suggested: cap.suggested,
+      };
+    },
+  );
+
+  r.get(
+    '/campaigns/:id/pool',
+    {
+      schema: {
+        params: idParamSchema,
+        querystring: campaignPoolQuerySchema,
+        response: { 200: campaignPoolResponseSchema },
+      },
+    },
+    async (req) => {
+      await requireCampaign(req.params.id);
+      const result = await listCampaignPool(
+        db,
+        req.params.id,
+        req.query.page,
+        req.query.per_page,
+        req.query.status,
+      );
+      const summary = await poolSummary(db, req.params.id);
+      return {
+        items: result.items.map((item) => ({
+          id: item.id,
+          campaign_id: item.campaignId,
+          lead: {
+            id: item.leadId,
+            email: item.email,
+            first_name: item.firstName,
+            last_name: item.lastName,
+            company: item.company,
+            tier: item.tier,
+          },
+          source_import_id: item.sourceImportId,
+          allocation_order: item.allocationOrder,
+          status: item.status,
+          enrollment_id: item.enrollmentId,
+          last_eligibility_reason: item.lastEligibilityReason,
+          allocated_at: item.allocatedAt.toISOString(),
+          enrolled_at: item.enrolledAt?.toISOString() ?? null,
+          released_at: item.releasedAt?.toISOString() ?? null,
+        })),
+        total: result.total,
+        page: req.query.page,
+        per_page: req.query.per_page,
+        summary: {
+          total: summary.total,
+          available: summary.available,
+          enrolled: summary.enrolled,
+          released: summary.released,
+          temporarily_ineligible: summary.temporarilyIneligible,
+          source_imports: summary.sourceImports,
+        },
+      };
+    },
+  );
+
+  r.post(
+    '/campaigns/:id/pool/add',
+    {
+      schema: {
+        params: idParamSchema,
+        body: poolAddBodySchema,
+        response: { 200: poolMutationResponseSchema },
+      },
+    },
+    async (req) => {
+      await requireCampaign(req.params.id);
+      try {
+        return await db.transaction(
+          (tx) =>
+            addNextGlobalPoolLeads(tx, sequences, {
+              campaignId: req.params.id,
+              count: req.body.count,
+              sourceImportId: req.body.source_import_id,
+              now: clock.now(),
+            }),
+          { isolationLevel: 'serializable' },
+        );
+      } catch (error) {
+        if (error instanceof PoolAllocationError)
+          throw new AppError('conflict', 409, error.message);
+        throw error;
+      }
+    },
+  );
+
+  r.post(
+    '/campaigns/:id/pool/release',
+    {
+      schema: {
+        params: idParamSchema,
+        body: poolLeadIdsBodySchema,
+        response: { 200: poolMutationResponseSchema },
+      },
+    },
+    async (req) => {
+      try {
+        const changed = await db.transaction((tx) =>
+          releaseFromPool(tx, {
+            campaignId: req.params.id,
+            leadIds: req.body.lead_ids,
+            now: clock.now(),
+          }),
+        );
+        return { changed, skipped: [] };
+      } catch (error) {
+        if (error instanceof PoolAllocationError)
+          throw new AppError('conflict', 409, error.message);
+        throw error;
+      }
+    },
+  );
+
+  r.post(
+    '/campaigns/:id/pool/reassign',
+    {
+      schema: {
+        params: idParamSchema,
+        body: poolReassignBodySchema,
+        response: { 200: poolMutationResponseSchema },
+      },
+    },
+    async (req) => {
+      try {
+        const changed = await db.transaction(
+          (tx) =>
+            reassignPoolLeads(tx, sequences, {
+              sourceCampaignId: req.params.id,
+              targetCampaignId: req.body.target_campaign_id,
+              leadIds: req.body.lead_ids,
+              now: clock.now(),
+            }),
+          { isolationLevel: 'serializable' },
+        );
+        return { changed, skipped: [] };
+      } catch (error) {
+        if (error instanceof PoolAllocationError)
+          throw new AppError('conflict', 409, error.message);
+        throw error;
+      }
+    },
+  );
+
+  r.patch(
+    '/campaigns/:id/auto-enrollment',
+    {
+      schema: {
+        params: idParamSchema,
+        body: patchAutoEnrollmentBodySchema,
+        response: { 200: patchAutoEnrollmentResponseSchema },
+      },
+    },
+    async (req) => {
+      const campaign = await requireCampaign(req.params.id);
+      if (req.body.enabled && req.body.acknowledge_auto_enrollment !== true) {
+        throw new AppError(
+          'validation',
+          422,
+          'acknowledge automatic enrollment before enabling it',
+        );
+      }
+      const summary = await poolSummary(db, campaign.id);
+      if (req.body.enabled && (campaign.leadSelectionMode !== 'pool' || summary.available === 0)) {
+        throw new AppError(
+          'conflict',
+          409,
+          'automatic enrollment requires an available campaign pool',
+        );
+      }
+      const row = await patchCampaign(db, campaign.id, { autoEnrollEnabled: req.body.enabled });
+      if (req.body.enabled && row!.status === 'active') {
+        await services.autoEnrollment.run('enabled', [row!.id]);
+      }
+      const sources = (await recycleSourcesByTargetIds(db, [campaign.id])).get(campaign.id) ?? [];
+      const lastRun = (await lastAutoEnrollmentRunsByCampaign(db, [campaign.id])).get(campaign.id);
+      return {
+        campaign: toCampaignDto(
+          row!,
+          await campaignCounts(db, campaign.id),
+          sources,
+          await poolSummary(db, campaign.id),
+          lastRun ?? null,
+        ),
+        run: lastRun ? toAutoRunDto(lastRun) : null,
+      };
+    },
+  );
+
+  r.get(
+    '/campaigns/:id/auto-enrollment/runs',
+    {
+      schema: {
+        params: idParamSchema,
+        querystring: autoEnrollmentRunsQuerySchema,
+        response: { 200: autoEnrollmentRunsResponseSchema },
+      },
+    },
+    async (req) => {
+      await requireCampaign(req.params.id);
+      const result = await listAutoEnrollmentRuns(
+        db,
+        req.params.id,
+        req.query.page,
+        req.query.per_page,
+      );
+      return {
+        items: result.items.map(toAutoRunDto),
+        total: result.total,
+        page: req.query.page,
+        per_page: req.query.per_page,
       };
     },
   );

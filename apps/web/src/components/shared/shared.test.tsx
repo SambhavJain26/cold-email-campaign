@@ -99,11 +99,15 @@ describe('CapacityMeter', () => {
         capacity={{
           total_daily_capacity: 120,
           followups_due_today: 34,
+          pending_openers_today: 2,
           sent_so_far_today: 12,
           room_for_new: 74,
           ramp_cap_remaining: 20,
           ramp_day: 2,
           ramp_stage: { start_day: 2, end_day: 2, cap: 20 },
+          effective_daily_enroll_cap: 20,
+          campaign_cap_remaining: 20,
+          pool_available: 40,
           enrolled_today: 0,
           suggested: 20,
         }}
@@ -122,11 +126,15 @@ describe('CapacityMeter', () => {
         capacity={{
           total_daily_capacity: 120,
           followups_due_today: 0,
+          pending_openers_today: 0,
           sent_so_far_today: 0,
           room_for_new: 120,
           ramp_cap_remaining: null,
           ramp_day: null,
           ramp_stage: null,
+          effective_daily_enroll_cap: 15,
+          campaign_cap_remaining: 15,
+          pool_available: null,
           enrolled_today: 0,
           suggested: 120,
         }}

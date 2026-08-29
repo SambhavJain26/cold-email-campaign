@@ -158,6 +158,20 @@ export async function countFollowupsDue(db: DbLike, before: Date): Promise<numbe
   return rows[0]?.n ?? 0;
 }
 
+/** Unsent Step-1 work already reserved in active campaigns for this local day. */
+export async function countPendingOpenersDue(db: DbLike, before: Date): Promise<number> {
+  const result = await db.execute(sql`
+    SELECT count(*)::int AS n
+      FROM enrollments e
+      JOIN campaigns c ON c.id = e.campaign_id AND c.status = 'active'
+      JOIN leads l ON l.id = e.lead_id AND NOT l.is_erased AND NOT l.is_suppressed
+     WHERE e.current_state = 'ACTIVE'
+       AND e.assigned_mailbox_id IS NULL
+       AND e.current_step_no = 1
+       AND e.next_send_at < ${before}`);
+  return Number((result.rows[0] as { n?: number } | undefined)?.n ?? 0);
+}
+
 /** Enrollments created today (ramp cap accounting). */
 export async function countEnrolledSince(
   db: DbLike,

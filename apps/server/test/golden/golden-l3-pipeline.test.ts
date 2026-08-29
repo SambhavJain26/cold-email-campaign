@@ -29,6 +29,9 @@ describe('@golden L3 — full pipeline over ~47 virtual days', () => {
     s = await scenario({
       mailboxes: GOLDEN.mailboxes,
       dailyCap: 30,
+      // Preserve the historical 30-enrollment/day cohort explicitly now that
+      // production campaigns retain a permanent post-ramp cap.
+      steadyDailyEnrollCap: 30,
       // The cohort sends 7 days/week (fixture model); hours stay 08–17 recipient-local.
       sendWindow: { days: [1, 2, 3, 4, 5, 6, 7], start: '08:00', end: '17:00' },
       sequence: GOLDEN_SEQUENCE,

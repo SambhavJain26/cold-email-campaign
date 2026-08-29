@@ -10,19 +10,33 @@ import {
   importPreviewResponseSchema,
   importDraftPreviewQuerySchema,
   importDraftPreviewResponseSchema,
+  importAllocationPreviewBodySchema,
+  importAllocationPreviewResponseSchema,
   importsListResponseSchema,
   pageQuerySchema,
   type ImportDto,
 } from '@coldemail/shared';
 import type { AppServices } from '../composition';
-import { getImport, listImports, type ImportRow } from '../db/repos/importsRepo';
-import { commitImport, createImportPreview, previewImportDrafts } from '../ingest/service';
+import {
+  getImport,
+  listImports,
+  poolAllocationsByImportIds,
+  type ImportPoolAllocationSummary,
+  type ImportRow,
+} from '../db/repos/importsRepo';
+import {
+  commitImport,
+  createImportPreview,
+  previewImportAllocations,
+  previewImportDrafts,
+} from '../ingest/service';
+import { PoolAllocationError } from '../services/campaignPools';
 import { getCampaign } from '../db/repos/campaignsRepo';
 import { MAX_BYTES } from '../ingest/parse';
 import { AppError } from './errors';
 import type { ZodTypeProvider } from './plugins/zodCompilers';
 
-function toImportDto(row: ImportRow): ImportDto {
+function toImportDto(row: ImportRow, allocations: ImportPoolAllocationSummary[] = []): ImportDto {
   return {
     id: row.id,
     filename: row.filename,
@@ -30,13 +44,21 @@ function toImportDto(row: ImportRow): ImportDto {
     counts: row.counts,
     committed: row.committed,
     commit_mode: row.commitMode as ImportDto['commit_mode'],
+    pool_allocations: allocations.map((allocation) => ({
+      campaign_id: allocation.campaignId,
+      campaign_name: allocation.campaignName,
+      total: allocation.total,
+      available: allocation.available,
+      enrolled: allocation.enrolled,
+      released: allocation.released,
+    })),
     created_at: row.createdAt.toISOString(),
   };
 }
 
 export async function importsRoutes(app: FastifyInstance, services: AppServices): Promise<void> {
   const r = app.withTypeProvider<ZodTypeProvider>();
-  const { db } = services;
+  const { db, clock, sequences } = services;
 
   // Registered here, not app-wide: only this group consumes multipart. Limits
   // mirror the ingest caps (docs/09 §1) so oversize dies at the socket.
@@ -98,15 +120,27 @@ export async function importsRoutes(app: FastifyInstance, services: AppServices)
         const campaign = await getCampaign(db, req.body.draft_campaign_id);
         if (!campaign) throw AppError.notFound('campaign');
       }
-      const result = await commitImport(
-        { db },
-        {
-          importId: req.params.id,
-          mode: req.body.mode,
-          draftCampaignId: req.body.draft_campaign_id,
-          replaceExistingDrafts: req.body.replace_existing_drafts,
-        },
-      );
+      let result;
+      try {
+        result = await commitImport(
+          { db, clock, sequences },
+          {
+            importId: req.params.id,
+            mode: req.body.mode,
+            draftCampaignId: req.body.draft_campaign_id,
+            replaceExistingDrafts: req.body.replace_existing_drafts,
+            allocations: req.body.allocations.map((allocation) => ({
+              campaignId: allocation.campaign_id,
+              count: allocation.count,
+            })),
+          },
+        );
+      } catch (error) {
+        if (error instanceof PoolAllocationError) {
+          throw new AppError('conflict', 409, error.message);
+        }
+        throw error;
+      }
       return {
         imported: result.inserted,
         leads_created: result.inserted,
@@ -114,7 +148,54 @@ export async function importsRoutes(app: FastifyInstance, services: AppServices)
         drafts_replaced: result.draftsReplaced,
         drafts_skipped: result.draftsSkipped,
         invalid_drafts: result.invalidDrafts,
+        allocations_created: result.allocationsCreated,
+        remaining_global: result.remainingGlobal,
       };
+    },
+  );
+
+  r.post(
+    '/imports/:id/allocation-preview',
+    {
+      schema: {
+        params: idParamSchema,
+        body: importAllocationPreviewBodySchema,
+        response: { 200: importAllocationPreviewResponseSchema },
+      },
+    },
+    async (req) => {
+      if (!(await getImport(db, req.params.id))) throw AppError.notFound('import');
+      try {
+        const result = await previewImportAllocations(
+          { db, clock, sequences },
+          {
+            importId: req.params.id,
+            mode: req.body.mode,
+            draftCampaignId: req.body.draft_campaign_id,
+            requests: req.body.allocations.map((allocation) => ({
+              campaignId: allocation.campaign_id,
+              count: allocation.count,
+            })),
+          },
+        );
+        return {
+          available: result.available,
+          existing_leads: result.existingLeads,
+          remaining_global: result.remainingGlobal,
+          exclusions: result.exclusions,
+          campaigns: result.campaigns.map((campaign) => ({
+            campaign_id: campaign.campaignId,
+            requested: campaign.requested,
+            allocatable: campaign.allocatable,
+            draft_reserved: campaign.draftReserved,
+          })),
+        };
+      } catch (error) {
+        if (error instanceof PoolAllocationError) {
+          throw new AppError('conflict', 409, error.message);
+        }
+        throw error;
+      }
     },
   );
 
@@ -150,7 +231,16 @@ export async function importsRoutes(app: FastifyInstance, services: AppServices)
     async (req) => {
       const { page, per_page } = req.query;
       const { items, total } = await listImports(db, page, per_page);
-      return { items: items.map(toImportDto), total, page, per_page };
+      const allocations = await poolAllocationsByImportIds(
+        db,
+        items.map((item) => item.id),
+      );
+      return {
+        items: items.map((item) => toImportDto(item, allocations.get(item.id))),
+        total,
+        page,
+        per_page,
+      };
     },
   );
 }

@@ -5,6 +5,7 @@ import {
   type CommitImportBody,
 } from '@coldemail/shared';
 import { apiFetch } from '../client';
+import { invalidateOperational } from '../operational-cache';
 
 /** POST /imports — multipart CSV upload → hygiene preview (docs/09). */
 export function useUploadImport() {
@@ -28,8 +29,7 @@ export function useCommitImport() {
         body,
       }),
     onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ['imports'] });
-      qc.invalidateQueries({ queryKey: ['leads'] });
+      invalidateOperational(qc);
     },
   });
 }

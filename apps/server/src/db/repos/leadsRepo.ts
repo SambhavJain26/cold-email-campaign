@@ -1,7 +1,14 @@
 import { and, eq, ilike, inArray, isNull, or, sql, type SQL } from 'drizzle-orm';
 import type { LeadTier } from '@coldemail/shared';
 import type { DbLike } from '../client';
-import { campaigns, enrollments, importRows, incomingMessages, leads } from '../schema';
+import {
+  campaignLeadPool,
+  campaigns,
+  enrollments,
+  importRows,
+  incomingMessages,
+  leads,
+} from '../schema';
 
 export type LeadRow = typeof leads.$inferSelect;
 
@@ -88,6 +95,8 @@ export interface LeadFilter {
   state?: string;
   /** Leads with an enrollment in this campaign. */
   campaignId?: number;
+  /** Leads currently reserved in this campaign's available pool. */
+  poolCampaignId?: number;
   /** Case-insensitive substring over email / first / last / company. */
   q?: string;
   suppressed?: boolean;
@@ -132,6 +141,14 @@ export function leadFilterWhere(filter: LeadFilter): SQL | undefined {
                   WHERE e.lead_id = ${leads.id} AND e.campaign_id = ${filter.campaignId})`,
     );
   }
+  if (filter.poolCampaignId !== undefined) {
+    conds.push(
+      sql`EXISTS (SELECT 1 FROM ${campaignLeadPool} p
+                  WHERE p.lead_id = ${leads.id}
+                    AND p.campaign_id = ${filter.poolCampaignId}
+                    AND p.status = 'available')`,
+    );
+  }
   return conds.length === 0 ? undefined : and(...conds);
 }
 
@@ -142,6 +159,11 @@ export interface LeadListItem {
     campaignName: string;
     currentState: string;
     currentStepNo: number;
+  } | null;
+  poolAssignment: {
+    campaignId: number;
+    campaignName: string;
+    status: 'available' | 'enrolled' | 'released';
   } | null;
 }
 
@@ -171,6 +193,14 @@ export async function listLeads(
   const latestByLead = new Map<
     number,
     { campaignId: number; campaignName: string; currentState: string; currentStepNo: number }
+  >();
+  const poolByLead = new Map<
+    number,
+    {
+      campaignId: number;
+      campaignName: string;
+      status: 'available' | 'enrolled' | 'released';
+    }
   >();
   if (rows.length > 0) {
     const enr = await db
@@ -208,10 +238,34 @@ export async function listLeads(
         currentStepNo: e.currentStepNo,
       });
     }
+    const poolRows = await db
+      .select({
+        leadId: campaignLeadPool.leadId,
+        campaignId: campaignLeadPool.campaignId,
+        campaignName: campaigns.name,
+        status: campaignLeadPool.status,
+      })
+      .from(campaignLeadPool)
+      .innerJoin(campaigns, eq(campaigns.id, campaignLeadPool.campaignId))
+      .where(
+        and(
+          inArray(
+            campaignLeadPool.leadId,
+            rows.map((row) => row.id),
+          ),
+          eq(campaignLeadPool.status, 'available'),
+        ),
+      )
+      .orderBy(campaignLeadPool.id);
+    for (const pool of poolRows) poolByLead.set(pool.leadId, pool);
   }
 
   return {
-    items: rows.map((lead) => ({ lead, latestEnrollment: latestByLead.get(lead.id) ?? null })),
+    items: rows.map((lead) => ({
+      lead,
+      latestEnrollment: latestByLead.get(lead.id) ?? null,
+      poolAssignment: poolByLead.get(lead.id) ?? null,
+    })),
     total: totals[0]?.n ?? 0,
   };
 }
@@ -477,4 +531,57 @@ export async function selectEligibleLeads(
     )
     .limit(limit);
   return rows;
+}
+
+/** Leads currently in NEW/ACTIVE work for any campaign, used by pool allocation. */
+export async function activeEnrollmentLeadIds(
+  db: DbLike,
+  leadIds: readonly number[],
+  exceptCampaignId?: number,
+): Promise<Set<number>> {
+  if (leadIds.length === 0) return new Set();
+  const result = await db.execute(sql`
+    SELECT DISTINCT lead_id
+      FROM enrollments
+     WHERE lead_id = ANY(${sql.param([...leadIds])}::bigint[])
+       AND current_state IN ('NEW','ACTIVE')
+       AND (${exceptCampaignId ?? null}::bigint IS NULL OR campaign_id <> ${exceptCampaignId ?? null})`);
+  return new Set(
+    (result.rows as unknown as Array<{ lead_id: number | string }>).map((row) =>
+      Number(row.lead_id),
+    ),
+  );
+}
+
+/** Global, non-specific pool allocation order: A → B → C → untiered, oldest first. */
+export async function poolAllocationCandidates(
+  db: DbLike,
+  limit: number,
+  sourceImportId?: number,
+  offset = 0,
+): Promise<EligibleLead[]> {
+  const result = await db.execute(sql`
+    SELECT l.id, l.tier
+      FROM leads l
+     WHERE NOT l.is_suppressed AND NOT l.is_erased
+       AND l.tier IS DISTINCT FROM 'nurture'
+       AND (${sourceImportId ?? null}::bigint IS NULL OR l.import_id = ${sourceImportId ?? null})
+       AND NOT EXISTS (
+         SELECT 1 FROM campaign_lead_pool p
+          WHERE p.lead_id = l.id AND p.status = 'available'
+       )
+       AND NOT EXISTS (
+         SELECT 1 FROM enrollments e
+          WHERE e.lead_id = l.id AND e.current_state IN ('NEW','ACTIVE')
+       )
+       AND NOT EXISTS (
+         SELECT 1 FROM events hr
+          WHERE hr.lead_id = l.id AND hr.type = 'human_reply'
+       )
+     ORDER BY CASE l.tier WHEN 'A' THEN 1 WHEN 'B' THEN 2 WHEN 'C' THEN 3 ELSE 4 END,
+              l.created_at, l.id
+     LIMIT ${limit} OFFSET ${offset}`);
+  return (result.rows as unknown as Array<{ id: number | string; tier: LeadTier | null }>).map(
+    (row) => ({ id: Number(row.id), tier: row.tier }),
+  );
 }

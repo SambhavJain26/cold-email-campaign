@@ -15,6 +15,7 @@ import { StaticSequenceProvider } from '../../src/scheduler/staticSequenceProvid
 import { RenderEngine } from '../../src/render/engine';
 import { CapturingAlerts } from '../../src/alerts/types';
 import { systemRng } from '../../src/util/rng';
+import { AutoEnrollmentService } from '../../src/services/autoEnrollment';
 import { TEST_DATABASE_URL, resetCoreTables, seedMailboxes } from '../helpers/db';
 
 describe('pg-boss wiring smoke (B3.16)', () => {
@@ -51,6 +52,7 @@ describe('pg-boss wiring smoke (B3.16)', () => {
       alerts,
     });
     const poller = new Poller({ db, store, transport, clock, alerts });
+    const autoEnrollment = new AutoEnrollmentService({ db, store, clock, sequences, alerts });
     jobs = new Jobs({
       connectionString: TEST_DATABASE_URL,
       db,
@@ -60,6 +62,7 @@ describe('pg-boss wiring smoke (B3.16)', () => {
       sequences,
       confirmDelivery: { db, store, clock },
       alerts,
+      autoEnrollment,
     });
   });
 
@@ -111,6 +114,13 @@ describe('pg-boss wiring smoke (B3.16)', () => {
       sequences: new StaticSequenceProvider(),
       confirmDelivery: { db, store: new EventStore(db), clock: new SystemClock() },
       alerts: new CapturingAlerts(),
+      autoEnrollment: new AutoEnrollmentService({
+        db,
+        store: new EventStore(db),
+        clock: new SystemClock(),
+        sequences: new StaticSequenceProvider(),
+        alerts: new CapturingAlerts(),
+      }),
     });
     await expect(notStarted.registerMailboxPoll(999)).resolves.toBeUndefined();
   }, 30_000);

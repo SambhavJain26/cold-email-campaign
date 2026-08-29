@@ -63,10 +63,10 @@ test('create → activate → day-1 ramp enrolls 5 and blocks more', async ({ pa
   await expect(page.getByTestId('suggested')).toHaveText('0');
 
   // Over-asking hits the ramp cap: 409 capacity_exceeded explains that nothing else fits today.
-  await page.getByLabel('Enroll').fill('200');
+  await today.getByLabel('Enroll').fill('200');
   await page.getByRole('button', { name: 'Enroll next 200' }).click();
   await expect(page.getByTestId('ramp-note')).toContainText('allows 0 more');
-  await expect(page.getByLabel('Enroll')).toHaveValue('0');
+  await expect(today.getByLabel('Enroll')).toHaveValue('0');
 
   // The list reflects the enrollment.
   await page.getByRole('button', { name: 'Back to list' }).click();

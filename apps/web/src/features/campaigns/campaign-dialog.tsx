@@ -89,6 +89,7 @@ export function CampaignDialog({
         { start_day: 4, end_day: 4, cap: 12 },
         { start_day: 5, end_day: 7, cap: 15 },
       ],
+      steady_daily_enroll_cap: 15,
       acknowledge_tier_a_manual: false,
     });
     setAutoField('');
@@ -269,6 +270,18 @@ export function CampaignDialog({
                 />
               </div>
             ))}
+            <div className="flex flex-col gap-1 pt-2">
+              <Label htmlFor="steady-enrollment-cap">Permanent daily cap after ramp</Label>
+              <Input
+                id="steady-enrollment-cap"
+                type="number"
+                min={1}
+                {...register('steady_daily_enroll_cap', { valueAsNumber: true })}
+              />
+              <p className="text-xs text-muted-foreground">
+                Defaults to the final ramp stage. After activation it may only be lowered.
+              </p>
+            </div>
           </fieldset>
 
           <fieldset className="space-y-3 rounded-lg border border-border p-3">

@@ -18,6 +18,14 @@ export const leadSchema = z
     tier: z.enum(LEAD_TIERS).nullable(),
     is_suppressed: z.boolean(),
     custom_fields: z.record(z.string(), z.string()),
+    pool_assignment: z
+      .object({
+        campaign_id: z.number().int(),
+        campaign_name: z.string(),
+        status: z.enum(['available', 'enrolled', 'released']),
+      })
+      .strict()
+      .optional(),
     latest_enrollment: z
       .object({
         campaign_id: z.number().int(),
@@ -35,6 +43,7 @@ export const leadsQuerySchema = pageQuerySchema.extend({
   tier: leadTierFilterSchema.optional(),
   state: z.string().optional(),
   campaign_id: z.coerce.number().int().positive().optional(),
+  pool_campaign_id: z.coerce.number().int().positive().optional(),
   q: z.string().optional(),
   suppressed: z
     .enum(['true', 'false'])
@@ -122,6 +131,7 @@ export const leadFilterSchema = z
     tier: leadTierFilterSchema.optional(),
     state: z.string().optional(),
     campaign_id: z.number().int().positive().optional(),
+    pool_campaign_id: z.number().int().positive().optional(),
     q: z.string().optional(),
     suppressed: z.boolean().optional(),
   })

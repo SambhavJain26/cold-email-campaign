@@ -6,6 +6,8 @@
 import type {
   AlertDto,
   CampaignDto,
+  CampaignPoolItemDto,
+  AutoEnrollmentRunSummaryDto,
   ComplianceDto,
   EventViewDto,
   ImportDto,
@@ -253,7 +255,7 @@ function buildSequence(): SequenceDto {
  * of in that parity fixture.
  */
 function buildCampaigns(): CampaignDto[] {
-  const [golden] = structuredClone(campaignsFx.items) as CampaignDto[];
+  const [golden] = structuredClone(campaignsFx.items) as unknown as CampaignDto[];
   return [
     {
       ...golden!,
@@ -263,6 +265,18 @@ function buildCampaigns(): CampaignDto[] {
       variable_overrides: {},
       resolved_variables: {},
       auto_observation: { field: null, rules: {} },
+      lead_selection_mode: 'global',
+      auto_enroll_enabled: false,
+      steady_daily_enroll_cap: 20,
+      pool_summary: {
+        total: 0,
+        available: 0,
+        enrolled: 0,
+        released: 0,
+        temporarily_ineligible: 0,
+        source_imports: 0,
+      },
+      last_auto_enrollment_run: null,
       recycle_sources: [],
     },
     {
@@ -281,6 +295,18 @@ function buildCampaigns(): CampaignDto[] {
       variable_overrides: {},
       resolved_variables: {},
       auto_observation: { field: null, rules: {} },
+      lead_selection_mode: 'global',
+      auto_enroll_enabled: false,
+      steady_daily_enroll_cap: 20,
+      pool_summary: {
+        total: 0,
+        available: 0,
+        enrolled: 0,
+        released: 0,
+        temporarily_ineligible: 0,
+        source_imports: 0,
+      },
+      last_auto_enrollment_run: null,
       recycle_sources: [],
       recycled_from_campaign_id: null,
       enrolled_count: 1,
@@ -444,6 +470,10 @@ export interface MockDb {
       ramp_day: number | null;
       ramp_stage: { start_day: number; end_day: number; cap: number } | null;
       enrolled_today: number;
+      pending_openers_today: number;
+      effective_daily_enroll_cap: number;
+      campaign_cap_remaining: number;
+      pool_available: number | null;
     };
   };
   steps: typeof stepsFx;
@@ -458,6 +488,8 @@ export interface MockDb {
   alerts: AlertDto[];
   reminders: ReminderDto[];
   imports: ImportDto[];
+  campaignPools: CampaignPoolItemDto[];
+  autoEnrollmentRuns: Array<AutoEnrollmentRunSummaryDto & { campaign_id: number }>;
   settings: Record<string, unknown>;
   compliance: ComplianceDto;
   nextId: number;
@@ -477,6 +509,10 @@ function build(): MockDb {
         ramp_day: 1,
         ramp_stage: { start_day: 1, end_day: 7, cap: 20 },
         enrolled_today: 0,
+        pending_openers_today: 0,
+        effective_daily_enroll_cap: 20,
+        campaign_cap_remaining: 20,
+        pool_available: null,
       },
     },
     steps: structuredClone(stepsFx),
@@ -505,9 +541,12 @@ function build(): MockDb {
         },
         committed: true,
         commit_mode: 'drop_flagged',
+        pool_allocations: [],
         created_at: '2026-01-04T18:00:00.000Z',
       },
     ],
+    campaignPools: [],
+    autoEnrollmentRuns: [],
     settings: {
       stop_on_reply: true,
       stop_on_hard_bounce: true,

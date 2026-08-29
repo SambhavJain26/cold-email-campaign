@@ -74,6 +74,8 @@ describe('ingest service (B5.3–B5.5)', () => {
       draftsReplaced: 0,
       draftsSkipped: 0,
       invalidDrafts: 0,
+      allocationsCreated: 0,
+      remainingGlobal: 2,
     });
 
     const rows = await pool.query(
@@ -132,6 +134,8 @@ describe('ingest service (B5.3–B5.5)', () => {
       draftsReplaced: 0,
       draftsSkipped: 0,
       invalidDrafts: 0,
+      allocationsCreated: 0,
+      remainingGlobal: 1,
     }); // only bob
     const emails = await pool.query(`SELECT email FROM leads`);
     expect(emails.rows).toEqual([{ email: 'bob@beta.dev' }]);
@@ -158,6 +162,8 @@ describe('ingest service (B5.3–B5.5)', () => {
       draftsReplaced: 0,
       draftsSkipped: 0,
       invalidDrafts: 0,
+      allocationsCreated: 0,
+      remainingGlobal: 2,
     });
   });
 
@@ -172,6 +178,8 @@ describe('ingest service (B5.3–B5.5)', () => {
       draftsReplaced: 0,
       draftsSkipped: 0,
       invalidDrafts: 0,
+      allocationsCreated: 0,
+      remainingGlobal: 2,
     });
   });
 

@@ -67,6 +67,32 @@ export const campaignRecycleSourceSchema = z
   })
   .strict();
 
+export const leadSelectionModeSchema = z.enum(['global', 'pool']);
+
+export const campaignPoolSummarySchema = z
+  .object({
+    total: z.number().int().min(0),
+    available: z.number().int().min(0),
+    enrolled: z.number().int().min(0),
+    released: z.number().int().min(0),
+    temporarily_ineligible: z.number().int().min(0),
+    source_imports: z.number().int().min(0),
+  })
+  .strict();
+
+export const autoEnrollmentRunSummarySchema = z
+  .object({
+    id: z.number().int(),
+    trigger: z.enum(['daily', 'enabled', 'activation', 'resume']),
+    local_date: z.string(),
+    status: z.enum(['running', 'completed', 'failed']),
+    enrolled: z.number().int().min(0),
+    started_at: isoDateTime,
+    completed_at: isoDateTime.nullable(),
+    error: z.string().nullable(),
+  })
+  .strict();
+
 export const campaignSchema = z
   .object({
     id: z.number().int(),
@@ -80,6 +106,11 @@ export const campaignSchema = z
     variable_overrides: sequenceVariablesSchema,
     resolved_variables: sequenceVariablesSchema,
     auto_observation: autoObservationConfigSchema,
+    lead_selection_mode: leadSelectionModeSchema,
+    auto_enroll_enabled: z.boolean(),
+    steady_daily_enroll_cap: z.number().int().positive(),
+    pool_summary: campaignPoolSummarySchema,
+    last_auto_enrollment_run: autoEnrollmentRunSummarySchema.nullable(),
     recycle_sources: z.array(campaignRecycleSourceSchema),
     recycled_from_campaign_id: z.number().int().nullable(),
     enrolled_count: z.number().int().min(0),
@@ -100,6 +131,8 @@ export const createCampaignBodySchema = z
     ramp_stages: rampStagesSchema.default(DEFAULT_RAMP_STAGES.map((stage) => ({ ...stage }))),
     variable_overrides: sequenceVariablesSchema.optional(),
     auto_observation: autoObservationConfigSchema.optional(),
+    steady_daily_enroll_cap: z.number().int().positive().optional(),
+    auto_enroll_enabled: z.boolean().optional(),
     acknowledge_tier_a_manual: z.boolean().optional(),
   })
   .strict()
@@ -125,6 +158,7 @@ export const patchCampaignBodySchema = z
     ramp_stages: rampStagesSchema.optional(),
     variable_overrides: sequenceVariablesSchema.optional(),
     auto_observation: autoObservationConfigSchema.optional(),
+    steady_daily_enroll_cap: z.number().int().positive().optional(),
   })
   .strict();
 export type PatchCampaignBody = z.infer<typeof patchCampaignBodySchema>;
@@ -136,17 +170,85 @@ export const capacityResponseSchema = z
   .object({
     total_daily_capacity: z.number().int(),
     followups_due_today: z.number().int(),
+    pending_openers_today: z.number().int(),
     sent_so_far_today: z.number().int(),
     room_for_new: z.number().int(),
     ramp_cap_remaining: z.number().int().nullable(),
     ramp_day: z.number().int().positive().nullable(),
     ramp_stage: rampStageSchema.nullable(),
+    effective_daily_enroll_cap: z.number().int().positive(),
+    campaign_cap_remaining: z.number().int().min(0),
+    pool_available: z.number().int().min(0).nullable(),
     enrolled_today: z.number().int().min(0),
     suggested: z.number().int(),
   })
   .strict();
 
 export type CapacityResponse = z.infer<typeof capacityResponseSchema>;
+
+export const campaignPoolItemSchema = z
+  .object({
+    id: z.number().int(),
+    campaign_id: z.number().int(),
+    lead: z
+      .object({
+        id: z.number().int(),
+        email: z.string(),
+        first_name: z.string().nullable(),
+        last_name: z.string().nullable(),
+        company: z.string().nullable(),
+        tier: z.enum(LEAD_TIERS).nullable(),
+      })
+      .strict(),
+    source_import_id: z.number().int().nullable(),
+    allocation_order: z.number().int(),
+    status: z.enum(['available', 'enrolled', 'released']),
+    enrollment_id: z.number().int().nullable(),
+    last_eligibility_reason: z.string().nullable(),
+    allocated_at: isoDateTime,
+    enrolled_at: isoDateTime.nullable(),
+    released_at: isoDateTime.nullable(),
+  })
+  .strict();
+export type CampaignPoolItemDto = z.infer<typeof campaignPoolItemSchema>;
+
+export const campaignPoolQuerySchema = pageQuerySchema.extend({
+  status: z.enum(['available', 'enrolled', 'released']).optional(),
+});
+
+export const campaignPoolResponseSchema = listOf(campaignPoolItemSchema).extend({
+  summary: campaignPoolSummarySchema,
+});
+
+export const poolAddBodySchema = z
+  .object({
+    count: z.number().int().positive(),
+    source_import_id: z.number().int().positive().optional(),
+  })
+  .strict();
+export const poolLeadIdsBodySchema = z
+  .object({ lead_ids: z.array(z.number().int().positive()).min(1) })
+  .strict();
+export const poolReassignBodySchema = poolLeadIdsBodySchema.extend({
+  target_campaign_id: z.number().int().positive(),
+});
+export const poolMutationResponseSchema = z
+  .object({
+    changed: z.number().int().min(0),
+    skipped: z.array(z.object({ reason: z.string(), count: z.number().int().min(1) }).strict()),
+  })
+  .strict();
+
+export const patchAutoEnrollmentBodySchema = z
+  .object({ enabled: z.boolean(), acknowledge_auto_enrollment: z.boolean().optional() })
+  .strict();
+export const patchAutoEnrollmentResponseSchema = z
+  .object({ campaign: campaignSchema, run: autoEnrollmentRunSummarySchema.nullable() })
+  .strict();
+
+export const autoEnrollmentRunsQuerySchema = pageQuerySchema;
+export const autoEnrollmentRunsResponseSchema = listOf(autoEnrollmentRunSummarySchema);
+export type AutoEnrollmentRunSummaryDto = z.infer<typeof autoEnrollmentRunSummarySchema>;
 
 export const enrollBodySchema = z.union([
   z.object({ count: z.number().int().min(1) }).strict(),

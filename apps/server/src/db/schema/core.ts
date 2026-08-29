@@ -5,6 +5,7 @@ import {
   bigserial,
   boolean,
   check,
+  date,
   index,
   integer,
   jsonb,
@@ -84,8 +85,67 @@ export const campaigns = pgTable('campaigns', {
       { start_day: 4, end_day: 4, cap: 12 },
       { start_day: 5, end_day: 7, cap: 15 },
     ]),
+  leadSelectionMode: text('lead_selection_mode')
+    .$type<'global' | 'pool'>()
+    .notNull()
+    .default('global'),
+  autoEnrollEnabled: boolean('auto_enroll_enabled').notNull().default(false),
+  steadyDailyEnrollCap: integer('steady_daily_enroll_cap').notNull().default(15),
   recycledFromCampaignId: bigint('recycled_from_campaign_id', { mode: 'number' }),
   createdAt: tz('created_at').notNull().defaultNow(),
+});
+
+export const autoEnrollmentDays = pgTable('auto_enrollment_days', {
+  localDate: date('local_date').primaryKey(),
+  status: text('status').$type<'running' | 'completed' | 'failed'>().notNull().default('running'),
+  startedAt: tz('started_at').notNull().defaultNow(),
+  completedAt: tz('completed_at'),
+  error: text('error'),
+});
+
+export const autoEnrollmentRuns = pgTable(
+  'auto_enrollment_runs',
+  {
+    id: bigint('id', { mode: 'number' }).generatedAlwaysAsIdentity().primaryKey(),
+    trigger: text('trigger').$type<'daily' | 'enabled' | 'activation' | 'resume'>().notNull(),
+    localDate: date('local_date').notNull(),
+    status: text('status').$type<'running' | 'completed' | 'failed'>().notNull().default('running'),
+    capacitySnapshot: jsonb('capacity_snapshot').notNull().default({}),
+    lastServedCampaignId: bigint('last_served_campaign_id', { mode: 'number' }).references(
+      () => campaigns.id,
+      { onDelete: 'set null' },
+    ),
+    startedAt: tz('started_at').notNull().defaultNow(),
+    completedAt: tz('completed_at'),
+    error: text('error'),
+  },
+  (t) => [index('auto_enrollment_runs_date').on(t.localDate, t.id)],
+);
+
+export const autoEnrollmentRunCampaigns = pgTable(
+  'auto_enrollment_run_campaigns',
+  {
+    runId: bigint('run_id', { mode: 'number' })
+      .notNull()
+      .references(() => autoEnrollmentRuns.id, { onDelete: 'cascade' }),
+    campaignId: bigint('campaign_id', { mode: 'number' })
+      .notNull()
+      .references(() => campaigns.id, { onDelete: 'cascade' }),
+    eligibleBefore: integer('eligible_before').notNull().default(0),
+    capRemaining: integer('cap_remaining').notNull().default(0),
+    enrolled: integer('enrolled').notNull().default(0),
+    skipped: jsonb('skipped').notNull().default({}),
+  },
+  (t) => [primaryKey({ columns: [t.runId, t.campaignId] })],
+);
+
+export const autoEnrollmentState = pgTable('auto_enrollment_state', {
+  singleton: boolean('singleton').primaryKey().default(true),
+  lastServedCampaignId: bigint('last_served_campaign_id', { mode: 'number' }).references(
+    () => campaigns.id,
+    { onDelete: 'set null' },
+  ),
+  updatedAt: tz('updated_at').notNull().defaultNow(),
 });
 
 export const enrollments = pgTable(

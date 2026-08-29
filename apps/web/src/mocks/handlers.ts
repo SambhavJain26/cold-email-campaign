@@ -9,6 +9,7 @@ import {
   createLeadBodySchema,
   changePasswordBodySchema,
   commitImportBodySchema,
+  importAllocationPreviewBodySchema,
   complianceSchema,
   createCampaignBodySchema,
   createMailboxBodySchema,
@@ -21,6 +22,10 @@ import {
   loginBodySchema,
   manualSendBodySchema,
   patchCampaignBodySchema,
+  patchAutoEnrollmentBodySchema,
+  poolAddBodySchema,
+  poolLeadIdsBodySchema,
+  poolReassignBodySchema,
   patchLeadBodySchema,
   patchMailboxBodySchema,
   patchReminderBodySchema,
@@ -101,6 +106,7 @@ function filterLeads(url: URL): LeadDto[] {
   const tier = url.searchParams.get('tier');
   const state = url.searchParams.get('state');
   const campaignId = url.searchParams.get('campaign_id');
+  const poolCampaignId = url.searchParams.get('pool_campaign_id');
   const q = url.searchParams.get('q')?.toLowerCase();
   const suppressed = url.searchParams.get('suppressed');
   return db.leads.filter((lead) => {
@@ -108,6 +114,8 @@ function filterLeads(url: URL): LeadDto[] {
     if (tier && tier !== 'untiered' && lead.tier !== tier) return false;
     if (state && lead.latest_enrollment?.current_state !== state) return false;
     if (campaignId && lead.latest_enrollment?.campaign_id !== Number(campaignId)) return false;
+    if (poolCampaignId && lead.pool_assignment?.campaign_id !== Number(poolCampaignId))
+      return false;
     if (suppressed !== null && lead.is_suppressed !== (suppressed === 'true')) return false;
     if (
       q &&
@@ -552,6 +560,7 @@ export const handlers: RequestHandler[] = [
         },
         committed: false,
         commit_mode: null,
+        pool_allocations: [],
         created_at: NOW,
       };
       db.imports.unshift(importRow);
@@ -579,6 +588,62 @@ export const handlers: RequestHandler[] = [
       importRow.committed = true;
       importRow.commit_mode = body.mode;
       const imported = body.mode === 'drop_flagged' ? 885 : 945;
+      let allocationsCreated = 0;
+      for (const allocation of body.allocations) {
+        const campaign = db.campaigns.find((item) => item.id === allocation.campaign_id);
+        if (!campaign) return notFound('campaign');
+        const candidates = db.leads.filter(
+          (lead) =>
+            !lead.is_suppressed &&
+            lead.tier !== 'nurture' &&
+            !db.campaignPools.some(
+              (pool) => pool.lead.id === lead.id && pool.status === 'available',
+            ),
+        );
+        if (candidates.length < allocation.count) {
+          return err('conflict', 'allocation changed; refresh the preview', 409);
+        }
+        for (const lead of candidates.slice(0, allocation.count)) {
+          db.campaignPools.push({
+            id: db.nextId++,
+            campaign_id: campaign.id,
+            lead: {
+              id: lead.id,
+              email: lead.email,
+              first_name: lead.first_name,
+              last_name: lead.last_name,
+              company: lead.company,
+              tier: lead.tier,
+            },
+            source_import_id: importRow.id,
+            allocation_order: db.nextId++,
+            status: 'available',
+            enrollment_id: null,
+            last_eligibility_reason: null,
+            allocated_at: NOW,
+            enrolled_at: null,
+            released_at: null,
+          });
+          lead.pool_assignment = {
+            campaign_id: campaign.id,
+            campaign_name: campaign.name,
+            status: 'available',
+          };
+        }
+        allocationsCreated += allocation.count;
+        campaign.lead_selection_mode = 'pool';
+        campaign.pool_summary.total += allocation.count;
+        campaign.pool_summary.available += allocation.count;
+        campaign.pool_summary.source_imports += 1;
+        importRow.pool_allocations.push({
+          campaign_id: campaign.id,
+          campaign_name: campaign.name,
+          total: allocation.count,
+          available: allocation.count,
+          enrolled: 0,
+          released: 0,
+        });
+      }
       return HttpResponse.json({
         imported,
         leads_created: imported,
@@ -586,6 +651,31 @@ export const handlers: RequestHandler[] = [
         drafts_replaced: 0,
         drafts_skipped: 0,
         invalid_drafts: 0,
+        allocations_created: allocationsCreated,
+        remaining_global: Math.max(0, imported - allocationsCreated),
+      });
+    }),
+  ),
+  http.post(
+    `${BASE}/imports/:id/allocation-preview`,
+    authed(async ({ request, params }) => {
+      if (!db.imports.some((item) => item.id === Number(params.id))) return notFound('import');
+      const body = await parseBody(request, importAllocationPreviewBodySchema);
+      if (body instanceof Response) return body;
+      const total = body.mode === 'drop_flagged' ? 885 : 945;
+      const requested = body.allocations.reduce((sum, allocation) => sum + allocation.count, 0);
+      return HttpResponse.json({
+        available: total,
+        existing_leads: 15,
+        remaining_global: Math.max(0, total - requested),
+        exclusions: {},
+        campaigns: body.allocations.map((allocation) => ({
+          campaign_id: allocation.campaign_id,
+          requested: allocation.count,
+          allocatable: requested <= total ? allocation.count : 0,
+          draft_reserved:
+            body.draft_campaign_id === allocation.campaign_id ? Math.min(3, allocation.count) : 0,
+        })),
       });
     }),
   ),
@@ -786,6 +876,18 @@ export const handlers: RequestHandler[] = [
         variable_overrides: body.variable_overrides ?? {},
         resolved_variables: {},
         auto_observation: body.auto_observation ?? { field: null, rules: {} },
+        lead_selection_mode: 'global' as const,
+        auto_enroll_enabled: false,
+        steady_daily_enroll_cap: body.steady_daily_enroll_cap ?? body.ramp_stages.at(-1)?.cap ?? 15,
+        pool_summary: {
+          total: 0,
+          available: 0,
+          enrolled: 0,
+          released: 0,
+          temporarily_ineligible: 0,
+          source_imports: 0,
+        },
+        last_auto_enrollment_run: null,
         recycle_sources: [],
         recycled_from_campaign_id: null,
         enrolled_count: 0,
@@ -834,8 +936,184 @@ export const handlers: RequestHandler[] = [
   http.get(
     `${BASE}/campaigns/:id/capacity`,
     authed(({ params }) => {
-      if (!db.campaigns.some((c) => c.id === Number(params.id))) return notFound('campaign');
-      return HttpResponse.json(db.overview.capacity);
+      const campaign = db.campaigns.find((c) => c.id === Number(params.id));
+      if (!campaign) return notFound('campaign');
+      return HttpResponse.json({
+        ...db.overview.capacity,
+        effective_daily_enroll_cap: campaign.steady_daily_enroll_cap,
+        campaign_cap_remaining: Math.max(
+          0,
+          campaign.steady_daily_enroll_cap - db.overview.capacity.enrolled_today,
+        ),
+        pool_available:
+          campaign.lead_selection_mode === 'pool' ? campaign.pool_summary.available : null,
+      });
+    }),
+  ),
+  http.get(
+    `${BASE}/campaigns/:id/pool`,
+    authed(({ request, params }) => {
+      const campaign = db.campaigns.find((item) => item.id === Number(params.id));
+      if (!campaign) return notFound('campaign');
+      const url = new URL(request.url);
+      const status = url.searchParams.get('status');
+      const items = db.campaignPools.filter(
+        (item) => item.campaign_id === campaign.id && (!status || item.status === status),
+      );
+      return HttpResponse.json({ ...paginate(items, url), summary: campaign.pool_summary });
+    }),
+  ),
+  http.post(
+    `${BASE}/campaigns/:id/pool/add`,
+    authed(async ({ request, params }) => {
+      const campaign = db.campaigns.find((item) => item.id === Number(params.id));
+      if (!campaign) return notFound('campaign');
+      const body = await parseBody(request, poolAddBodySchema);
+      if (body instanceof Response) return body;
+      const candidates = db.leads
+        .filter(
+          (lead) =>
+            !lead.is_suppressed &&
+            lead.tier !== 'nurture' &&
+            !db.campaignPools.some(
+              (pool) => pool.lead.id === lead.id && pool.status === 'available',
+            ),
+        )
+        .slice(0, body.count);
+      if (candidates.length < body.count) return err('conflict', 'not enough safe leads', 409);
+      for (const lead of candidates) {
+        db.campaignPools.push({
+          id: db.nextId++,
+          campaign_id: campaign.id,
+          lead: {
+            id: lead.id,
+            email: lead.email,
+            first_name: lead.first_name,
+            last_name: lead.last_name,
+            company: lead.company,
+            tier: lead.tier,
+          },
+          source_import_id: body.source_import_id ?? null,
+          allocation_order: db.nextId++,
+          status: 'available',
+          enrollment_id: null,
+          last_eligibility_reason: null,
+          allocated_at: NOW,
+          enrolled_at: null,
+          released_at: null,
+        });
+        lead.pool_assignment = {
+          campaign_id: campaign.id,
+          campaign_name: campaign.name,
+          status: 'available',
+        };
+      }
+      campaign.lead_selection_mode = 'pool';
+      campaign.pool_summary.total += candidates.length;
+      campaign.pool_summary.available += candidates.length;
+      return HttpResponse.json({ changed: candidates.length, skipped: [] });
+    }),
+  ),
+  http.post(
+    `${BASE}/campaigns/:id/pool/release`,
+    authed(async ({ request, params }) => {
+      const campaign = db.campaigns.find((item) => item.id === Number(params.id));
+      if (!campaign) return notFound('campaign');
+      const body = await parseBody(request, poolLeadIdsBodySchema);
+      if (body instanceof Response) return body;
+      let changed = 0;
+      for (const item of db.campaignPools) {
+        if (
+          item.campaign_id === campaign.id &&
+          item.status === 'available' &&
+          body.lead_ids.includes(item.lead.id)
+        ) {
+          item.status = 'released';
+          item.released_at = NOW;
+          const lead = db.leads.find((candidate) => candidate.id === item.lead.id);
+          if (lead) delete lead.pool_assignment;
+          changed += 1;
+        }
+      }
+      campaign.pool_summary.available -= changed;
+      campaign.pool_summary.released += changed;
+      return HttpResponse.json({ changed, skipped: [] });
+    }),
+  ),
+  http.post(
+    `${BASE}/campaigns/:id/pool/reassign`,
+    authed(async ({ request, params }) => {
+      const source = db.campaigns.find((item) => item.id === Number(params.id));
+      if (!source) return notFound('campaign');
+      const body = await parseBody(request, poolReassignBodySchema);
+      if (body instanceof Response) return body;
+      const target = db.campaigns.find((item) => item.id === body.target_campaign_id);
+      if (!target) return notFound('campaign');
+      let changed = 0;
+      for (const item of db.campaignPools) {
+        if (
+          item.campaign_id === source.id &&
+          item.status === 'available' &&
+          body.lead_ids.includes(item.lead.id)
+        ) {
+          item.campaign_id = target.id;
+          const lead = db.leads.find((candidate) => candidate.id === item.lead.id);
+          if (lead) {
+            lead.pool_assignment = {
+              campaign_id: target.id,
+              campaign_name: target.name,
+              status: 'available',
+            };
+          }
+          changed += 1;
+        }
+      }
+      source.pool_summary.available -= changed;
+      source.pool_summary.total -= changed;
+      target.pool_summary.available += changed;
+      target.pool_summary.total += changed;
+      target.lead_selection_mode = 'pool';
+      return HttpResponse.json({ changed, skipped: [] });
+    }),
+  ),
+  http.patch(
+    `${BASE}/campaigns/:id/auto-enrollment`,
+    authed(async ({ request, params }) => {
+      const campaign = db.campaigns.find((item) => item.id === Number(params.id));
+      if (!campaign) return notFound('campaign');
+      const body = await parseBody(request, patchAutoEnrollmentBodySchema);
+      if (body instanceof Response) return body;
+      campaign.auto_enroll_enabled = body.enabled;
+      let run = null;
+      if (body.enabled && campaign.status === 'active') {
+        const enrolled = Math.min(
+          campaign.pool_summary.available,
+          campaign.steady_daily_enroll_cap,
+          db.overview.capacity.room_for_new,
+        );
+        run = {
+          id: db.nextId++,
+          trigger: 'enabled' as const,
+          local_date: '2026-02-21',
+          status: 'completed' as const,
+          enrolled,
+          started_at: NOW,
+          completed_at: NOW,
+          error: null,
+        };
+        db.autoEnrollmentRuns.unshift({ ...run, campaign_id: campaign.id });
+        campaign.last_auto_enrollment_run = run;
+      }
+      return HttpResponse.json({ campaign, run });
+    }),
+  ),
+  http.get(
+    `${BASE}/campaigns/:id/auto-enrollment/runs`,
+    authed(({ request, params }) => {
+      const rows = db.autoEnrollmentRuns
+        .filter((run) => run.campaign_id === Number(params.id))
+        .map(({ campaign_id: _campaignId, ...run }) => run);
+      return HttpResponse.json(paginate(rows, new URL(request.url)));
     }),
   ),
   http.post(

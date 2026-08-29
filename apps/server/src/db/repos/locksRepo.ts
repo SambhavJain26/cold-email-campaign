@@ -15,3 +15,8 @@ export async function acquireRebuildLockExclusive(db: DbLike): Promise<void> {
 export async function lockEnrollment(db: DbLike, enrollmentId: number): Promise<void> {
   await db.execute(sql`SELECT pg_advisory_xact_lock(1, ${enrollmentId})`);
 }
+
+/** Serializes manual and automatic capacity reservation across campaigns. */
+export async function acquireEnrollmentCapacityLock(db: DbLike): Promise<void> {
+  await db.execute(sql`SELECT pg_advisory_xact_lock(3, 0)`);
+}

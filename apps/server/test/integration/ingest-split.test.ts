@@ -64,6 +64,8 @@ describe('the 1000 → 885 fixture split (B5.8)', () => {
       draftsReplaced: 0,
       draftsSkipped: 0,
       invalidDrafts: 0,
+      allocationsCreated: 0,
+      remainingGlobal: 885,
     });
 
     const leads = await pool.query(
@@ -129,7 +131,7 @@ describe('remaining docs/09 §7 edges (B5.9)', () => {
        ('a@x.dev', 'nurture'), ('b@x.dev', 'C'), ('c@x.dev', NULL)`,
     );
 
-    const r = await enroll({ db, store, clock, sequences }, 1, 10, { force: true });
+    const r = await enroll({ db, store, clock, sequences }, 1, 5, { force: true });
     expect(r.enrolled).toBe(2);
     expect(r.leadIds.sort()).toEqual([2, 3]); // the nurture lead stays out
   });

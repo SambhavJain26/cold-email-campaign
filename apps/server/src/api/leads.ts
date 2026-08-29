@@ -44,7 +44,11 @@ import { createSingleLead } from '../ingest/service';
 import { AppError } from './errors';
 import type { ZodTypeProvider } from './plugins/zodCompilers';
 
-function toLeadDto(row: LeadRow, latest: LeadListItem['latestEnrollment']): LeadDto {
+function toLeadDto(
+  row: LeadRow,
+  latest: LeadListItem['latestEnrollment'],
+  pool: LeadListItem['poolAssignment'] = null,
+): LeadDto {
   return {
     id: row.id,
     email: row.email,
@@ -56,6 +60,13 @@ function toLeadDto(row: LeadRow, latest: LeadListItem['latestEnrollment']): Lead
     tier: row.tier,
     is_suppressed: row.isSuppressed,
     custom_fields: (row.customFields ?? {}) as Record<string, string>,
+    ...(pool && {
+      pool_assignment: {
+        campaign_id: pool.campaignId,
+        campaign_name: pool.campaignName,
+        status: pool.status,
+      },
+    }),
     ...(latest && {
       latest_enrollment: {
         campaign_id: latest.campaignId,
@@ -90,15 +101,16 @@ export async function leadsRoutes(app: FastifyInstance, services: AppServices): 
     '/leads',
     { schema: { querystring: leadsQuerySchema, response: { 200: leadsListResponseSchema } } },
     async (req) => {
-      const { page, per_page, tier, state, campaign_id, q, suppressed } = req.query;
+      const { page, per_page, tier, state, campaign_id, pool_campaign_id, q, suppressed } =
+        req.query;
       const { items, total } = await listLeads(
         db,
-        { tier, state, campaignId: campaign_id, q, suppressed },
+        { tier, state, campaignId: campaign_id, poolCampaignId: pool_campaign_id, q, suppressed },
         page,
         per_page,
       );
       return {
-        items: items.map((i) => toLeadDto(i.lead, i.latestEnrollment)),
+        items: items.map((i) => toLeadDto(i.lead, i.latestEnrollment, i.poolAssignment)),
         total,
         page,
         per_page,
@@ -190,6 +202,7 @@ export async function leadsRoutes(app: FastifyInstance, services: AppServices): 
               tier: req.body.filter.tier,
               state: req.body.filter.state,
               campaignId: req.body.filter.campaign_id,
+              poolCampaignId: req.body.filter.pool_campaign_id,
               q: req.body.filter.q,
               suppressed: req.body.filter.suppressed,
             },

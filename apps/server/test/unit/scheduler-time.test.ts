@@ -3,9 +3,11 @@ import { describe, expect, it } from 'vitest';
 import { resolveTimezone, STATE_TZ } from '../../src/scheduler/tzmap';
 import {
   insideWindow,
+  localDayOrdinal,
   localParts,
   parseHHMM,
   startOfLocalDay,
+  startOfNextLocalDay,
   windowMinutes,
 } from '../../src/scheduler/window';
 import type { SendWindow } from '../../src/db/schema/transport';
@@ -90,6 +92,17 @@ describe('startOfLocalDay — the cap-reset anchor (no reset cron)', () => {
     expect(startOfLocalDay(now, 'America/New_York').toISOString()).toBe(
       '2026-03-08T05:00:00.000Z', // midnight was still EST (UTC-5)
     );
+  });
+
+  it('finds the next local midnight without assuming every day has 24 hours', () => {
+    const spring = new Date('2026-03-08T15:00:00Z');
+    expect(startOfNextLocalDay(spring, 'America/New_York').toISOString()).toBe(
+      '2026-03-09T04:00:00.000Z',
+    );
+    expect(
+      localDayOrdinal(new Date('2026-03-09T15:00:00Z'), 'America/New_York') -
+        localDayOrdinal(spring, 'America/New_York'),
+    ).toBe(1);
   });
 });
 

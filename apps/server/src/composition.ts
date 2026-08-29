@@ -29,6 +29,7 @@ import { InlineJobQueue, SimulationDriver } from './services/simulation';
 import { isSteppable } from './clock';
 import { VirtualClock } from './clock/virtual';
 import { GoogleOAuthService } from './services/googleOAuth';
+import { AutoEnrollmentService } from './services/autoEnrollment';
 
 export interface AppServices {
   config: Config;
@@ -52,6 +53,7 @@ export interface AppServices {
   dns: DnsResolver;
   googleOAuth: GoogleOAuthService;
   mailboxConnections: DbMailboxConnectionProvider;
+  autoEnrollment: AutoEnrollmentService;
 }
 
 export interface ComposeOverrides {
@@ -140,6 +142,13 @@ export function compose(config: Config, overrides: ComposeOverrides = {}): AppSe
     alerts,
     ...(sentiment && { sentiment }),
   });
+  const autoEnrollment = new AutoEnrollmentService({
+    db,
+    store,
+    clock,
+    sequences,
+    alerts,
+  });
   const jobs = new Jobs({
     connectionString: databaseUrl,
     db,
@@ -149,6 +158,7 @@ export function compose(config: Config, overrides: ComposeOverrides = {}): AppSe
     sequences,
     confirmDelivery: { db, store, clock },
     alerts,
+    autoEnrollment,
     backupDir: config.BACKUP_DIR,
   });
 
@@ -186,6 +196,7 @@ export function compose(config: Config, overrides: ComposeOverrides = {}): AppSe
     dns: overrides.dns ?? createDnsResolver(),
     googleOAuth,
     mailboxConnections,
+    autoEnrollment,
     ...(simulation && { simulation }),
   };
 }

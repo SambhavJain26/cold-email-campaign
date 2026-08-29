@@ -32,7 +32,11 @@ export function EnrollPanel({
   const [count, setCount] = useState<number>(capacity.suggested);
   const [rampNote, setRampNote] = useState<string | null>(null);
   const enroll = useEnroll();
-  const blocked = blockedReason(campaign);
+  const blocked =
+    blockedReason(campaign) ??
+    (campaign?.lead_selection_mode === 'pool' && capacity.pool_available === 0
+      ? 'No eligible pooled leads are available. Add or release safe leads into this campaign pool.'
+      : null);
 
   const submit = (n: number) => {
     if (!campaign || n < 1) return;
@@ -58,7 +62,7 @@ export function EnrollPanel({
             setRampNote(
               suggested === undefined
                 ? error.message
-                : `Today's ramp stage allows ${suggested} more new enrollments.`,
+                : `Today's campaign and mailbox capacity allows ${suggested} more new enrollments.`,
             );
             if (typeof suggested === 'number') setCount(suggested);
           }

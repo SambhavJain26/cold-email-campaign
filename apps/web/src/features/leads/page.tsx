@@ -21,6 +21,7 @@ import { StateBadge } from '@/components/shared/state-badge';
 import { TierBadge } from '@/components/shared/tier-badge';
 import { useCampaignParam } from '@/components/layout/campaign-selector';
 import { useLeads, type LeadsQuery } from '@/api/queries/leads';
+import { useCampaigns } from '@/api/queries/campaigns';
 import { BulkTierBar } from './bulk-tier-bar';
 import { AddLeadDialog } from './add-lead-dialog';
 import { ImportWizard } from './import-wizard';
@@ -36,9 +37,11 @@ export default function LeadsPage() {
   const [perPage, setPerPage] = useState(25);
   const [tier, setTier] = useState<string>(ANY);
   const [state, setState] = useState<string>(ANY);
+  const [poolCampaign, setPoolCampaign] = useState<string>(ANY);
   const [search, setSearch] = useState('');
   const [suppressedOnly, setSuppressedOnly] = useState(false);
   const q = useDeferredValue(search);
+  const campaigns = useCampaigns();
 
   const [selected, setSelected] = useState<Set<number>>(new Set());
   const [allMatching, setAllMatching] = useState(false);
@@ -51,6 +54,7 @@ export default function LeadsPage() {
     tier: tier === ANY ? undefined : tier,
     state: state === ANY ? undefined : state,
     campaign_id: campaignId,
+    pool_campaign_id: poolCampaign === ANY ? undefined : Number(poolCampaign),
     q: q === '' ? undefined : q,
     suppressed: suppressedOnly ? true : undefined,
   };
@@ -122,6 +126,11 @@ export default function LeadsPage() {
     },
     { key: 'tier', header: 'Tier', cell: (l) => <TierBadge tier={l.tier} /> },
     {
+      key: 'pool',
+      header: 'Pool',
+      cell: (lead) => lead.pool_assignment?.campaign_name ?? 'Global',
+    },
+    {
       key: 'state',
       header: 'State',
       cell: (l) =>
@@ -187,10 +196,11 @@ export default function LeadsPage() {
         activeCount={
           Number(tier !== ANY) +
           Number(state !== ANY) +
+          Number(poolCampaign !== ANY) +
           Number(search !== '') +
           Number(suppressedOnly)
         }
-        description="Filter by tier, enrollment state, search text, or suppression status."
+        description="Filter by tier, enrollment state, campaign pool, search text, or suppression status."
       >
         <Select value={tier} onValueChange={(v) => setFilter(() => setTier(v))}>
           <SelectTrigger size="sm" className="w-32" aria-label="Tier filter">
@@ -203,6 +213,22 @@ export default function LeadsPage() {
             <SelectItem value="C">⚪ Tier C</SelectItem>
             <SelectItem value="nurture">🔵 Nurture</SelectItem>
             <SelectItem value="untiered">Untiered</SelectItem>
+          </SelectContent>
+        </Select>
+        <Select
+          value={poolCampaign}
+          onValueChange={(value) => setFilter(() => setPoolCampaign(value))}
+        >
+          <SelectTrigger size="sm" className="w-44" aria-label="Campaign pool filter">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value={ANY}>All campaign pools</SelectItem>
+            {(campaigns.data?.items ?? []).map((campaign) => (
+              <SelectItem key={campaign.id} value={String(campaign.id)}>
+                {campaign.name}
+              </SelectItem>
+            ))}
           </SelectContent>
         </Select>
         <Select value={state} onValueChange={(v) => setFilter(() => setState(v))}>
@@ -248,6 +274,7 @@ export default function LeadsPage() {
                     tier: query.tier as LeadTier | 'untiered' | undefined,
                     state: query.state,
                     campaign_id: query.campaign_id,
+                    pool_campaign_id: query.pool_campaign_id,
                     q: query.q,
                     suppressed: query.suppressed,
                   },
@@ -322,6 +349,9 @@ export default function LeadsPage() {
               {lead.latest_enrollment && (
                 <StateBadge state={lead.latest_enrollment.current_state} />
               )}
+              <span className="text-xs text-muted-foreground">
+                {lead.pool_assignment ? `Pool: ${lead.pool_assignment.campaign_name}` : 'Global'}
+              </span>
               {[lead.city, lead.state].filter(Boolean).length > 0 && (
                 <span className="text-xs text-muted-foreground">
                   {[lead.city, lead.state].filter(Boolean).join(', ')}

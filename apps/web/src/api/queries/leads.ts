@@ -9,6 +9,7 @@ export interface LeadsQuery {
   tier?: string;
   state?: string;
   campaign_id?: number;
+  pool_campaign_id?: number;
   q?: string;
   suppressed?: boolean;
 }

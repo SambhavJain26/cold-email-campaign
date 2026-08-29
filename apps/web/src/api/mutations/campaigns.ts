@@ -7,6 +7,8 @@ import {
   recyclePreviewResponseSchema,
   type CreateCampaignBody,
   type PatchCampaignBody,
+  poolMutationResponseSchema,
+  patchAutoEnrollmentResponseSchema,
 } from '@coldemail/shared';
 import { apiFetch } from '../client';
 import { invalidateOperational } from '../operational-cache';
@@ -98,5 +100,69 @@ export function useDeactivateVariant() {
       invalidateOperational(qc);
       void qc.invalidateQueries({ queryKey: ['sequences'] });
     },
+  });
+}
+
+export function useAddPoolLeads() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({
+      campaignId,
+      count,
+      sourceImportId,
+    }: {
+      campaignId: number;
+      count: number;
+      sourceImportId?: number;
+    }) =>
+      apiFetch(`/campaigns/${campaignId}/pool/add`, poolMutationResponseSchema, {
+        method: 'POST',
+        body: { count, ...(sourceImportId && { source_import_id: sourceImportId }) },
+      }),
+    onSuccess: () => invalidateOperational(qc),
+  });
+}
+
+export function useReleasePoolLeads() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ campaignId, leadIds }: { campaignId: number; leadIds: number[] }) =>
+      apiFetch(`/campaigns/${campaignId}/pool/release`, poolMutationResponseSchema, {
+        method: 'POST',
+        body: { lead_ids: leadIds },
+      }),
+    onSuccess: () => invalidateOperational(qc),
+  });
+}
+
+export function useReassignPoolLeads() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({
+      campaignId,
+      targetCampaignId,
+      leadIds,
+    }: {
+      campaignId: number;
+      targetCampaignId: number;
+      leadIds: number[];
+    }) =>
+      apiFetch(`/campaigns/${campaignId}/pool/reassign`, poolMutationResponseSchema, {
+        method: 'POST',
+        body: { target_campaign_id: targetCampaignId, lead_ids: leadIds },
+      }),
+    onSuccess: () => invalidateOperational(qc),
+  });
+}
+
+export function usePatchAutoEnrollment() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ campaignId, enabled }: { campaignId: number; enabled: boolean }) =>
+      apiFetch(`/campaigns/${campaignId}/auto-enrollment`, patchAutoEnrollmentResponseSchema, {
+        method: 'PATCH',
+        body: { enabled, ...(enabled && { acknowledge_auto_enrollment: true }) },
+      }),
+    onSuccess: () => invalidateOperational(qc),
   });
 }

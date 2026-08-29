@@ -27,6 +27,7 @@ export function DraftConfigurationEditor({ campaign }: { campaign: CampaignDto }
   const patch = usePatchCampaign();
   const [effort, setEffort] = useState(campaign.tier_effort_config);
   const [stages, setStages] = useState(campaign.ramp_stages);
+  const [steadyCap, setSteadyCap] = useState(campaign.steady_daily_enroll_cap);
   const [autoField, setAutoField] = useState(campaign.auto_observation.field ?? '');
   const [rules, setRules] = useState<Array<{ key: string; value: string }>>(() => {
     const entries = Object.entries(campaign.auto_observation.rules);
@@ -50,6 +51,7 @@ export function DraftConfigurationEditor({ campaign }: { campaign: CampaignDto }
         body: {
           tier_effort_config: effort,
           ramp_stages: stages,
+          steady_daily_enroll_cap: steadyCap,
           variable_overrides: Object.fromEntries(
             overrides
               .filter((item) => item.key.trim())
@@ -123,6 +125,18 @@ export function DraftConfigurationEditor({ campaign }: { campaign: CampaignDto }
             ))}
           </div>
         ))}
+      </div>
+      <div className="flex flex-col gap-1">
+        <Label htmlFor="draft-steady-cap" className="text-xs">
+          Permanent daily enrollment cap after ramp
+        </Label>
+        <Input
+          id="draft-steady-cap"
+          type="number"
+          min={1}
+          value={steadyCap}
+          onChange={(event) => setSteadyCap(Number(event.target.value))}
+        />
       </div>
       <div className="space-y-2">
         <Label htmlFor="draft-auto-field" className="text-xs">

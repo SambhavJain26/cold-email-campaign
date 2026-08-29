@@ -30,12 +30,16 @@ test('upload → the exact preview split → commit 885 → result', async ({ pa
   await page.getByRole('button', { name: 'samples' }).first().click();
   await expect(page.getByText(/row \d+:/).first()).toBeVisible();
 
-  // Buttons carry the exact counts.
+  // The selected mode's commit button carries the exact count.
   await expect(page.getByRole('button', { name: 'Drop flagged & import 885' })).toBeVisible();
+  await page.getByLabel('Import mode').click();
+  await page.getByRole('option', { name: 'Include role-based addresses' }).click();
   await expect(
     page.getByRole('button', { name: 'Import all incl. role-based (945)' }),
   ).toBeVisible();
 
+  await page.getByLabel('Import mode').click();
+  await page.getByRole('option', { name: 'Drop role-based and invalid' }).click();
   await page.getByRole('button', { name: 'Drop flagged & import 885' }).click();
   await expect(page.getByTestId('import-result')).toHaveText('885');
   await expect(page.getByText(/untiered \(decision R\)/)).toBeVisible();

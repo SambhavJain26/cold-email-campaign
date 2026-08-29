@@ -280,16 +280,20 @@ describe('capacity + enroll (B3.9)', () => {
       total: 60,
       sentSoFar: 0,
       followupsDue: 0,
+      pendingOpeners: 0,
       roomForNew: 60,
       rampCap: 20,
       rampDay: 1,
       rampStage: { start_day: 1, end_day: 7, cap: 20 },
       enrolledToday: 0,
+      effectiveDailyCap: 20,
+      campaignCapRemaining: 20,
+      poolAvailable: null,
       suggested: 20, // min(roomForNew, rampCap)
     });
   });
 
-  it('enroll rejects count > suggested unless force', async () => {
+  it('enroll rejects count above the permanent campaign allowance even with force', async () => {
     s = await scenario({
       mailboxes: 1,
       dailyCap: 30,
@@ -298,11 +302,14 @@ describe('capacity + enroll (B3.9)', () => {
     });
     await s.importLeads(5);
 
-    await expect(enroll(deps(s), s.campaignId, 3)).rejects.toThrow(/exceeds suggested capacity/);
+    await expect(enroll(deps(s), s.campaignId, 3)).rejects.toThrow(
+      /exceeds the current enrollment allowance/,
+    );
     const ok = await enroll(deps(s), s.campaignId, 2);
     expect(ok.enrolled).toBe(2);
-    const forced = await enroll(deps(s), s.campaignId, 3, { force: true });
-    expect(forced.enrolled).toBe(3);
+    await expect(enroll(deps(s), s.campaignId, 1, { force: true })).rejects.toThrow(
+      /current enrollment allowance 0/,
+    );
   });
 
   it('selection order: A → B → C → untiered, oldest first; nurture never auto-enrolled', async () => {
@@ -314,7 +321,7 @@ describe('capacity + enroll (B3.9)', () => {
     await s.pool.query(`UPDATE leads SET tier = 'A' WHERE id IN (7,8)`);
     await s.pool.query(`UPDATE leads SET tier = 'nurture' WHERE id IN (9,10)`);
 
-    const r = await enroll(deps(s), s.campaignId, 20, { force: true });
+    const r = await enroll(deps(s), s.campaignId, 15, { force: true });
     expect(r.leadIds).toEqual([7, 8, 5, 6, 3, 4, 1, 2]); // nurture (9,10) excluded
 
     const modes = await s.pool.query(

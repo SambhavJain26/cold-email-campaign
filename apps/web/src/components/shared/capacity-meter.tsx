@@ -4,11 +4,15 @@ import { ProgressBar } from './progress-bar';
 export interface CapacityDto {
   total_daily_capacity: number;
   followups_due_today: number;
+  pending_openers_today: number;
   sent_so_far_today: number;
   room_for_new: number;
   ramp_cap_remaining: number | null;
   ramp_day: number | null;
   ramp_stage: { start_day: number; end_day: number; cap: number } | null;
+  effective_daily_enroll_cap: number;
+  campaign_cap_remaining: number;
+  pool_available: number | null;
   enrolled_today: number;
   suggested: number;
 }
@@ -23,7 +27,10 @@ export function CapacityMeter({
 }) {
   const rows: Array<[string, string]> = [
     ['Follow-ups due today', String(capacity.followups_due_today)],
+    ['Pending openers already reserved', String(capacity.pending_openers_today)],
     ['Room for new openers', String(capacity.room_for_new)],
+    ['Effective campaign cap', String(capacity.effective_daily_enroll_cap)],
+    ['Campaign cap remaining', String(capacity.campaign_cap_remaining)],
   ];
   if (capacity.ramp_cap_remaining !== null) {
     if (capacity.ramp_day !== null && capacity.ramp_stage !== null) {
@@ -31,6 +38,15 @@ export function CapacityMeter({
       rows.push(['New enrollments today', String(capacity.enrolled_today)]);
     }
     rows.push(['Ramp cap remaining', String(capacity.ramp_cap_remaining)]);
+  } else if (capacity.ramp_day !== null) {
+    rows.push([
+      `Campaign day ${capacity.ramp_day} · permanent cap`,
+      String(capacity.effective_daily_enroll_cap),
+    ]);
+    rows.push(['New enrollments today', String(capacity.enrolled_today)]);
+  }
+  if (capacity.pool_available !== null) {
+    rows.push(['Available pooled leads', String(capacity.pool_available)]);
   }
   return (
     <div className={cn('space-y-3', className)} data-testid="capacity-meter">

@@ -23,13 +23,18 @@ export function getTestPool(): Pool {
  */
 export async function resetCoreTables(pool: Pool): Promise<void> {
   await pool.query(
-    `TRUNCATE events, recycle_enrollment_sources, campaign_recycle_sources,
+    `TRUNCATE events, auto_enrollment_run_campaigns, auto_enrollment_runs,
+             auto_enrollment_days, auto_enrollment_state, campaign_lead_pool,
+             recycle_enrollment_sources, campaign_recycle_sources,
              enrollments, suppressions, manual_campaign_drafts, campaigns, leads,
              incoming_messages, sent_messages, mailbox_secrets, mailboxes,
              step_variants, sequence_steps, sequences, import_rows, imports,
              operator, alerts, send_blocker_episodes, unsubscribe_tokens,
              operator_reminders
      RESTART IDENTITY CASCADE`,
+  );
+  await pool.query(
+    `INSERT INTO auto_enrollment_state (singleton) VALUES (true) ON CONFLICT DO NOTHING`,
   );
   // compliance_settings survives TRUNCATE (single seeded row) and its seed
   // default physical_address is '' — which trips the B4 global send guard

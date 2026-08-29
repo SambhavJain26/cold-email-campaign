@@ -130,6 +130,8 @@ export async function createCampaign(
     rampStages?: RampStage[];
     variableOverrides?: Record<string, string>;
     autoObservation?: AutoObservationConfig;
+    steadyDailyEnrollCap?: number;
+    autoEnrollEnabled?: boolean;
   },
 ): Promise<CampaignRow> {
   const rows = await db
@@ -145,6 +147,10 @@ export async function createCampaign(
         autoObservationField: input.autoObservation.field,
         autoObservationRules: input.autoObservation.rules,
       }),
+      ...(input.steadyDailyEnrollCap !== undefined && {
+        steadyDailyEnrollCap: input.steadyDailyEnrollCap,
+      }),
+      ...(input.autoEnrollEnabled !== undefined && { autoEnrollEnabled: input.autoEnrollEnabled }),
     })
     .returning();
   return rows[0]!;
@@ -161,6 +167,8 @@ export async function patchCampaign(
     variableOverrides?: Record<string, string>;
     autoObservation?: AutoObservationConfig;
     firstActivatedAt?: Date;
+    steadyDailyEnrollCap?: number;
+    autoEnrollEnabled?: boolean;
   },
 ): Promise<CampaignRow | undefined> {
   const rows = await db
@@ -176,6 +184,10 @@ export async function patchCampaign(
         autoObservationRules: patch.autoObservation.rules,
       }),
       ...(patch.firstActivatedAt !== undefined && { firstActivatedAt: patch.firstActivatedAt }),
+      ...(patch.steadyDailyEnrollCap !== undefined && {
+        steadyDailyEnrollCap: patch.steadyDailyEnrollCap,
+      }),
+      ...(patch.autoEnrollEnabled !== undefined && { autoEnrollEnabled: patch.autoEnrollEnabled }),
     })
     .where(eq(campaigns.id, id))
     .returning();

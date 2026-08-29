@@ -41,9 +41,10 @@ describe('migration runner', () => {
   });
 
   it('backfills legacy single-source campaign and enrollment provenance', async () => {
-    const latest = names.at(-1)!;
-    expect(latest).toBe('0017_multi_source_recycling');
-    await migrateDown(pool, MIGRATIONS_DIR, 1);
+    const targetMigration = '0017_multi_source_recycling';
+    const targetIndex = names.indexOf(targetMigration);
+    expect(targetIndex).toBeGreaterThanOrEqual(0);
+    await migrateDown(pool, MIGRATIONS_DIR, names.length - targetIndex);
     const source = (
       await pool.query(
         `INSERT INTO campaigns (name, status) VALUES ('legacy source', 'completed') RETURNING id`,
@@ -79,7 +80,7 @@ describe('migration runner', () => {
       )
     ).rows[0].id as number;
 
-    expect(await migrateUp(pool, MIGRATIONS_DIR)).toEqual([latest]);
+    expect(await migrateUp(pool, MIGRATIONS_DIR)).toEqual(names.slice(targetIndex));
     expect(
       (
         await pool.query(
@@ -102,6 +103,38 @@ describe('migration runner', () => {
         target_enrollment_id: targetEnrollment,
         source_campaign_id: source,
         source_enrollment_id: sourceEnrollment,
+      },
+    ]);
+    await resetCoreTables(pool);
+  });
+
+  it('backfills the permanent cap from the final legacy ramp stage', async () => {
+    const latest = names.at(-1)!;
+    expect(latest).toBe('0018_campaign_pools_auto_enrollment');
+    await migrateDown(pool, MIGRATIONS_DIR, 1);
+    const campaignId = (
+      await pool.query(
+        `INSERT INTO campaigns (name, status, ramp_stages)
+         VALUES ('legacy ramp', 'draft',
+                 '[{"start_day":1,"end_day":2,"cap":4},{"start_day":3,"end_day":7,"cap":11}]')
+         RETURNING id`,
+      )
+    ).rows[0].id as number;
+
+    expect(await migrateUp(pool, MIGRATIONS_DIR)).toEqual([latest]);
+    expect(
+      (
+        await pool.query(
+          `SELECT lead_selection_mode, auto_enroll_enabled, steady_daily_enroll_cap
+             FROM campaigns WHERE id = $1`,
+          [campaignId],
+        )
+      ).rows,
+    ).toEqual([
+      {
+        lead_selection_mode: 'global',
+        auto_enroll_enabled: false,
+        steady_daily_enroll_cap: 11,
       },
     ]);
     await resetCoreTables(pool);

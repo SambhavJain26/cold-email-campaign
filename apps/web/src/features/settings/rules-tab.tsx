@@ -207,8 +207,8 @@ export function RulesTab({
             )}
             {num(
               'max_ramp_daily_enroll_cap',
-              'Max ramp enroll/day',
-              'A campaign cannot be created with a higher ramp cap.',
+              'Max campaign enroll/day',
+              'Ceiling for every campaign ramp stage and its permanent post-ramp daily cap.',
             )}
             {num(
               'min_ramp_days',

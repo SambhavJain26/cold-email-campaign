@@ -64,6 +64,13 @@ export const commitImportBodySchema = z
     mode: z.enum(['drop_flagged', 'import_all']),
     draft_campaign_id: z.number().int().positive().optional(),
     replace_existing_drafts: z.boolean().default(false),
+    allocations: z
+      .array(
+        z
+          .object({ campaign_id: z.number().int().positive(), count: z.number().int().positive() })
+          .strict(),
+      )
+      .default([]),
   })
   .strict();
 export type CommitImportBody = z.infer<typeof commitImportBodySchema>;
@@ -76,9 +83,44 @@ export const commitImportResponseSchema = z
     drafts_replaced: z.number().int().min(0),
     drafts_skipped: z.number().int().min(0),
     invalid_drafts: z.number().int().min(0),
+    allocations_created: z.number().int().min(0),
+    remaining_global: z.number().int().min(0),
   })
   .strict();
 export type CommitImportResponse = z.infer<typeof commitImportResponseSchema>;
+
+export const importAllocationPreviewBodySchema = z
+  .object({
+    mode: z.enum(['drop_flagged', 'import_all']),
+    draft_campaign_id: z.number().int().positive().optional(),
+    allocations: z
+      .array(
+        z
+          .object({ campaign_id: z.number().int().positive(), count: z.number().int().positive() })
+          .strict(),
+      )
+      .min(1),
+  })
+  .strict();
+
+export const importAllocationPreviewResponseSchema = z
+  .object({
+    available: z.number().int().min(0),
+    existing_leads: z.number().int().min(0),
+    remaining_global: z.number().int().min(0),
+    exclusions: z.record(z.string(), z.number().int().min(0)),
+    campaigns: z.array(
+      z
+        .object({
+          campaign_id: z.number().int(),
+          requested: z.number().int().positive(),
+          allocatable: z.number().int().min(0),
+          draft_reserved: z.number().int().min(0),
+        })
+        .strict(),
+    ),
+  })
+  .strict();
 
 export const manualDraftSchema = z
   .object({
@@ -113,6 +155,18 @@ export const importSchema = z
     counts: importCountsSchema,
     committed: z.boolean(),
     commit_mode: z.enum(['drop_flagged', 'import_all']).nullable(),
+    pool_allocations: z.array(
+      z
+        .object({
+          campaign_id: z.number().int(),
+          campaign_name: z.string(),
+          total: z.number().int().min(0),
+          available: z.number().int().min(0),
+          enrolled: z.number().int().min(0),
+          released: z.number().int().min(0),
+        })
+        .strict(),
+    ),
     created_at: isoDateTime,
   })
   .strict();

@@ -101,6 +101,7 @@ describe('scheduler edges (B3.18)', () => {
       tickMinutes: 5,
       jitterPct: 0, // equal cadence — rotation alone decides the spread
       seed: 99,
+      steadyDailyEnrollCap: 40,
     });
     await s.importLeads(40);
     await s.enroll({ count: 40 });

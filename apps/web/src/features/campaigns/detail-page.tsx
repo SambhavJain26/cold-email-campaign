@@ -17,6 +17,7 @@ import { CompletionPanel } from './completion-panel';
 import { CampaignStatusBadge } from './status-badge';
 import { DraftConfigurationEditor } from './draft-configuration';
 import { useState } from 'react';
+import { LeadPoolPanel } from './lead-pool-panel';
 
 const MODE_LABEL: Record<string, string> = {
   human_written: 'Mode 1 — human-written',
@@ -133,6 +134,8 @@ export default function CampaignDetailPage() {
 
       {campaign.status === 'draft' && <DraftConfigurationEditor campaign={campaign} />}
 
+      <LeadPoolPanel campaign={campaign} />
+
       {campaign.tier_effort_config.A === 'human_written' && (
         <Alert>
           <AlertTitle>Tier A is manual-only</AlertTitle>
@@ -212,6 +215,22 @@ export default function CampaignDetailPage() {
                     </Link>
                   )}
                 </dd>
+              </div>
+              <div className="flex justify-between gap-4">
+                <dt className="text-muted-foreground">Lead selection</dt>
+                <dd>
+                  {campaign.lead_selection_mode === 'pool'
+                    ? 'Campaign pool only'
+                    : 'Global eligible list'}
+                </dd>
+              </div>
+              <div className="flex justify-between gap-4">
+                <dt className="text-muted-foreground">Permanent cap</dt>
+                <dd className="tabular-nums">{campaign.steady_daily_enroll_cap}/day after ramp</dd>
+              </div>
+              <div className="flex justify-between gap-4">
+                <dt className="text-muted-foreground">Auto-enrollment</dt>
+                <dd>{campaign.auto_enroll_enabled ? 'Enabled' : 'Off'}</dd>
               </div>
               {(['A', 'B', 'C'] as const).map((tier) => (
                 <div key={tier} className="flex justify-between gap-4">

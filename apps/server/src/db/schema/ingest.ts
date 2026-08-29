@@ -11,7 +11,7 @@ import {
   text,
   timestamp,
 } from 'drizzle-orm/pg-core';
-import { campaigns, events, leads } from './core';
+import { campaigns, enrollments, events, leads } from './core';
 
 const tz = (name: string) => timestamp(name, { withTimezone: true, mode: 'date' });
 
@@ -51,6 +51,44 @@ export const importRows = pgTable(
     leadId: bigint('lead_id', { mode: 'number' }).references(() => leads.id),
   },
   (t) => [index('ir_import_flag').on(t.importId, t.flag)],
+);
+
+export const campaignLeadPool = pgTable(
+  'campaign_lead_pool',
+  {
+    id: bigint('id', { mode: 'number' }).generatedAlwaysAsIdentity().primaryKey(),
+    campaignId: bigint('campaign_id', { mode: 'number' })
+      .notNull()
+      .references(() => campaigns.id, { onDelete: 'cascade' }),
+    leadId: bigint('lead_id', { mode: 'number' })
+      .notNull()
+      .references(() => leads.id, { onDelete: 'cascade' }),
+    sourceImportId: bigint('source_import_id', { mode: 'number' }).references(() => imports.id, {
+      onDelete: 'set null',
+    }),
+    allocationOrder: bigint('allocation_order', { mode: 'number' }).notNull(),
+    status: text('status')
+      .$type<'available' | 'enrolled' | 'released'>()
+      .notNull()
+      .default('available'),
+    enrollmentId: bigint('enrollment_id', { mode: 'number' }).references(() => enrollments.id, {
+      onDelete: 'set null',
+    }),
+    lastEligibilityReason: text('last_eligibility_reason'),
+    lastCheckedAt: tz('last_checked_at'),
+    allocatedAt: tz('allocated_at').notNull().defaultNow(),
+    enrolledAt: tz('enrolled_at'),
+    releasedAt: tz('released_at'),
+  },
+  (t) => [
+    index('campaign_lead_pool_campaign_status_order').on(
+      t.campaignId,
+      t.status,
+      t.allocationOrder,
+      t.id,
+    ),
+    index('campaign_lead_pool_source_import').on(t.sourceImportId, t.campaignId),
+  ],
 );
 
 export const manualCampaignDrafts = pgTable(

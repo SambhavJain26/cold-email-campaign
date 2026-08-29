@@ -1,6 +1,6 @@
 import { and, asc, eq, inArray, sql } from 'drizzle-orm';
 import type { DbLike } from '../client';
-import { importRows, imports, type ImportCounts } from '../schema';
+import { campaignLeadPool, campaigns, importRows, imports, type ImportCounts } from '../schema';
 
 export type ImportRow = typeof imports.$inferSelect;
 export type ImportRowRow = typeof importRows.$inferSelect;
@@ -90,6 +90,46 @@ export async function listImports(
     .offset((page - 1) * perPage);
   const totals = await db.select({ n: sql<number>`count(*)::int` }).from(imports);
   return { items, total: totals[0]?.n ?? 0 };
+}
+
+export interface ImportPoolAllocationSummary {
+  campaignId: number;
+  campaignName: string;
+  total: number;
+  available: number;
+  enrolled: number;
+  released: number;
+}
+
+/** Auditable per-campaign allocation totals for an import-history page. */
+export async function poolAllocationsByImportIds(
+  db: DbLike,
+  importIds: readonly number[],
+): Promise<Map<number, ImportPoolAllocationSummary[]>> {
+  if (importIds.length === 0) return new Map();
+  const rows = await db
+    .select({
+      importId: campaignLeadPool.sourceImportId,
+      campaignId: campaignLeadPool.campaignId,
+      campaignName: campaigns.name,
+      total: sql<number>`count(*)::int`,
+      available: sql<number>`count(*) FILTER (WHERE ${campaignLeadPool.status} = 'available')::int`,
+      enrolled: sql<number>`count(*) FILTER (WHERE ${campaignLeadPool.status} = 'enrolled')::int`,
+      released: sql<number>`count(*) FILTER (WHERE ${campaignLeadPool.status} = 'released')::int`,
+    })
+    .from(campaignLeadPool)
+    .innerJoin(campaigns, eq(campaigns.id, campaignLeadPool.campaignId))
+    .where(inArray(campaignLeadPool.sourceImportId, [...importIds]))
+    .groupBy(campaignLeadPool.sourceImportId, campaignLeadPool.campaignId, campaigns.name)
+    .orderBy(campaignLeadPool.sourceImportId, campaignLeadPool.campaignId);
+  const result = new Map<number, ImportPoolAllocationSummary[]>();
+  for (const row of rows) {
+    if (row.importId === null) continue;
+    const summaries = result.get(row.importId) ?? [];
+    summaries.push(row);
+    result.set(row.importId, summaries);
+  }
+  return result;
 }
 
 export async function markCommitted(

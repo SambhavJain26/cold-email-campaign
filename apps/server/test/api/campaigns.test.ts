@@ -121,10 +121,14 @@ describe('B6.6 campaigns', () => {
       followups_due_today: 0,
       sent_so_far_today: 0,
       room_for_new: 60,
+      pending_openers_today: 0,
       ramp_cap_remaining: 5,
       ramp_day: 1,
       ramp_stage: { start_day: 1, end_day: 1, cap: 5 },
       enrolled_today: 0,
+      effective_daily_enroll_cap: 5,
+      campaign_cap_remaining: 5,
+      pool_available: null,
       suggested: 5,
     });
   });
@@ -164,7 +168,7 @@ describe('B6.6 campaigns', () => {
     expect(res.json().error.details.suggested).toBe(0);
   });
 
-  it('enroll {lead_ids}: per-reason skipped buckets; force bypasses capacity', async () => {
+  it('enroll {lead_ids}: per-reason skipped buckets without bypassing permanent caps', async () => {
     // suppress one candidate
     await h.pool.query(
       `UPDATE leads SET is_suppressed = true, suppression_reason = 'manual' WHERE email = 'lead12@pool.dev'`,
@@ -176,12 +180,28 @@ describe('B6.6 campaigns', () => {
       ids.rows.map((r: { id: number; email: string }) => [r.email, r.id]),
     );
     const wm = await eventWatermark(h.pool);
+    const explicitCampaign = (
+      await h.inject({
+        method: 'POST',
+        url: '/api/v1/campaigns',
+        payload: {
+          name: 'Explicit selection',
+          sequence_id: seqId,
+          acknowledge_tier_a_manual: true,
+        },
+      })
+    ).json();
+    await h.inject({
+      method: 'PATCH',
+      url: `/api/v1/campaigns/${explicitCampaign.id}`,
+      payload: { status: 'active' },
+    });
     const res = await h.inject({
       method: 'POST',
-      url: `/api/v1/campaigns/${campaignId}/enroll`,
+      url: `/api/v1/campaigns/${explicitCampaign.id}/enroll`,
       payload: {
         lead_ids: [
-          byEmail['lead1@pool.dev'], // already enrolled (tier A batch)
+          byEmail['lead1@pool.dev'], // active in another campaign
           byEmail['lead11@pool.dev'], // fine
           byEmail['lead12@pool.dev'], // suppressed
           999999, // not found
@@ -198,7 +218,7 @@ describe('B6.6 campaigns', () => {
       new Map([
         ['not_found', 1],
         ['suppressed', 1],
-        ['already_enrolled', 1],
+        ['active_enrollment_elsewhere', 1],
       ]),
     );
     await expectAppended(h.pool, wm, { enrolled: 1 });
@@ -316,25 +336,22 @@ describe('B6.6 campaigns', () => {
       UPDATE enrollments SET current_state = 'REPLIED', best_reply_sentiment = 'neutral'
       WHERE id IN (SELECT id FROM enrollments ORDER BY id OFFSET 1 LIMIT 1)`);
     await h.pool.query(`
-      UPDATE enrollments SET current_state = 'REPLIED', best_reply_sentiment = NULL
+      UPDATE enrollments SET current_state = 'REPLIED', best_reply_sentiment = 'negative'
       WHERE id IN (SELECT id FROM enrollments ORDER BY id OFFSET 2 LIMIT 1)`);
     await h.pool.query(`
-      UPDATE enrollments SET current_state = 'REPLIED', best_reply_sentiment = 'negative'
-      WHERE id IN (SELECT id FROM enrollments ORDER BY id OFFSET 3 LIMIT 1)`);
-    await h.pool.query(`
       UPDATE enrollments SET current_state = 'COMPLETED'
-      WHERE id IN (SELECT id FROM enrollments ORDER BY id OFFSET 4 LIMIT 2)`);
+      WHERE id IN (SELECT id FROM enrollments ORDER BY id OFFSET 3 LIMIT 2)`);
     const res = (
       await h.inject({ method: 'GET', url: `/api/v1/campaigns/${campaignId}/outcomes` })
     ).json();
     expect(res).toEqual({
       UNSUBSCRIBED: 0,
       BOUNCED: 0,
-      REPLIED: { positive: 1, neutral: 3 },
+      REPLIED: { positive: 1, neutral: 2 },
       COMPLETED: 2,
       ACTIVE: 0, // every enrollment was placed into a terminal state above
       NEW: 0,
-      total: 6,
+      total: 5,
     });
   });
 
