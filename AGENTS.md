@@ -36,10 +36,10 @@ commissioning** until the operator completes the handoffs below:
   is verified, and Spaceship was advanced to the pinned Stage 4 commit on 2026-08-25. No campaign
   activation, production enrollment, or send is authorized.
 - The operator-approved 2026-08-30 campaign-pool/auto-enrollment/permanent-cap implementation is
-  complete and verified locally on `b8.3-local-canary`: exact import allocation, durable pool
+  complete, verified, and deployed on Spaceship at `6ca1183`: exact import allocation, durable pool
   management, pool-only count enrollment, opt-in idempotent daily fair allocation, shared opener
-  reservations, and permanent post-ramp caps. It is **not deployed**. Do not deploy it without
-  separate approval, and do not treat auto-enrollment as authorization to activate/enroll/send.
+  reservations, and permanent post-ramp caps. Auto-enrollment remains disabled because production
+  has no campaigns or leads. Do not treat the deployment as authorization to activate/enroll/send.
 - The approved Spaceship deployment, subpath support, sender-domain unsubscribe routing, and
   per-mailbox Google Workspace OAuth implementation are complete on `b8.3-local-canary`. Do not
   extend production scope, change DNS/Caddy, or configure a real mailbox beyond the approved
@@ -99,7 +99,8 @@ commissioning** until the operator completes the handoffs below:
   API 130; GreenMail 29; golden exactly 47; mock E2E 60; real-backend E2E 1; migration 0018
   apply/down/apply; populated `checked 5 enrollments — 0 diff(s)`; self-check clean; and a validated
   custom-format dump/scratch restore/rebuild/zero-drift/self-check. Concurrent daily claims and a
-  timezone change that moves the local date backward are covered. This candidate is local only.
+  timezone change that moves the local date backward are covered. The verified candidate was
+  subsequently deployed to Spaceship under separate operator approval.
 
 ## Production deployments
 
@@ -112,7 +113,7 @@ temporary rollback/canary environment.
 - App: `/opt/email-campaign`; stack: `docker-compose.spaceship.yml` with `.env.prod`
 - Public UI: `https://sambhavpmtech.com/email-campaign/`
 - Internal gateway: `127.0.0.1:18080`; host Caddy is the only public 80/443 listener
-- Deployed branch/commit: `b8.3-local-canary` at `f58b977`
+- Deployed branch/commit: `b8.3-local-canary` at `6ca1183`
 
 The repository is private and the VPS currently has no GitHub deploy credential. Until a read-only
 deploy key is deliberately installed, transfer a reviewed `git bundle`, fetch the pinned branch
@@ -154,21 +155,22 @@ and password rotation.
 
 ## Live deployment state
 
-Spaceship production was deployed on 2026-08-22, advanced to the complete Stage 4 commit, and then
-to the verified pagination/settings UX hotfix `f58b977` on 2026-08-25. DNS and TLS are live for the
-two outreach domains and their unsubscribe subdomains. The route matrix is
+Spaceship production was deployed on 2026-08-22, advanced through Stage 4 and its UX hotfix, and
+then to the campaign-pool/auto-enrollment/permanent-cap release `6ca1183` on 2026-08-30. DNS and TLS
+are live for the two outreach domains and their unsubscribe subdomains. The route matrix is
 verified: `/email-campaign/` and direct SPA routes return 200; the bare app path canonicalizes;
 normal outreach-domain traffic redirects 308 to `https://sambhavbuilds.com/`; unsubscribe hosts
 serve only `/u/*` and return 404 elsewhere. The portfolio remains HTTP 200.
 
 - db/app/gateway/backup containers are healthy; only `127.0.0.1:18080` is published
-- production has one `google_oauth` mailbox in `ok` state, but zero campaigns, leads,
-  enrollments, active campaigns, or sendable enrollments, so no message can be scheduled
+- production has four `google_oauth` mailboxes in `ok` state, but zero campaigns, leads,
+  enrollments, available pooled leads, auto-enrollment-enabled campaigns, active campaigns, or
+  sendable enrollments, so no message can be scheduled
 - health and database checks pass; self-check is clean; projection dry-run is `0 diff(s)`
-- post-hotfix migrations through `0017` remain applied; dump
-  `coldemail-20260825-121851.dump` passed `pg_restore --list`; the earlier scratch restore and the
-  current local Stage 4 restore drill
-  passed; Spaceship AutoBackup is active on trial with a five-backup limit
+- migrations through `0018_campaign_pools_auto_enrollment` are applied; pre-deploy dump
+  `coldemail-20260829-212720.dump` (799,599 bytes) and post-deploy dump
+  `coldemail-20260829-213315.dump` (816,236 bytes) passed `pg_restore --list`; the local 0018
+  scratch restore drill passed; Spaceship AutoBackup remains configured with a five-backup limit
 - production Google OAuth credentials are configured on the VPS; never print or copy them
 - the business postal address and unsubscribe template are configured; the bounded owner-address
   send/reply/unsubscribe canary remains separately operator-gated

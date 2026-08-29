@@ -3,18 +3,12 @@
 Single always-on VPS (finalized decision). Docker Compose primary; systemd alternative. Implemented
 in B7 and cut over to Spaceship production on 2026-08-22.
 
-**Production status (2026-08-25):** the ten-workstream implementation through Stage 4 and the
-pagination/settings UX hotfix are deployed from `b8.3-local-canary` commit `f58b977`. The complete
-serial gate, proportional hotfix gate, pre-deploy backup, migrations,
-container health, public routes, self-check, zero-drift dry-run, dormant send state, and post-deploy
-backup all pass. Oracle remains paused and unchanged.
-
-**Local candidate (2026-08-30; not deployed):** migration `0018` and the campaign
-pool/auto-enrollment/permanent-cap implementation passed the complete local gate and scratch restore
-drill. Production remains at `f58b977` with migrations through `0017`. A future rollout requires
-fresh explicit deploy approval, a validated pre-deploy backup, pinned-commit transfer, migration
-verification through `0018`, and the normal post-deploy health/drift/self-check/backup checks. Do
-not infer campaign activation, enrollment, or send permission from deployment approval.
+**Production status (2026-08-30):** the ten-workstream implementation, pagination/settings UX
+hotfix, and campaign-pool/auto-enrollment/permanent-cap release are deployed from
+`b8.3-local-canary` commit `6ca1183`. The complete local gate, scratch restore, pre-deploy backup,
+migration 0018, container health, public routes, served feature markers, self-check, zero-drift
+dry-run, dormant send state, and post-deploy backup all pass. Oracle remains paused and unchanged.
+Deployment did not authorize campaign activation, enrollment, or sending.
 
 ---
 
@@ -158,10 +152,10 @@ Full stack built and brought up from a clean state (`docker compose -f docker-co
 
 Remaining for a full **M3** close: the real-backend walkthrough replay (§5, `e2e/walkthrough.spec.ts` — Playwright web ⇄ real server + MockTransport + `advance-clock`), which the frontend track deferred here from F8.
 
-## 8. Spaceship shared-VPS production — deployed 2026-08-22, Stage 4 rollout 2026-08-25
+## 8. Spaceship shared-VPS production — deployed 2026-08-22, latest rollout 2026-08-30
 
 Production is live at `https://sambhavpmtech.com/email-campaign/` on the existing Spaceship VM.
-The portfolio at `sambhavbuilds.com` remained online throughout. Code is pinned to `f58b977` on
+The portfolio at `sambhavbuilds.com` remained online throughout. Code is pinned to `6ca1183` on
 `b8.3-local-canary`; `main` was not merged. Oracle remains paused and unchanged as the temporary
 rollback environment.
 
@@ -196,6 +190,18 @@ real-backend E2E 1, and the production Vite build passed. Post-deploy containers
 routing, migrations through `0017`, self-check, dormant send state, and zero projection drift all
 passed. Dump `coldemail-20260825-121851.dump` is 294,643 bytes and passed `pg_restore --list`.
 Oracle, `main`, DNS, Caddy, campaign state, and mailbox configuration were unchanged.
+
+The 2026-08-30 operator-approved rollout fast-forwarded the same clean branch by reviewed Git
+bundle to `6ca1183`, rebuilt the app/gateway/backup images, and applied
+`0018_campaign_pools_auto_enrollment`. All containers and internal/public health are green. The
+SPA, direct routes, canonical redirect, outreach redirects, unsubscribe-host isolation, portfolio,
+and served feature markers pass. Self-check is clean and the live projection dry-run reports
+`checked 0 enrollments — 0 diff(s)`. Production has four healthy `google_oauth` mailboxes but zero
+campaigns, leads, enrollments, active campaigns, available pooled leads, or
+auto-enrollment-enabled campaigns. Pre-deploy dump `coldemail-20260829-212720.dump` (799,599 bytes)
+and post-deploy dump `coldemail-20260829-213315.dump` (816,236 bytes) passed `pg_restore --list`.
+No campaign was activated, no lead was enrolled, and no mail was sent; Oracle, `main`, DNS, Caddy,
+and mailbox configuration were unchanged.
 
 ### Unsubscribe URL and Gmail one-click — deployed, commissioning pending
 

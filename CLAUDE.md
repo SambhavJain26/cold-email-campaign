@@ -19,10 +19,11 @@ commissioning**:
   atomic multi-source cold-storage recycling with durable provenance; and the responsive/mobile
   redesign. The complete serial gate and restore drill pass, and Spaceship is pinned to the Stage 4
   commit. This does not authorize activation, production enrollment, or any send.
-- **2026-08-30 local candidate:** exact import-to-campaign pools, durable pool management,
+- **2026-08-30 production release:** exact import-to-campaign pools, durable pool management,
   opt-in idempotent/fair daily enrollment, strengthened shared opener reservation, and permanent
-  post-ramp campaign caps are implemented and fully verified locally. They are not deployed;
-  production remains pinned to `f58b977` until separate deploy approval.
+  post-ramp campaign caps are implemented, fully verified, and deployed on Spaceship at `6ca1183`.
+  Production still has no campaigns or leads; deployment does not authorize activation,
+  enrollment, or sending.
 - The operator-approved Spaceship deployment, subpath support, sender-domain unsubscribe routing,
   and individual Google Workspace OAuth implementation are complete. Do not extend production
   scope or change DNS/Caddy/mailboxes outside the approved commissioning steps without fresh
@@ -84,7 +85,7 @@ rollback/canary environment.
 - Stack: `docker-compose.spaceship.yml` with `.env.prod`
 - UI: `https://sambhavpmtech.com/email-campaign/`
 - Internal gateway: `127.0.0.1:18080`; host Caddy alone owns public 80/443
-- Deployed branch/commit: `b8.3-local-canary` at `f58b977`
+- Deployed branch/commit: `b8.3-local-canary` at `6ca1183`
 
 The private repository currently has no GitHub deploy credential on the VPS. Until a read-only
 deploy key is deliberately installed, transfer a reviewed `git bundle`, fetch the pinned branch
@@ -138,16 +139,18 @@ After an authorized deploy, verify container health, `https://localhost/health`,
 - **Final canary wrap completed 2026-08-21:** the bounded owner-address catch-up scenario accepted four sends in two paced waves (two per mailbox, 925-second same-mailbox gap) after 10,833 seconds of app downtime and emitted `catchup_backlog`. The campaign was paused at the bound. Accelerated settings were restored, both mailboxes are healthy at cap 5 with no resume cap, and both Gmail test campaigns are paused.
 - **Oracle rollback canary:** `4e9e125` plus its documentation-only wrap; both campaigns remain
   paused. Health, self-check, backup, and `checked 24 enrollments — 0 diff(s)` are clean.
-- **Spaceship production:** deployed 2026-08-22 and advanced to the verified pagination/settings
-  UX hotfix `f58b977` on 2026-08-25. It has one
-  `google_oauth` mailbox in `ok` state and zero campaigns/leads/enrollments, active campaigns, or
-  sendable enrollments. DNS, TLS, the `/email-campaign/` SPA/API subpath, outreach
+- **Spaceship production:** deployed 2026-08-22 and advanced through the verified
+  campaign-pool/auto-enrollment/permanent-cap release `6ca1183` on 2026-08-30. It has four
+  `google_oauth` mailboxes in `ok` state and zero campaigns/leads/enrollments, available pooled
+  leads, auto-enrollment-enabled campaigns, active campaigns, or sendable enrollments. DNS, TLS,
+  the `/email-campaign/` SPA/API subpath, outreach
   redirects, and the two isolated unsubscribe hosts are live. Containers and health are green;
-  self-check and zero-drift pass; a custom-format dump passed listing and the scratch restore drill;
-  Spaceship AutoBackup is active on trial with a five-backup limit. The portfolio remained online.
+  migration 0018, self-check, and zero drift pass; both deployment dumps passed catalog validation
+  and the local scratch restore drill passed; Spaceship AutoBackup has a five-backup limit. The
+  portfolio remained online.
 - **Still open, deliberately:** obtain separate authorization for the one-message owner-address
   send/reply/unsubscribe canary. The business address, sender-domain unsubscribe template,
-  production Internal Google OAuth credentials, and one account-matched OAuth mailbox are
+  production Internal Google OAuth credentials, and four account-matched OAuth mailboxes are
   configured.
   Finding #12 still needs warmed-domain evidence; provider DSN/OOO fixture capture remains deferred.
 

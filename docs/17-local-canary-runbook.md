@@ -1,10 +1,11 @@
 # Local canary runbook (B8.3-local) — two-week validation on throwaway Gmail
 
-## 2026-08-30 campaign pools, auto-enrollment, and permanent caps — verified locally
+## 2026-08-30 campaign pools, auto-enrollment, and permanent caps — verified and deployed
 
-The operator-approved campaign-selection improvement is complete on `b8.3-local-canary` and is not
-deployed. CSV imports can preview and atomically reserve exact lead counts into multiple campaign
-pools while leaving the remainder global. Existing safe leads retain their stored profile data;
+The operator-approved campaign-selection improvement is complete on `b8.3-local-canary` and is
+deployed on Spaceship at `6ca1183`. CSV imports can preview and atomically reserve exact lead counts
+into multiple campaign pools while leaving the remainder global. Existing safe leads retain their
+stored profile data;
 manual-draft leads reserve first inside the requested total; every exclusion is rechecked at
 commit. Once a campaign is pool-backed, manual or automatic count enrollment draws only from its
 available pool. Draft/paused campaigns can add, release, or reassign available reservations while
@@ -38,9 +39,16 @@ Verified evidence:
 - user-manual screenshots **24–26** document the desktop pool, phone pool cards, and exact import
   allocation preview.
 
-No production/Oracle/DNS/Caddy/mailbox state changed. No production campaign was activated, no
-production lead was enrolled, and no email was sent. Spaceship remains pinned to `f58b977`; rollout
-requires separate explicit deployment approval.
+After separate operator approval, the clean production checkout fast-forwarded by reviewed bundle
+from `f58b977` to `6ca1183`; `0018_campaign_pools_auto_enrollment` is applied. All four containers,
+internal/public health, the SPA/direct-route/redirect/unsubscribe/portfolio matrix, and the served
+feature markers pass. Production reports `checked 0 enrollments — 0 diff(s)` and a clean self-check.
+It has four healthy Google OAuth mailboxes but zero campaigns, leads, enrollments, active campaigns,
+available pooled leads, or auto-enrollment-enabled campaigns. Pre-deploy dump
+`coldemail-20260829-212720.dump` (799,599 bytes) and post-deploy dump
+`coldemail-20260829-213315.dump` (816,236 bytes) passed `pg_restore --list`. No campaign was
+activated, no lead was enrolled, and no email was sent. Oracle, `main`, DNS, Caddy, and mailbox
+configuration were unchanged.
 
 ## 2026-08-25 pagination/settings UX hotfix — verified and deployed
 
@@ -407,8 +415,9 @@ prospect send, the operator has approved this implementation sequence:
 
 All five items are implemented and locally verified. The Spaceship deployment, DNS, routing, and
 public unsubscribe hosts are live as recorded above. Production OAuth client configuration,
-business postal address/template, one OAuth mailbox Test Connection, and the bounded owner-address
-canary remain operator handoffs. No prospect sending is authorized by this record alone.
+business postal address/template, and four healthy OAuth mailboxes are configured. The bounded
+owner-address canary remains a separately approved operator handoff. No prospect sending is
+authorized by this record alone.
 
 ## Pre-cohort readiness update (2026-08-09)
 

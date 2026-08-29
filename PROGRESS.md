@@ -4,11 +4,11 @@
 
 **Legend:** `[ ]` not started · `[~]` in progress · `[x]` done · `[!]` blocked (note why in the log)
 
-**Current focus:** → **Campaign pools/auto-enrollment/permanent caps are locally verified and await
-separate deployment approval.** Production remains pinned to the verified UX hotfix `f58b977`.
-No production campaign activation, enrollment, outbound send, Spaceship change, or Oracle change
-was performed. Every future deploy, activation, enrollment, or owner/prospect send remains
-separately approval-gated.
+**Current focus:** → **Campaign pools/auto-enrollment/permanent caps are verified and deployed on
+Spaceship at `6ca1183`.** Production has no campaigns, leads, enrollments, available pooled leads,
+or auto-enrollment-enabled campaigns, so it remains dormant. No campaign activation, enrollment,
+outbound send, Oracle change, DNS change, or `main` merge was performed. Every future deploy,
+activation, enrollment, or owner/prospect send remains separately approval-gated.
 
 > **⚠️ Superseded framing (corrected 2026-08-09).** This line previously read "No code work is outstanding" and "everything left in B8 … is *operations*, not code." **That was wrong.** Operating the canary against a real provider exposed genuine **code** defects — the reply/send race (finding 15), whole-mailbox history ingestion (16), plain-text-only mail (19), and a class of backend-implemented/UI-invisible gaps (3–9). All were fixed on `b8.3-local-canary`. Treat [docs/17](docs/17-local-canary-runbook.md) as the authoritative status record, not this header.
 
@@ -106,7 +106,14 @@ fairly rotate across campaigns. Final local gate: type/lint/format; unit 342; we
 167; API 130; GreenMail 29; golden exactly 47; mock E2E 60; real-backend E2E 1; migration
 apply/down/apply; populated `checked 5 enrollments — 0 diff(s)`; clean self-check; validated
 custom-format dump and scratch restore/rebuild/zero-drift/self-check. Manual screenshots 24–26
-added. Not deployed; production/Oracle/mail state untouched.
+added. After separate deployment approval, Spaceship fast-forwarded by reviewed bundle to
+`6ca1183`; migration 0018, all containers, health, route matrix, served feature markers, self-check,
+and `checked 0 enrollments — 0 diff(s)` pass. Production has four healthy Google OAuth mailboxes
+but zero campaigns/leads/enrollments/pool reservations/auto-enrollment-enabled campaigns. Dumps
+`coldemail-20260829-212720.dump` (799,599 bytes, pre-deploy) and
+`coldemail-20260829-213315.dump` (816,236 bytes, post-deploy) passed `pg_restore --list`. No
+campaign was activated, no lead was enrolled, no email was sent, and Oracle/`main`/DNS/Caddy were
+unchanged.
 
 ---
 
