@@ -20,13 +20,13 @@ page-level horizontal scrolling.
 ## 2. 📥 Leads `/leads`, detail `/leads/:id` (§Stage 2)
 
 **Data:** `GET /leads` (filters in URL params), `GET /leads/:id`.
-**Regions:** tier-distribution header (counts per tier from meta — the Stage-2 panel), **untiered banner** ("N leads need tiering → Bulk tag", decision R); filter row (tier, state, campaign, search, suppressed toggle); DataTable: email, name, company, location, TierBadge, StateBadge (latest enrollment), suppressed 🚫.
+**Regions:** tier-distribution header (counts per tier from meta — the Stage-2 panel), **untiered banner** ("N leads need tiering → Bulk tag", decision R); filter row (tier, state, campaign, pool campaign, search, suppressed toggle); DataTable/card: email, name, company, location, TierBadge, StateBadge (latest enrollment), pool assignment, suppressed 🚫.
 **Interactions:** row click → detail; checkbox select + select-all-matching-filter → BulkTierBar (choose tier → `POST bulk-tier` with ids or filter); detail page: editable tier/notes/`custom_observation` (+ other custom fields), **event timeline** (rendered from `timeline`, newest first, event-type icons), Manual Compose button (§12-14).
 **Edge:** suppressed lead detail shows red banner (reason + date) and a "Remove suppression" link → `ConfirmTypedDialog` (must type the email) → `DELETE /suppressions/:email` (decision U).
 
 ## 3. Import wizard `/leads` → dialog (§Stage 1)
 
-Three steps in a dialog: **Upload** (drag/drop CSV, client-side 10 MB check) → `POST /imports` → **Preview** — the walkthrough panel verbatim: counts per flag with expandable 20-row samples, explainer copy ("Role-based + invalid bounce more…"), two buttons labeled with exact counts (`Drop flagged & import 885` / `Import all incl. role-based`; invalid+suppressed never importable — shown struck-through) → `POST commit` → **Result** (imported count, link to untiered filter).
+Three steps in a dialog: **Upload** (drag/drop CSV, client-side 10 MB check) → `POST /imports` → **Preview** — hygiene counts with expandable samples, import-mode controls, imported-draft target when present, and optional repeatable **Campaign allocation** rows with campaign plus exact count. Allocation preview shows requested/available/excluded and remaining-global totals before commit. `POST commit` is all-or-nothing when exact allocations drift. **Result** separately reports leads, drafts, allocations, and the global remainder. Import History shows the durable campaign-pool breakdown.
 **Edge:** `import_too_large` 413 → inline error; suppressed>0 → amber compliance note "these opted out previously — always excluded".
 
 ## 4. 📧 Mailboxes `/mailboxes` (§Stage 0, §Stage 7 failures, §11 volume)
@@ -49,12 +49,12 @@ Three steps in a dialog: **Upload** (drag/drop CSV, client-side 10 MB check) →
 
 ## 6. 🚀 Campaigns `/campaigns`, detail `/campaigns/:id` (§Stage 5, §Stage 9)
 
-**Data:** campaigns CRUD, capacity, outcomes, cold-storage, recycle.
+**Data:** campaigns CRUD, capacity, lead pool, auto-enrollment history, outcomes, cold-storage, recycle.
 **List:** name, status, sequence, enrolled/contacted, progress bar, and a recycled-source badge when
 campaign provenance exists. Detail shows every source name with its distinct contributed-lead
 count; the deprecated single-source field is not the display source of truth.
-**Detail regions:** (a) capacity meter with activation-day/current-stage details + **[Enroll next N]**; (b) enrollment breakdown; (c) completion panel; (d) draft-only editor for tier effort, staged ramp, Auto Observation field/rules, and sequence-variable overrides. First activation freezes configuration and records the permanent ramp start; pause/resume does not unlock or restart it.
-**Edge:** enroll into `draft` campaign → blocked with "Activate first"; sequence missing → blocked.
+**Detail regions:** (a) capacity meter with activation day, ramp/permanent cap, pending opener reservations, shared room, pool availability, and **[Enroll next N]**; (b) lead-pool panel with summary, paginated table/cards, add-next-N, release/reassign, permanent cap, auto-enrollment switch and run history; (c) enrollment breakdown; (d) completion panel; (e) draft-only editor for tier effort, staged ramp, Auto Observation field/rules, and sequence-variable overrides. First activation freezes personalization/ramp configuration and prevents later permanent-cap increases; pause/resume does not restart the calendar.
+**Edge:** enroll into `draft` campaign → blocked with "Activate first"; sequence missing → blocked. A pool-backed campaign with no eligible pool entries explains that it will not draw unrelated global leads. Enabling auto-enrollment on an active campaign requires a visible acknowledgement.
 
 ## 7. 💬 Unibox `/unibox` (§Stage 6)
 

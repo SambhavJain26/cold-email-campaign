@@ -123,6 +123,9 @@ CREATE TABLE campaigns (
   auto_observation_rules jsonb NOT NULL DEFAULT '{}',
   first_activated_at timestamptz,
   ramp_stages        jsonb NOT NULL,
+  lead_selection_mode text NOT NULL DEFAULT 'global', -- global | pool; pool cannot revert
+  auto_enroll_enabled boolean NOT NULL DEFAULT false,
+  steady_daily_enroll_cap int NOT NULL DEFAULT 15,
   recycled_from_campaign_id bigint REFERENCES campaigns(id),   -- deprecated single-source compatibility
   created_at         timestamptz NOT NULL DEFAULT now()
 );
@@ -151,6 +154,40 @@ CREATE TABLE recycle_enrollment_sources (
   PRIMARY KEY (target_enrollment_id, source_enrollment_id)
 );
 ```
+
+Migration `0018` adds campaign-scoped lead pools, opt-in automatic enrollment, and the permanent
+post-ramp daily cap. Existing campaigns remain in `global` selection mode with auto-enrollment off.
+Their permanent cap is copied from their final ramp stage (15 only as a malformed-data fallback).
+A trigger prevents a pool-backed campaign returning to the global selector and prevents increasing
+the permanent cap after first activation.
+
+```sql
+CREATE TABLE campaign_lead_pool (
+  id bigint GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+  campaign_id bigint NOT NULL REFERENCES campaigns(id) ON DELETE CASCADE,
+  lead_id bigint NOT NULL REFERENCES leads(id) ON DELETE CASCADE,
+  source_import_id bigint REFERENCES imports(id) ON DELETE SET NULL,
+  allocation_order bigint NOT NULL,
+  status text NOT NULL CHECK (status IN ('available','enrolled','released')),
+  enrollment_id bigint REFERENCES enrollments(id) ON DELETE SET NULL,
+  last_eligibility_reason text,
+  last_checked_at timestamptz,
+  allocated_at timestamptz NOT NULL DEFAULT now(),
+  enrolled_at timestamptz,
+  released_at timestamptz,
+  UNIQUE (campaign_id, lead_id)
+);
+
+CREATE UNIQUE INDEX campaign_lead_pool_one_available_campaign
+  ON campaign_lead_pool (lead_id) WHERE status = 'available';
+```
+
+`auto_enrollment_days` is the one-claim-per-application-local-date idempotency ledger.
+`auto_enrollment_runs` records trigger, date, capacity snapshot, cursor, status, and failure;
+`auto_enrollment_run_campaigns` records per-campaign eligible/cap/enrolled/skipped results.
+`auto_enrollment_state` stores the last-served campaign for fair round-robin continuation. Pool
+consumption, enrollment insertion, projections, and the append-only `enrolled` event share one
+transaction.
 
 ### `enrollments` — the state machine lives here (spec Part 3)
 
@@ -426,5 +463,9 @@ GRANT  INSERT, SELECT ON events TO app_rw;
 ## 6. Migration policy
 
 - Migrations are **hand-authored paired SQL files** (`NNNN_name.up.sql` / `NNNN_name.down.sql`) in `apps/server/src/db/migrations/`, executed by the in-repo runner (`src/db/migrate.ts`, tracked in `schema_migrations`), committed to git, applied on boot (prod) and by `npm run db:migrate` / `db:rollback` / `db:status`. drizzle-kit is generation-assist only (diff SQL from schema defs into gitignored `drizzle-kit-out/`, hand-copied in) — it cannot execute or roll back migrations. *(Changed at B0.4: drizzle-kit has no down-migration support, and this doc requires tested downs; hand-written DDL also fits the trigger/grant-heavy schema.)*
-- Numbered plan continues through `0010_unsubscribe`, `0011_guardrails`, `0012_poll_folders`, `0013_reply_safety`, `0014_google_oauth`, and `0015_operational_workflows`. Later stages add columns only via new migrations — never edit an applied migration.
+- Numbered migrations continue through `0010_unsubscribe`, `0011_guardrails`,
+  `0012_poll_folders`, `0013_reply_safety`, `0014_google_oauth`, `0015_operational_workflows`,
+  `0016_personalization_ramp`, `0017_multi_source_recycling`, and
+  `0018_campaign_pools_auto_enrollment`. Later stages add columns only via new migrations — never
+  edit an applied migration.
 - Rollback: every migration ships a `down`; tested in CI (apply → down → apply).

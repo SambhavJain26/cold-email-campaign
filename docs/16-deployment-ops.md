@@ -9,6 +9,13 @@ serial gate, proportional hotfix gate, pre-deploy backup, migrations,
 container health, public routes, self-check, zero-drift dry-run, dormant send state, and post-deploy
 backup all pass. Oracle remains paused and unchanged.
 
+**Local candidate (2026-08-30; not deployed):** migration `0018` and the campaign
+pool/auto-enrollment/permanent-cap implementation passed the complete local gate and scratch restore
+drill. Production remains at `f58b977` with migrations through `0017`. A future rollout requires
+fresh explicit deploy approval, a validated pre-deploy backup, pinned-commit transfer, migration
+verification through `0018`, and the normal post-deploy health/drift/self-check/backup checks. Do
+not infer campaign activation, enrollment, or send permission from deployment approval.
+
 ---
 
 ## 1. Environment variables (complete list — zod-validated at boot, 02 §5)

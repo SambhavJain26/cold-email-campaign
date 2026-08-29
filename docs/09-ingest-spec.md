@@ -38,7 +38,7 @@ Preview response = counts per flag + 20 sample rows per flag (walkthrough Stage 
 
 ## 3. Commit
 
-`POST /imports/:id/commit { mode, draft_campaign_id?, replace_existing_drafts? }`
+`POST /imports/:id/commit { mode, draft_campaign_id?, replace_existing_drafts?, allocations? }`
 
 - `drop_flagged`: insert rows flagged `ok` + `missing_first_name`.
 - `import_all`: additionally insert `role_based` + `invalid`-lite… **No.** `invalid` and `suppressed` are *never* imported under either mode (undeliverable / illegal); `import_all` only additionally admits `role_based`. The preview labels the buttons accordingly ("Import 885" vs "Import 945 incl. role-based").
@@ -48,6 +48,28 @@ Preview response = counts per flag + 20 sample rows per flag (walkthrough Stage 
   receive a draft without overwriting profile data; suppressed/erased leads do not. Existing
   unsent-draft conflicts skip unless replacement is explicitly selected. Results report lead and
   draft counts separately.
+- The optional `allocations` list reserves exact counts into distinct draft/paused campaign pools.
+  `POST /imports/:id/allocation-preview` reports requested/allocatable counts, exclusions, safely
+  linked existing leads, and the global remainder before commit. Candidates follow accepted CSV
+  row order. A safely allocatable existing duplicate may be reserved without overwriting its lead
+  profile. Suppressed, erased, nurture, actively enrolled, already reserved, recontact-blocked,
+  and target-content-conflicting leads are excluded.
+- Manual-draft leads are reserved to their chosen draft campaign first and count inside that
+  campaign's requested total. A request below the safe draft minimum is refused. Commit rechecks
+  everything under a serializable transaction: if every exact requested count can no longer be
+  met, neither leads, drafts, nor allocations commit. Unallocated accepted leads remain global.
+
+### 3.1 Campaign lead pools
+
+A pool reserves candidates; it does not enroll, activate, or send. Pool history is durable with
+`available`, `enrolled`, and `released` states, source import, allocation order, and resulting
+enrollment. One lead can be available in only one campaign pool at a time. The campaign becomes
+permanently pool-backed after its first allocation.
+
+Draft/paused campaigns may add the next N safe global leads in Tier A → B → C →
+untiered, oldest-first order, or release/reassign selected available entries. Enrolled entries
+cannot be moved. At enrollment time all compliance, recontact, active-enrollment, and
+duplicate-content checks run again; temporary ineligibility is reported rather than bypassed.
 
 ## 4. Tiering (walkthrough Stage 2)
 
@@ -80,4 +102,8 @@ Removal (false positives only): decision U — typed-confirmation, audit alert.
 
 ## 7. Tests (B5)
 
-Fixture `real_estate_leads.csv` (1,000 rows) reproducing the exact walkthrough split; alias-header and BOM/semicolon parse cases; suppressed-address re-import dropped under both modes; dup-within-file keeps first; bulk-tier by filter; nurture excluded from auto-enroll; recycle: rest-day gate, hash-conflict block, changed-sequence pass; `import_all` never admits invalid/suppressed.
+Fixture `real_estate_leads.csv` (1,000 rows) reproducing the exact walkthrough split; alias-header
+and BOM/semicolon parse cases; suppressed-address re-import dropped under both modes;
+dup-within-file keeps first; exact multi-campaign pool allocation and atomic preview/commit drift;
+bulk-tier by filter; nurture excluded from auto-enroll; recycle: rest-day gate, hash-conflict block,
+changed-sequence pass; `import_all` never admits invalid/suppressed.

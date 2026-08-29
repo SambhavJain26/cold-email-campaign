@@ -45,7 +45,7 @@ Shapes below in TS notation. `Metric = { numerator: number, denominator: number 
 ## Leads & imports
 | | |
 |---|---|
-| GET `/leads?tier=A\|B\|C\|nurture\|untiered&state=NEW\|ACTIVE\|REPLIED\|BOUNCED\|UNSUBSCRIBED\|COMPLETED&campaign_id=&q=&suppressed=&page=` | → list of `Lead = {id, email, first_name, last_name, company, city, state, tier, is_suppressed, custom_fields, latest_enrollment?: {campaign_id, current_state, current_step_no}}` + `{untiered_count}` in meta |
+| GET `/leads?tier=A\|B\|C\|nurture\|untiered&state=NEW\|ACTIVE\|REPLIED\|BOUNCED\|UNSUBSCRIBED\|COMPLETED&campaign_id=&pool_campaign_id=&q=&suppressed=&page=` | → list of `Lead = {id, email, first_name, last_name, company, city, state, tier, is_suppressed, custom_fields, pool_assignment?, latest_enrollment?}` + `{untiered_count}` in meta. `pool_campaign_id` filters durable pool membership. |
 
 > **`state` is the ENROLLMENT state machine, not `leads.state`** (the postal column, which is returned in the DTO but is not filterable). The parameter was originally written as a bare `state=`; the frontend read it as the enrollment state and the backend implemented it against `leads.state`, so every state filter in the UI silently returned zero rows while the api suite — which asserted `state=TX` — stayed green. Disambiguated 2026-08-07 (docs/17 §0 finding 17). When `campaign_id` is also supplied, both must match the **same** enrollment.
 
@@ -55,8 +55,9 @@ Shapes below in TS notation. `Metric = { numerator: number, denominator: number 
 | POST `/leads/bulk-tier` | `{lead_ids?: number[], filter?: LeadFilter, tier}` → `{updated: number}` |
 | POST `/imports` | multipart CSV → `{import_id, counts, samples, draft_counts}` (preview; nothing committed) |
 | GET `/imports/:id/draft-preview?campaign_id=` | → new/existing lead counts, valid/invalid draft counts, and existing-draft conflicts |
-| POST `/imports/:id/commit` | `{mode, draft_campaign_id?, replace_existing_drafts?}` → separate lead/draft created/replaced/skipped/invalid counts |
-| GET `/imports` | → import history rows |
+| POST `/imports/:id/allocation-preview` | `{mode, draft_campaign_id?, allocations:[{campaign_id,count}]}` → requested/allocatable campaign totals, exclusions, safe existing leads, and global remainder. Read-only. |
+| POST `/imports/:id/commit` | `{mode, draft_campaign_id?, replace_existing_drafts?, allocations?}` → separate lead/draft/allocation counts and global remainder. Exact allocations are rechecked and committed atomically; drift aborts the whole commit. |
+| GET `/imports` | → import history rows including durable per-campaign pool allocation summaries |
 | DELETE `/suppressions/:email` | `{confirm: string}` (must equal the email) → `{ok}` — decision U; audit alert emitted |
 
 ## Sequences
@@ -71,9 +72,15 @@ Shapes below in TS notation. `Metric = { numerator: number, denominator: number 
 ## Campaigns
 | | |
 |---|---|
-| GET `/campaigns` · POST `/campaigns` · PATCH `/campaigns/:id` | Campaign includes effort, staged ramp, first activation, Auto Observation, variable overrides/frozen snapshot, provenance, and counts. Personalization/ramp patches are draft-only. |
-| GET `/campaigns/:id/capacity` | → capacity plus `ramp_day`, current `ramp_stage`, `enrolled_today`, and remaining stage allowance |
-| POST `/campaigns/:id/enroll` | `{count} \| {lead_ids, force?, allow_recontact?}` → `{enrolled, skipped: {reason, count}[]}`. Count enrollment excludes prior human repliers. Explicit recontact requires `allow_recontact:true`, completed reply disposition, and an elapsed `not_now` date; suppression is never overrideable. |
+| GET `/campaigns` · POST `/campaigns` · PATCH `/campaigns/:id` | Campaign includes effort, staged ramp, permanent daily cap, first activation, Auto Observation, variable overrides/frozen snapshot, lead-selection mode, pool summary, auto-enrollment status/last run, provenance, and counts. Personalization/ramp patches are draft-only; an activated permanent cap can decrease but not increase. |
+| GET `/campaigns/:id/capacity` | → capacity plus `ramp_day`, current `ramp_stage`, `effective_daily_enroll_cap`, `campaign_cap_remaining`, `pending_openers_today`, shared `room_for_new`, `pool_available`, and `enrolled_today` |
+| POST `/campaigns/:id/enroll` | `{count} \| {lead_ids, force?, allow_recontact?}` → `{enrolled, skipped: {reason, count}[]}`. Pool-backed count enrollment draws only from its available pool; legacy global campaigns retain the global selector. Manual and automatic enrollment share the effective daily cap. Explicit recontact requires `allow_recontact:true`, completed reply disposition, and an elapsed `not_now` date; suppression is never overrideable. |
+| GET `/campaigns/:id/pool?status=&page=&per_page=` | → paginated pool entries plus total/available/enrolled/released/temporarily-ineligible/source-import summary |
+| POST `/campaigns/:id/pool/add` | `{count, source_import_id?}` → `{changed, skipped}`; reserves the next safe global leads by tier then age |
+| POST `/campaigns/:id/pool/release` | `{lead_ids}` → `{changed, skipped}`; available entries only |
+| POST `/campaigns/:id/pool/reassign` | `{lead_ids, target_campaign_id}` → `{changed, skipped}`; atomically moves eligible available entries between draft/paused campaigns |
+| PATCH `/campaigns/:id/auto-enrollment` | `{enabled, acknowledge_auto_enrollment?}` → `{campaign, run}`. Enabling an active campaign requires acknowledgement and performs one bounded immediate run. |
+| GET `/campaigns/:id/auto-enrollment/runs?page=&per_page=` | → paginated run audit history |
 | GET `/campaigns/:id/outcomes` | → `{UNSUBSCRIBED, BOUNCED, REPLIED: {positive, neutral}, COMPLETED, ACTIVE, NEW, total}` (Stage-9 completion panel) |
 | POST `/campaigns/:id/recycle/preview` | `{source_campaign_ids:[at least two unique ids]}` → read-only `{breakdown, sources}` with unique leads, duplicates, every exclusion category, eligible count, and per-source candidate/eligible counts |
 | POST `/campaigns/:id/recycle` | `{source_campaign_ids:[at least two unique ids]}` → recomputed atomic `{enrolled, skipped, breakdown, sources}`. Legacy `{source_campaign_id}` remains accepted. Conflicting content is skipped and reported; source enrollments/history stay untouched. |

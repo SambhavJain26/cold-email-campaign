@@ -35,6 +35,11 @@ commissioning** until the operator completes the handoffs below:
   recycling with durable provenance; and the responsive/mobile redesign. The complete local gate
   is verified, and Spaceship was advanced to the pinned Stage 4 commit on 2026-08-25. No campaign
   activation, production enrollment, or send is authorized.
+- The operator-approved 2026-08-30 campaign-pool/auto-enrollment/permanent-cap implementation is
+  complete and verified locally on `b8.3-local-canary`: exact import allocation, durable pool
+  management, pool-only count enrollment, opt-in idempotent daily fair allocation, shared opener
+  reservations, and permanent post-ramp caps. It is **not deployed**. Do not deploy it without
+  separate approval, and do not treat auto-enrollment as authorization to activate/enroll/send.
 - The approved Spaceship deployment, subpath support, sender-domain unsubscribe routing, and
   per-mailbox Google Workspace OAuth implementation are complete on `b8.3-local-canary`. Do not
   extend production scope, change DNS/Caddy, or configure a real mailbox beyond the approved
@@ -90,6 +95,11 @@ commissioning** until the operator completes the handoffs below:
 - The 2026-08-25 pagination/settings UX hotfix passed type/lint/format, web 57, mock E2E 60,
   real-backend E2E 1, and a production Vite build. This frontend-only change did not alter events,
   projections, migrations, scheduler behavior, or mail transport.
+- The 2026-08-30 campaign-pool gate passed type/lint/format; unit 342; web 58; integration 167;
+  API 130; GreenMail 29; golden exactly 47; mock E2E 60; real-backend E2E 1; migration 0018
+  apply/down/apply; populated `checked 5 enrollments — 0 diff(s)`; self-check clean; and a validated
+  custom-format dump/scratch restore/rebuild/zero-drift/self-check. Concurrent daily claims and a
+  timezone change that moves the local date backward are covered. This candidate is local only.
 
 ## Production deployments
 
@@ -188,7 +198,14 @@ finding 11 is closed as unanswerable with this rig and must not be re-litigated.
   same transaction or the next poll ingests that folder's entire history. Provider folder names
   differ (`[Gmail]/Spam` vs `Junk`).
 - `enroll(campaign, count)` chooses tier A→B→C→untiered, oldest first; it does not preserve an
-  intended set. Use `enrollByIds` when identities matter.
+  intended set for legacy global campaigns. Pool-backed campaigns instead choose only their
+  available pool by tier then allocation order and never fall back to global. Use `enrollByIds`
+  when identities matter.
+- Manual and automatic enrollment share the campaign's effective daily cap. Ramp stages transition
+  to `steady_daily_enroll_cap`; after first activation that cap may be lowered but never raised.
+  Shared room subtracts sent mail, due follow-ups, and unsent Step-1 opener reservations. Daily
+  auto-enrollment is opt-in/pool-only, claimed once per application-local date, and never catches up
+  missed quotas.
 - The scheduler sends at most one message per mailbox per tick. Pace is
   `send_window_minutes / daily_cap`; ticking faster does not accelerate the cohort.
 - `wait_days: 0` makes step 2 due as soon as step 1 lands. Pause after step 1 or the follow-up can

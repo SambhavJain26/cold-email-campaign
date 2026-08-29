@@ -4,11 +4,11 @@
 
 **Legend:** `[ ]` not started · `[~]` in progress · `[x]` done · `[!]` blocked (note why in the log)
 
-**Current focus:** → **Stages 1–4 are deployed; pre-prospect commissioning remains.** The final
-serial gate and production rollout are complete; production is pinned to the verified UX hotfix
-`f58b977`. No campaign activation, production
-enrollment, outbound send, or Oracle change was performed. Every future activation, enrollment,
-or owner/prospect send remains separately approval-gated.
+**Current focus:** → **Campaign pools/auto-enrollment/permanent caps are locally verified and await
+separate deployment approval.** Production remains pinned to the verified UX hotfix `f58b977`.
+No production campaign activation, enrollment, outbound send, Spaceship change, or Oracle change
+was performed. Every future deploy, activation, enrollment, or owner/prospect send remains
+separately approval-gated.
 
 > **⚠️ Superseded framing (corrected 2026-08-09).** This line previously read "No code work is outstanding" and "everything left in B8 … is *operations*, not code." **That was wrong.** Operating the canary against a real provider exposed genuine **code** defects — the reply/send race (finding 15), whole-mailbox history ingestion (16), plain-text-only mail (19), and a class of backend-implemented/UI-invisible gaps (3–9). All were fixed on `b8.3-local-canary`. Treat [docs/17](docs/17-local-canary-runbook.md) as the authoritative status record, not this header.
 
@@ -95,6 +95,18 @@ real-backend E2E 1, and a production Vite build. Spaceship fast-forwarded by rev
 All containers and public routes pass, migrations remain applied through `0017`, self-check is
 clean, production reports `checked 0 enrollments — 0 diff(s)`, and post-deploy dump
 `coldemail-20260825-121851.dump` (294,643 bytes) passed `pg_restore --list`.
+
+**2026-08-30 campaign pools, auto-enrollment, and permanent caps:** migration `0018` adds durable
+campaign reservations, import allocation audit, opt-in daily claims/run history/fairness cursor,
+and a permanent post-ramp daily cap. CSV preview/commit supports exact multi-campaign allocation
+(verified 100/100/800) with draft-first reservation and serializable all-or-nothing rechecks.
+Pool-backed campaigns never fall back to global leads. Manual and automatic enrollment share the
+same cap and strengthened shared-room formula; daily runs are idempotent, skip missed dates, and
+fairly rotate across campaigns. Final local gate: type/lint/format; unit 342; web 58; integration
+167; API 130; GreenMail 29; golden exactly 47; mock E2E 60; real-backend E2E 1; migration
+apply/down/apply; populated `checked 5 enrollments — 0 diff(s)`; clean self-check; validated
+custom-format dump and scratch restore/rebuild/zero-drift/self-check. Manual screenshots 24–26
+added. Not deployed; production/Oracle/mail state untouched.
 
 ---
 

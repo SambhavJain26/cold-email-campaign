@@ -19,6 +19,10 @@ commissioning**:
   atomic multi-source cold-storage recycling with durable provenance; and the responsive/mobile
   redesign. The complete serial gate and restore drill pass, and Spaceship is pinned to the Stage 4
   commit. This does not authorize activation, production enrollment, or any send.
+- **2026-08-30 local candidate:** exact import-to-campaign pools, durable pool management,
+  opt-in idempotent/fair daily enrollment, strengthened shared opener reservation, and permanent
+  post-ramp campaign caps are implemented and fully verified locally. They are not deployed;
+  production remains pinned to `f58b977` until separate deploy approval.
 - The operator-approved Spaceship deployment, subpath support, sender-domain unsubscribe routing,
   and individual Google Workspace OAuth implementation are complete. Do not extend production
   scope or change DNS/Caddy/mailboxes outside the approved commissioning steps without fresh
@@ -63,6 +67,10 @@ Treat the runbook as the **durable status record** — task chips and chat summa
 - The 2026-08-25 frontend-only pagination/settings UX hotfix passed type/lint/format, web 57,
   mock E2E 60, real-backend E2E 1, and a production Vite build. It changed no event, projection,
   migration, scheduler, or mail-transport behavior.
+- The 2026-08-30 campaign-pool gate passed type/lint/format; unit 342; web 58; integration 167;
+  API 130; GreenMail 29; golden exactly 47; mock E2E 60; real-backend E2E 1; migration 0018
+  apply/down/apply; populated five-enrollment zero drift; clean self-check; and scratch restore.
+  Concurrent daily claims and a timezone change that moves the local date backward are covered.
 
 ## Production deployments
 
@@ -175,7 +183,18 @@ F7 facts that bite: `/analytics/variants` is SEQUENCE-scoped while every other a
 
 F6 facts that bite: optimistic unibox updates must patch BOTH shapes cached under `['unibox', …]` — the paginated list and the thread-view detail row (`patchUniboxCaches` in `api/mutations/unibox.ts`). `POST /unibox/:id/sentiment` returns the updated **item** (`uniboxItemSchema`), not `{ok:true}` — parsing it with `okResponseSchema` toasted "request failed" on every success and drove seven undeletable duplicate `sentiment_tagged` events (finding #18). Seeding a form from fetched data needs a QUERY plus a `key`-remounted child (`useSequencePreview` + the composer form) — the builder's button-triggered preview mutation can't do it without setState-in-effect. In mock-mode e2e, `page.goto()` REBUILDS the MSW state from fixtures: any assertion that spans screens (tag → Overview rate) must use in-app nav links.
 
-F5 facts that bite: campaign effort, Auto Observation rules, sequence-variable overrides, and ramp stages are editable only while the campaign is `draft`. First activation snapshots resolved variables, fixes `first_activated_at`, and permanently freezes personalization/ramp configuration; pause/resume never restarts or unlocks it. The default staged caps are days 1/2/3/4/5–7 = 5/8/10/12/15, after which only mailbox/other capacity applies. Components shared by two features (`EnrollPanel`, `CatchupBanner`) must live in `components/shared/` — the eslint rule forbids `features/*` importing each other. The catch-up never-burst copy appears in BOTH the alerts bell and the banner, so any e2e asserting it must scope to one of them.
+F5 facts that bite: campaign effort, Auto Observation rules, sequence-variable overrides, and ramp stages are editable only while the campaign is `draft`. First activation snapshots resolved variables, fixes `first_activated_at`, and permanently freezes personalization/ramp configuration; pause/resume never restarts or unlocks it. The default staged caps are days 1/2/3/4/5–7 = 5/8/10/12/15, after which `steady_daily_enroll_cap` applies (default 15). That cap may be lowered after activation but never raised. Components shared by two features (`EnrollPanel`, `CatchupBanner`) must live in `components/shared/` — the eslint rule forbids `features/*` importing each other. The catch-up never-burst copy appears in BOTH the alerts bell and the banner, so any e2e asserting it must scope to one of them.
+
+Pool/auto-enrollment facts that bite (0018): the first pool allocation permanently changes a
+campaign's selector from `global` to `pool`; an empty/ineligible pool must never fall back. Pool
+allocation is not enrollment and does not consume capacity. Import allocations are exact and
+serializable: preview/commit drift aborts leads, drafts, and reservations together. Manual drafts
+reserve first inside—not in addition to—the requested campaign count. Enrollment row, projection,
+append-only `enrolled` event, and pool consumption share the EventStore transaction. Manual and
+automatic enrollment use one advisory capacity lock and the same effective cap; shared room also
+subtracts unsent Step-1 opener reservations. Daily auto-enrollment is opt-in, pool-only, claimed by
+application-local date, and deliberately never accumulates downtime quotas. Fairness resumes after
+the persisted last-served campaign.
 
 F4 facts that bite: the builder's `step_no` is POSITIONAL — `toWriteBody` stamps index+1 at save (`features/sequences/draft.ts`), and retired variants (`active:false`) must stay in the draft: omitting them from a replace-set save DELETES them at zero sends. There is no GET /sequences/:id in the contract — the builder finds its row in the list response. Sequence variables use `{{sequence.key|fallback}}`; defaults belong to the sequence, draft campaigns may override them, and first activation freezes the resolved snapshot. Values are literal and never recursively parsed. Preview renders SAVED templates (unsaved edits are not previewed), supports sequence-default or campaign context, and shows the resolution trace. The panel splits the footer off the body at the engine's final blank line (`\n\n`) — always split from the end so earlier message paragraphs remain body content. `variations` = subject × body spintax counts (`variationCount` multiplies both parses).
 

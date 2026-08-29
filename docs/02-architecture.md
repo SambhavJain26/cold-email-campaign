@@ -84,7 +84,7 @@ One Node process, three logical roles, selected by `ROLE` env (default `all`):
 | Role | Runs |
 |------|------|
 | `api` | Fastify HTTP server |
-| `worker` | pg-boss: `scheduler-tick` (cron `*/5 * * * *`), `imap-poll:<mailboxId>` (every 5 min per active mailbox), `confirm-delivery` (delayed jobs), `self-check` (daily 03:00), `rebuild-compare` (weekly), `backup-reminder` check |
+| `worker` | pg-boss: `scheduler-tick` (cron `*/5 * * * *`, also checks the idempotent daily auto-enrollment claim), `imap-poll:<mailboxId>` (every 5 min per active mailbox), `confirm-delivery` (delayed jobs), `self-check` (daily 03:00), `rebuild-compare` (weekly), `backup-reminder` check |
 | `all` | Both (production default on the single VPS) |
 
 pg-boss provides retry/backoff for every job: SMTP transient failures retry `retryLimit: 5, retryBackoff: true`; poll failures retry and, past `settings.stale_poll_hours`, flip mailbox status to `imap_stale` (spec Part 9).
@@ -104,6 +104,11 @@ action (API handler, scheduler, poller)
 ```
 
 `eventStore.append` is the single chokepoint; nothing else writes `events` or `enrollments.current_state`. It takes the `Clock` for `occurred_at`.
+
+Lead-pool consumption uses the EventStore's in-transaction append path: creating an enrollment,
+changing its pool entry from `available` to `enrolled`, initializing scheduling projections, and
+appending the `enrolled` fact succeed or roll back together. Manual and automatic enrollment share
+one advisory capacity lock so separate campaigns cannot overbook the same mailbox room.
 
 **Read path:** API handlers read projections (`enrollments`, `sent_messages`, `mailboxes`, `incoming_messages`) for current state and run the metric queries (docs/05) for numbers. No API call ever replays events.
 
@@ -138,7 +143,7 @@ export function compose(cfg: Config) {
 | **Env** (secrets + wiring) | `.env` / process env, parsed by zod at boot — boot fails loudly on invalid | `DATABASE_URL`, `SECRET_KEY` (sodium, 32B hex), `SESSION_KEY`, `MAIL_TRANSPORT`, `ROLE`, `ANTHROPIC_API_KEY?`, `ALERT_WEBHOOK_URL?`, `OPERATOR_INITIAL_PASSWORD` | restart |
 | **Settings** (operator-tunable) | `settings` DB row, edited in UI | caps defaults, bounce auto-pause params, tick/poll intervals, `delivery_confirm_hours`, `stale_poll_hours`, `default_timezone`, `optout_detection`, deliverability toggles | none (read per tick) |
 | **Compliance** | `compliance_settings` row | physical address, opt-out text | none |
-| **Per-campaign** | `campaigns.tier_effort_config`, `ramp_config` | tier→mode mapping, ramp caps | none |
+| **Per-campaign** | `campaigns.tier_effort_config`, `ramp_stages`, `steady_daily_enroll_cap`, pool/auto-enroll configuration | tier→mode mapping, ramp/permanent caps, reserved lead source, opt-in daily allocation | none |
 
 Full env table: [16-deployment-ops.md](16-deployment-ops.md) §1.
 

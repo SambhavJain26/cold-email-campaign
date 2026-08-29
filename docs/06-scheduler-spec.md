@@ -121,15 +121,48 @@ on pause: status='auto_paused', alert with both window numbers (walkthrough Stag
 capacityToday(campaign):
   total        = Σ capToday over mailboxes status='ok'
   followupsDue = count ACTIVE enrollments with sent-count ≥ 1 AND next_send_at < endOfDay
+  pendingOpeners = count ACTIVE step-1 enrollments reserved for today but not yet sent
   sentSoFar    = Σ sentToday
-  roomForNew   = max(0, total - sentSoFar - followupsDue)
+  roomForNew   = max(0, total - sentSoFar - followupsDue - pendingOpeners)
   rampDay      = calendar day since campaign.first_activated_at (day 1 on activation)
   rampStage    = staged range containing rampDay, or none after final stage
-  rampCap      = rampStage ? rampStage.cap - enrolledToday : ∞
-  suggested    = min(roomForNew, rampCap)
+  effectiveCap = rampStage ? rampStage.cap : campaign.steady_daily_enroll_cap
+  capRemaining = max(0, effectiveCap - enrolledToday)
+  suggested    = min(roomForNew, capRemaining, poolAvailable when pool-backed)
 ```
 
-`POST /campaigns/:id/enroll` (count-based) selects leads: not suppressed, no prior human reply, not already enrolled in this campaign, **recycle guard passes (decision Q)**, tier ≠ nurture; ordered Tier A → B → C → untiered, oldest-imported first. Explicit-ID recontact requires `allow_recontact:true`, a disposition for every reply, and an elapsed `not_now` date. Suppression is never overrideable.
+Manual and automatic enrollments consume the same effective campaign cap. During the configured
+ramp, the matching stage is the cap; beginning the next application-local date after the final
+stage, `steady_daily_enroll_cap` applies forever. Unused capacity never carries forward. Draft
+campaigns may edit the permanent cap within the global ceiling. After first activation it may be
+lowered, but never raised; lowering below today's count simply leaves zero allowance today.
+
+`POST /campaigns/:id/enroll` (count-based) selects leads: not suppressed, not erased, no prior
+human reply, not already actively enrolled elsewhere, **recycle guard passes (decision Q)**,
+tier ≠ nurture; ordered Tier A → B → C → untiered, oldest-imported first. Once a
+campaign receives its first pool allocation, count-based enrollment selects only its available
+pool in that tier order and then allocation order. An empty pool never falls back to unrelated
+global leads. Existing campaigns that have never received an allocation retain the legacy global
+selector. Explicit-ID recontact requires `allow_recontact:true`, a disposition for every reply,
+and an elapsed `not_now` date. Suppression is never overrideable.
+
+### 7.1 Optional daily auto-enrollment
+
+`auto_enroll_enabled` is false by default and works only for pool-backed campaigns. Drafts may be
+armed, but are never processed. Activation runs an armed campaign immediately; enabling on an
+already active campaign requires an explicit acknowledgement and runs once against today's
+remaining capacity. Paused and archived campaigns are skipped. Resume may run the still-enabled
+preference, but disabling it does not remove existing enrollments.
+
+The normal job cadence calls the coordinator. A persisted application-timezone calendar-date
+claim makes the daily run idempotent across retries, concurrent workers, restarts, daylight-saving
+transitions, and timezone changes. Claims advance monotonically, so moving the configured timezone
+backward cannot resurrect an older unclaimed date. Restarting after missed days runs only the
+current date; quotas do not accrue or burst. Under one global enrollment advisory lock, shared room is calculated once and divided
+one lead per campaign per pass with a persisted round-robin cursor. Each candidate is rechecked
+immediately before the atomic enrollment/event/projection/pool-consumption transaction. Every run
+records its trigger, capacity snapshot, per-campaign eligibility/cap/enrollment results, skips, and
+failure status.
 
 ## 8. Tests (B3 — via scenario runner, docs/13)
 

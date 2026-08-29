@@ -1,5 +1,47 @@
 # Local canary runbook (B8.3-local) — two-week validation on throwaway Gmail
 
+## 2026-08-30 campaign pools, auto-enrollment, and permanent caps — verified locally
+
+The operator-approved campaign-selection improvement is complete on `b8.3-local-canary` and is not
+deployed. CSV imports can preview and atomically reserve exact lead counts into multiple campaign
+pools while leaving the remainder global. Existing safe leads retain their stored profile data;
+manual-draft leads reserve first inside the requested total; every exclusion is rechecked at
+commit. Once a campaign is pool-backed, manual or automatic count enrollment draws only from its
+available pool. Draft/paused campaigns can add, release, or reassign available reservations while
+preserving history.
+
+Auto-enrollment is opt-in, pool-only, disabled by default, and skips non-active campaigns. A
+persisted application-local-date claim prevents duplicate daily runs and missed dates never accrue.
+Multiple campaigns share capacity through a persistent fair round-robin cursor under the same
+global enrollment lock. Manual and automatic enrollment now share the effective campaign cap and
+the strengthened room calculation subtracts sent messages, due follow-ups, and already-reserved
+unsent Step-1 openers. Ramp stages transition to a permanent daily cap (default: final ramp stage);
+after activation the permanent cap may be lowered but never raised.
+
+Verified evidence:
+
+- migration `0018_campaign_pools_auto_enrollment` passed apply/down/apply and its legacy-cap
+  backfill test;
+- typecheck, lint, and format pass; unit **342**; web **58**; integration **167**; API **130**;
+  GreenMail SMTP/IMAP **29**; locked golden exactly **47**; mock-browser E2E **60**;
+  real-backend E2E **1**;
+- focused tests cover exact 100/100/800 allocation, deterministic order, existing-profile
+  preservation, draft-first reservation, preview/commit rollback, pool-only selection,
+  release/reassign, immediate activation/enable runs, concurrent-worker idempotency, monotonic
+  local-date claims across timezone changes, fair allocation, shared caps, permanent-cap
+  transition/lower-only behavior, and local-date/DST helpers;
+- the populated event-backed test database reports `checked 5 enrollments — 0 diff(s)` and
+  self-check reports no invariant violations;
+- a fresh custom-format dump passed `pg_restore --list`, restored into the explicitly named
+  `coldemail_0018_restore_drill` scratch database, and passed rebuild, five-enrollment zero-drift
+  comparison, and self-check; the scratch database and temporary dump were removed;
+- user-manual screenshots **24–26** document the desktop pool, phone pool cards, and exact import
+  allocation preview.
+
+No production/Oracle/DNS/Caddy/mailbox state changed. No production campaign was activated, no
+production lead was enrolled, and no email was sent. Spaceship remains pinned to `f58b977`; rollout
+requires separate explicit deployment approval.
+
 ## 2026-08-25 pagination/settings UX hotfix — verified and deployed
 
 After explicit operator approval, Spaceship production was fast-forwarded by reviewed Git bundle

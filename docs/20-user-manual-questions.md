@@ -543,16 +543,17 @@ Selection order is:
 3. Tier C
 4. Untiered
 
-Within each group, older imports are selected first. Nurture leads are excluded. Suppressed leads,
-leads already in that campaign, disallowed prior repliers, and leads who would receive duplicate
-content are also excluded.
+Within each group, legacy global campaigns select older imports first. Pool-backed campaigns select
+only available reserved leads in allocation order. Nurture leads are excluded. Suppressed/erased
+leads, active enrollments elsewhere, leads already in that campaign, disallowed prior repliers, and
+leads who would receive duplicate content are also excluded.
 
 Example: the eligible pool contains 3 Tier-A leads, 20 Tier-B leads, and 50 Tier-C leads. **Enroll
 next 10** selects the 3 Tier-A leads and the 7 oldest Tier-B leads.
 
 The button does not use whichever checkboxes happen to be selected on the Leads screen. It uses
-the campaign's count-based priority order. An explicit-ID enrollment capability exists in the
-backend, but the ordinary campaign **Enroll next N** control is the priority-based operation.
+the campaign's count-based priority order. Once a campaign has a lead pool, that pool becomes its
+eligible source permanently; an empty pool never pulls unrelated leads from the global list.
 
 After enrollment:
 
@@ -562,9 +563,10 @@ After enrollment:
 - Mailbox capacity, daily caps, send windows, pace gaps, and follow-ups due today still limit what
   can send.
 
-The capacity panel reserves room for due follow-ups before suggesting new enrollments. For
-example, if healthy mailboxes have room for 20 sends today but 8 follow-ups are due, suggested room
-for new leads cannot exceed 12 before applying the campaign ramp limit.
+The capacity panel reserves room for due follow-ups and unsent Step-1 openers already scheduled for
+today before suggesting new enrollments. For example, if healthy mailboxes have room for 20 sends,
+8 follow-ups are due, and 2 opener reservations already exist, shared room for new leads cannot
+exceed 10 before applying the campaign cap and pool availability.
 
 ### 4.5 How ramp works today
 
@@ -580,15 +582,48 @@ The schedule is now progressive and starts on **first activation**, not campaign
 | 3 | 10 |
 | 4 | 12 |
 | 5–7 | 15 |
-| After day 7 | No campaign ramp limit |
+| After day 7 | Permanent daily enrollment cap, default 15 |
 
 Pausing does not stop or restart this calendar. Draft campaigns may define custom contiguous stages
-before first activation. First activation freezes the schedule permanently. The campaign detail
-shows the current day/stage, enrolled today, remaining today, and upcoming stages. Mailbox caps,
-pace gaps, send windows, follow-up reservations, and other safeguards always continue to apply.
+and a permanent cap before first activation. First activation freezes increases: the permanent cap
+may later be lowered for safety, but not raised. The campaign detail shows the current day/stage or
+**Permanent cap**, effective cap, enrolled/remaining today, shared mailbox room, pending openers,
+and pool availability. Mailbox caps, pace gaps, send windows, follow-up reservations, and other
+safeguards always continue to apply.
 
 Also remember that a ramp value inside the configured ceiling is merely permitted. It does not
 prove that a real mailbox is warmed enough for that volume.
+
+### 4.6 How import allocation and campaign pools work
+
+After a CSV hygiene preview, you may optionally add exact campaign/count rows. If 1,000 unique safe
+leads are available, Campaign A = 100 and Campaign B = 100 creates two reservation pools and leaves
+800 global. It does not create 200 enrollments and it cannot send anything.
+
+Candidates follow accepted CSV row order. Existing safe duplicate leads may be linked into a pool
+without overwriting their profile. Draft-bearing leads are reserved to their chosen draft campaign
+first and count inside that campaign's requested number. The server shows exclusions and refuses
+the whole commit if the exact counts cannot be revalidated; it never silently imports and underfills
+one campaign.
+
+Campaign detail lets you add the next N safe global leads using A → B → C → untiered,
+oldest-first priority, or release/reassign selected **available** pool members while the campaign is
+draft or paused. Enrolled entries remain historical and cannot be moved. Leads and Import History
+show the current/durable pool relationship.
+
+### 4.7 Do I have to click Enroll every day?
+
+No. Manual **Enroll next N** remains available, but a pool-backed campaign can opt into
+**Automatic daily enrollment**. It is off by default. A draft can be armed safely; activation runs
+one bounded pass. Enabling it on an already active campaign requires an acknowledgement and uses
+only today's remaining capacity.
+
+The first worker check after application-local midnight claims that date once. It never catches up
+missed days in a burst. If several campaigns are enabled, they share mailbox room fairly, one lead
+per campaign per pass, and continue after the last-served campaign on the next run. Manual and
+automatic enrollments use the same ramp/permanent campaign cap, mailbox-room calculation, pool,
+suppression, recontact, active-enrollment, and duplicate-content safeguards. The campaign page
+shows an audit history of what each run did.
 
 ## 5. Metrics, positive replies, meetings, and variant performance
 

@@ -366,10 +366,12 @@ Rates are event-based and may overlap. A person may reply and later unsubscribe.
 ### TODAY panel
 
 The capacity meter accounts for healthy-mailbox capacity, sends already made today, follow-ups due,
-and the campaign ramp. **Enroll next N** uses count-based selection.
+unsent Step-1 openers already reserved for today, and the campaign's ramp or permanent daily cap.
+**Enroll next N** uses count-based selection.
 
-Count-based enrollment order is Tier A → B → C → untiered, oldest imported first. It does not
-preserve an informal selection you may have in mind. Nurture leads are excluded. If exact identities
+Count-based enrollment order is Tier A → B → C → untiered. Legacy global campaigns use
+oldest-imported order. Pool-backed campaigns use their reserved candidates and allocation order;
+they never silently take unrelated global leads. Nurture leads are excluded. If exact identities
 matter, do not assume the count button chooses them.
 
 The panel explains why enrollment is blocked for a draft, paused, archived, or sequence-less
@@ -391,6 +393,7 @@ Filters:
 - **Search:** case-insensitive email, name, or company search.
 - **Suppressed only:** shows leads that cannot receive email.
 - **Campaign context:** when the global campaign selector is set, the list is campaign-filtered.
+- **Campaign pool:** shows leads allocated to a particular campaign, including their pool status.
 
 Filters reset pagination and selection. Long operational lists default to 25 rows. Use **Rows per
 page** below the list to choose 25, 50, or 100; changing it returns to page 1. The footer always
@@ -476,6 +479,30 @@ addresses; invalid, duplicate, and suppressed rows remain excluded. Expand **sam
 representative rows before committing.
 
 All imported leads start untiered.
+
+#### Optional campaign allocation during import
+
+After hygiene preview, expand **Campaign allocation** to reserve exact numbers of the accepted
+leads for one or more draft/paused campaigns. For example, add Campaign A = 100 and Campaign B =
+100; if the accepted set contains 1,000 unique safe leads, the preview shows 800 remaining global.
+Nothing is enrolled or sent by this action.
+
+![Import preview showing an exact campaign allocation and the remaining global leads](images/user-manual/26-import-campaign-allocation.png)
+
+Allocation uses safe accepted leads in CSV row order. Safely linked existing duplicate leads may
+also be allocated without replacing their stored name, company, or custom fields. Suppressed,
+erased, nurture, currently reserved, actively enrolled, recontact-blocked, and duplicate-content
+conflicting leads are excluded. The preview shows the available/excluded totals and whether every
+exact request can be satisfied.
+
+When manual-draft columns are present, valid draft leads are reserved to the chosen draft campaign
+first and count inside that campaign's requested number. If 12 safe drafts belong to Campaign A,
+Campaign A's allocation must be at least 12; asking for 10 is refused.
+
+Commit is all-or-nothing. The server rechecks every condition in one transaction. If another
+operation makes an exact count impossible after preview, no leads, drafts, or pool reservations
+from that commit are saved; refresh the preview and try again. Import History preserves each
+campaign's total, available, enrolled, and released allocation counts.
 
 #### Imported manual-draft workflow
 
@@ -854,7 +881,8 @@ Once sends exist:
 
 ## 11. Campaigns
 
-A campaign combines one sequence, tier-to-effort rules, a ramp policy, and enrolled leads.
+A campaign combines one sequence, tier-to-effort rules, ramp and permanent daily enrollment caps,
+an optional reserved lead pool, and enrolled leads.
 
 ![Campaign list showing status, sequence, enrolled/contacted counts, progress, and controls](images/user-manual/09-campaigns.png)
 
@@ -881,7 +909,8 @@ Choose **New Campaign** and set:
 - **Name**;
 - **Sequence**;
 - **Effort per tier** for A, B, and C; and
-- initial ramp settings.
+- initial ramp settings; and
+- the permanent daily enrollment cap that applies after the ramp ends.
 
 Campaigns start as drafts. When Tier A uses human-written mode, you must acknowledge that the
 scheduler will never send those Tier-A openers and that you will use Manual compose.
@@ -895,7 +924,8 @@ On the draft campaign detail page, configure:
 
 These controls are editable only while the campaign is draft. First activation permanently freezes
 them and records the ramp start. Pausing and resuming neither unlocks the configuration nor restarts
-the ramp. Create a new campaign if the design must change after activation.
+the ramp. The permanent daily cap may be lowered after activation as a safety action, but never
+raised. Create a new campaign if the other design must change after activation.
 
 New campaigns use this default schedule:
 
@@ -906,7 +936,7 @@ New campaigns use this default schedule:
 | 3 | 10 |
 | 4 | 12 |
 | 5–7 | 15 |
-| After day 7 | No campaign ramp limit; mailbox and other safeguards remain |
+| After day 7 | Permanent daily enrollment cap, default 15 |
 
 Custom stages must cover every day from 1 through the final ramp day exactly once, with no gaps or
 overlaps. Global guardrails can refuse a stage cap that is too high or a schedule that ends too
@@ -921,8 +951,9 @@ The header provides **Activate, Pause, Resume, Archive, Delete,** and **Back to 
   Campaigns with history cannot be deleted as though they never existed.
 
 The page also includes catch-up status, a Tier-A manual-only warning, TODAY capacity/enrollment,
-state breakdown, and configuration. Drafts show the editable personalization/ramp panel; activated
-campaigns show the frozen configuration and first-activation time.
+lead-pool management, auto-enrollment status/history, state breakdown, and configuration. Drafts
+show editable personalization/ramp settings; activated campaigns show the frozen configuration and
+first-activation time.
 
 ### 11.4 Capacity calculation
 
@@ -932,7 +963,9 @@ Suggested new enrollment capacity is approximately:
 healthy mailbox effective capacity
 − sends already made today
 − follow-ups due today
-bounded by the current activation-day ramp stage
+− unsent Step-1 openers already reserved for today
+bounded by the current ramp stage or permanent daily campaign cap
+bounded by available pool leads when the campaign is pool-backed
 ```
 
 Follow-ups are reserved before new openers. A high mailbox cap or allowed configuration is not
@@ -942,13 +975,54 @@ evidence that the volume is safe for reputation.
 
 Enrollment into an active campaign can result in sends on the next scheduler tick.
 
-The count-based picker excludes suppressed leads, nurture leads, prior human repliers, duplicate
-campaign enrollments, and content-hash conflicts. It orders Tier A → B → C → untiered, oldest first.
-If fewer eligible leads exist, the result reports skipped buckets.
+The count-based picker excludes suppressed/erased leads, nurture leads, prior human repliers,
+concurrent active enrollments, duplicate campaign enrollments, recontact holds, and content-hash
+conflicts. It orders Tier A → B → C → untiered. Legacy global campaigns then use oldest
+import first; pool-backed campaigns use allocation order. An empty pool reports no eligible pooled
+leads and never falls back to the global list. If fewer eligible leads exist, the result reports
+skipped buckets.
 
 Tier-A human-written enrollments become active manual work and do not send automatically.
 
-### 11.6 Completion report
+### 11.6 Lead pools and automatic daily enrollment
+
+A campaign lead pool is a reservation list, not an enrollment list. Pool entries have these states:
+
+![Campaign lead-pool controls showing summaries, automatic enrollment, the permanent cap, and reserved leads](images/user-manual/24-campaign-lead-pool.png)
+
+- **Available:** reserved for this campaign and eligible to be considered.
+- **Enrolled:** consumed into an enrollment; it cannot be released or reassigned.
+- **Released:** historical record that the reservation was returned or moved.
+
+While a campaign is draft or paused, the pool panel can add the next N safe global leads, release
+selected available entries, or atomically reassign selected entries to another draft/paused
+campaign. Summary cards show total, available, enrolled, released, temporarily ineligible, and
+source-import counts. Once a campaign receives a pool allocation it stays pool-backed permanently.
+
+**Automatic daily enrollment** is optional and off by default. It requires a pool-backed campaign.
+You may arm a draft, but it does nothing until activation. Enabling it on an active campaign shows
+an acknowledgement and immediately uses only today's remaining safe capacity. Paused, draft, and
+archived campaigns are skipped; disabling it does not remove existing enrollments.
+
+After application-local midnight, the first worker check performs at most one daily allocation.
+Retries, restarts, concurrent workers, and daylight-saving changes cannot run that date twice. If
+the server was offline for three days, it runs only today's allowance after restart—the three missed
+allowances do not accumulate. With several enabled campaigns, available shared mailbox room is
+distributed one lead per campaign per pass, continuing after the last-served campaign next time.
+The run-history table records the trigger, date, result, and failures.
+
+On phones, the same pool controls and lead rows become touch-friendly stacked cards.
+
+![Phone campaign lead-pool controls and reserved-lead cards](images/user-manual/25-mobile-campaign-lead-pool.png)
+
+Example: four healthy mailboxes provide 40 shared sends today. Ten sends already occurred, 12
+follow-ups are due, and 3 Step-1 openers are already reserved, leaving 15 shared slots. Campaign A
+has 20 pool leads and 10 cap remaining; Campaign B has 20 pool leads and 8 cap remaining. The fair
+allocator can enroll 8 for A and 7 for B (one per campaign per pass) rather than letting A consume
+all 15. Those enrollments reserve capacity; the scheduler still applies each mailbox's send window
+and pace gap before any message is actually sent.
+
+### 11.7 Completion report
 
 When nothing remains `NEW` or `ACTIVE`, the completion report shows mutually exclusive outcomes:
 
@@ -1192,8 +1266,8 @@ The absolute rule can protect at low volume. Do not weaken thresholds to keep a 
 
 Validation ranges are: scheduler 1–60 minutes; IMAP poll 1–120 minutes; stale-poll and delivery
 confirmation 1–72 hours; soft retries 0–10; jitter 0–100%; and cold-storage rest 0 days or more.
-Use a valid IANA timezone name such as `America/New_York` or `UTC`; the field itself checks only
-that it is non-empty, so a typo can surface later when scheduling.
+Choose a valid IANA timezone such as `America/New_York` or `UTC` from the searchable selector. Both
+the browser and server reject invalid names, so a mistyped timezone cannot be saved.
 
 After the first send exists, `delivery_confirm_hours` is immutable. This preserves replay-stable
 completion times. Attempting to change it is refused by both application logic and the database.
@@ -1201,7 +1275,7 @@ completion times. Attempting to change it is refused by both application logic a
 ### 15.5 Rules → launch guardrails
 
 - **Max mailbox daily cap:** mailbox records cannot be saved above this ceiling.
-- **Max ramp enroll/day:** new campaigns cannot exceed this ramp cap.
+- **Max campaign enroll/day:** ramp-stage and permanent campaign caps cannot exceed this ceiling.
 - **Min ramp days:** new campaigns cannot use a shorter ramp; `0` disables enforcement and is not
   launch-ready.
 
