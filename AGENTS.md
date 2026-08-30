@@ -56,7 +56,7 @@ commissioning** until the operator completes the handoffs below:
   `https://unsubscribe.{sender_domain}` template are configured. Do not claim the production Gmail
   body link or RFC 8058 one-click behavior is verified until a separately approved owner-address
   canary proves it.
-- Work on the current `b8.3-local-canary` branch. Do not branch off, push to `main`, or merge to
+- Work on the current `canary` branch. Do not branch off, push to `main`, or merge to
   `main` without explicit authorization. Make surgical edits, preserve unrelated dirty-worktree
   changes, and commit each completed task on the current branch.
 
@@ -113,7 +113,7 @@ temporary rollback/canary environment.
 - App: `/opt/email-campaign`; stack: `docker-compose.spaceship.yml` with `.env.prod`
 - Public UI: `https://sambhavpmtech.com/email-campaign/`
 - Internal gateway: `127.0.0.1:18080`; host Caddy is the only public 80/443 listener
-- Deployed branch/commit: `b8.3-local-canary` at `6ca1183`
+- Deployed branch: `canary`; application code remains `6ca1183` with later documentation commits
 
 The repository is private and the VPS currently has no GitHub deploy credential. Until a read-only
 deploy key is deliberately installed, transfer a reviewed `git bundle`, fetch the pinned branch
@@ -156,7 +156,9 @@ and password rotation.
 ## Live deployment state
 
 Spaceship production was deployed on 2026-08-22, advanced through Stage 4 and its UX hotfix, and
-then to the campaign-pool/auto-enrollment/permanent-cap release `6ca1183` on 2026-08-30. DNS and TLS
+then to the campaign-pool/auto-enrollment/permanent-cap release `6ca1183` on 2026-08-30. After
+separate operator approval, the clean checkout moved to the one-word `canary` branch and was fully
+redeployed from documentation wrap `0299e42`; application code remained unchanged. DNS and TLS
 are live for the two outreach domains and their unsubscribe subdomains. The route matrix is
 verified: `/email-campaign/` and direct SPA routes return 200; the bare app path canonicalizes;
 normal outreach-domain traffic redirects 308 to `https://sambhavbuilds.com/`; unsubscribe hosts

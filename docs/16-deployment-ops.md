@@ -4,8 +4,8 @@ Single always-on VPS (finalized decision). Docker Compose primary; systemd alter
 in B7 and cut over to Spaceship production on 2026-08-22.
 
 **Production status (2026-08-30):** the ten-workstream implementation, pagination/settings UX
-hotfix, and campaign-pool/auto-enrollment/permanent-cap release are deployed from
-`b8.3-local-canary` commit `6ca1183`. The complete local gate, scratch restore, pre-deploy backup,
+hotfix, and campaign-pool/auto-enrollment/permanent-cap release are deployed on the one-word
+`canary` branch; application code remains commit `6ca1183`. The complete local gate, scratch restore, pre-deploy backup,
 migration 0018, container health, public routes, served feature markers, self-check, zero-drift
 dry-run, dormant send state, and post-deploy backup all pass. Oracle remains paused and unchanged.
 Deployment did not authorize campaign activation, enrollment, or sending.
@@ -156,7 +156,7 @@ Remaining for a full **M3** close: the real-backend walkthrough replay (§5, `e2
 
 Production is live at `https://sambhavpmtech.com/email-campaign/` on the existing Spaceship VM.
 The portfolio at `sambhavbuilds.com` remained online throughout. Code is pinned to `6ca1183` on
-`b8.3-local-canary`; `main` was not merged. Oracle remains paused and unchanged as the temporary
+`canary`; `main` was not merged. Oracle remains paused and unchanged as the temporary
 rollback environment.
 
 - **Reverse proxy:** host Caddy is the only public 80/443 listener. The container gateway binds
@@ -202,6 +202,15 @@ auto-enrollment-enabled campaigns. Pre-deploy dump `coldemail-20260829-212720.du
 and post-deploy dump `coldemail-20260829-213315.dump` (816,236 bytes) passed `pg_restore --list`.
 No campaign was activated, no lead was enrolled, and no mail was sent; Oracle, `main`, DNS, Caddy,
 and mailbox configuration were unchanged.
+
+After a separate operator-approved branch transition on 2026-08-30, local/GitHub and Spaceship
+moved from `b8.3-local-canary` to the one-word `canary` branch. A reviewed bundle advanced the
+production checkout through documentation wrap `0299e42`; the stack was rebuilt and recreated even
+though application code remained `6ca1183`. Containers, migrations through 0018, public routing,
+self-check, zero projection drift, four healthy mailboxes, zero sendable state, zero open alerts,
+and zero failed jobs passed. Pre/post dumps `coldemail-20260830-090245.dump` (903,838 bytes) and
+`coldemail-20260830-090758.dump` (904,427 bytes) passed `pg_restore --list`. No campaign, lead,
+enrollment, send, DNS/Caddy, Oracle, or `main` change occurred.
 
 ### Unsubscribe URL and Gmail one-click — deployed, commissioning pending
 

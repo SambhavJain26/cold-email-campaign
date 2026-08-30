@@ -55,7 +55,7 @@ Treat the runbook as the **durable status record** — task chips and chat summa
 - **Keep this file current, and keep AGENTS.md in step.** When you learn something durable — a better approach, a good practice, a lesson from a mistake — add it here. When something here is outdated, remove it. Terse: facts only, no filler.
 - **First inspect and report the current state before proposing changes.** For a question, explain the feature using the actual code/UI/data model rather than from memory.
 - **Smallest safe implementation**, tested proportionally, with UI/database behavior verified where relevant. Update the runbook only for verified results.
-- **Commit after every completed task**, on the current working branch (`b8.3-local-canary`) — do not branch off or push to `main`, and do not merge to `main` without explicit authorization. Pushing to `origin b8.3-local-canary` is fine; deploying is a separate, separately-authorized step.
+- **Commit after every completed task**, on the current working branch (`canary`) — do not branch off or push to `main`, and do not merge to `main` without explicit authorization. Pushing to `origin canary` is fine; deploying is a separate, separately-authorized step.
 - Make surgical patch-style edits and **preserve unrelated changes in a dirty working tree**.
 
 ## Test discipline
@@ -85,7 +85,7 @@ rollback/canary environment.
 - Stack: `docker-compose.spaceship.yml` with `.env.prod`
 - UI: `https://sambhavpmtech.com/email-campaign/`
 - Internal gateway: `127.0.0.1:18080`; host Caddy alone owns public 80/443
-- Deployed branch/commit: `b8.3-local-canary` at `6ca1183`
+- Deployed branch: `canary`; application code remains `6ca1183` with later documentation commits
 
 The private repository currently has no GitHub deploy credential on the VPS. Until a read-only
 deploy key is deliberately installed, transfer a reviewed `git bundle`, fetch the pinned branch
@@ -148,6 +148,10 @@ After an authorized deploy, verify container health, `https://localhost/health`,
   migration 0018, self-check, and zero drift pass; both deployment dumps passed catalog validation
   and the local scratch restore drill passed; Spaceship AutoBackup has a five-backup limit. The
   portfolio remained online.
+- **2026-08-30 branch transition:** after explicit operator approval, local/GitHub and Spaceship
+  moved to the one-word `canary` branch. Spaceship was rebuilt from documentation wrap `0299e42`;
+  migrations, routes, self-check, zero drift, dormant state, and fresh backups all passed. The
+  application code remained `6ca1183`; Oracle and `main` were unchanged.
 - **Still open, deliberately:** obtain separate authorization for the one-message owner-address
   send/reply/unsubscribe canary. The business address, sender-domain unsubscribe template,
   production Internal Google OAuth credentials, and four account-matched OAuth mailboxes are

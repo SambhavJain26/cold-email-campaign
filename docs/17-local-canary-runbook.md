@@ -1,5 +1,20 @@
 # Local canary runbook (B8.3-local) — two-week validation on throwaway Gmail
 
+## 2026-08-30 branch transition — verified and deployed
+
+After explicit operator approval, the clean local checkout and GitHub moved to the one-word
+`canary` branch at documentation wrap `0299e42`. Spaceship received a reviewed Git bundle, switched
+from `b8.3-local-canary` to `canary`, rebuilt, and recreated the production stack. Application code
+remained `6ca1183`.
+
+All four containers run; app/database health, migrations through 0018, the public route matrix,
+self-check, and `checked 0 enrollments — 0 diff(s)` pass. Production retains four healthy OAuth
+mailboxes and zero campaigns, leads, enrollments, available pooled leads, active campaigns,
+auto-enrollment-enabled campaigns, open alerts, or failed jobs. Pre/post dumps
+`coldemail-20260830-090245.dump` (903,838 bytes) and `coldemail-20260830-090758.dump` (904,427 bytes)
+passed `pg_restore --list`. No email was sent and Oracle, `main`, DNS, Caddy, and mailbox
+configuration were unchanged.
+
 ## 2026-08-30 campaign pools, auto-enrollment, and permanent caps — verified and deployed
 
 The operator-approved campaign-selection improvement is complete on `b8.3-local-canary` and is
