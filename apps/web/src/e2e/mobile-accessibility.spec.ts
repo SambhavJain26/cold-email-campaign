@@ -96,7 +96,7 @@ test('phone filters, pagination, dialogs, forms, cards, and details remain usabl
   await expect(page.getByTestId('timeline')).toBeVisible();
   await expectNoHorizontalOverflow(page);
 
-  const compose = page.getByRole('button', { name: 'Manual compose' });
+  const compose = page.getByRole('button', { name: 'Personalized Copy' });
   await compose.click();
   const body = page.getByLabel('Body');
   await body.fill('Unsaved mobile draft\nwith a second line.');

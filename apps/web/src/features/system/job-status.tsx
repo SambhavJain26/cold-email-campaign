@@ -41,7 +41,7 @@ export function JobStatus() {
     <section className="space-y-3">
       <h2 className="text-sm font-semibold">Job status</h2>
 
-      <dl className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+      <dl className="grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
         <div className="rounded-lg border border-border p-3">
           <dt className="text-xs text-muted-foreground">Transport</dt>
           <dd className="mt-1">
@@ -74,7 +74,24 @@ export function JobStatus() {
           <dt className="text-xs text-muted-foreground">Pollers</dt>
           <dd className="mt-1 text-sm font-medium tabular-nums">{data.pollers.length}</dd>
         </div>
+        <div className="rounded-lg border border-border p-3">
+          <dt className="text-xs text-muted-foreground">Personalized copy holds</dt>
+          <dd className="mt-1 text-sm font-medium tabular-nums">
+            {data.personalized_copy_blocked_count}
+          </dd>
+        </div>
       </dl>
+
+      {data.personalized_copy_blocked_count > 0 && (
+        <Alert>
+          <AlertTitle>Personalized copy required</AlertTitle>
+          <AlertDescription>
+            {data.personalized_copy_blocked_count} enrollment
+            {data.personalized_copy_blocked_count === 1 ? ' is' : 's are'} held. Other ready leads
+            continue normally.
+          </AlertDescription>
+        </Alert>
+      )}
 
       {data.send_blockers.map((blocker) => (
         <Alert key={blocker.code} variant="destructive">

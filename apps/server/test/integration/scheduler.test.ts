@@ -5,6 +5,9 @@ import { scenario, leadEmail, type Scenario } from '../helpers/scenario';
 import { capacityToday, enroll } from '../../src/services/enrollment';
 import { buildEvent } from '../../src/domain/events';
 import { testSequence } from '../helpers/sequences';
+import { createSequence, loadSequenceDef } from '../../src/db/repos/sequencesRepo';
+import { createOrReplaceCampaignPersonalizedCopy } from '../../src/db/repos/manualDraftsRepo';
+import { contentHashOf } from '../../src/render/hash';
 
 const fourStep = testSequence(1, [0, 3, 4, 5]);
 const twoStep = testSequence(1, [0, 3]);
@@ -140,6 +143,153 @@ describe('scheduler (B3.7/B3.8)', () => {
     expect(toPT()).toHaveLength(1);
     expect(toPT()[0]!.at.getTime()).toBeGreaterThanOrEqual(Date.parse('2026-01-05T16:00:00Z'));
   });
+
+  it('runs personalized 1 → researched template 2 → personalized 3 → template 4 and holds only missing copy', async () => {
+    s = await scenario({ mailboxes: 1, sequence: fourStep, tickMinutes: 30, jitterPct: 0 });
+    const sequenceId = await createSequence(s.db, {
+      name: 'mixed personalized path',
+      steps: [
+        { stepNo: 1, waitDays: 0, inThread: false, contentSource: 'personalized', variants: [] },
+        {
+          stepNo: 2,
+          waitDays: 1,
+          inThread: true,
+          contentSource: 'template',
+          variants: [
+            {
+              label: 'A',
+              subjectTemplate: 'Research note',
+              bodyTemplate: 'Hi {{first_name|there}},\n\n{{custom_observation}}\n\nBest,\nSam',
+              contentHash: contentHashOf('Research note', '{{custom_observation}}'),
+            },
+          ],
+        },
+        { stepNo: 3, waitDays: 1, inThread: true, contentSource: 'personalized', variants: [] },
+        {
+          stepNo: 4,
+          waitDays: 1,
+          inThread: true,
+          contentSource: 'template',
+          variants: [
+            {
+              label: 'A',
+              subjectTemplate: 'Last note',
+              bodyTemplate: 'Hi {{first_name|there}},\n\nClosing the loop.\n\nBest,\nSam',
+              contentHash: contentHashOf('Last note', 'Closing the loop.'),
+            },
+          ],
+        },
+      ],
+    });
+    await s.pool.query(`UPDATE campaigns SET sequence_id = $1 WHERE id = $2`, [
+      sequenceId,
+      s.campaignId,
+    ]);
+    const def = await loadSequenceDef(s.db, sequenceId);
+    expect(def).not.toBeNull();
+    s.sequences.register(s.campaignId, def!);
+    const step1Id = def!.steps[0]!.id!;
+    const step3Id = def!.steps[2]!.id!;
+
+    await s.importLeads(2);
+    await s.pool.query(
+      `UPDATE leads
+          SET tier = 'A', first_name = CASE id WHEN 1 THEN 'Ada' ELSE 'Ben' END,
+              custom_fields = jsonb_build_object('custom_observation', 'A researched signal')`,
+    );
+    for (const leadId of [1, 2]) {
+      const subject = `Personal opener ${leadId}`;
+      const body = `Hi ${leadId === 1 ? 'Ada' : 'Ben'},\n\nA genuinely personal opener for lead ${leadId}.\n\nBest,\nSam`;
+      await createOrReplaceCampaignPersonalizedCopy(s.db, {
+        leadId,
+        campaignId: s.campaignId,
+        sequenceStepId: step1Id,
+        stepNo: 1,
+        subject,
+        body,
+        contentHash: contentHashOf(subject, body),
+        status: 'ready',
+        replace: false,
+      });
+    }
+    const lead2Step3Subject = 'A second personal thought for Ben';
+    const lead2Step3Body = 'Hi Ben,\n\nOne more note written only for you.\n\nBest,\nSam';
+    await createOrReplaceCampaignPersonalizedCopy(s.db, {
+      leadId: 2,
+      campaignId: s.campaignId,
+      sequenceStepId: step3Id,
+      stepNo: 3,
+      subject: lead2Step3Subject,
+      body: lead2Step3Body,
+      contentHash: contentHashOf(lead2Step3Subject, lead2Step3Body),
+      status: 'ready',
+      replace: false,
+    });
+
+    expect(await s.enroll({ count: 2 })).toEqual([1, 2]);
+    await s.advanceHours(60);
+
+    expect(s.mock.sentTo(leadEmail('L0001'))).toHaveLength(2);
+    expect(s.mock.sentTo(leadEmail('L0002'))).toHaveLength(3);
+    expect(s.mock.sentTo(leadEmail('L0001'))[1]!.msg.bodyText.includes('A researched signal')).toBe(
+      true,
+    );
+    const blockedAlerts = () =>
+      s.alerts.emitted.filter((alert) => alert.kind === 'personalized_copy_blocked');
+    expect(blockedAlerts()).toHaveLength(1);
+    expect(blockedAlerts()[0]!.payload).toMatchObject({ leadId: 1, stepNo: 3, reason: 'missing' });
+
+    await s.scheduler.tick();
+    expect(blockedAlerts()).toHaveLength(1); // one alert for the active blocker episode
+
+    const lead1Step3Subject = 'A second personal thought for Ada';
+    const lead1Step3Body = 'Hi Ada,\n\nOne more note written only for you.\n\nBest,\nSam';
+    await createOrReplaceCampaignPersonalizedCopy(s.db, {
+      leadId: 1,
+      campaignId: s.campaignId,
+      sequenceStepId: step3Id,
+      stepNo: 3,
+      subject: lead1Step3Subject,
+      body: lead1Step3Body,
+      contentHash: contentHashOf(lead1Step3Subject, lead1Step3Body),
+      status: 'ready',
+      replace: false,
+    });
+    await s.advanceDays(3);
+
+    expect(s.mock.sentTo(leadEmail('L0001'))).toHaveLength(4);
+    expect(s.mock.sentTo(leadEmail('L0002'))).toHaveLength(4);
+    const sent = await s.pool.query(
+      `SELECT lead_id, step_no, rendered_subject, rendered_body_text, content_source,
+              personalized_copy_id
+         FROM sent_messages ORDER BY lead_id, step_no`,
+    );
+    expect(sent.rows).toHaveLength(8);
+    expect(
+      sent.rows.find(
+        (row: { lead_id: number; step_no: number }) => row.lead_id === 1 && row.step_no === 1,
+      ),
+    ).toMatchObject({
+      rendered_subject: 'Personal opener 1',
+      content_source: 'personalized',
+    });
+    expect(
+      sent.rows.find(
+        (row: { lead_id: number; step_no: number }) => row.lead_id === 1 && row.step_no === 3,
+      ),
+    ).toMatchObject({
+      rendered_subject: 'Re: Personal opener 1',
+      content_source: 'personalized',
+    });
+    expect(
+      sent.rows.find(
+        (row: { lead_id: number; step_no: number }) => row.lead_id === 1 && row.step_no === 3,
+      ).personalized_copy_id,
+    ).not.toBeNull();
+    expect(
+      (await s.pool.query(`SELECT count(*)::int n FROM personalized_copy_blockers`)).rows[0].n,
+    ).toBe(0);
+  }, 30_000);
 
   it('daily cap: 2/day drains 5 due enrollments across 3 days, never bursting', async () => {
     s = await scenario({ mailboxes: 1, dailyCap: 2, sequence: fourStep, tickMinutes: 30 });
@@ -312,17 +462,19 @@ describe('capacity + enroll (B3.9)', () => {
     );
   });
 
-  it('selection order: A → B → C → untiered, oldest first; nurture never auto-enrolled', async () => {
+  it('selection order is A → B; untiered and nurture cannot enroll', async () => {
     s = await scenario({ mailboxes: 1, sequence: fourStep });
-    // L1-2 untiered, L3-4 C, L5-6 B, L7-8 A, L9-10 nurture
+    // L1-4 untiered, L5-6 B, L7-8 A, L9-10 nurture.
     await s.importLeads(10);
-    await s.pool.query(`UPDATE leads SET tier = 'C' WHERE id IN (3,4)`);
+    await s.pool.query(`UPDATE leads SET tier = NULL WHERE id IN (1,2,3,4)`);
     await s.pool.query(`UPDATE leads SET tier = 'B' WHERE id IN (5,6)`);
     await s.pool.query(`UPDATE leads SET tier = 'A' WHERE id IN (7,8)`);
-    await s.pool.query(`UPDATE leads SET tier = 'nurture' WHERE id IN (9,10)`);
+    await s.pool.query(
+      `UPDATE leads SET tier = NULL, outreach_status = 'nurture' WHERE id IN (9,10)`,
+    );
 
     const r = await enroll(deps(s), s.campaignId, 15, { force: true });
-    expect(r.leadIds).toEqual([7, 8, 5, 6, 3, 4, 1, 2]); // nurture (9,10) excluded
+    expect(r.leadIds).toEqual([7, 8, 5, 6]);
 
     const modes = await s.pool.query(
       `SELECT lead_id, personalization_mode FROM enrollments ORDER BY lead_id`,
@@ -333,10 +485,10 @@ describe('capacity + enroll (B3.9)', () => {
         row.personalization_mode,
       ]),
     );
-    expect(byLead[7]).toBe('human_written'); // A
-    expect(byLead[5]).toBe('template_researched'); // B
-    expect(byLead[3]).toBe('template_auto'); // C
-    expect(byLead[1]).toBe('template_auto'); // untiered default
+    expect(byLead[7]).toBe('template_researched'); // A
+    expect(byLead[5]).toBe('template_auto'); // B
+    expect(byLead[3]).toBeUndefined();
+    expect(byLead[1]).toBeUndefined();
   });
 
   it('recycle guard (decision Q): a lead who already received a matching content_hash is skipped', async () => {

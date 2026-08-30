@@ -6,6 +6,7 @@
 import { http, HttpResponse, type RequestHandler } from 'msw';
 import {
   bulkTierBodySchema,
+  bulkOutreachStatusBodySchema,
   createLeadBodySchema,
   changePasswordBodySchema,
   commitImportBodySchema,
@@ -20,7 +21,7 @@ import {
   dispositionReplyBodySchema,
   eraseLeadBodySchema,
   loginBodySchema,
-  manualSendBodySchema,
+  personalizedCopyWriteBodySchema,
   patchCampaignBodySchema,
   patchAutoEnrollmentBodySchema,
   poolAddBodySchema,
@@ -49,6 +50,22 @@ import {
 import { buildTimeline, db, persistSession, NOW } from './db';
 
 const BASE = '/api/v1';
+const mockPersonalizedSources = new Map<
+  string,
+  {
+    id: number;
+    lead_id: number;
+    slot_no: number;
+    target_step_no: null;
+    subject: string;
+    body: string;
+    status: 'needs_review' | 'ready';
+    source_import_id: null;
+    content_hash: string;
+    created_at: string;
+    updated_at: string;
+  }
+>();
 
 function err(code: ApiErrorCode, message: string, status: number, details?: unknown) {
   return HttpResponse.json(
@@ -106,17 +123,33 @@ function filterLeads(url: URL): LeadDto[] {
   const tier = url.searchParams.get('tier');
   const state = url.searchParams.get('state');
   const campaignId = url.searchParams.get('campaign_id');
+  const campaignScope = url.searchParams.get('campaign_scope') ?? 'enrolled';
   const poolCampaignId = url.searchParams.get('pool_campaign_id');
   const q = url.searchParams.get('q')?.toLowerCase();
   const suppressed = url.searchParams.get('suppressed');
+  const outreachStatus = url.searchParams.get('outreach_status');
   return db.leads.filter((lead) => {
     if (tier === 'untiered' && lead.tier !== null) return false;
     if (tier && tier !== 'untiered' && lead.tier !== tier) return false;
     if (state && lead.latest_enrollment?.current_state !== state) return false;
-    if (campaignId && lead.latest_enrollment?.campaign_id !== Number(campaignId)) return false;
+    if (campaignId) {
+      const id = Number(campaignId);
+      const enrolled = lead.latest_enrollment?.campaign_id === id;
+      const pooled =
+        lead.pool_assignment?.campaign_id === id && lead.pool_assignment.status === 'available';
+      if (
+        campaignScope === 'pool'
+          ? !pooled
+          : campaignScope === 'both'
+            ? !enrolled && !pooled
+            : !enrolled
+      )
+        return false;
+    }
     if (poolCampaignId && lead.pool_assignment?.campaign_id !== Number(poolCampaignId))
       return false;
     if (suppressed !== null && lead.is_suppressed !== (suppressed === 'true')) return false;
+    if (outreachStatus && lead.outreach_status !== outreachStatus) return false;
     if (
       q &&
       ![lead.email, lead.first_name, lead.last_name, lead.company]
@@ -437,7 +470,9 @@ export const handlers: RequestHandler[] = [
       const filtered = filterLeads(url);
       return HttpResponse.json({
         ...paginate(filtered, url),
-        untiered_count: db.leads.filter((l) => l.tier === null).length,
+        untiered_count: filtered.filter(
+          (lead) => lead.tier === null && lead.outreach_status === 'standard',
+        ).length,
       });
     }),
   ),
@@ -460,6 +495,49 @@ export const handlers: RequestHandler[] = [
         timeline: buildTimeline(lead),
         manual_sendable_enrollments: manualSendable,
       });
+    }),
+  ),
+  http.get(
+    `${BASE}/leads/:id/personalized-copies`,
+    authed(({ params }) => {
+      const leadId = Number(params.id);
+      if (!db.leads.some((lead) => lead.id === leadId)) return notFound('lead');
+      return HttpResponse.json({
+        sources: [...mockPersonalizedSources.values()].filter(
+          (source) => source.lead_id === leadId,
+        ),
+        campaign_copies: [],
+      });
+    }),
+  ),
+  http.put(
+    `${BASE}/leads/:id/personalized-copy-sources/:slot`,
+    authed(async ({ request, params }) => {
+      const leadId = Number(params.id);
+      const slotNo = Number(params.slot);
+      if (!db.leads.some((lead) => lead.id === leadId)) return notFound('lead');
+      const body = await parseBody(request, personalizedCopyWriteBodySchema);
+      if (body instanceof Response) return body;
+      if (body.action === 'copy_from_source') {
+        return err('validation', 'an unassigned source cannot copy from itself', 400);
+      }
+      const key = `${leadId}:${slotNo}`;
+      const existing = mockPersonalizedSources.get(key);
+      const source = {
+        id: existing?.id ?? leadId * 1000 + slotNo,
+        lead_id: leadId,
+        slot_no: slotNo,
+        target_step_no: null,
+        subject: body.subject ?? '',
+        body: body.body ?? '',
+        status: body.action === 'mark_ready' ? ('ready' as const) : ('needs_review' as const),
+        source_import_id: null,
+        content_hash: `mock-${leadId}-${slotNo}-${(body.subject ?? '').length}-${(body.body ?? '').length}`,
+        created_at: existing?.created_at ?? NOW,
+        updated_at: NOW,
+      };
+      mockPersonalizedSources.set(key, source);
+      return HttpResponse.json({ result: existing ? 'replaced' : 'created', source });
     }),
   ),
   http.patch(
@@ -499,6 +577,7 @@ export const handlers: RequestHandler[] = [
         city: body.city ?? null,
         state: body.state ?? null,
         tier: null, // decision R — imported leads start untiered
+        outreach_status: 'standard',
         is_suppressed: false,
         custom_fields: {},
       });
@@ -522,6 +601,29 @@ export const handlers: RequestHandler[] = [
         targets = filterLeads(url);
       }
       for (const lead of targets) lead.tier = body.tier;
+      return HttpResponse.json({ updated: targets.length });
+    }),
+  ),
+  http.post(
+    `${BASE}/leads/bulk-outreach-status`,
+    authed(async ({ request }) => {
+      const body = await parseBody(request, bulkOutreachStatusBodySchema);
+      if (body instanceof Response) return body;
+      let targets: LeadDto[] = [];
+      if (body.lead_ids) {
+        const ids = new Set(body.lead_ids);
+        targets = db.leads.filter((lead) => ids.has(lead.id));
+      } else if (body.filter) {
+        const url = new URL('http://mock/leads');
+        for (const [key, value] of Object.entries(body.filter)) {
+          if (value !== undefined) url.searchParams.set(key, String(value));
+        }
+        targets = filterLeads(url);
+      }
+      for (const lead of targets) {
+        lead.outreach_status = body.outreach_status;
+        lead.tier = null;
+      }
       return HttpResponse.json({ updated: targets.length });
     }),
   ),
@@ -595,7 +697,7 @@ export const handlers: RequestHandler[] = [
         const candidates = db.leads.filter(
           (lead) =>
             !lead.is_suppressed &&
-            lead.tier !== 'nurture' &&
+            lead.outreach_status !== 'nurture' &&
             !db.campaignPools.some(
               (pool) => pool.lead.id === lead.id && pool.status === 'available',
             ),
@@ -653,6 +755,12 @@ export const handlers: RequestHandler[] = [
         invalid_drafts: 0,
         allocations_created: allocationsCreated,
         remaining_global: Math.max(0, imported - allocationsCreated),
+        sources_created: 0,
+        sources_replaced: 0,
+        sources_skipped: 0,
+        copies_bound: 0,
+        copies_unassigned: 0,
+        copy_conflicts: 0,
       });
     }),
   ),
@@ -724,6 +832,7 @@ export const handlers: RequestHandler[] = [
           step_no: step.step_no,
           wait_days: step.wait_days,
           in_thread: step.in_thread,
+          content_source: step.content_source,
           variants: step.variants.map((v) => ({
             id: db.nextId++,
             label: v.label,
@@ -762,6 +871,7 @@ export const handlers: RequestHandler[] = [
           step_no: step.step_no,
           wait_days: step.wait_days,
           in_thread: step.in_thread,
+          content_source: step.content_source,
           variants: step.variants.map((v) => ({
             id: v.id ?? db.nextId++,
             label: v.label,
@@ -859,9 +969,9 @@ export const handlers: RequestHandler[] = [
         name: body.name,
         status: 'draft' as const,
         sequence_id: body.sequence_id,
-        tier_effort_config: body.tier_effort_config ?? {
-          A: 'human_written' as const,
-          B: 'template_researched' as const,
+        tier_effort_config: {
+          A: 'template_researched' as const,
+          B: 'template_auto' as const,
           C: 'template_auto' as const,
         },
         ramp_config: body.ramp_config ?? { ramp_days: 7, ramp_daily_enroll_cap: 20 },
@@ -974,7 +1084,7 @@ export const handlers: RequestHandler[] = [
         .filter(
           (lead) =>
             !lead.is_suppressed &&
-            lead.tier !== 'nurture' &&
+            lead.outreach_status !== 'nurture' &&
             !db.campaignPools.some(
               (pool) => pool.lead.id === lead.id && pool.status === 'available',
             ),
@@ -1172,6 +1282,8 @@ export const handlers: RequestHandler[] = [
           duplicates: 36,
           rest_period_failures: 42,
           nurture_exclusions: 10,
+          untiered_exclusions: 0,
+          personalized_copy_blocks: 0,
           suppression_recontact_blocks: 8,
           existing_target_enrollments: 4,
           prior_content_conflicts: 12,
@@ -1215,6 +1327,8 @@ export const handlers: RequestHandler[] = [
           duplicates: 36,
           rest_period_failures: 42,
           nurture_exclusions: 10,
+          untiered_exclusions: 0,
+          personalized_copy_blocks: 0,
           suppression_recontact_blocks: 8,
           existing_target_enrollments: 4,
           prior_content_conflicts: 12,
@@ -1505,18 +1619,13 @@ export const handlers: RequestHandler[] = [
   ),
   http.post(
     `${BASE}/manual-sends`,
-    authed(async ({ request }) => {
-      const body = await parseBody(request, manualSendBodySchema);
-      if (body instanceof Response) return body;
-      const lead = db.leads.find((l) => l.id === body.lead_id);
-      if (!lead) return notFound('lead');
-      if (lead.is_suppressed) return err('conflict', 'lead is suppressed', 409);
-      return HttpResponse.json({
-        enrollment_id: lead.id,
-        message_id: `<ce-manual-${lead.id}-${db.nextId++}@mock>`,
-        checks: mockChecks,
-      });
-    }),
+    authed(() =>
+      err(
+        'conflict',
+        'manual sending is retired; save Personalized Copy and send through a sequence',
+        410,
+      ),
+    ),
   ),
 
   // ── analytics ─────────────────────────────────────────────────────────────
@@ -1766,6 +1875,7 @@ export const handlers: RequestHandler[] = [
           last_successful_poll_at: m.last_successful_poll_at,
         })),
         pending_jobs: 0,
+        personalized_copy_blocked_count: 0,
       }),
     ),
   ),

@@ -82,6 +82,28 @@ export interface ParsedRow {
   rowNo: number;
   fields: Partial<Record<CanonicalField, string>>;
   customFields: Record<string, string>;
+  copySlots?: Record<number, { subject?: string; body?: string; targetStepNo: number | null }>;
+  copyConflicts?: string[];
+}
+
+export function decodePersonalizedCopyEscapes(value: string): string {
+  let decoded = '';
+  for (let index = 0; index < value.length; index += 1) {
+    if (value[index] !== '\\') {
+      decoded += value[index];
+      continue;
+    }
+    if (value[index + 1] === '\\' && value[index + 2] === 'n') {
+      decoded += '\\n';
+      index += 2;
+    } else if (value[index + 1] === 'n') {
+      decoded += '\n';
+      index += 1;
+    } else {
+      decoded += value[index];
+    }
+  }
+  return decoded;
 }
 
 export function toSnakeCase(header: string): string {
@@ -127,7 +149,9 @@ export async function parseCsv(buffer: Buffer): Promise<ParsedRow[]> {
   );
 
   let headerMap: Array<
-    { kind: 'field'; field: CanonicalField } | { kind: 'custom'; key: string }
+    | { kind: 'field'; field: CanonicalField }
+    | { kind: 'copy'; slotNo: number; part: 'subject' | 'body'; targetStepNo: number }
+    | { kind: 'custom'; key: string }
   > | null = null;
   const rows: ParsedRow[] = [];
 
@@ -135,6 +159,15 @@ export async function parseCsv(buffer: Buffer): Promise<ParsedRow[]> {
     if (headerMap === null) {
       headerMap = record.map((h) => {
         const key = toSnakeCase(h);
+        const stepCopy = /^step_(\d+)_(subject|body)$/.exec(key);
+        if (stepCopy) {
+          return {
+            kind: 'copy' as const,
+            slotNo: Number(stepCopy[1]),
+            targetStepNo: Number(stepCopy[1]),
+            part: stepCopy[2] as 'subject' | 'body',
+          };
+        }
         const field = ALIASES[key];
         return field ? { kind: 'field' as const, field } : { kind: 'custom' as const, key };
       });
@@ -148,15 +181,40 @@ export async function parseCsv(buffer: Buffer): Promise<ParsedRow[]> {
     }
     const fields: Partial<Record<CanonicalField, string>> = {};
     const customFields: Record<string, string> = {};
+    const copySlots: ParsedRow['copySlots'] = {};
+    const copyConflicts: string[] = [];
     for (let i = 0; i < headerMap.length; i++) {
       const value = (record[i] ?? '').trim();
       if (value === '') continue;
       const m = headerMap[i]!;
       // first non-empty wins when two headers alias the same field
       if (m.kind === 'field') fields[m.field] ??= value;
-      else if (m.key !== '') customFields[m.key] ??= value;
+      else if (m.kind === 'copy') {
+        const slot = (copySlots[m.slotNo] ??= { targetStepNo: m.targetStepNo });
+        slot[m.part] ??= decodePersonalizedCopyEscapes(value);
+      } else if (m.key !== '') customFields[m.key] ??= value;
     }
-    rows.push({ rowNo: rows.length + 1, fields, customFields });
+    if (fields.manual_subject || fields.manual_body) {
+      const slot = (copySlots[1] ??= { targetStepNo: null });
+      const genericSubject = fields.manual_subject
+        ? decodePersonalizedCopyEscapes(fields.manual_subject)
+        : undefined;
+      const genericBody = fields.manual_body
+        ? decodePersonalizedCopyEscapes(fields.manual_body)
+        : undefined;
+      if (
+        slot.targetStepNo === 1 &&
+        ((genericSubject && slot.subject && genericSubject !== slot.subject) ||
+          (genericBody && slot.body && genericBody !== slot.body))
+      ) {
+        copyConflicts.push('generic_and_step_1');
+      } else {
+        slot.subject ??= genericSubject;
+        slot.body ??= genericBody;
+        if (slot.targetStepNo !== 1) slot.targetStepNo = null;
+      }
+    }
+    rows.push({ rowNo: rows.length + 1, fields, customFields, copySlots, copyConflicts });
   }
   return rows;
 }

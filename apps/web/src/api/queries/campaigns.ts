@@ -6,6 +6,7 @@ import {
   outcomesResponseSchema,
   campaignPoolResponseSchema,
   autoEnrollmentRunsResponseSchema,
+  personalizedCopyCoverageResponseSchema,
 } from '@coldemail/shared';
 import { apiFetch } from '../client';
 import { POLL } from '../queryClient';
@@ -14,6 +15,18 @@ export function useCampaigns() {
   return useQuery({
     queryKey: ['campaigns'],
     queryFn: () => apiFetch('/campaigns', campaignsListResponseSchema),
+    refetchInterval: POLL.operational,
+  });
+}
+
+export function usePersonalizedCopyCoverage(campaignId: number) {
+  return useQuery({
+    queryKey: ['campaigns', campaignId, 'personalized-copy-coverage'],
+    queryFn: () =>
+      apiFetch(
+        `/campaigns/${campaignId}/personalized-copy-coverage`,
+        personalizedCopyCoverageResponseSchema,
+      ),
     refetchInterval: POLL.operational,
   });
 }

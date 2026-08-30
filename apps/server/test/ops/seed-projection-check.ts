@@ -13,7 +13,7 @@ const cohort = await scenario({
 });
 
 try {
-  await cohort.importLeads(5, { tiers: { A: 2, B: 2, C: 1 } });
+  await cohort.importLeads(5, { tiers: { A: 2, B: 3 } });
   const enrolled = await cohort.enroll({ count: 5 });
   console.log(`seeded ${enrolled.length} event-backed enrollments for projection verification`);
 } finally {

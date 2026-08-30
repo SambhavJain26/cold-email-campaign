@@ -1,5 +1,11 @@
 # API Contract — v1 (frozen seam between backend and frontend)
 
+> **Migration 0019 additive contract:** sequence writes include
+> `content_source=template|personalized`; Personalized Copy source/campaign-step APIs replace manual
+> draft/send APIs; Leads accepts `campaign_id` plus `campaign_scope=pool|enrolled|both`; current
+> tier writes allow A/B/null and use separate `outreach_status`. Legacy manual endpoints return
+> `410 Gone`. See [docs/22](22-personalized-copy-two-tier.md).
+
 All routes under `/api/v1` **except** `GET /health`, public Google callback
 `GET /oauth/google/callback`, and the public unsubscribe pair `GET|POST /u/:token`. The production
 gateway prefixes the app/API/callback with `/email-campaign` while leaving unsubscribe hosts at

@@ -1,12 +1,9 @@
-import { toast } from 'sonner';
 import type { TierAnalyticsRow } from '@coldemail/shared';
-import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { EmptyState } from '@/components/shared/empty-state';
 import { DataTable, type DataTableColumn } from '@/components/shared/data-table';
 import { TierBadge } from '@/components/shared/tier-badge';
 import { useTierAnalytics } from '@/api/queries/analytics';
-import { useBulkTier } from '@/api/mutations/leads';
 import { tiersReconciliation } from './reconciliation';
 
 const MODE_LABEL: Record<string, string> = {
@@ -15,7 +12,7 @@ const MODE_LABEL: Record<string, string> = {
   template_auto: 'auto (Mode 2)',
 };
 
-/** F7.3 — 13c tier performance + the promote action (engaged Tier-C → Tier B). */
+/** F7.3 — current A/B performance plus read-only legacy tier snapshots. */
 export function TiersTab({
   campaignId,
   campaignMeetings,
@@ -26,7 +23,6 @@ export function TiersTab({
   campaignContacted: number | null;
 }) {
   const { data, isPending, isError, refetch } = useTierAnalytics(campaignId);
-  const bulkTier = useBulkTier();
 
   if (isPending) return <Skeleton className="h-40 w-full" />;
   if (isError) {
@@ -44,7 +40,18 @@ export function TiersTab({
   const totalMeetings = checks[0]!.sum;
   const promotable = data.promotable.tier_c_engaged;
   const columns: Array<DataTableColumn<TierAnalyticsRow>> = [
-    { key: 'tier', header: 'Tier', cell: (row) => <TierBadge tier={row.tier} /> },
+    {
+      key: 'tier',
+      header: 'Tier',
+      cell: (row) => (
+        <span className="flex items-center gap-2">
+          <TierBadge tier={row.tier} />
+          {(row.tier === 'C' || row.tier === 'nurture') && (
+            <span className="text-xs text-muted-foreground">Legacy</span>
+          )}
+        </span>
+      ),
+    },
     { key: 'contacted', header: 'Contacted', align: 'right', cell: (row) => row.contacted },
     {
       key: 'reply',
@@ -116,39 +123,22 @@ export function TiersTab({
           </p>
         )}
         <p>
-          • Tier C converts thinnest; consider recycling those leads with a sharper segment message
-          rather than spending more effort per lead.
+          • Legacy Tier C converts thinnest; consider recycling those leads with a sharper segment
+          message. New enrollment uses only Tier A and Tier B.
         </p>
         {promotable > 0 && (
           <p>
-            • {promotable} Tier-C leads replied — promote them to Tier B (researched mode) for the
-            next pass.
+            • {promotable} historical Tier-C leads replied. Their analytics remain visible while
+            current tier controls stay limited to A and B.
           </p>
         )}
       </div>
 
       {promotable > 0 && (
-        <Button
-          size="sm"
-          variant="outline"
-          disabled={bulkTier.isPending}
-          data-testid="promote-tier-c"
-          onClick={() =>
-            // The server picks the set from the same filter it shares with the
-            // leads list: engaged (REPLIED) Tier-C leads in THIS campaign.
-            bulkTier.mutate(
-              {
-                filter: { tier: 'C', state: 'REPLIED', campaign_id: campaignId },
-                tier: 'B',
-              },
-              {
-                onSuccess: (result) => toast.success(`Promoted ${result.updated} leads to Tier B`),
-              },
-            )
-          }
-        >
-          Promote {promotable} engaged Tier-C → Tier B
-        </Button>
+        <p className="text-sm text-muted-foreground">
+          {promotable} historical Tier-C replies are retained for legacy analytics. Current lead
+          tier controls use only Tier A and Tier B.
+        </p>
       )}
     </div>
   );

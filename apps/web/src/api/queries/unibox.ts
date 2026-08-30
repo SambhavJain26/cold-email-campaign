@@ -1,6 +1,5 @@
 import { useQuery } from '@tanstack/react-query';
 import {
-  manualComposePrefillSchema,
   reminderListResponseSchema,
   uniboxDetailResponseSchema,
   uniboxListResponseSchema,
@@ -15,15 +14,6 @@ export interface UniboxQuery {
   sentiment?: 'positive' | 'neutral' | 'negative';
   mailbox_id?: number;
   unhandled?: boolean;
-}
-
-export function useManualComposePrefill(enrollmentId: number | undefined) {
-  return useQuery({
-    queryKey: ['manual-compose-prefill', enrollmentId],
-    queryFn: () =>
-      apiFetch(`/enrollments/${enrollmentId}/manual-compose-prefill`, manualComposePrefillSchema),
-    enabled: enrollmentId !== undefined,
-  });
 }
 
 export interface ReminderQuery {

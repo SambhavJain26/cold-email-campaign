@@ -47,6 +47,50 @@ export async function latestSentToLead(
   return rows[0];
 }
 
+/** Exact immutable snapshot for a prior send of one enrollment step. */
+export async function sentMessageForStep(
+  db: DbLike,
+  enrollmentId: number,
+  stepNo: number,
+): Promise<SentMessageRow | undefined> {
+  return (
+    await db
+      .select()
+      .from(sentMessages)
+      .where(and(eq(sentMessages.enrollmentId, enrollmentId), eq(sentMessages.stepNo, stepNo)))
+      .orderBy(desc(sentMessages.sentAt))
+      .limit(1)
+  )[0];
+}
+
+/** Exact Step-1 subject is the audit/threading anchor for every later step. */
+export async function firstSentMessage(
+  db: DbLike,
+  enrollmentId: number,
+): Promise<SentMessageRow | undefined> {
+  return (
+    await db
+      .select()
+      .from(sentMessages)
+      .where(eq(sentMessages.enrollmentId, enrollmentId))
+      .orderBy(sentMessages.sentAt)
+      .limit(1)
+  )[0];
+}
+
+export async function leadReceivedContentHash(
+  db: DbLike,
+  leadId: number,
+  contentHash: string,
+): Promise<boolean> {
+  const rows = await db
+    .select({ messageId: sentMessages.messageId })
+    .from(sentMessages)
+    .where(and(eq(sentMessages.leadId, leadId), eq(sentMessages.contentHash, contentHash)))
+    .limit(1);
+  return rows.length > 0;
+}
+
 /**
  * Recycle hash guard probe (decision Q, docs/09 §6): which of the candidate
  * hashes have ANY of these leads already received?

@@ -88,7 +88,7 @@ describe('manual compose (B4.10)', () => {
       [seqId],
     );
     await pool.query(
-      `INSERT INTO leads (email, first_name, company, state) VALUES ('jane@acme.dev', 'Jane', 'Acme', 'TX')`,
+      `INSERT INTO leads (email, first_name, company, state, tier) VALUES ('jane@acme.dev', 'Jane', 'Acme', 'TX', 'B')`,
     );
     await pool.query(
       `INSERT INTO enrollments (lead_id, campaign_id, current_state, current_step_no, personalization_mode, enrolled_at, next_send_at)
@@ -208,7 +208,7 @@ describe('manual compose (B4.10)', () => {
        RETURNING id`,
     );
     await pool.query(
-      `INSERT INTO manual_campaign_drafts
+      `INSERT INTO campaign_personalized_copies
          (lead_id, campaign_id, source_import_id, subject, body)
        VALUES (1, 1, $1, $2, $3)`,
       [imp.rows[0].id, SUBJECT, BODY],
@@ -239,7 +239,7 @@ describe('manual compose (B4.10)', () => {
       ),
     ).rejects.toThrow(/marked ready/);
 
-    await pool.query(`UPDATE manual_campaign_drafts SET status = 'ready' WHERE id = 1`);
+    await pool.query(`UPDATE campaign_personalized_copies SET status = 'ready' WHERE id = 1`);
     const result = await manualSend(
       {
         ...deps(),
@@ -248,7 +248,7 @@ describe('manual compose (B4.10)', () => {
     );
     expect(result.outcome).toBe('sent');
     const draft = await pool.query(
-      `SELECT status, sent_message_id, sent_event_id, sent_at FROM manual_campaign_drafts WHERE id = 1`,
+      `SELECT status, sent_message_id, sent_event_id, sent_at FROM campaign_personalized_copies WHERE id = 1`,
     );
     expect(draft.rows[0].status).toBe('sent');
     expect(draft.rows[0].sent_message_id).toBe(result.messageId);

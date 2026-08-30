@@ -1,9 +1,19 @@
 # User Manual Companion: Plain-Language Answers and Product Notes
 
 This document answers the questions raised after reading [the main user manual](19-user-manual.md).
-It is a companion to that manual, not a replacement for it. The answers describe the application
-as it works on 25 August 2026. Where an idea would require a product change, the answer says so
-explicitly.
+It is a companion to that manual, not a replacement for it. The answers are reconciled through the
+locally verified 30 August 2026 migration `0019` candidate on `canary`. That candidate is not yet
+deployed; Spaceship remains on application code `6ca1183`.
+
+> **Current correction:** Personalized copy is no longer a human-written tier or direct-send mode.
+> Sequence steps choose Template or Personalized Copy. Current tiers are only A/B/Untiered;
+> Nurture is a separate outreach hold. `manual_subject`/`manual_body` create a global source, while
+> `step_N_subject`/`step_N_body` can bind exact personalized steps. The Personalized Copy editor
+> saves/reviews this content and has no mailbox or Send button; the scheduler performs every send.
+> Missing/unreviewed copy fails closed for only that lead. Campaign-scoped Leads filtering supports
+> Pool, Enrolled, and Both and drives exact bulk tiering. Older answers below that describe Manual
+> Compose, Mode 1, current Tier C, or Nurture-as-tier are predecessor behavior retained for audit;
+> use [docs/22](22-personalized-copy-two-tier.md) for the authoritative model.
 
 ## How to read the status labels
 

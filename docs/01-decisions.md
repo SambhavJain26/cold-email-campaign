@@ -1,5 +1,23 @@
 # Decision Register
 
+> **Current decision overlay (migration 0019):** sequence steps, not tiers, choose Template or
+> Personalized Copy; current tiers are A/B/Untiered; Nurture is a separate outreach status; all
+> sends are scheduler-only. [Docs/22](22-personalized-copy-two-tier.md) supersedes conflicting
+> Mode 1/Manual Compose/Tier C current-behavior entries below while preserving them as history.
+
+## Personalized Copy decisions (2026-08-30)
+
+| ID | Decision | Rationale |
+|----|----------|-----------|
+| PC1 | Personalized copy is a sequence-step content source, never a lead tier or delivery mode. | The same lead can receive personalized Steps 1 and 3 with different copy while template steps remain category-driven. |
+| PC2 | All mail sends through the scheduler; old manual-send routes return 410. | One delivery pipeline preserves reply locks, suppression, pacing, caps, threading, footer/checks, transport confirmation, and events. |
+| PC3 | Current tiers are A/B/null; Nurture is a separate outreach status. | Tier represents template observation behavior; Nurture represents “do not enroll.” Historical snapshots remain unchanged. |
+| PC4 | Imported copy first becomes a global lead/slot source, then copy-on-assignment creates an independent campaign-step snapshot. | A 1,000-lead source file can feed exact campaign subsets without later global edits rewriting campaign copy. |
+| PC5 | Complete imported copy starts `needs_review`; missing/unreviewed personalized copy fails closed for only that lead. | Human-authored content needs an explicit readiness decision and must never silently fall back to unrelated template text. |
+| PC6 | Template steps require variants; personalized steps forbid variants; sent sequences cannot change a step's source. | Every personalized lead copy is its variation, and immutable sent semantics protect audit/history. |
+| PC7 | Campaign lead filtering has exact Pool, Enrolled, and deduplicated Both scopes; listing and bulk “all matching” share one predicate. | Operators can bulk-tier the intended campaign cohort without accidentally changing global leads. |
+| PC8 | `\n` decoding applies only to personalized-copy CSV cells; `\\n` remains literal. | Spreadsheet-friendly bodies gain predictable newlines without mutating ordinary lead/custom fields. |
+
 ## Pre-canary remediation decisions (2026-08-09)
 
 | ID | Decision | Rationale |

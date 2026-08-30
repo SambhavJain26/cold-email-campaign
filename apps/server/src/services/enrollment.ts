@@ -1,7 +1,7 @@
 // Capacity + enrollment (B3.9, docs/06 §7, walkthrough Stages 5/8).
 import type { Db, DbLike, Tx } from '../db/client';
 import type { Clock } from '../clock';
-import type { LeadTier } from '@coldemail/shared';
+import type { CurrentLeadTier, LeadTier } from '@coldemail/shared';
 import type { EventStore } from './eventStore';
 import type { SequenceProvider } from '../scheduler/types';
 import { getSettings } from '../db/repos/settingsRepo';
@@ -15,7 +15,7 @@ import {
   enrolledLeadIdsIn,
   insertEnrollments,
 } from '../db/repos/enrollmentsRepo';
-import { getCampaign, rampStagesOf, tierEffortOf, type RampStage } from '../db/repos/campaignsRepo';
+import { getCampaign, rampStagesOf, type RampStage } from '../db/repos/campaignsRepo';
 import {
   leadsByIds,
   activeEnrollmentLeadIds,
@@ -37,6 +37,7 @@ import {
 } from '../db/repos/campaignPoolRepo';
 import { poolEligibility } from './campaignPools';
 import { acquireEnrollmentCapacityLock } from '../db/repos/locksRepo';
+import { campaignPersonalizedCopyReadiness } from '../db/repos/manualDraftsRepo';
 
 export interface EnrollmentDeps {
   db: Db;
@@ -157,17 +158,17 @@ export interface EnrollResult {
 }
 
 /**
- * Count-based enrollment: selects eligible leads (suppression, dedupe,
- * recycle guard, nurture exclusion — enforced in SQL), tier order A→B→C→
- * untiered, oldest first; appends `enrolled` per lead with next_send_at = now
- * and personalization_mode from tier_effort_config. Rejects count > suggested
- * unless force.
+ * Count-based enrollment selects eligible leads (suppression, dedupe,
+ * recycle guard, Nurture/Untiered exclusion, and personalized Step-1
+ * readiness), Tier A→B oldest first. It appends `enrolled` with
+ * next_send_at = now and the fixed tier mode. Rejects count > suggested unless
+ * force.
  */
 export async function enroll(
   deps: EnrollmentDeps,
   campaignId: number,
   count: number,
-  opts: { tier?: LeadTier; force?: boolean } = {},
+  opts: { tier?: CurrentLeadTier; force?: boolean } = {},
 ): Promise<EnrollResult> {
   return deps.db.transaction(async (tx) => {
     await acquireEnrollmentCapacityLock(tx);
@@ -187,6 +188,7 @@ export async function enroll(
         campaignId,
         candidates.map((candidate) => candidate.leadId),
         now,
+        { requireTier: true },
       );
       const eligibleIds = new Set(checked.eligible.map((lead) => lead.id));
       for (const candidate of candidates) {
@@ -198,7 +200,11 @@ export async function enroll(
         );
       }
       const selected = candidates
-        .filter((candidate) => eligibleIds.has(candidate.leadId))
+        .flatMap((candidate) =>
+          eligibleIds.has(candidate.leadId) && (candidate.tier === 'A' || candidate.tier === 'B')
+            ? [{ ...candidate, tier: candidate.tier }]
+            : [],
+        )
         .slice(0, count);
       const result = await enrollLeadsInTransaction(
         deps,
@@ -216,13 +222,38 @@ export async function enroll(
       }
       return result;
     }
-    const eligible = await selectEligibleLeads(
+    let eligible = await selectEligibleLeads(
       tx,
       campaignId,
       allContentHashes(seq),
-      count,
+      Math.max(count, count * 10),
       opts.tier,
     );
+    const firstStep = seq.steps.find((step) => step.stepNo === 1);
+    if (firstStep?.contentSource === 'personalized' && firstStep.id) {
+      const readiness = await campaignPersonalizedCopyReadiness(
+        tx,
+        campaignId,
+        firstStep.id,
+        eligible.map((lead) => lead.id),
+      );
+      const blocked = new Map<string, number>();
+      eligible = eligible.filter((lead) => {
+        const reason = readiness.get(lead.id);
+        if (reason) blocked.set(reason, (blocked.get(reason) ?? 0) + 1);
+        return !reason;
+      });
+      eligible = eligible.slice(0, count);
+      const result = await enrollLeadsInTransaction(deps, tx, campaignId, eligible, now);
+      result.skipped.push(
+        ...[...blocked].map(([reason, blockedCount]) => ({ reason, count: blockedCount })),
+      );
+      if (eligible.length < count) {
+        result.skipped.push({ reason: 'insufficient_eligible', count: count - eligible.length });
+      }
+      return result;
+    }
+    eligible = eligible.slice(0, count);
     const result = await enrollLeadsInTransaction(deps, tx, campaignId, eligible, now);
     if (eligible.length < count) {
       result.skipped.push({ reason: 'insufficient_eligible', count: count - eligible.length });
@@ -268,6 +299,11 @@ export async function enrollByIds(
     const activeElsewhere = await activeEnrollmentLeadIds(tx, unique, campaignId);
     const conflicted = await leadsWithHashConflict(tx, unique, allContentHashes(seq));
     const recontact = await recontactStatusByLeadIds(tx, unique);
+    const firstStep = seq.steps.find((step) => step.stepNo === 1);
+    const copyReadiness =
+      firstStep?.contentSource === 'personalized' && firstStep.id
+        ? await campaignPersonalizedCopyReadiness(tx, campaignId, firstStep.id, unique)
+        : new Map<number, string | null>();
 
     const skippedCounts = new Map<string, number>();
     const skip = (reason: string) =>
@@ -287,6 +323,9 @@ export async function enrollByIds(
       else if (recontact.get(id)?.hasUndispositionedReply) skip('reply_needs_disposition');
       else if ((recontact.get(id)?.blockedUntil?.getTime() ?? 0) > now.getTime())
         skip('recontact_not_due');
+      else if (lead.outreachStatus === 'nurture') skip('nurture');
+      else if (lead.tier !== 'A' && lead.tier !== 'B') skip('untiered');
+      else if (copyReadiness.get(id)) skip(copyReadiness.get(id)!);
       else eligible.push({ id: lead.id, tier: lead.tier });
     }
 
@@ -310,10 +349,8 @@ export async function enrollLeadsInTransaction(
   const { store } = deps;
   if (eligible.length === 0) return { enrolled: 0, leadIds: [], enrollmentIds: [], skipped: [] };
 
-  const campaign = await getCampaign(tx, campaignId);
-  const effort = tierEffortOf(campaign!);
-  const modeFor = (tier: LeadTier | null) =>
-    tier === null || tier === 'nurture' ? 'template_auto' : effort[tier];
+  const modeFor = (tier: CurrentLeadTier | null) =>
+    tier === 'A' ? 'template_researched' : 'template_auto';
 
   const enrollmentIds = await insertEnrollments(
     tx,

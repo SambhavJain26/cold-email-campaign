@@ -4,11 +4,26 @@
 
 **Legend:** `[ ]` not started · `[~]` in progress · `[x]` done · `[!]` blocked (note why in the log)
 
-**Current focus:** → **Campaign pools/auto-enrollment/permanent caps are verified and deployed on
-the one-word `canary` branch; application code remains `6ca1183`.** Production has no campaigns, leads, enrollments, available pooled leads,
-or auto-enrollment-enabled campaigns, so it remains dormant. No campaign activation, enrollment,
-outbound send, Oracle change, DNS change, or `main` merge was performed. Every future deploy,
-activation, enrollment, or owner/prospect send remains separately approval-gated.
+**Current focus:** → **Personalized Copy, current A/B tiers, separate Nurture status, and exact
+Campaign Pool/Enrolled/Both lead filtering are implemented and verified locally on `canary`.** The
+candidate is not deployed. Spaceship remains on application code `6ca1183` with no campaigns,
+leads, enrollments, available pooled leads, or auto-enrollment-enabled campaigns. No campaign
+activation, enrollment, outbound send, production/Oracle/DNS change, or `main` merge was performed.
+Every deploy, activation, enrollment, or owner/prospect send remains separately approval-gated.
+
+**2026-08-30 Personalized Copy/two-tier implementation:** migration `0019` replaces direct Manual
+Compose sending with source and campaign-step Personalized Copy records used only by sequence
+steps. Template steps retain variants and fixed Tier A researched/Tier B Auto behavior;
+personalized steps have no variants and fail closed per lead when copy is missing, invalid, or not
+ready. Current lead controls allow A/B/Untiered, Nurture is a separate outreach hold, sent copy is
+snapshotted, CSV import supports generic and `step_N_*` copy with safe newline decoding and atomic
+100/100/800 assignment, and Campaign Pool/Enrolled/Both filters share their predicate with exact
+bulk tiering. The complete local gate passed: type/lint/format; unit 345; web 58; integration 168;
+API 138; GreenMail 29; golden exactly 47; mock E2E 61; real-backend E2E 1; production build;
+migration 0019 apply/down/apply; populated `checked 5 enrollments — 0 diff(s)`; clean self-check;
+and a 110,760-byte custom-format dump catalog/restore/rebuild/zero-drift/self-check drill. The
+scratch database and dump were removed. Production was not inspected or changed for deployment,
+and its required zero-legacy pre-deploy check remains a future deploy gate.
 
 > **⚠️ Superseded framing (corrected 2026-08-09).** This line previously read "No code work is outstanding" and "everything left in B8 … is *operations*, not code." **That was wrong.** Operating the canary against a real provider exposed genuine **code** defects — the reply/send race (finding 15), whole-mailbox history ingestion (16), plain-text-only mail (19), and a class of backend-implemented/UI-invisible gaps (3–9). All were fixed on `b8.3-local-canary`. Treat [docs/17](docs/17-local-canary-runbook.md) as the authoritative status record, not this header.
 

@@ -1,5 +1,10 @@
 # Domain — Event Catalog, State Machine Reducer, Invariants
 
+> **Migration 0019 overlay:** personalized steps still use the same append-only enrollment/event
+> state machine. Exact rendered content is snapshotted in `sent_messages`; copy blockers are
+> durable operational state and PII erasure scrubs copy/snapshots without rewriting event lineage.
+> See [docs/22](22-personalized-copy-two-tier.md).
+
 Implements spec Parts 2–4. This layer (`apps/server/src/domain/`) is **pure**: no I/O, no dates from the wall clock, no imports from db/api/transport. Everything here is exhaustively unit-testable.
 
 ---

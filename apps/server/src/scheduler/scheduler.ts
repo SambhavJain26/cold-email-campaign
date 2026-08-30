@@ -31,7 +31,12 @@ import {
   listDue,
   type DueEnrollment,
 } from '../db/repos/enrollmentsRepo';
-import { insertSentMessage } from '../db/repos/sentMessagesRepo';
+import {
+  firstSentMessage,
+  insertSentMessage,
+  leadReceivedContentHash,
+  sentMessageForStep,
+} from '../db/repos/sentMessagesRepo';
 import { issueToken } from '../db/repos/unsubscribeTokensRepo';
 import { resolveUnsubscribeBaseUrl } from '../services/unsubscribeBaseUrl';
 import {
@@ -57,6 +62,15 @@ import { pickMailbox, type RotationCandidate } from './rotation';
 import { buildMessageId, buildThreadHeaders } from './mime';
 import { isRateLimitError, transientVerdict } from './providerBlock';
 import { reconcileSendBlockerEpisodes } from '../db/repos/sendBlockerEpisodesRepo';
+import {
+  clearPersonalizedCopyBlocker,
+  getCampaignPersonalizedCopy,
+  markManualDraftSent,
+  setPersonalizedCopyBlocker,
+  type ManualDraftRow,
+  type PersonalizedCopyBlockerReason,
+} from '../db/repos/manualDraftsRepo';
+import type { RenderedMessage } from '../render/types';
 
 const SCHEDULER_LOCK = [2, 0] as const; // advisory keyspace: (2,0) = tick
 
@@ -241,7 +255,7 @@ export class Scheduler {
     if (manualDue.length > 0) {
       blockers.push({
         code: 'manual_only',
-        message: `${manualDue.length} due Tier A enrollment${manualDue.length === 1 ? '' : 's'} require the manual composer.`,
+        message: `${manualDue.length} legacy human-written enrollment${manualDue.length === 1 ? ' is' : 's are'} held; migrate campaign content to sequence Personalized Copy before sending.`,
       });
     }
     if (automaticDue.length > 0 && budgets.size > 0) {
@@ -445,6 +459,44 @@ export class Scheduler {
     const step = stepOf(seq, stepNo);
     if (!step) return 'no_step'; // past the end — completion housekeeping owns this
 
+    const personalized = step.contentSource === 'personalized';
+    let personalizedCopy: ManualDraftRow | null = null;
+    let retrySnapshot: Awaited<ReturnType<typeof sentMessageForStep>> | null = null;
+    if (personalized) {
+      if (step.id === undefined) {
+        await this.blockPersonalizedCopy(e, stepNo, -stepNo, 'missing', now);
+        return 'render_failed';
+      }
+      if (retryOf) {
+        retrySnapshot = (await sentMessageForStep(db, e.id, stepNo)) ?? null;
+        if (
+          !retrySnapshot?.renderedSubject ||
+          !retrySnapshot.renderedBodyText ||
+          !retrySnapshot.renderedBodyHtml
+        ) {
+          await this.blockPersonalizedCopy(e, stepNo, step.id, 'missing', now);
+          return 'render_failed';
+        }
+      } else {
+        personalizedCopy =
+          (await getCampaignPersonalizedCopy(db, e.leadId, e.campaignId, step.id)) ?? null;
+        const reason: PersonalizedCopyBlockerReason | null = !personalizedCopy
+          ? 'missing'
+          : personalizedCopy.status !== 'ready'
+            ? 'needs_review'
+            : !personalizedCopy.subject.trim() || !personalizedCopy.body.trim()
+              ? 'invalid_copy'
+              : (await leadReceivedContentHash(db, e.leadId, personalizedCopy.contentHash ?? ''))
+                ? 'content_conflict'
+                : null;
+        if (reason) {
+          await this.blockPersonalizedCopy(e, stepNo, step.id, reason, now);
+          return 'render_failed';
+        }
+        await clearPersonalizedCopyBlocker(db, e.id, step.id);
+      }
+    }
+
     // Variant selection (B4.8): manual override > retry pins the ORIGINAL
     // variant (the retry must resend the same text) > round-robin.
     let variant = opts.variantOverride ?? (retryOf ? this.variantOf(seq, retryOf) : null);
@@ -463,7 +515,17 @@ export class Scheduler {
         literal = row.attributes.bespoke === true;
       }
     }
-    if (variant === null) {
+    if (variant === null && personalizedCopy) {
+      variant = {
+        id: -personalizedCopy.id,
+        label: `Personalized ${personalizedCopy.id}`,
+        contentHash: personalizedCopy.contentHash ?? '',
+        subjectTemplate: personalizedCopy.subject,
+        bodyTemplate: personalizedCopy.body,
+      };
+      literal = true;
+    }
+    if (variant === null && !retrySnapshot) {
       if (step.variants.length === 0) {
         await this.alertRenderFailed(-step.stepNo, e, ['no_active_variants']);
         return 'render_failed';
@@ -474,32 +536,37 @@ export class Scheduler {
     // Issued BEFORE render: the URL goes in the body, so it must exist first.
     // A send that then fails leaves an unused token row, which is harmless.
     const compliance = this.tickCtx?.compliance ?? (await getComplianceSettings(db));
-    const unsubscribeUrl = await this.unsubscribeUrlFor(
-      e,
-      stepNo,
-      compliance.unsubscribeBaseUrl,
-      mb.fromAddress,
-    );
+    const unsubscribeUrl = retrySnapshot
+      ? undefined
+      : await this.unsubscribeUrlFor(e, stepNo, compliance.unsubscribeBaseUrl, mb.fromAddress);
 
-    const rendered = renderer.render({
-      variant,
-      step,
-      lead: this.leadLiteOf(e),
-      enrollmentId: e.id,
-      ctx: await this.renderContextFor(e, seq, step, { literal, unsubscribeUrl }),
-    });
+    const rendered: RenderedMessage = retrySnapshot
+      ? {
+          subject: retrySnapshot.renderedSubject!,
+          bodyText: retrySnapshot.renderedBodyText!,
+          bodyHtml: retrySnapshot.renderedBodyHtml!,
+          contentHash: retrySnapshot.contentHash,
+          checks: { fatal: [], warnings: [], score: 10, variations: 1 },
+        }
+      : renderer.render({
+          variant: variant!,
+          step,
+          lead: this.leadLiteOf(e),
+          enrollmentId: e.id,
+          ctx: await this.renderContextFor(e, seq, step, { literal, unsubscribeUrl }),
+        });
 
     // Fatal pre-send checks block the send (docs/08 §5); the enrollment stays
     // due so a fixed template resumes it naturally.
     if (rendered.checks.fatal.length > 0) {
       await this.alertRenderFailed(
-        variant.id,
+        variant?.id ?? -stepNo,
         e,
         rendered.checks.fatal.map((f) => f.id),
       );
       return 'render_failed';
     }
-    this.renderFailAlerted.delete(variant.id);
+    this.renderFailAlerted.delete(variant?.id ?? -stepNo);
 
     // Threading (docs/07 §4) via buildMime (docs/08 §6).
     const messageId = buildMessageId(e.id, stepNo, now, mb.fromAddress);
@@ -537,7 +604,12 @@ export class Scheduler {
             stepNo,
             mailboxId: mb.id,
             messageId,
-            attributes: { content_hash: rendered.contentHash, variant_id: variant.id },
+            attributes: {
+              content_hash: rendered.contentHash,
+              ...(!personalized && { variant_id: variant!.id }),
+              content_source: personalized ? 'personalized' : 'template',
+              ...(personalizedCopy && { personalized_copy_id: personalizedCopy.id }),
+            },
           }),
         ],
         {
@@ -557,8 +629,22 @@ export class Scheduler {
               mailboxId: mb.id,
               stepNo,
               contentHash: rendered.contentHash,
+              renderedSubject: rendered.subject,
+              renderedBodyText: rendered.bodyText,
+              renderedBodyHtml: rendered.bodyHtml,
+              contentSource: personalized ? 'personalized' : 'template',
+              personalizedCopyId: personalizedCopy?.id ?? retrySnapshot?.personalizedCopyId ?? null,
               sentAt: now,
             });
+            if (personalizedCopy) {
+              await markManualDraftSent(
+                lockedTx,
+                personalizedCopy.id,
+                messageId,
+                eventIds[0]!,
+                now,
+              );
+            }
             if (opts.acceptedTxWork) {
               await opts.acceptedTxWork(lockedTx, eventIds[0]!, messageId);
             }
@@ -765,6 +851,8 @@ export class Scheduler {
     base: RenderContext,
   ): Promise<string | undefined> {
     const { db, renderer } = this.deps;
+    const snapshot = await firstSentMessage(db, e.id);
+    if (snapshot?.renderedSubject) return snapshot.renderedSubject.replace(/^Re:\s*/i, '');
     const first = await firstSentEvent(db, e.id);
     if (!first) return undefined;
     let variant = this.variantOf(seq, first);
@@ -790,6 +878,32 @@ export class Scheduler {
       enrollmentId: e.id,
       ctx: { ...base, threadSubject: undefined, literal },
     }).subject;
+  }
+
+  private async blockPersonalizedCopy(
+    e: DueEnrollment,
+    stepNo: number,
+    sequenceStepId: number,
+    reason: PersonalizedCopyBlockerReason,
+    now: Date,
+  ): Promise<void> {
+    const opened = await setPersonalizedCopyBlocker(this.deps.db, {
+      enrollmentId: e.id,
+      sequenceStepId,
+      campaignId: e.campaignId,
+      leadId: e.leadId,
+      reason,
+      at: now,
+    });
+    if (opened) {
+      await this.deps.alerts.emit('personalized_copy_blocked', 'warning', {
+        campaignId: e.campaignId,
+        enrollmentId: e.id,
+        leadId: e.leadId,
+        stepNo,
+        reason,
+      });
+    }
   }
 
   private async alertRenderFailed(

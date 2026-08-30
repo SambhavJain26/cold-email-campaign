@@ -31,7 +31,7 @@ describe('bulk-tier (B5.6)', () => {
     await pool.query(
       `INSERT INTO leads (email, first_name, company, state, tier) VALUES
        ('a@x.dev', 'Ann', 'Acme Realty', 'TX', NULL),
-       ('b@x.dev', 'Bob', 'Beta Homes', 'TX', 'C'),
+       ('b@x.dev', 'Bob', 'Beta Homes', 'TX', 'B'),
        ('c@x.dev', 'Cal', 'Gamma Group', 'CA', NULL),
        ('d@x.dev', 'Dee', 'Acme West', 'CA', 'A')`,
     );
@@ -41,7 +41,7 @@ describe('bulk-tier (B5.6)', () => {
     const r = await bulkTier({ db }, { leadIds: [1, 3], tier: 'B' });
     expect(r).toEqual({ updated: 2 });
     const tiers = await pool.query(`SELECT id, tier FROM leads ORDER BY id`);
-    expect(tiers.rows.map((x: { tier: string | null }) => x.tier)).toEqual(['B', 'C', 'B', 'A']);
+    expect(tiers.rows.map((x: { tier: string | null }) => x.tier)).toEqual(['B', 'B', 'B', 'A']);
   });
 
   it('by filter — untiered + state, and q substring', async () => {
@@ -50,7 +50,7 @@ describe('bulk-tier (B5.6)', () => {
       `INSERT INTO enrollments (lead_id, campaign_id, current_state, personalization_mode, enrolled_at)
        VALUES (1, 1, 'ACTIVE', 'template_auto', now())`,
     );
-    const r = await bulkTier({ db }, { filter: { tier: 'untiered', state: 'ACTIVE' }, tier: 'C' });
+    const r = await bulkTier({ db }, { filter: { tier: 'untiered', state: 'ACTIVE' }, tier: 'B' });
     expect(r).toEqual({ updated: 1 }); // only a@x.dev is both untiered and ACTIVE
 
     const q = await bulkTier({ db }, { filter: { q: 'acme' }, tier: 'A' });
@@ -125,9 +125,9 @@ describe('cold storage + recycle (B5.7)', () => {
        VALUES ('pass1', 'completed', NULL), ('pass2', 'draft', 1)`,
     );
     await pool.query(
-      `INSERT INTO leads (email, tier, is_suppressed) VALUES
-       ('r1@x.dev', 'B', false), ('r2@x.dev', 'B', false),
-       ('r3@x.dev', 'B', true), ('r4@x.dev', 'nurture', false)`,
+      `INSERT INTO leads (email, tier, is_suppressed, outreach_status) VALUES
+       ('r1@x.dev', 'B', false, 'standard'), ('r2@x.dev', 'B', false, 'standard'),
+       ('r3@x.dev', 'B', true, 'standard'), ('r4@x.dev', NULL, false, 'nurture')`,
     );
     for (const [leadId, completed] of [
       [1, daysAgo(61)],

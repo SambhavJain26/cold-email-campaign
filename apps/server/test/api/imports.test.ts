@@ -73,6 +73,12 @@ describe('B6.4 imports', () => {
       invalid_drafts: 0,
       allocations_created: 0,
       remaining_global: 885,
+      sources_created: 0,
+      sources_replaced: 0,
+      sources_skipped: 0,
+      copies_bound: 0,
+      copy_conflicts: 0,
+      copies_unassigned: 0,
     });
 
     const leads = await h.pool.query('SELECT count(*)::int AS n FROM leads');
@@ -140,14 +146,8 @@ describe('B6.4 imports', () => {
               step_no: 1,
               wait_days: 0,
               in_thread: true,
-              variants: [
-                {
-                  label: 'A',
-                  subject_template: 'Hello',
-                  body_template: 'Hello there',
-                  active: true,
-                },
-              ],
+              content_source: 'personalized',
+              variants: [],
             },
           ],
         },
@@ -214,7 +214,7 @@ describe('B6.4 imports', () => {
     expect(
       (
         await h.pool.query(
-          `SELECT subject, body, status FROM manual_campaign_drafts
+          `SELECT subject, body, status FROM campaign_personalized_copies
             WHERE campaign_id = $1 AND lead_id = $2`,
           [campaign.id, existing.id],
         )

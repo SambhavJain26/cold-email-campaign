@@ -1,7 +1,12 @@
 import { useDeferredValue, useState } from 'react';
 import { Plus, Upload } from 'lucide-react';
 import { Link, useNavigate } from 'react-router-dom';
-import { ENROLLMENT_STATES, type LeadDto, type LeadTier } from '@coldemail/shared';
+import {
+  ENROLLMENT_STATES,
+  type CurrentLeadTier,
+  type BulkOutreachStatusBody,
+  type LeadDto,
+} from '@coldemail/shared';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Input } from '@/components/ui/input';
@@ -37,7 +42,11 @@ export default function LeadsPage() {
   const [perPage, setPerPage] = useState(25);
   const [tier, setTier] = useState<string>(ANY);
   const [state, setState] = useState<string>(ANY);
-  const [poolCampaign, setPoolCampaign] = useState<string>(ANY);
+  const [campaignFilter, setCampaignFilter] = useState<string>(
+    campaignId ? String(campaignId) : ANY,
+  );
+  const [campaignScope, setCampaignScope] = useState<'pool' | 'enrolled' | 'both'>('both');
+  const [outreachStatus, setOutreachStatus] = useState<string>(ANY);
   const [search, setSearch] = useState('');
   const [suppressedOnly, setSuppressedOnly] = useState(false);
   const q = useDeferredValue(search);
@@ -53,8 +62,10 @@ export default function LeadsPage() {
     per_page: perPage,
     tier: tier === ANY ? undefined : tier,
     state: state === ANY ? undefined : state,
-    campaign_id: campaignId,
-    pool_campaign_id: poolCampaign === ANY ? undefined : Number(poolCampaign),
+    campaign_id: campaignFilter === ANY ? undefined : Number(campaignFilter),
+    campaign_scope: campaignFilter === ANY ? undefined : campaignScope,
+    outreach_status:
+      outreachStatus === ANY ? undefined : (outreachStatus as 'standard' | 'nurture'),
     q: q === '' ? undefined : q,
     suppressed: suppressedOnly ? true : undefined,
   };
@@ -183,10 +194,20 @@ export default function LeadsPage() {
           data-testid="untiered-banner"
         >
           <p>
-            <span className="font-semibold tabular-nums">{data.untiered_count}</span> leads need
-            tiering before they can be prioritized.
+            <span className="font-semibold tabular-nums">{data.untiered_count}</span>{' '}
+            {campaignFilter === ANY ? 'leads' : 'matching campaign leads'} need tiering before they
+            can enroll.
           </p>
-          <Button size="sm" variant="outline" onClick={() => setFilter(() => setTier('untiered'))}>
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={() =>
+              setFilter(() => {
+                setTier('untiered');
+                setOutreachStatus('standard');
+              })
+            }
+          >
             Bulk tag
           </Button>
         </div>
@@ -196,11 +217,12 @@ export default function LeadsPage() {
         activeCount={
           Number(tier !== ANY) +
           Number(state !== ANY) +
-          Number(poolCampaign !== ANY) +
+          Number(campaignFilter !== ANY) +
+          Number(outreachStatus !== ANY) +
           Number(search !== '') +
           Number(suppressedOnly)
         }
-        description="Filter by tier, enrollment state, campaign pool, search text, or suppression status."
+        description="Filter by campaign membership, tier, Nurture status, enrollment state, search text, or suppression status."
       >
         <Select value={tier} onValueChange={(v) => setFilter(() => setTier(v))}>
           <SelectTrigger size="sm" className="w-32" aria-label="Tier filter">
@@ -210,25 +232,53 @@ export default function LeadsPage() {
             <SelectItem value={ANY}>All tiers</SelectItem>
             <SelectItem value="A">🟢 Tier A</SelectItem>
             <SelectItem value="B">🟡 Tier B</SelectItem>
-            <SelectItem value="C">⚪ Tier C</SelectItem>
-            <SelectItem value="nurture">🔵 Nurture</SelectItem>
             <SelectItem value="untiered">Untiered</SelectItem>
           </SelectContent>
         </Select>
         <Select
-          value={poolCampaign}
-          onValueChange={(value) => setFilter(() => setPoolCampaign(value))}
+          value={campaignFilter}
+          onValueChange={(value) => setFilter(() => setCampaignFilter(value))}
         >
-          <SelectTrigger size="sm" className="w-44" aria-label="Campaign pool filter">
+          <SelectTrigger size="sm" className="w-44" aria-label="Campaign filter">
             <SelectValue />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value={ANY}>All campaign pools</SelectItem>
+            <SelectItem value={ANY}>All campaigns</SelectItem>
             {(campaigns.data?.items ?? []).map((campaign) => (
               <SelectItem key={campaign.id} value={String(campaign.id)}>
                 {campaign.name}
               </SelectItem>
             ))}
+          </SelectContent>
+        </Select>
+        {campaignFilter !== ANY && (
+          <Select
+            value={campaignScope}
+            onValueChange={(value: 'pool' | 'enrolled' | 'both') =>
+              setFilter(() => setCampaignScope(value))
+            }
+          >
+            <SelectTrigger size="sm" className="w-32" aria-label="Campaign membership scope">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="pool">Pool</SelectItem>
+              <SelectItem value="enrolled">Enrolled</SelectItem>
+              <SelectItem value="both">Both</SelectItem>
+            </SelectContent>
+          </Select>
+        )}
+        <Select
+          value={outreachStatus}
+          onValueChange={(value) => setFilter(() => setOutreachStatus(value))}
+        >
+          <SelectTrigger size="sm" className="w-36" aria-label="Outreach status filter">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value={ANY}>All statuses</SelectItem>
+            <SelectItem value="standard">Standard</SelectItem>
+            <SelectItem value="nurture">Nurture</SelectItem>
           </SelectContent>
         </Select>
         <Select value={state} onValueChange={(v) => setFilter(() => setState(v))}>
@@ -265,21 +315,39 @@ export default function LeadsPage() {
           selectedCount={selected.size}
           allMatching={allMatching}
           matchingTotal={data.total}
-          buildBody={(tierValue: LeadTier | null) =>
+          buildBody={(tierValue: CurrentLeadTier | null) =>
             allMatching
               ? {
                   tier: tierValue,
                   filter: {
                     // Select only offers contract values — safe narrowing.
-                    tier: query.tier as LeadTier | 'untiered' | undefined,
+                    tier: query.tier as CurrentLeadTier | 'untiered' | undefined,
                     state: query.state,
                     campaign_id: query.campaign_id,
+                    campaign_scope: query.campaign_scope,
                     pool_campaign_id: query.pool_campaign_id,
                     q: query.q,
                     suppressed: query.suppressed,
+                    outreach_status: query.outreach_status,
                   },
                 }
               : { tier: tierValue, lead_ids: [...selected] }
+          }
+          buildOutreachBody={(status): BulkOutreachStatusBody =>
+            allMatching
+              ? {
+                  outreach_status: status,
+                  filter: {
+                    tier: query.tier as CurrentLeadTier | 'untiered' | undefined,
+                    state: query.state,
+                    campaign_id: query.campaign_id,
+                    campaign_scope: query.campaign_scope,
+                    q: query.q,
+                    suppressed: query.suppressed,
+                    outreach_status: query.outreach_status,
+                  },
+                }
+              : { outreach_status: status, lead_ids: [...selected] }
           }
           onDone={clearSelection}
         />

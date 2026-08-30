@@ -32,6 +32,7 @@ Progress is tracked in [PROGRESS.md](../PROGRESS.md) at the repo root.
 | 19 | [19-user-manual.md](19-user-manual.md) | Complete operator guide to every screen, workflow, automatic behavior, safety rule, and edge case | First use + daily operations |
 | 20 | [20-user-manual-questions.md](20-user-manual-questions.md) | Plain-language answers about CSVs, campaigns, personalization, replies, analytics, safety controls, and proposed UI improvements | User-manual companion |
 | 21 | [21-stage-4-completion-handoff.md](21-stage-4-completion-handoff.md) | Exact completed Stage 4 verification, documentation, commit, and push record | Audit the Stage 4 completion |
+| 22 | [22-personalized-copy-two-tier.md](22-personalized-copy-two-tier.md) | **Current migration 0019 specification**: sequence-only personalized copy, A/B tiers, separate Nurture status, CSV binding, blockers, and Campaign-scoped lead filtering | Personalized-copy and lead-selection work |
 
 ## Reading order
 
@@ -60,4 +61,4 @@ The build is contract-first. [10-api-contract.md](10-api-contract.md) is the sea
 | **Golden cohort** | The spec Part 10 worked 885-lead dataset, used as a locked regression test |
 | **Scenario runner** | Test harness driving real scheduler+poller over `MockTransport` + `VirtualClock` |
 | **Pace budget** | Per-mailbox minimum gap between sends (window ÷ cap, ±jitter) — the never-burst mechanism |
-| **Mode 1 / Mode 2** | Human-written bespoke email / template-filled (researched or auto slot) |
+| **Personalized / Template step** | Current sequence content sources. Personalized loads a ready lead/campaign/step snapshot; Template renders variants with Tier A researched or Tier B Auto Observation data. Older Mode 1/Mode 2 terminology is legacy. |

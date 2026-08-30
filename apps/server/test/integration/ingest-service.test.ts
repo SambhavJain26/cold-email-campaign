@@ -3,7 +3,7 @@
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import type { Pool } from 'pg';
 import { createDb, type Db } from '../../src/db/client';
-import { commitImport, createImportPreview, previewImportDrafts } from '../../src/ingest/service';
+import { commitImport, createImportPreview } from '../../src/ingest/service';
 import { TEST_DATABASE_URL, resetCoreTables } from '../helpers/db';
 
 const buf = (s: string): Buffer => Buffer.from(s, 'utf8');
@@ -70,6 +70,12 @@ describe('ingest service (B5.3–B5.5)', () => {
     expect(r).toEqual({
       inserted: 2,
       skipped: 0,
+      sourcesCreated: 0,
+      sourcesReplaced: 0,
+      sourcesSkipped: 0,
+      copiesBound: 0,
+      copiesUnassigned: 0,
+      copyConflicts: 0,
       draftsCreated: 0,
       draftsReplaced: 0,
       draftsSkipped: 0,
@@ -130,6 +136,12 @@ describe('ingest service (B5.3–B5.5)', () => {
     expect(r).toEqual({
       inserted: 1,
       skipped: 1,
+      sourcesCreated: 0,
+      sourcesReplaced: 0,
+      sourcesSkipped: 0,
+      copiesBound: 0,
+      copiesUnassigned: 0,
+      copyConflicts: 0,
       draftsCreated: 0,
       draftsReplaced: 0,
       draftsSkipped: 0,
@@ -158,6 +170,12 @@ describe('ingest service (B5.3–B5.5)', () => {
     expect(r).toEqual({
       inserted: 0,
       skipped: 0,
+      sourcesCreated: 0,
+      sourcesReplaced: 0,
+      sourcesSkipped: 0,
+      copiesBound: 0,
+      copiesUnassigned: 0,
+      copyConflicts: 0,
       draftsCreated: 0,
       draftsReplaced: 0,
       draftsSkipped: 0,
@@ -174,6 +192,12 @@ describe('ingest service (B5.3–B5.5)', () => {
     expect(r).toEqual({
       inserted: 1,
       skipped: 1,
+      sourcesCreated: 0,
+      sourcesReplaced: 0,
+      sourcesSkipped: 0,
+      copiesBound: 0,
+      copiesUnassigned: 0,
+      copyConflicts: 0,
       draftsCreated: 0,
       draftsReplaced: 0,
       draftsSkipped: 0,
@@ -191,8 +215,7 @@ describe('ingest service (B5.3–B5.5)', () => {
     ).rejects.toThrow(/already committed/);
   });
 
-  it('imports multiline Step-1 drafts for new and existing leads, preserves lead data, and handles conflicts explicitly', async () => {
-    await pool.query(`INSERT INTO campaigns (name, status) VALUES ('Draft target', 'draft')`);
+  it('imports multiline personalized sources globally and replaces them only when explicit', async () => {
     await pool.query(
       `INSERT INTO leads (email, first_name, company, custom_fields)
        VALUES ('existing@acme.dev', 'Original', 'Original Co', '{"industry":"saas"}')`,
@@ -212,28 +235,17 @@ describe('ingest service (B5.3–B5.5)', () => {
       { filename: 'researched.csv', content: buf(csv) },
     );
     expect(preview.draftCounts).toMatchObject({ validDrafts: 2, invalidDrafts: 1 });
-    await expect(
-      commitImport({ db }, { importId: preview.importId, mode: 'drop_flagged' }),
-    ).rejects.toThrow(/select one target campaign/);
-
-    const selected = await previewImportDrafts(
-      { db },
-      { importId: preview.importId, campaignId: 1 },
-    );
-    expect(selected).toMatchObject({
-      validDrafts: 2,
-      invalidDrafts: 2,
-      existingDraftConflicts: 0,
-    });
     const committed = await commitImport(
       { db },
-      { importId: preview.importId, mode: 'drop_flagged', draftCampaignId: 1 },
+      { importId: preview.importId, mode: 'drop_flagged' },
     );
     expect(committed).toMatchObject({
       inserted: 2,
-      draftsCreated: 2,
-      draftsReplaced: 0,
-      draftsSkipped: 1,
+      sourcesCreated: 2,
+      sourcesReplaced: 0,
+      sourcesSkipped: 1,
+      copiesBound: 0,
+      copiesUnassigned: 2,
       invalidDrafts: 1,
     });
     const existing = await pool.query(
@@ -244,13 +256,13 @@ describe('ingest service (B5.3–B5.5)', () => {
       company: 'Original Co',
       custom_fields: { industry: 'saas' },
     });
-    const drafts = await pool.query(
-      `SELECT l.email, d.step_no, d.status, d.subject, d.body
-         FROM manual_campaign_drafts d JOIN leads l ON l.id = d.lead_id
+    const sources = await pool.query(
+      `SELECT l.email, d.slot_no, d.status, d.subject, d.body
+         FROM personalized_copy_sources d JOIN leads l ON l.id = d.lead_id
         ORDER BY l.email`,
     );
-    expect(drafts.rows).toHaveLength(2);
-    expect(drafts.rows[1].body).toContain('I noticed the expansion.\n\nWorth comparing notes?');
+    expect(sources.rows).toHaveLength(2);
+    expect(sources.rows[1].body).toContain('I noticed the expansion.\n\nWorth comparing notes?');
 
     const second = await createImportPreview(
       { db },
@@ -262,14 +274,8 @@ describe('ingest service (B5.3–B5.5)', () => {
       },
     );
     expect(
-      await previewImportDrafts({ db }, { importId: second.importId, campaignId: 1 }),
-    ).toMatchObject({ existingDraftConflicts: 1 });
-    expect(
-      await commitImport(
-        { db },
-        { importId: second.importId, mode: 'drop_flagged', draftCampaignId: 1 },
-      ),
-    ).toMatchObject({ draftsCreated: 0, draftsReplaced: 0, draftsSkipped: 1 });
+      await commitImport({ db }, { importId: second.importId, mode: 'drop_flagged' }),
+    ).toMatchObject({ sourcesCreated: 0, sourcesReplaced: 0, sourcesSkipped: 1 });
 
     const third = await createImportPreview(
       { db },
@@ -286,13 +292,12 @@ describe('ingest service (B5.3–B5.5)', () => {
         {
           importId: third.importId,
           mode: 'drop_flagged',
-          draftCampaignId: 1,
           replaceExistingDrafts: true,
         },
       ),
-    ).toMatchObject({ draftsReplaced: 1 });
+    ).toMatchObject({ sourcesReplaced: 1 });
     const replaced = await pool.query(
-      `SELECT subject, body, status FROM manual_campaign_drafts d
+      `SELECT subject, body, status FROM personalized_copy_sources d
        JOIN leads l ON l.id = d.lead_id WHERE l.email = 'existing@acme.dev'`,
     );
     expect(replaced.rows[0]).toEqual({

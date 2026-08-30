@@ -40,9 +40,6 @@ describe('@golden L3 — full pipeline over ~47 virtual days', () => {
       tickMinutes: 9, // divides the 18-min pace gap exactly
       pollMinutes: 54,
       jitterPct: 0, // exact-slot pacing: 30 sends fill the 9h window precisely
-      // The golden cohort validates scheduler/metric parity, not the
-      // operator's manual Tier-A workflow; keep its historic automated mix.
-      tierEffortConfig: { A: 'template_researched', B: 'template_researched', C: 'template_auto' },
     });
     // Leads have no state → default ET; ticking outside 12:00–23:00Z can't
     // produce work (window is 13:00–22:00Z) — skip those steps for speed.
@@ -52,12 +49,16 @@ describe('@golden L3 — full pipeline over ~47 virtual days', () => {
       if (h >= 12 && h < 23) await realTick(now);
     };
 
-    await s.importLeads(GOLDEN.totalLeads, { tiers: { A: 260, B: 455, C: 170 } });
+    // Current enrollment controls have only A/B. The final 170 leads enter as
+    // B, then their immutable enrollment snapshots are marked legacy C below
+    // so this locked historical analytics fixture continues proving that old
+    // C rows remain readable without permitting new C enrollment.
+    await s.importLeads(GOLDEN.totalLeads, { tiers: { A: 260, B: 625 } });
     scriptGoldenCohort(s);
 
     // 30 days of enrollment at 30/day (the last day enrolls the final 15),
     // exactly the fixture's enrollDay(i) layout because selection is
-    // tier-ordered A→B→C, oldest first.
+    // tier-ordered A→B, oldest first.
     for (let day = 0; day < 30; day++) {
       await s.enroll({ count: GOLDEN.enrollPerDay });
       await s.advanceDays(1);
@@ -67,6 +68,11 @@ describe('@golden L3 — full pipeline over ~47 virtual days', () => {
         await resumeMailbox({ db: s.db }, row.id, 100, s.clock.now());
       }
     }
+    await s.pool.query(
+      `UPDATE enrollments SET enrolled_tier = 'C'
+        WHERE campaign_id = $1 AND lead_id BETWEEN 716 AND 885`,
+      [GOLDEN.campaignId],
+    );
     // Drain the tail: last cohort's steps 2–4 (+12 days) + confirm + completion.
     await s.advanceDays(17);
 

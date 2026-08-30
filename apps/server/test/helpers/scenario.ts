@@ -15,7 +15,7 @@ import { threadedReply, dsnBounce, oooReply } from '../../src/transport/mock/inb
 import { seededRng, type Rng } from '../../src/util/rng';
 import type { SequenceDef } from '../../src/domain/sequence';
 import type { SendWindow } from '../../src/db/schema/transport';
-import type { EnrollmentState, LeadTier } from '@coldemail/shared';
+import type { CurrentLeadTier, EnrollmentState, LeadTier } from '@coldemail/shared';
 import { Scheduler } from '../../src/scheduler/scheduler';
 import { Poller } from '../../src/poller/poller';
 import { StaticSequenceProvider } from '../../src/scheduler/staticSequenceProvider';
@@ -42,7 +42,7 @@ export interface ScenarioConfig {
   ramp?: { ramp_days: number; ramp_daily_enroll_cap: number };
   /** Test-only post-ramp safety cap; production campaigns default to 15. */
   steadyDailyEnrollCap?: number;
-  /** Test-only campaign mode mapping; production defaults keep Tier A manual. */
+  /** Legacy-read fixture override. New campaign behavior is fixed A=researched/B=auto. */
   tierEffortConfig?: {
     A: 'human_written' | 'template_researched' | 'template_auto';
     B: 'human_written' | 'template_researched' | 'template_auto';
@@ -190,8 +190,8 @@ export class Scenario {
         JSON.stringify(rampStages),
         JSON.stringify(
           this.cfg.tierEffortConfig ?? {
-            A: 'human_written',
-            B: 'template_researched',
+            A: 'template_researched',
+            B: 'template_auto',
             C: 'template_auto',
           },
         ),
@@ -215,7 +215,10 @@ export class Scenario {
     opts: { tiers?: Partial<Record<LeadTier, number>>; state?: string } = {},
   ): Promise<void> {
     const tierOf = (i: number): LeadTier | null => {
-      if (!opts.tiers) return null;
+      // Most scheduler scenarios exercise delivery, so their default leads
+      // must be currently enrollable. Import-specific tests continue to
+      // create genuinely untiered leads through the ingest service.
+      if (!opts.tiers) return 'B';
       let cursor = 0;
       for (const [tier, n] of Object.entries(opts.tiers) as [LeadTier, number][]) {
         cursor += n;
@@ -239,7 +242,11 @@ export class Scenario {
   }
 
   /** Enroll leads via the REAL enrollment service (B3.9, docs/06 §7). */
-  async enroll(opts: { count: number; tier?: LeadTier; force?: boolean }): Promise<number[]> {
+  async enroll(opts: {
+    count: number;
+    tier?: CurrentLeadTier;
+    force?: boolean;
+  }): Promise<number[]> {
     const result = await enrollService(
       { db: this.db, store: this.store, clock: this.clock, sequences: this.sequences },
       this.campaignId,

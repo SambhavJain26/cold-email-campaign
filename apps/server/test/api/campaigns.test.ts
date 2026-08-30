@@ -95,14 +95,23 @@ describe('B6.6 campaigns', () => {
     expect(bad.statusCode).toBe(404);
   });
 
-  it('requires explicit acknowledgement when Tier A remains manual', async () => {
+  it('uses fixed researched/auto tiers without a manual acknowledgement', async () => {
     const res = await h.inject({
       method: 'POST',
       url: '/api/v1/campaigns',
       payload: { name: 'No acknowledgement', sequence_id: seqId },
     });
-    expect(res.statusCode).toBe(400);
-    expect(res.json().error.code).toBe('validation');
+    expect(res.statusCode).toBe(200);
+    expect(res.json().tier_effort_config).toEqual({
+      A: 'template_researched',
+      B: 'template_auto',
+      C: 'template_auto',
+    });
+    await h.inject({
+      method: 'DELETE',
+      url: `/api/v1/campaigns/${res.json().id}`,
+      payload: { confirm: 'No acknowledgement' },
+    });
   });
 
   it('PATCH activates; capacity meter shows the docs/06 §7 numbers', async () => {
@@ -174,7 +183,7 @@ describe('B6.6 campaigns', () => {
       `UPDATE leads SET is_suppressed = true, suppression_reason = 'manual' WHERE email = 'lead12@pool.dev'`,
     );
     const ids = await h.pool.query(
-      `SELECT id, email FROM leads WHERE email IN ('lead1@pool.dev','lead11@pool.dev','lead12@pool.dev') ORDER BY id`,
+      `SELECT id, email FROM leads WHERE email IN ('lead1@pool.dev','lead6@pool.dev','lead12@pool.dev') ORDER BY id`,
     );
     const byEmail = Object.fromEntries(
       ids.rows.map((r: { id: number; email: string }) => [r.email, r.id]),
@@ -202,7 +211,7 @@ describe('B6.6 campaigns', () => {
       payload: {
         lead_ids: [
           byEmail['lead1@pool.dev'], // active in another campaign
-          byEmail['lead11@pool.dev'], // fine
+          byEmail['lead6@pool.dev'], // fine Tier B
           byEmail['lead12@pool.dev'], // suppressed
           999999, // not found
         ],

@@ -1,5 +1,26 @@
 # Local canary runbook (B8.3-local) — two-week validation on throwaway Gmail
 
+## 2026-08-30 Personalized Copy/two-tier candidate — locally verified, not deployed
+
+The operator-approved migration `0019` release is complete on local branch `canary`: Manual
+Compose direct sending is retired in favor of sequence-only Personalized Copy steps; current lead
+tiers are A/B with Nurture as a separate outreach status; global imported copy binds to independent
+campaign-step snapshots; missing/unreviewed copy fails closed with durable per-enrollment blockers;
+and the Leads screen has exact Campaign Pool/Enrolled/Both filtering shared by “all matching” bulk
+tiering. The authoritative behavior and deployment gate are in [docs/22](22-personalized-copy-two-tier.md).
+
+Verified local gate: typecheck/lint/format; unit 345/345; web 58/58; integration 168/168; API
+138/138; GreenMail 29/29; golden exactly 47/47; mock E2E 61/61; real-backend E2E 1/1; production
+Vite build; migration 0019 apply/down/apply; event-backed five-enrollment projection dry-run with
+zero diffs; and clean self-check. A fresh 110,760-byte custom-format dump passed catalog listing,
+restored into the explicitly named `coldemail_0019_restore_drill` database, and passed projection
+rebuild, five-enrollment zero-drift dry-run, and self-check. The scratch database and temporary dump
+were removed.
+
+No production/Oracle state, DNS, Caddy, mailbox configuration, campaign, enrollment, or message was
+changed. Spaceship remains deployed at application code `6ca1183`. Production zero-legacy checking,
+backup, migration, and deployment remain future gates requiring explicit deploy authorization.
+
 ## 2026-08-30 branch transition — verified and deployed
 
 After explicit operator approval, the clean local checkout and GitHub moved to the one-word

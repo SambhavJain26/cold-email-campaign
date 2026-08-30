@@ -6,6 +6,7 @@ export * from './mailboxes';
 export * from './settings';
 export * from './alerts';
 export * from './leads';
+export * from './personalizedCopies';
 export * from './imports';
 export * from './sequences';
 export * from './campaigns';

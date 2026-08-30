@@ -1,4 +1,4 @@
-// Unibox + enrollment actions + manual-sends (B6.7/B6.8, docs/10 §Unibox).
+// Unibox + enrollment actions (B6.7/B6.8, docs/10 §Unibox).
 // Sentiment tagging appends `sentiment_tagged` (decision M — never an UPDATE);
 // manual unsubscribe appends `unsubscribe(source=manual)` whose suppression
 // side effect fires inside the eventStore chokepoint; snooze is a scheduling
@@ -8,13 +8,8 @@ import {
   idParamSchema,
   createReminderBodySchema,
   dispositionReplyBodySchema,
-  manualComposePrefillSchema,
-  manualDraftSchema,
-  manualSendBodySchema,
-  manualSendResponseSchema,
   okResponseSchema,
   patchReminderBodySchema,
-  patchManualDraftBodySchema,
   reminderListResponseSchema,
   reminderQuerySchema,
   snoozeBodySchema,
@@ -29,12 +24,6 @@ import type { AppServices } from '../composition';
 import { getUniboxRow, listUnibox, type UniboxRow } from '../db/repos/incomingMessagesRepo';
 import { getById, patchScheduling } from '../db/repos/enrollmentsRepo';
 import { listThreadMessageIds } from '../db/repos/sentMessagesRepo';
-import {
-  FatalChecksError,
-  MailboxUnhealthyError,
-  manualComposePrefill,
-  manualSend,
-} from '../services/manualCompose';
 import { buildEvent } from '../domain/events';
 import type { DomainEvent } from '../domain/events';
 import { AppError } from './errors';
@@ -49,27 +38,6 @@ import {
   type ReminderListRow,
 } from '../db/repos/remindersRepo';
 import { getSettings } from '../db/repos/settingsRepo';
-import {
-  getManualDraft,
-  patchManualDraft as updateManualDraft,
-  type ManualDraftRow,
-} from '../db/repos/manualDraftsRepo';
-
-function toManualDraftDto(row: ManualDraftRow) {
-  return {
-    id: row.id,
-    lead_id: row.leadId,
-    campaign_id: row.campaignId,
-    step_no: 1 as const,
-    source_import_id: row.sourceImportId,
-    subject: row.subject,
-    body: row.body,
-    status: row.status,
-    created_at: row.createdAt.toISOString(),
-    updated_at: row.updatedAt.toISOString(),
-    sent_at: row.sentAt?.toISOString() ?? null,
-  };
-}
 
 function calendarDateInZone(at: Date, timeZone: string): string {
   const parts = new Intl.DateTimeFormat('en-US', {
@@ -124,7 +92,7 @@ function toUniboxItemDto(row: UniboxRow): UniboxItemDto {
 
 export async function uniboxRoutes(app: FastifyInstance, services: AppServices): Promise<void> {
   const r = app.withTypeProvider<ZodTypeProvider>();
-  const { db, clock, store, scheduler, renderer } = services;
+  const { db, clock, store } = services;
 
   r.get(
     '/reminders',
@@ -368,78 +336,35 @@ export async function uniboxRoutes(app: FastifyInstance, services: AppServices):
 
   r.get(
     '/enrollments/:id/manual-compose-prefill',
-    {
-      schema: { params: idParamSchema, response: { 200: manualComposePrefillSchema } },
-    },
-    async (req) => {
-      try {
-        const result = await manualComposePrefill({ db, renderer }, req.params.id);
-        return {
-          enrollment_id: result.enrollmentId,
-          lead_id: result.leadId,
-          campaign: result.campaign,
-          step_no: result.stepNo,
-          step_count: result.stepCount,
-          due_at: result.dueAt?.toISOString() ?? null,
-          personalization_mode: result.personalizationMode,
-          subject: result.subject,
-          body: result.body,
-          variant_id: result.variantId,
-          draft_id: result.draftId,
-          draft_status: result.draftStatus,
-          draft_source_import_id: result.draftSourceImportId,
-          thread: {
-            assigned_mailbox_id: result.thread.assignedMailboxId,
-            previous_message_ids: result.thread.previousMessageIds,
-            in_thread: result.thread.inThread,
-          },
-          checks: result.checks,
-        };
-      } catch (error) {
-        if (error instanceof Error && error.message.includes('not found')) {
-          throw AppError.notFound('enrollment');
-        }
-        if (error instanceof Error) throw new AppError('conflict', 409, error.message);
-        throw error;
-      }
+    { schema: { params: idParamSchema } },
+    async () => {
+      throw new AppError(
+        'conflict',
+        410,
+        'manual compose prefill is retired; use lead Personalized Copy and sequence steps',
+      );
     },
   );
 
-  r.get(
-    '/manual-drafts/:id',
-    { schema: { params: idParamSchema, response: { 200: manualDraftSchema } } },
-    async (req) => {
-      const draft = await getManualDraft(db, req.params.id);
-      if (!draft) throw AppError.notFound('manual draft');
-      return toManualDraftDto(draft);
-    },
-  );
+  r.get('/manual-drafts/:id', { schema: { params: idParamSchema } }, async () => {
+    throw new AppError(
+      'conflict',
+      410,
+      'manual drafts are retired; use the personalized-copy source or campaign-step APIs',
+    );
+  });
 
   r.patch(
     '/manual-drafts/:id',
     {
-      schema: {
-        params: idParamSchema,
-        body: patchManualDraftBodySchema,
-        response: { 200: manualDraftSchema },
-      },
+      schema: { params: idParamSchema },
     },
-    async (req) => {
-      const existing = await getManualDraft(db, req.params.id);
-      if (!existing) throw AppError.notFound('manual draft');
-      if (existing.status === 'sent') {
-        throw new AppError('conflict', 409, 'sent drafts are immutable');
-      }
-      const draft = await updateManualDraft(db, req.params.id, {
-        subject: req.body.subject,
-        body: req.body.body,
-        status:
-          req.body.status ??
-          (req.body.subject !== undefined || req.body.body !== undefined
-            ? 'needs_review'
-            : undefined),
-      });
-      return toManualDraftDto(draft!);
+    async () => {
+      throw new AppError(
+        'conflict',
+        410,
+        'manual drafts are retired; use the personalized-copy source or campaign-step APIs',
+      );
     },
   );
 
@@ -504,51 +429,11 @@ export async function uniboxRoutes(app: FastifyInstance, services: AppServices):
     },
   );
 
-  r.post(
-    '/manual-sends',
-    { schema: { body: manualSendBodySchema, response: { 200: manualSendResponseSchema } } },
-    async (req) => {
-      let result;
-      try {
-        result = await manualSend(
-          { db, clock, scheduler, renderer },
-          {
-            leadId: req.body.lead_id,
-            campaignId: req.body.campaign_id,
-            enrollmentId: req.body.enrollment_id,
-            draftId: req.body.draft_id,
-            mailboxId: req.body.mailbox_id,
-            subject: req.body.subject,
-            bodyText: req.body.body,
-            allowRecontact: req.body.allow_recontact,
-          },
-        );
-      } catch (err) {
-        // typed errors (mailbox_unhealthy 409, fatal checks 422) pass through
-        if (err instanceof MailboxUnhealthyError || err instanceof FatalChecksError) throw err;
-        if (err instanceof Error && err.message.includes('not found')) {
-          throw new AppError('not_found', 404, err.message);
-        }
-        // remaining service refusals are state conflicts: suppressed lead,
-        // non-ACTIVE/wrong-mode enrollment, recycle guard, reroute attempt
-        if (err instanceof Error) throw new AppError('conflict', 409, err.message);
-        throw err;
-      }
-      if (result.outcome !== 'sent' || result.messageId === null) {
-        // transient SMTP failure / instant RCPT rejection — the send did not land
-        throw new AppError(
-          result.outcome === 'transient' || result.outcome === 'auth_failed'
-            ? 'mailbox_unhealthy'
-            : 'conflict',
-          409,
-          `manual send did not complete: ${result.outcome}`,
-        );
-      }
-      return {
-        enrollment_id: result.enrollmentId,
-        message_id: result.messageId,
-        checks: result.checks,
-      };
-    },
-  );
+  r.post('/manual-sends', {}, async () => {
+    throw new AppError(
+      'conflict',
+      410,
+      'Direct manual sending has been retired. Save Personalized Copy and send it through a personalized sequence step.',
+    );
+  });
 }

@@ -7,7 +7,7 @@ import {
   leads,
   recycleEnrollmentSources,
 } from '../schema';
-import type { LeadTier } from '@coldemail/shared';
+import type { LeadTier, OutreachStatus } from '@coldemail/shared';
 
 export interface SourceEnrollmentCandidate {
   sourceCampaignId: number;
@@ -15,6 +15,7 @@ export interface SourceEnrollmentCandidate {
   leadId: number;
   email: string;
   tier: LeadTier | null;
+  outreachStatus: OutreachStatus;
   isSuppressed: boolean;
   isErased: boolean;
   completedAt: Date;
@@ -32,6 +33,7 @@ export async function completedSourceEnrollments(
       leadId: enrollments.leadId,
       email: leads.email,
       tier: leads.tier,
+      outreachStatus: leads.outreachStatus,
       isSuppressed: leads.isSuppressed,
       isErased: leads.isErased,
       completedAt: enrollments.terminalAt,

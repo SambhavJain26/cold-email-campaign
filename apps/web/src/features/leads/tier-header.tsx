@@ -1,5 +1,9 @@
 import { useQueries } from '@tanstack/react-query';
-import { leadsListResponseSchema, LEAD_TIERS, type LeadTier } from '@coldemail/shared';
+import {
+  leadsListResponseSchema,
+  CURRENT_LEAD_TIERS,
+  type CurrentLeadTier,
+} from '@coldemail/shared';
 import { TierBadge } from '@/components/shared/tier-badge';
 import { apiFetch } from '@/api/client';
 
@@ -8,7 +12,7 @@ import { apiFetch } from '@/api/client';
  *  filtered endpoint the table uses — counts can never drift from the list. */
 export function TierHeader({ total, untiered }: { total: number; untiered: number }) {
   const probes = useQueries({
-    queries: LEAD_TIERS.map((tier) => ({
+    queries: CURRENT_LEAD_TIERS.map((tier) => ({
       queryKey: ['leads', 'tier-count', tier],
       queryFn: () =>
         apiFetch('/leads', leadsListResponseSchema, { query: { tier, page: 1, per_page: 1 } }),
@@ -18,7 +22,7 @@ export function TierHeader({ total, untiered }: { total: number; untiered: numbe
 
   return (
     <div className="flex flex-wrap items-center gap-x-6 gap-y-2 rounded-lg border border-border bg-card px-4 py-3">
-      {LEAD_TIERS.map((tier: LeadTier, i) => (
+      {CURRENT_LEAD_TIERS.map((tier: CurrentLeadTier, i) => (
         <div key={tier} className="flex items-center gap-2 text-sm">
           <TierBadge tier={tier} />
           <span className="font-semibold tabular-nums" data-testid={`tier-count-${tier}`}>

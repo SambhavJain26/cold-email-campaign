@@ -64,6 +64,7 @@ export const commitImportBodySchema = z
     mode: z.enum(['drop_flagged', 'import_all']),
     draft_campaign_id: z.number().int().positive().optional(),
     replace_existing_drafts: z.boolean().default(false),
+    mark_valid_copy_ready: z.boolean().default(false),
     allocations: z
       .array(
         z
@@ -85,6 +86,12 @@ export const commitImportResponseSchema = z
     invalid_drafts: z.number().int().min(0),
     allocations_created: z.number().int().min(0),
     remaining_global: z.number().int().min(0),
+    sources_created: z.number().int().min(0),
+    sources_replaced: z.number().int().min(0),
+    sources_skipped: z.number().int().min(0),
+    copies_bound: z.number().int().min(0),
+    copy_conflicts: z.number().int().min(0),
+    copies_unassigned: z.number().int().min(0),
   })
   .strict();
 export type CommitImportResponse = z.infer<typeof commitImportResponseSchema>;

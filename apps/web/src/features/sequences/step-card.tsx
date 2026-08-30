@@ -5,6 +5,13 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import {
   blankVariant,
@@ -68,6 +75,29 @@ export function StepCard({
     >
       <div className="flex flex-wrap items-center gap-4">
         <h2 className="text-sm font-semibold">Step {stepNo}</h2>
+        <Select
+          value={step.content_source}
+          onValueChange={(value: 'template' | 'personalized') =>
+            onChange({
+              ...step,
+              content_source: value,
+              variants:
+                value === 'personalized'
+                  ? []
+                  : step.variants.length > 0
+                    ? step.variants
+                    : [blankVariant('A')],
+            })
+          }
+        >
+          <SelectTrigger size="sm" className="w-44" aria-label={`Step ${stepNo} content source`}>
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="template">Template</SelectItem>
+            <SelectItem value="personalized">Personalized Copy</SelectItem>
+          </SelectContent>
+        </Select>
         <div className="flex items-center gap-2">
           <Label htmlFor={`${step.uid}-wait`} className="text-xs text-muted-foreground">
             Wait
@@ -109,60 +139,75 @@ export function StepCard({
         </Button>
       </div>
 
-      <div className="flex items-center gap-2">
-        <Tabs value={active?.uid ?? ''} onValueChange={setActiveUid}>
-          <TabsList className="h-8">
-            {step.variants.map((variant) => (
-              <TabsTrigger key={variant.uid} value={variant.uid} className="text-xs">
-                {variant.label}
-                {!variant.active && <span className="ml-1 text-muted-foreground">(retired)</span>}
-                {variantHasError(variant) && <span className="ml-1 text-destructive">•</span>}
-              </TabsTrigger>
-            ))}
-          </TabsList>
-        </Tabs>
-        <Button
-          variant="ghost"
-          size="xs"
-          onClick={addVariant}
-          aria-label={`Add variant to step ${stepNo}`}
-        >
-          <Plus className="size-3.5" /> Variant
-        </Button>
-        {active && (
-          <div className="ml-auto flex items-center gap-2">
-            {!active.active && (
-              <Badge variant="outline" className="text-[10px]">
-                retired — kept for history
-              </Badge>
-            )}
-            <Button
-              variant="ghost"
-              size="xs"
-              disabled={active.id === undefined}
-              title={
-                active.id === undefined ? 'Save the sequence first to preview this variant' : ''
-              }
-              aria-label={`Preview step ${stepNo} variant ${active.label}`}
-              onClick={() => onPreview(stepNo, active)}
-            >
-              <Eye className="size-3.5" /> Preview
-            </Button>
-            <Button
-              variant="ghost"
-              size="xs"
-              className="text-destructive"
-              disabled={step.variants.length === 1}
-              aria-label={`Remove step ${stepNo} variant ${active.label}`}
-              onClick={() => removeVariant(active.uid)}
-            >
-              <Trash2 className="size-3.5" /> Variant
-            </Button>
-          </div>
-        )}
-      </div>
+      {step.content_source === 'personalized' ? (
+        <div className="flex flex-col gap-2 rounded-md border border-border p-3 text-sm">
+          <p className="font-medium">Lead-specific sequence content</p>
+          <p className="text-muted-foreground">
+            Subject: <code>{'{{manual_subject}}'}</code>
+          </p>
+          <p className="text-muted-foreground">
+            Body: <code>{'{{manual_body}}'}</code>
+          </p>
+          <p className="text-xs text-muted-foreground">
+            This step has no variants. Each lead must have ready campaign copy for this exact step.
+          </p>
+        </div>
+      ) : (
+        <div className="flex items-center gap-2">
+          <Tabs value={active?.uid ?? ''} onValueChange={setActiveUid}>
+            <TabsList className="h-8">
+              {step.variants.map((variant) => (
+                <TabsTrigger key={variant.uid} value={variant.uid} className="text-xs">
+                  {variant.label}
+                  {!variant.active && <span className="ml-1 text-muted-foreground">(retired)</span>}
+                  {variantHasError(variant) && <span className="ml-1 text-destructive">•</span>}
+                </TabsTrigger>
+              ))}
+            </TabsList>
+          </Tabs>
+          <Button
+            variant="ghost"
+            size="xs"
+            onClick={addVariant}
+            aria-label={`Add variant to step ${stepNo}`}
+          >
+            <Plus className="size-3.5" /> Variant
+          </Button>
+          {active && (
+            <div className="ml-auto flex items-center gap-2">
+              {!active.active && (
+                <Badge variant="outline" className="text-[10px]">
+                  retired — kept for history
+                </Badge>
+              )}
+              <Button
+                variant="ghost"
+                size="xs"
+                disabled={active.id === undefined}
+                title={
+                  active.id === undefined ? 'Save the sequence first to preview this variant' : ''
+                }
+                aria-label={`Preview step ${stepNo} variant ${active.label}`}
+                onClick={() => onPreview(stepNo, active)}
+              >
+                <Eye className="size-3.5" /> Preview
+              </Button>
+              <Button
+                variant="ghost"
+                size="xs"
+                className="text-destructive"
+                disabled={step.variants.length === 1}
+                aria-label={`Remove step ${stepNo} variant ${active.label}`}
+                onClick={() => removeVariant(active.uid)}
+              >
+                <Trash2 className="size-3.5" /> Variant
+              </Button>
+            </div>
+          )}
+        </div>
+      )}
 
-      {active && (
+      {step.content_source === 'template' && active && (
         <div className="space-y-3">
           <TemplateField
             id={`${active.uid}-subject`}

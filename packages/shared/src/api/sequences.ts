@@ -25,6 +25,7 @@ export const stepSchema = z
     step_no: z.number().int(),
     wait_days: z.number().int(),
     in_thread: z.boolean(),
+    content_source: z.enum(['template', 'personalized']),
     variants: z.array(variantSchema),
   })
   .strict();
@@ -64,9 +65,26 @@ export const stepWriteSchema = z
     step_no: z.number().int().min(1),
     wait_days: z.number().int().min(0),
     in_thread: z.boolean(),
-    variants: z.array(variantWriteSchema).min(1),
+    content_source: z.enum(['template', 'personalized']).default('template'),
+    variants: z.array(variantWriteSchema).default([]),
   })
-  .strict();
+  .strict()
+  .superRefine((step, ctx) => {
+    if (step.content_source === 'template' && step.variants.length === 0) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['variants'],
+        message: 'template steps require at least one variant',
+      });
+    }
+    if (step.content_source === 'personalized' && step.variants.length !== 0) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['variants'],
+        message: 'personalized steps do not use variants',
+      });
+    }
+  });
 
 export const sequenceWriteBodySchema = z.object({
   name: z.string().min(1),
@@ -85,7 +103,7 @@ export const previewBodySchema = z
   .object({
     lead_id: z.number().int().positive(),
     step_no: z.number().int().min(1),
-    variant_id: z.number().int().positive(),
+    variant_id: z.number().int().positive().optional(),
     campaign_id: z.number().int().positive().optional(),
   })
   .strict();

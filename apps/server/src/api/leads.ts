@@ -5,6 +5,8 @@ import type { FastifyInstance } from 'fastify';
 import {
   bulkTierBodySchema,
   bulkTierResponseSchema,
+  bulkOutreachStatusBodySchema,
+  campaignPersonalizedCopyWriteResponseSchema,
   deleteSuppressionBodySchema,
   eraseLeadBodySchema,
   idParamSchema,
@@ -16,6 +18,9 @@ import {
   leadsQuerySchema,
   okResponseSchema,
   patchLeadBodySchema,
+  personalizedCopiesResponseSchema,
+  personalizedCopySourceWriteResponseSchema,
+  personalizedCopyWriteBodySchema,
   type EventViewDto,
   type LeadDto,
 } from '@coldemail/shared';
@@ -29,6 +34,8 @@ import {
   listLeads,
   patchLead,
   untieredCount,
+  updateOutreachStatusByFilter,
+  updateOutreachStatusByIds,
   type LeadListItem,
   type LeadRow,
 } from '../db/repos/leadsRepo';
@@ -43,6 +50,16 @@ import { bulkTier } from '../services/tiering';
 import { createSingleLead } from '../ingest/service';
 import { AppError } from './errors';
 import type { ZodTypeProvider } from './plugins/zodCompilers';
+import {
+  clearPersonalizedCopyBlockersForLeadStep,
+  createOrReplaceCampaignPersonalizedCopy,
+  createOrReplacePersonalizedCopySource,
+  getCampaignPersonalizedCopy,
+  getPersonalizedCopySource,
+  listPersonalizedCopiesForLead,
+} from '../db/repos/manualDraftsRepo';
+import { getStepByNumber } from '../db/repos/sequencesRepo';
+import { contentHashOf } from '../render/hash';
 
 function toLeadDto(
   row: LeadRow,
@@ -58,6 +75,7 @@ function toLeadDto(
     city: row.city,
     state: row.state,
     tier: row.tier,
+    outreach_status: row.outreachStatus,
     is_suppressed: row.isSuppressed,
     custom_fields: (row.customFields ?? {}) as Record<string, string>,
     ...(pool && {
@@ -92,6 +110,54 @@ function toEventView(row: EventRow): EventViewDto {
 }
 
 const suppressionParamsSchema = z.object({ email: z.string() });
+const sourceSlotParamsSchema = idParamSchema.extend({ slot: z.coerce.number().int().positive() });
+const campaignStepParamsSchema = idParamSchema.extend({
+  campaignId: z.coerce.number().int().positive(),
+  stepNo: z.coerce.number().int().positive(),
+});
+
+function sourceDto(source: Awaited<ReturnType<typeof getPersonalizedCopySource>>) {
+  if (!source) throw AppError.notFound('personalized copy source');
+  return {
+    id: source.id,
+    lead_id: source.leadId,
+    slot_no: source.slotNo,
+    target_step_no: source.targetStepNo,
+    subject: source.subject,
+    body: source.body,
+    status: source.status,
+    source_import_id: source.sourceImportId,
+    content_hash: contentHashOf(source.subject, source.body),
+    created_at: source.createdAt.toISOString(),
+    updated_at: source.updatedAt.toISOString(),
+  };
+}
+
+type PersonalizedCopiesForLead = Awaited<ReturnType<typeof listPersonalizedCopiesForLead>>;
+type ListedCampaignCopy = PersonalizedCopiesForLead['copies'][number];
+
+function campaignCopyDto(row: ListedCampaignCopy) {
+  if (!row.step) throw new Error(`personalized copy ${row.copy.id} has no sequence step`);
+  return {
+    id: row.copy.id,
+    lead_id: row.copy.leadId,
+    campaign_id: row.copy.campaignId,
+    campaign_name: row.campaign.name,
+    sequence_step_id: row.step.id,
+    step_no: row.copy.stepNo,
+    subject: row.copy.subject,
+    body: row.copy.body,
+    status: row.copy.status,
+    source_copy_id: row.copy.sourceCopyId,
+    source_import_id: row.copy.sourceImportId,
+    content_hash: row.copy.contentHash ?? contentHashOf(row.copy.subject, row.copy.body),
+    sent_event_id: row.copy.sentEventId,
+    sent_message_id: row.copy.sentMessageId,
+    created_at: row.copy.createdAt.toISOString(),
+    updated_at: row.copy.updatedAt.toISOString(),
+    sent_at: row.copy.sentAt?.toISOString() ?? null,
+  };
+}
 
 export async function leadsRoutes(app: FastifyInstance, services: AppServices): Promise<void> {
   const r = app.withTypeProvider<ZodTypeProvider>();
@@ -101,20 +167,35 @@ export async function leadsRoutes(app: FastifyInstance, services: AppServices): 
     '/leads',
     { schema: { querystring: leadsQuerySchema, response: { 200: leadsListResponseSchema } } },
     async (req) => {
-      const { page, per_page, tier, state, campaign_id, pool_campaign_id, q, suppressed } =
-        req.query;
-      const { items, total } = await listLeads(
-        db,
-        { tier, state, campaignId: campaign_id, poolCampaignId: pool_campaign_id, q, suppressed },
+      const {
         page,
         per_page,
-      );
+        tier,
+        state,
+        campaign_id,
+        campaign_scope,
+        pool_campaign_id,
+        q,
+        suppressed,
+        outreach_status,
+      } = req.query;
+      const filter = {
+        tier,
+        state,
+        campaignId: campaign_id,
+        campaignScope: campaign_scope,
+        poolCampaignId: pool_campaign_id,
+        q,
+        suppressed,
+        outreachStatus: outreach_status,
+      };
+      const { items, total } = await listLeads(db, filter, page, per_page);
       return {
         items: items.map((i) => toLeadDto(i.lead, i.latestEnrollment, i.poolAssignment)),
         total,
         page,
         per_page,
-        untiered_count: await untieredCount(db),
+        untiered_count: await untieredCount(db, filter),
       };
     },
   );
@@ -179,6 +260,7 @@ export async function leadsRoutes(app: FastifyInstance, services: AppServices): 
         req.params.id,
         {
           tier: req.body.tier,
+          outreachStatus: req.body.outreach_status,
           notes: req.body.notes,
           customFields: req.body.custom_fields,
         },
@@ -186,6 +268,127 @@ export async function leadsRoutes(app: FastifyInstance, services: AppServices): 
       );
       if (!updated || updated.isErased) throw AppError.notFound('lead');
       return toLeadDto(updated, await latestEnrollmentLite(db, updated.id));
+    },
+  );
+
+  r.get(
+    '/leads/:id/personalized-copies',
+    {
+      schema: {
+        params: idParamSchema,
+        response: { 200: personalizedCopiesResponseSchema },
+      },
+    },
+    async (req) => {
+      const lead = await getLeadById(db, req.params.id);
+      if (!lead || lead.isErased) throw AppError.notFound('lead');
+      const listed = await listPersonalizedCopiesForLead(db, lead.id);
+      return {
+        sources: listed.sources.map((source) => sourceDto(source)),
+        campaign_copies: listed.copies.map(campaignCopyDto),
+      };
+    },
+  );
+
+  r.put(
+    '/leads/:id/personalized-copy-sources/:slot',
+    {
+      schema: {
+        params: sourceSlotParamsSchema,
+        body: personalizedCopyWriteBodySchema,
+        response: { 200: personalizedCopySourceWriteResponseSchema },
+      },
+    },
+    async (req) => {
+      const lead = await getLeadById(db, req.params.id);
+      if (!lead || lead.isErased) throw AppError.notFound('lead');
+      if (req.body.action === 'copy_from_source') {
+        throw new AppError('validation', 400, 'an unassigned source cannot copy from itself');
+      }
+      const subject = req.body.subject ?? '';
+      const body = req.body.body ?? '';
+      if (req.body.action === 'mark_ready' && (!subject.trim() || !body.trim())) {
+        throw new AppError('validation', 422, 'subject and body are required before marking ready');
+      }
+      const result = await createOrReplacePersonalizedCopySource(db, {
+        leadId: lead.id,
+        slotNo: req.params.slot,
+        targetStepNo: null,
+        sourceImportId: null,
+        subject,
+        body,
+        status: req.body.action === 'mark_ready' ? 'ready' : 'needs_review',
+        replace: req.body.replace,
+        at: clock.now(),
+      });
+      return { result: result.result, source: sourceDto(result.source) };
+    },
+  );
+
+  r.put(
+    '/leads/:id/campaigns/:campaignId/steps/:stepNo/personalized-copy',
+    {
+      schema: {
+        params: campaignStepParamsSchema,
+        body: personalizedCopyWriteBodySchema,
+        response: { 200: campaignPersonalizedCopyWriteResponseSchema },
+      },
+    },
+    async (req) => {
+      const lead = await getLeadById(db, req.params.id);
+      if (!lead || lead.isErased) throw AppError.notFound('lead');
+      const campaign = await getCampaign(db, req.params.campaignId);
+      if (!campaign?.sequenceId) throw AppError.notFound('campaign sequence');
+      const step = await getStepByNumber(db, campaign.sequenceId, req.params.stepNo);
+      if (!step) throw AppError.notFound('sequence step');
+      if (step.contentSource !== 'personalized') {
+        throw new AppError('conflict', 409, 'the selected sequence step uses template content');
+      }
+      const existing = await getCampaignPersonalizedCopy(db, lead.id, campaign.id, step.id);
+      if (existing?.status === 'sent') {
+        throw new AppError('conflict', 409, 'sent personalized copy is immutable');
+      }
+      const source =
+        req.body.action === 'copy_from_source'
+          ? await getPersonalizedCopySource(db, lead.id, req.body.source_slot_no)
+          : undefined;
+      if (req.body.action === 'copy_from_source' && !source) {
+        throw AppError.notFound('personalized copy source');
+      }
+      const subject = source?.subject ?? req.body.subject ?? '';
+      const body = source?.body ?? req.body.body ?? '';
+      const status =
+        req.body.action === 'mark_ready'
+          ? ('ready' as const)
+          : req.body.action === 'copy_from_source' && source?.status === 'ready'
+            ? ('ready' as const)
+            : ('needs_review' as const);
+      if (status === 'ready' && (!subject.trim() || !body.trim())) {
+        throw new AppError('validation', 422, 'subject and body are required before marking ready');
+      }
+      const result = await createOrReplaceCampaignPersonalizedCopy(db, {
+        leadId: lead.id,
+        campaignId: campaign.id,
+        sequenceStepId: step.id,
+        stepNo: step.stepNo,
+        sourceCopyId: source?.id ?? existing?.sourceCopyId ?? null,
+        sourceImportId: source?.sourceImportId ?? existing?.sourceImportId ?? null,
+        subject,
+        body,
+        contentHash: contentHashOf(subject, body),
+        status,
+        replace: req.body.replace,
+        at: clock.now(),
+      });
+      if (status === 'ready') {
+        await clearPersonalizedCopyBlockersForLeadStep(db, lead.id, campaign.id, step.id);
+      }
+      const listed = await listPersonalizedCopiesForLead(db, lead.id);
+      const saved = listed.copies.find(
+        (row) => row.copy.campaignId === campaign.id && row.step?.id === step.id,
+      );
+      if (!saved) throw new Error('saved personalized copy not found');
+      return { result, copy: campaignCopyDto(saved) };
     },
   );
 
@@ -202,9 +405,11 @@ export async function leadsRoutes(app: FastifyInstance, services: AppServices): 
               tier: req.body.filter.tier,
               state: req.body.filter.state,
               campaignId: req.body.filter.campaign_id,
+              campaignScope: req.body.filter.campaign_scope,
               poolCampaignId: req.body.filter.pool_campaign_id,
               q: req.body.filter.q,
               suppressed: req.body.filter.suppressed,
+              outreachStatus: req.body.filter.outreach_status,
             },
             tier: req.body.tier,
           },
@@ -213,6 +418,35 @@ export async function leadsRoutes(app: FastifyInstance, services: AppServices): 
         // service refusals (exactly-one-of, empty filter) are caller mistakes
         throw new AppError('validation', 400, (err as Error).message);
       }
+    },
+  );
+
+  r.post(
+    '/leads/bulk-outreach-status',
+    { schema: { body: bulkOutreachStatusBodySchema, response: { 200: bulkTierResponseSchema } } },
+    async (req) => {
+      const hasIds = (req.body.lead_ids?.length ?? 0) > 0;
+      const hasFilter = req.body.filter !== undefined;
+      if (hasIds === hasFilter) {
+        throw new AppError('validation', 400, 'provide exactly one of lead_ids or filter');
+      }
+      const updated = hasIds
+        ? await updateOutreachStatusByIds(db, req.body.lead_ids!, req.body.outreach_status)
+        : await updateOutreachStatusByFilter(
+            db,
+            {
+              tier: req.body.filter!.tier,
+              state: req.body.filter!.state,
+              campaignId: req.body.filter!.campaign_id,
+              campaignScope: req.body.filter!.campaign_scope,
+              poolCampaignId: req.body.filter!.pool_campaign_id,
+              q: req.body.filter!.q,
+              suppressed: req.body.filter!.suppressed,
+              outreachStatus: req.body.filter!.outreach_status,
+            },
+            req.body.outreach_status,
+          );
+      return { updated };
     },
   );
 

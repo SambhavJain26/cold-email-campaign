@@ -76,12 +76,12 @@ test('accessibility: primary landmarks and labelled controls (F8.3)', async ({ p
     await expect(page.getByRole('link', { name: label })).toBeVisible();
   }
 
-  // Dialogs expose an accessible title (the composer, opened from a lead).
+  // Dialogs expose an accessible title (Personalized Copy, opened from a lead).
   await page.getByRole('link', { name: 'Leads' }).click();
   await page.getByRole('table').getByRole('row').nth(1).click();
-  await page.getByRole('button', { name: 'Manual compose' }).click();
+  await page.getByRole('button', { name: 'Personalized Copy' }).click();
   await expect(page.getByRole('dialog')).toBeVisible();
-  await expect(page.getByRole('heading', { name: /Write manually to/ })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Personalized Copy' })).toBeVisible();
   // Escape closes it — keyboard-operable.
   await page.keyboard.press('Escape');
   await expect(page.getByRole('dialog')).toHaveCount(0);

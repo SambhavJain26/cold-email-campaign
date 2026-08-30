@@ -105,6 +105,17 @@ export default function OverviewPage() {
         </Alert>
       ))}
 
+      {(system.data?.personalized_copy_blocked_count ?? 0) > 0 && (
+        <Alert>
+          <AlertTitle>Personalized copy holds</AlertTitle>
+          <AlertDescription>
+            {system.data!.personalized_copy_blocked_count} enrollment
+            {system.data!.personalized_copy_blocked_count === 1 ? ' is' : 's are'} waiting for
+            valid, ready personalized copy.
+          </AlertDescription>
+        </Alert>
+      )}
+
       {data.watch_flags.map((flag) => (
         <div
           key={flag}

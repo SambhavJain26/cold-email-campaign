@@ -102,12 +102,11 @@ test('real backend: import → enroll → advance → reply/STOP → tag → met
   // 4 — Tier the untiered cohort, then create + activate the campaign.
   await api(page, 'post', '/api/v1/leads/bulk-tier', {
     filter: { tier: 'untiered' },
-    tier: 'C',
+    tier: 'B',
   });
   const camp = await api<{ id: number }>(page, 'post', '/api/v1/campaigns', {
     name: 'Real Replay Campaign',
     sequence_id: seq.id,
-    tier_effort_config: { A: 'template_auto', B: 'template_auto', C: 'template_auto' },
     ramp_config: { ramp_days: 7, ramp_daily_enroll_cap: 25 },
   });
   await api(page, 'patch', `/api/v1/campaigns/${camp.id}`, { status: 'active' });

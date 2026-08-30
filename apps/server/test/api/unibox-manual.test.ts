@@ -335,7 +335,7 @@ describe('B6.7 unibox + B6.8 manual-sends', () => {
     expect(lead!.suppressionReason).toBe('unsubscribed');
   });
 
-  it('manual-send uses an existing due enrollment, sends, and returns message_id + checks', async () => {
+  it('manual-send is permanently retired in favor of sequence-only personalized copy', async () => {
     const wm = await eventWatermark(h.pool);
     const res = await h.inject({
       method: 'POST',
@@ -348,94 +348,30 @@ describe('B6.7 unibox + B6.8 manual-sends', () => {
         body: 'Manny — impressive portfolio. Fifteen minutes this week to talk seller leads?',
       },
     });
-    expect(res.statusCode).toBe(200);
-    const body = res.json();
-    expect(body.enrollment_id).toBe(2);
-    expect(body.message_id).toMatch(/^<ce-/);
-    expect(body.checks.fatal).toEqual([]);
-    await expectAppended(h.pool, wm, { sent: 1 });
-
-    const e = await getById(h.services.db, body.enrollment_id);
-    expect(e!.personalizationMode).toBe('human_written');
-    expect(e!.currentStepNo).toBe(2); // sent advanced the step
-
-    const prefill = (
-      await h.inject({
-        method: 'GET',
-        url: `/api/v1/enrollments/${body.enrollment_id}/manual-compose-prefill`,
-      })
-    ).json();
-    expect(prefill).toMatchObject({
-      enrollment_id: 2,
-      step_no: 2,
-      step_count: 2,
-      subject: 'Re: Saw your work at Fresh LLC',
-      body: 'Step two for Manny — following up here.',
-      thread: { assigned_mailbox_id: 1, in_thread: true },
-    });
-
-    const variants = (
-      await h.inject({
-        method: 'GET',
-        url: `/api/v1/analytics/variants?campaign_id=${campaignId}&step_no=1`,
-      })
-    ).json().items;
-    expect(variants).toContainEqual(
-      expect.objectContaining({
-        label: `Manual · enrollment ${body.enrollment_id}`,
-        subject_template: 'Saw your work at Fresh LLC',
-        deactivatable: false,
-        sent: 1,
-      }),
-    );
+    expect(res.statusCode).toBe(410);
+    expect(res.json().error.message).toMatch(/sequence/i);
+    await expectNoNewEvents(h.pool, wm);
   });
 
-  it('manual-send maps refusals: fatal checks 422, suppressed 409, no mailbox 409', async () => {
-    // URL in a step-1 send = fatal check (walkthrough rule) → 422
-    const fatal = await h.inject({
-      method: 'POST',
-      url: '/api/v1/manual-sends',
-      payload: {
-        lead_id: 3,
-        campaign_id: campaignId,
-        enrollment_id: 3,
-        subject: 'Quick look',
-        body: 'Carla — see https://my-portfolio.dev for examples.',
-      },
+  it('legacy manual prefill and draft APIs return sequence-only guidance', async () => {
+    const wm = await eventWatermark(h.pool);
+    const prefill = await h.inject({
+      method: 'GET',
+      url: '/api/v1/enrollments/2/manual-compose-prefill',
     });
-    expect(fatal.statusCode).toBe(422);
-    expect(fatal.json().error.code).toBe('validation');
+    expect(prefill.statusCode).toBe(410);
+    expect(prefill.json().error.message).toMatch(/Personalized Copy/i);
 
-    // suppressed lead (rita, unsubscribed above) — fresh campaign so the
-    // enroll-if-needed path hits the suppression wall
-    const suppressed = await h.inject({
-      method: 'POST',
-      url: '/api/v1/manual-sends',
-      payload: {
-        lead_id: 1,
-        campaign_id: campaignId,
-        subject: 'Should never send',
-        body: 'Nope.',
-      },
-    });
-    expect(suppressed.statusCode).toBe(409);
+    const readDraft = await h.inject({ method: 'GET', url: '/api/v1/manual-drafts/1' });
+    expect(readDraft.statusCode).toBe(410);
+    expect(readDraft.json().error.message).toMatch(/personalized-copy/i);
 
-    // all mailboxes paused → mailbox_unhealthy (lead 3 is still at step 1
-    // with no assigned mailbox — lead 2 advanced past the sequence's last step)
-    await h.pool.query(`UPDATE mailboxes SET status = 'paused'`);
-    const unhealthy = await h.inject({
-      method: 'POST',
-      url: '/api/v1/manual-sends',
-      payload: {
-        lead_id: 3,
-        campaign_id: campaignId,
-        enrollment_id: 3,
-        subject: 'Another angle',
-        body: 'Different content entirely, still solid.',
-      },
+    const editDraft = await h.inject({
+      method: 'PATCH',
+      url: '/api/v1/manual-drafts/1',
+      payload: { subject: 'must not be accepted' },
     });
-    expect(unhealthy.statusCode).toBe(409);
-    expect(unhealthy.json().error.code).toBe('mailbox_unhealthy');
-    await h.pool.query(`UPDATE mailboxes SET status = 'ok'`);
+    expect(editDraft.statusCode).toBe(410);
+    await expectNoNewEvents(h.pool, wm);
   });
 });

@@ -56,6 +56,7 @@ function toSequenceDto(n: NestedSequence): SequenceDto {
       step_no: step.stepNo,
       wait_days: step.waitDays,
       in_thread: step.inThread,
+      content_source: step.contentSource,
       variants: variants.map((v) => ({
         id: v.id,
         label: v.label,
@@ -71,6 +72,7 @@ function toSequenceDto(n: NestedSequence): SequenceDto {
 function assertTemplatesParse(body: SequenceWriteBody): void {
   const errors: Array<{ step_no: number; label: string; field: string; message: string }> = [];
   for (const step of body.steps) {
+    if (step.content_source === 'personalized') continue;
     for (const v of step.variants) {
       for (const [field, src] of [
         ['subject_template', v.subject_template],
@@ -93,6 +95,7 @@ function toSaveSteps(body: SequenceWriteBody) {
     stepNo: s.step_no,
     waitDays: s.wait_days,
     inThread: s.in_thread,
+    contentSource: s.content_source,
     variants: s.variants.map((v) => ({
       id: v.id,
       label: v.label,
@@ -192,6 +195,14 @@ export async function sequencesRoutes(app: FastifyInstance, services: AppService
       if (!nested) throw AppError.notFound('sequence');
       const stepEntry = nested.steps.find((s) => s.step.stepNo === req.body.step_no);
       if (!stepEntry) throw AppError.notFound('step');
+      if (stepEntry.step.contentSource === 'personalized') {
+        throw new AppError(
+          'conflict',
+          409,
+          'Preview personalized copy from the lead Personalized Copy editor',
+        );
+      }
+      if (!req.body.variant_id) throw AppError.notFound('variant');
       const variant = await getVariantById(db, req.body.variant_id);
       if (!variant || variant.stepId !== stepEntry.step.id) throw AppError.notFound('variant');
       const lead = await getLeadById(db, req.body.lead_id);

@@ -7,8 +7,8 @@ test('tier header shows the golden distribution and the untiered banner', async 
   await page.getByRole('link', { name: 'Leads' }).click();
 
   await expect(page.getByTestId('tier-count-A')).toHaveText('255');
-  await expect(page.getByTestId('tier-count-B')).toHaveText('447');
-  await expect(page.getByTestId('tier-count-C')).toHaveText('165');
+  await expect(page.getByTestId('tier-count-B')).toHaveText('612');
+  await expect(page.getByTestId('tier-count-C')).toHaveCount(0);
   await expect(page.getByTestId('untiered-banner')).toContainText('18 leads need tiering');
 });
 
@@ -24,12 +24,32 @@ test('bulk-tier the untiered cohort clears the banner', async ({ page }) => {
   await expect(bar).toContainText('18 selected');
 
   await bar.getByLabel('Bulk tier').click();
-  await page.getByRole('option', { name: '⚪ Tier C' }).click();
+  await page.getByRole('option', { name: '🟡 Tier B' }).click();
   await bar.getByRole('button', { name: 'Apply' }).click();
 
   await expect(page.getByText('18 leads re-tiered')).toBeVisible();
   await expect(page.getByTestId('untiered-banner')).not.toBeVisible();
-  await expect(page.getByTestId('tier-count-C')).toHaveText('183');
+  await expect(page.getByTestId('tier-count-B')).toHaveText('630');
+});
+
+test('Campaign filter exposes Pool, Enrolled, and Both membership scopes', async ({ page }) => {
+  await login(page);
+  await page.getByRole('link', { name: 'Leads' }).click();
+
+  await page.getByLabel('Campaign filter').click();
+  await page.getByRole('option', { name: 'Golden Pass 1' }).click();
+  await expect(page.getByLabel('Campaign membership scope')).toHaveText('Both');
+  await expect(page.getByRole('table').getByRole('row')).toHaveCount(26);
+  await expect(page.getByRole('navigation', { name: 'Leads pagination' })).toContainText('36');
+
+  await page.getByLabel('Campaign membership scope').click();
+  await page.getByRole('option', { name: 'Pool' }).click();
+  await expect(page.getByText('No leads match this filter')).toBeVisible();
+
+  await page.getByLabel('Campaign membership scope').click();
+  await page.getByRole('option', { name: 'Enrolled' }).click();
+  await expect(page.getByRole('table').getByRole('row')).toHaveCount(26);
+  await expect(page.getByRole('navigation', { name: 'Leads pagination' })).toContainText('36');
 });
 
 test('select-all-matching applies the FILTER body, not ids', async ({ page }) => {
@@ -41,12 +61,12 @@ test('select-all-matching applies the FILTER body, not ids', async ({ page }) =>
 
   await page.getByLabel('Select page').check();
   await page.getByTestId('select-all-matching').click();
-  await expect(page.getByTestId('bulk-tier-bar')).toContainText('447 matching leads');
+  await expect(page.getByTestId('bulk-tier-bar')).toContainText('612 matching leads');
 
   await page.getByLabel('Bulk tier').click();
   await page.getByRole('option', { name: '🟡 Tier B' }).click();
   await page.getByTestId('bulk-tier-bar').getByRole('button', { name: 'Apply' }).click();
-  await expect(page.getByText('447 leads re-tiered')).toBeVisible();
+  await expect(page.getByText('612 leads re-tiered')).toBeVisible();
 });
 
 test('lead detail: timeline renders, edits save', async ({ page }) => {

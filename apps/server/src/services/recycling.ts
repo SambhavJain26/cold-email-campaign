@@ -1,8 +1,8 @@
-import type { LeadTier } from '@coldemail/shared';
+import type { CurrentLeadTier } from '@coldemail/shared';
 import type { Clock } from '../clock';
 import type { Db, DbLike } from '../db/client';
 import { enrolledLeadIdsIn, insertEnrollments } from '../db/repos/enrollmentsRepo';
-import { getCampaign, tierEffortOf } from '../db/repos/campaignsRepo';
+import { getCampaign } from '../db/repos/campaignsRepo';
 import { recontactStatusByLeadIds } from '../db/repos/leadsRepo';
 import { leadsWithHashConflict } from '../db/repos/sentMessagesRepo';
 import { getSettings } from '../db/repos/settingsRepo';
@@ -18,6 +18,7 @@ import {
   type SourceEnrollmentCandidate,
 } from '../db/repos/recyclingRepo';
 import { allContentHashes } from '../domain/sequence';
+import { campaignPersonalizedCopyReadiness } from '../db/repos/manualDraftsRepo';
 import { buildEvent } from '../domain/events';
 import type { EventStore } from './eventStore';
 
@@ -26,6 +27,8 @@ export interface RecycleBreakdown {
   duplicates: number;
   restPeriodFailures: number;
   nurtureExclusions: number;
+  untieredExclusions: number;
+  personalizedCopyBlocks: number;
   suppressionRecontactBlocks: number;
   existingTargetEnrollments: number;
   priorContentConflicts: number;
@@ -60,7 +63,7 @@ export class RecycleValidationError extends Error {
 
 interface EligibleRecycleLead {
   leadId: number;
-  tier: LeadTier | null;
+  tier: CurrentLeadTier;
   sources: SourceEnrollmentCandidate[];
 }
 
@@ -109,12 +112,19 @@ async function evaluateRecycle(
   const already = await enrolledLeadIdsIn(db, targetCampaignId, leadIds);
   const conflicts = await leadsWithHashConflict(db, leadIds, allContentHashes(sequence));
   const recontact = await recontactStatusByLeadIds(db, leadIds);
+  const firstStep = sequence.steps[0];
+  const copyReadiness =
+    firstStep?.contentSource === 'personalized' && firstStep.id !== undefined
+      ? await campaignPersonalizedCopyReadiness(db, targetCampaignId, firstStep.id, leadIds)
+      : new Map<number, null>();
   const restMs = settings.coldStorageRestDays * 86_400_000;
   const breakdown: RecycleBreakdown = {
     uniqueLeads: leadIds.length,
     duplicates: candidates.length - leadIds.length,
     restPeriodFailures: 0,
     nurtureExclusions: 0,
+    untieredExclusions: 0,
+    personalizedCopyBlocks: 0,
     suppressionRecontactBlocks: 0,
     existingTargetEnrollments: 0,
     priorContentConflicts: 0,
@@ -134,7 +144,10 @@ async function evaluateRecycle(
     const restedSources = rows.filter((row) => row.completedAt.getTime() + restMs <= now.getTime());
     if (blocked) breakdown.suppressionRecontactBlocks += 1;
     else if (already.has(leadId)) breakdown.existingTargetEnrollments += 1;
-    else if (lead.tier === 'nurture') breakdown.nurtureExclusions += 1;
+    else if (lead.outreachStatus === 'nurture') breakdown.nurtureExclusions += 1;
+    else if (lead.tier === null || (lead.tier !== 'A' && lead.tier !== 'B'))
+      breakdown.untieredExclusions += 1;
+    else if (copyReadiness.get(leadId)) breakdown.personalizedCopyBlocks += 1;
     else if (restedSources.length === 0) breakdown.restPeriodFailures += 1;
     else if (conflicts.has(leadId)) breakdown.priorContentConflicts += 1;
     else {
@@ -190,10 +203,8 @@ export async function commitRecycle(
     async (tx) => {
       await lockTargetCampaign(tx, targetCampaignId);
       const evaluated = await evaluateRecycle(tx, now, targetCampaignId, sourceCampaignIds);
-      const target = (await getCampaign(tx, targetCampaignId))!;
-      const effort = tierEffortOf(target);
-      const modeFor = (tier: LeadTier | null) =>
-        tier === null || tier === 'nurture' ? 'template_auto' : effort[tier];
+      const modeFor = (tier: CurrentLeadTier) =>
+        tier === 'A' ? 'template_researched' : 'template_auto';
       const enrollmentIds = await insertEnrollments(
         tx,
         evaluated.eligibleLeads.map((lead) => ({
@@ -246,6 +257,8 @@ export async function commitRecycle(
       const skipped = [
         ['rest_period', evaluated.breakdown.restPeriodFailures],
         ['nurture', evaluated.breakdown.nurtureExclusions],
+        ['untiered', evaluated.breakdown.untieredExclusions],
+        ['personalized_copy', evaluated.breakdown.personalizedCopyBlocks],
         ['suppression_or_recontact', evaluated.breakdown.suppressionRecontactBlocks],
         ['already_enrolled', evaluated.breakdown.existingTargetEnrollments],
         ['content_hash_conflict', evaluated.breakdown.priorContentConflicts],

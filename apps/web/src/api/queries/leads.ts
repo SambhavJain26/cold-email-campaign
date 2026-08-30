@@ -1,5 +1,9 @@
 import { useQuery } from '@tanstack/react-query';
-import { leadDetailResponseSchema, leadsListResponseSchema } from '@coldemail/shared';
+import {
+  leadDetailResponseSchema,
+  leadsListResponseSchema,
+  personalizedCopiesResponseSchema,
+} from '@coldemail/shared';
 import { apiFetch } from '../client';
 import { POLL } from '../queryClient';
 
@@ -10,6 +14,8 @@ export interface LeadsQuery {
   state?: string;
   campaign_id?: number;
   pool_campaign_id?: number;
+  campaign_scope?: 'pool' | 'enrolled' | 'both';
+  outreach_status?: 'standard' | 'nurture';
   q?: string;
   suppressed?: boolean;
 }
@@ -27,5 +33,14 @@ export function useLead(id: number) {
     queryKey: ['leads', 'detail', id],
     queryFn: () => apiFetch(`/leads/${id}`, leadDetailResponseSchema),
     refetchInterval: POLL.operational,
+  });
+}
+
+export function usePersonalizedCopies(leadId: number, enabled = true) {
+  return useQuery({
+    queryKey: ['leads', leadId, 'personalized-copies'],
+    queryFn: () =>
+      apiFetch(`/leads/${leadId}/personalized-copies`, personalizedCopiesResponseSchema),
+    enabled,
   });
 }

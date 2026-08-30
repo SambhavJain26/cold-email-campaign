@@ -24,6 +24,13 @@ commissioning**:
   post-ramp campaign caps are implemented, fully verified, and deployed on Spaceship at `6ca1183`.
   Production still has no campaigns or leads; deployment does not authorize activation,
   enrollment, or sending.
+- **2026-08-30 local candidate:** the operator-approved Personalized Copy/two-tier/campaign-lead
+  filter release is implemented and fully verified through migration `0019`. Personalized copy is
+  now sequence content only; current tiers are A/B with separate Nurture status; imported global
+  sources bind to independent campaign-step snapshots; missing copy fails closed with durable
+  blockers; and Campaign Pool/Enrolled/Both filters drive exact bulk tiering. It is not deployed.
+  Spaceship remains on application code `6ca1183`; deploy, activation, enrollment, and sends remain
+  separately gated.
 - The operator-approved Spaceship deployment, subpath support, sender-domain unsubscribe routing,
   and individual Google Workspace OAuth implementation are complete. Do not extend production
   scope or change DNS/Caddy/mailboxes outside the approved commissioning steps without fresh
@@ -72,6 +79,11 @@ Treat the runbook as the **durable status record** — task chips and chat summa
   API 130; GreenMail 29; golden exactly 47; mock E2E 60; real-backend E2E 1; migration 0018
   apply/down/apply; populated five-enrollment zero drift; clean self-check; and scratch restore.
   Concurrent daily claims and a timezone change that moves the local date backward are covered.
+- The 2026-08-30 Personalized Copy/two-tier/campaign-filter gate passed type/lint/format; unit 345;
+  web 58; integration 168; API 138; GreenMail 29; golden exactly 47; mock E2E 61;
+  real-backend E2E 1; migration 0019 apply/down/apply; populated five-enrollment zero drift; clean
+  self-check; production build; and a validated custom-format dump/scratch restore. Production was
+  not changed.
 
 ## Production deployments
 

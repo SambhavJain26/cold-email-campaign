@@ -45,6 +45,10 @@ export const leads = pgTable(
     notes: text('notes'),
     customFields: jsonb('custom_fields').notNull().default({}),
     tier: leadTierEnum('tier'),
+    outreachStatus: text('outreach_status')
+      .$type<'standard' | 'nurture'>()
+      .notNull()
+      .default('standard'),
     isSuppressed: boolean('is_suppressed').notNull().default(false),
     suppressionReason: suppressionReasonEnum('suppression_reason'),
     suppressedAt: tz('suppressed_at'),

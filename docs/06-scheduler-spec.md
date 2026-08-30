@@ -1,5 +1,10 @@
 # Scheduler Spec — Tick, Pacing, Rotation, Capacity, Catch-up, Auto-pause
 
+> **Migration 0019 overlay:** template steps retain the renderer; personalized steps load a ready
+> campaign-step copy and then use the same footer, checks, suppression/reply lock, pacing, windows,
+> threading, transport, confirmation, retry, and event pipeline. Missing copy holds only the
+> affected enrollment and never falls back. See [docs/22](22-personalized-copy-two-tier.md).
+
 Implements spec Part 7 + Part 11, walkthrough Stages 5, 8. Lives in `apps/server/src/scheduler/`. Runs as pg-boss cron job `scheduler-tick` every `settings.scheduler_tick_minutes` (default 5). All time via `Clock`; all sends via `MailTransport`. The tick is **idempotent and crash-safe**: it holds a pg advisory lock (`pg_try_advisory_lock`) so overlapping ticks can't double-send; every send is committed (event appended) before the next is attempted.
 
 ---

@@ -1,31 +1,13 @@
 import { useState } from 'react';
 import { toast } from 'sonner';
-import {
-  PERSONALIZATION_MODES,
-  type CampaignDto,
-  type PersonalizationMode,
-} from '@coldemail/shared';
+import { type CampaignDto } from '@coldemail/shared';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
 import { usePatchCampaign } from '@/api/mutations/campaigns';
-
-const MODE_LABEL: Record<PersonalizationMode, string> = {
-  human_written: 'Mode 1 — human-written',
-  template_researched: 'Mode 2 — researched slot',
-  template_auto: 'Mode 2 — auto slot',
-};
 
 export function DraftConfigurationEditor({ campaign }: { campaign: CampaignDto }) {
   const patch = usePatchCampaign();
-  const [effort, setEffort] = useState(campaign.tier_effort_config);
   const [stages, setStages] = useState(campaign.ramp_stages);
   const [steadyCap, setSteadyCap] = useState(campaign.steady_daily_enroll_cap);
   const [autoField, setAutoField] = useState(campaign.auto_observation.field ?? '');
@@ -49,7 +31,6 @@ export function DraftConfigurationEditor({ campaign }: { campaign: CampaignDto }
       {
         id: campaign.id,
         body: {
-          tier_effort_config: effort,
           ramp_stages: stages,
           steady_daily_enroll_cap: steadyCap,
           variable_overrides: Object.fromEntries(
@@ -79,29 +60,8 @@ export function DraftConfigurationEditor({ campaign }: { campaign: CampaignDto }
           Editable until first activation. Activation freezes this configuration permanently.
         </p>
       </div>
-      <div className="grid gap-2 sm:grid-cols-3">
-        {(['A', 'B', 'C'] as const).map((tier) => (
-          <div key={tier} className="space-y-1">
-            <Label className="text-xs">Tier {tier}</Label>
-            <Select
-              value={effort[tier]}
-              onValueChange={(value) =>
-                setEffort({ ...effort, [tier]: value as PersonalizationMode })
-              }
-            >
-              <SelectTrigger aria-label={`Tier ${tier} effort`}>
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                {PERSONALIZATION_MODES.map((mode) => (
-                  <SelectItem key={mode} value={mode}>
-                    {MODE_LABEL[mode]}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-        ))}
+      <div className="rounded-md border border-border p-3 text-sm">
+        Tier A = Researched · Tier B = Auto. Personalized sequence steps use saved lead copy.
       </div>
       <div className="space-y-2">
         <Label className="text-xs">Ramp stages: start day, end day, new-enrollment cap</Label>

@@ -21,7 +21,8 @@ export type AlertKind =
   | 'send_blocked_daily_capacity_exhausted'
   | 'send_blocked_pacing_delay'
   | 'send_blocked_manual_only'
-  | 'render_failed'; // fatal pre-send check blocked a send (B4.8)
+  | 'render_failed' // fatal pre-send check blocked a send (B4.8)
+  | 'personalized_copy_blocked';
 
 export interface AlertSink {
   emit(kind: AlertKind, severity: AlertSeverity, payload: Record<string, unknown>): Promise<void>;

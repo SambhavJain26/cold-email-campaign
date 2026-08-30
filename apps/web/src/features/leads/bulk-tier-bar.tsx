@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { toast } from 'sonner';
-import type { BulkTierBody, LeadTier } from '@coldemail/shared';
+import type { BulkOutreachStatusBody, BulkTierBody, CurrentLeadTier } from '@coldemail/shared';
 import { Button } from '@/components/ui/button';
 import {
   Select,
@@ -9,7 +9,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { useBulkTier } from '@/api/mutations/leads';
+import { useBulkOutreachStatus, useBulkTier } from '@/api/mutations/leads';
 
 /** F3.2 — appears once rows are selected: pick a tier, apply to the selected
  *  ids OR to everything matching the current filter (docs/12 §2). */
@@ -18,6 +18,7 @@ export function BulkTierBar({
   allMatching,
   matchingTotal,
   buildBody,
+  buildOutreachBody,
   onDone,
 }: {
   selectedCount: number;
@@ -25,11 +26,13 @@ export function BulkTierBar({
   allMatching: boolean;
   matchingTotal: number;
   /** Page owns the ids-vs-filter body shape. */
-  buildBody: (tier: LeadTier | null) => BulkTierBody;
+  buildBody: (tier: CurrentLeadTier | null) => BulkTierBody;
+  buildOutreachBody: (status: 'standard' | 'nurture') => BulkOutreachStatusBody;
   onDone: () => void;
 }) {
   const [tier, setTier] = useState<string>('');
   const bulkTier = useBulkTier();
+  const bulkOutreach = useBulkOutreachStatus();
   const count = allMatching ? matchingTotal : selectedCount;
 
   return (
@@ -48,8 +51,6 @@ export function BulkTierBar({
         <SelectContent>
           <SelectItem value="A">🟢 Tier A</SelectItem>
           <SelectItem value="B">🟡 Tier B</SelectItem>
-          <SelectItem value="C">⚪ Tier C</SelectItem>
-          <SelectItem value="nurture">🔵 Nurture</SelectItem>
           <SelectItem value="clear">— clear tier</SelectItem>
         </SelectContent>
       </Select>
@@ -57,7 +58,7 @@ export function BulkTierBar({
         size="sm"
         disabled={tier === '' || bulkTier.isPending}
         onClick={() =>
-          bulkTier.mutate(buildBody(tier === 'clear' ? null : (tier as LeadTier)), {
+          bulkTier.mutate(buildBody(tier === 'clear' ? null : (tier as CurrentLeadTier)), {
             onSuccess: ({ updated }) => {
               toast.success(`${updated} leads re-tiered`);
               onDone();
@@ -69,6 +70,36 @@ export function BulkTierBar({
       </Button>
       <Button size="sm" variant="ghost" onClick={onDone}>
         Cancel
+      </Button>
+      <Button
+        size="sm"
+        variant="outline"
+        disabled={bulkOutreach.isPending}
+        onClick={() =>
+          bulkOutreach.mutate(buildOutreachBody('nurture'), {
+            onSuccess: ({ updated }) => {
+              toast.success(`${updated} leads moved to Nurture`);
+              onDone();
+            },
+          })
+        }
+      >
+        Move to Nurture
+      </Button>
+      <Button
+        size="sm"
+        variant="outline"
+        disabled={bulkOutreach.isPending}
+        onClick={() =>
+          bulkOutreach.mutate(buildOutreachBody('standard'), {
+            onSuccess: ({ updated }) => {
+              toast.success(`${updated} leads restored as untiered`);
+              onDone();
+            },
+          })
+        }
+      >
+        Restore from Nurture
       </Button>
     </div>
   );

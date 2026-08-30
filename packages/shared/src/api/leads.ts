@@ -1,10 +1,17 @@
 // Leads + suppression endpoints (docs/10 §Leads & imports).
 import { z } from 'zod';
-import { ENROLLMENT_STATES, EVENT_TYPES, LEAD_TIERS } from '../domain/index';
+import {
+  CURRENT_LEAD_TIERS,
+  ENROLLMENT_STATES,
+  EVENT_TYPES,
+  HISTORICAL_LEAD_TIERS,
+  OUTREACH_STATUSES,
+} from '../domain/index';
 import { isoDateTime, listOf, pageQuerySchema } from './common';
 
 /** Query/filter tier vocabulary: real tiers + the 'untiered' pseudo-value (decision R). */
-export const leadTierFilterSchema = z.enum([...LEAD_TIERS, 'untiered'] as const);
+export const leadTierFilterSchema = z.enum([...CURRENT_LEAD_TIERS, 'untiered'] as const);
+export const campaignScopeSchema = z.enum(['pool', 'enrolled', 'both']);
 
 export const leadSchema = z
   .object({
@@ -15,7 +22,8 @@ export const leadSchema = z
     company: z.string().nullable(),
     city: z.string().nullable(),
     state: z.string().nullable(),
-    tier: z.enum(LEAD_TIERS).nullable(),
+    tier: z.enum(HISTORICAL_LEAD_TIERS).nullable(),
+    outreach_status: z.enum(OUTREACH_STATUSES),
     is_suppressed: z.boolean(),
     custom_fields: z.record(z.string(), z.string()),
     pool_assignment: z
@@ -44,11 +52,13 @@ export const leadsQuerySchema = pageQuerySchema.extend({
   state: z.string().optional(),
   campaign_id: z.coerce.number().int().positive().optional(),
   pool_campaign_id: z.coerce.number().int().positive().optional(),
+  campaign_scope: campaignScopeSchema.optional(),
   q: z.string().optional(),
   suppressed: z
     .enum(['true', 'false'])
     .optional()
     .transform((v) => (v === undefined ? undefined : v === 'true')),
+  outreach_status: z.enum(OUTREACH_STATUSES).optional(),
 });
 
 /** List envelope + the untiered banner count (decision R). */
@@ -118,7 +128,8 @@ export const createLeadResponseSchema = z
 
 export const patchLeadBodySchema = z
   .object({
-    tier: z.enum(LEAD_TIERS).nullable().optional(),
+    tier: z.enum(CURRENT_LEAD_TIERS).nullable().optional(),
+    outreach_status: z.enum(OUTREACH_STATUSES).optional(),
     notes: z.string().nullable().optional(),
     custom_fields: z.record(z.string(), z.string()).optional(),
   })
@@ -132,8 +143,10 @@ export const leadFilterSchema = z
     state: z.string().optional(),
     campaign_id: z.number().int().positive().optional(),
     pool_campaign_id: z.number().int().positive().optional(),
+    campaign_scope: campaignScopeSchema.optional(),
     q: z.string().optional(),
     suppressed: z.boolean().optional(),
+    outreach_status: z.enum(OUTREACH_STATUSES).optional(),
   })
   .strict();
 
@@ -141,12 +154,21 @@ export const bulkTierBodySchema = z
   .object({
     lead_ids: z.array(z.number().int().positive()).optional(),
     filter: leadFilterSchema.optional(),
-    tier: z.enum(LEAD_TIERS).nullable(),
+    tier: z.enum(CURRENT_LEAD_TIERS).nullable(),
   })
   .strict();
 export type BulkTierBody = z.infer<typeof bulkTierBodySchema>;
 
 export const bulkTierResponseSchema = z.object({ updated: z.number().int().min(0) }).strict();
+
+export const bulkOutreachStatusBodySchema = z
+  .object({
+    lead_ids: z.array(z.number().int().positive()).optional(),
+    filter: leadFilterSchema.optional(),
+    outreach_status: z.enum(OUTREACH_STATUSES),
+  })
+  .strict();
+export type BulkOutreachStatusBody = z.infer<typeof bulkOutreachStatusBodySchema>;
 
 /** Decision U: the typed-confirm body — must equal the email being un-suppressed. */
 export const deleteSuppressionBodySchema = z.object({ confirm: z.string() }).strict();

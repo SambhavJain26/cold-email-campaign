@@ -25,8 +25,9 @@ export async function resetCoreTables(pool: Pool): Promise<void> {
   await pool.query(
     `TRUNCATE events, auto_enrollment_run_campaigns, auto_enrollment_runs,
              auto_enrollment_days, auto_enrollment_state, campaign_lead_pool,
+             personalized_copy_blockers, personalized_copy_sources,
              recycle_enrollment_sources, campaign_recycle_sources,
-             enrollments, suppressions, manual_campaign_drafts, campaigns, leads,
+             enrollments, suppressions, campaign_personalized_copies, campaigns, leads,
              incoming_messages, sent_messages, mailbox_secrets, mailboxes,
              step_variants, sequence_steps, sequences, import_rows, imports,
              operator, alerts, send_blocker_episodes, unsubscribe_tokens,

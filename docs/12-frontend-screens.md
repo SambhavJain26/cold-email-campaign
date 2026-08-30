@@ -1,5 +1,11 @@
 # Frontend Screens — Low-Level Spec
 
+> **Migration 0019 overlay:** the Leads screen adds Campaign + Pool/Enrolled/Both scope, exact bulk
+> A/B/Untiered actions, and separate Nurture controls. Lead detail renames Manual Compose to
+> Personalized Copy and removes all direct-send controls. Sequence steps choose Template or
+> Personalized Copy; campaigns display fixed A=Researched/B=Auto behavior and copy coverage. See
+> [docs/22](22-personalized-copy-two-tier.md).
+
 Every screen: purpose, data (endpoints from [10-api-contract.md](10-api-contract.md)), regions, interactions, and edge states. Walkthrough section references in parentheses. Build order/tasks: [15-build-stages-frontend.md](15-build-stages-frontend.md).
 
 Common to all screens: skeleton loading, inline error+retry, campaign selector in top bar scopes

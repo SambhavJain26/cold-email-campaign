@@ -102,8 +102,9 @@ export function EnrollPanel({
 
       {campaign?.tier_effort_config.A === 'human_written' && campaign.manual_only_count > 0 && (
         <p className="mt-3 text-xs text-muted-foreground">
-          {campaign.manual_only_count} Tier A enrollment
-          {campaign.manual_only_count === 1 ? ' requires' : 's require'} manual compose.
+          {campaign.manual_only_count} legacy human-written enrollment
+          {campaign.manual_only_count === 1 ? ' is' : 's are'} held. Migrate the campaign to
+          sequence Personalized Copy before sending.
         </p>
       )}
 

@@ -44,6 +44,32 @@ describe('header aliasing', () => {
 });
 
 describe('format tolerance', () => {
+  it('maps generic and step-specific personalized copy without treating it as custom fields', async () => {
+    const rows = await parseCsv(
+      buf(
+        'email,manual_subject,manual_body,step_3_subject,step_3_body\n' +
+          'jo@x.dev,Hello,First\\nSecond,Later,Third\\\\nLiteral\n',
+      ),
+    );
+    expect(rows[0]!.copySlots).toEqual({
+      1: { subject: 'Hello', body: 'First\nSecond', targetStepNo: null },
+      3: { subject: 'Later', body: 'Third\\nLiteral', targetStepNo: 3 },
+    });
+    expect(rows[0]!.customFields).toEqual({});
+  });
+
+  it('flags conflicting generic and explicit Step-1 values', async () => {
+    const [row] = await parseCsv(
+      buf('email,manual_subject,manual_body,step_1_subject,step_1_body\njo@x.dev,A,B,X,Y\n'),
+    );
+    expect(row!.copyConflicts).toContain('generic_and_step_1');
+  });
+
+  it('preserves RFC quoted multiline personalized bodies', async () => {
+    const [row] = await parseCsv(buf('email,manual_subject,manual_body\njo@x.dev,Hi,"one\ntwo"\n'));
+    expect(row!.copySlots?.[1]?.body).toBe('one\ntwo');
+  });
+
   it('BOM is stripped from the first header', async () => {
     const rows = await parseCsv(buf('﻿email,first_name\njo@x.dev,Jo\n'));
     expect(rows[0]!.fields.email).toBe('jo@x.dev');

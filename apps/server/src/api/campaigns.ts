@@ -32,6 +32,7 @@ import {
   recyclePreviewBodySchema,
   recyclePreviewResponseSchema,
   type CampaignDto,
+  personalizedCopyCoverageResponseSchema,
 } from '@coldemail/shared';
 import type { AppServices } from '../composition';
 import {
@@ -87,6 +88,7 @@ import {
   reassignPoolLeads,
   releaseFromPool,
 } from '../services/campaignPools';
+import { personalizedCopyCoverage } from '../db/repos/manualDraftsRepo';
 
 function toCampaignDto(
   row: CampaignRow,
@@ -158,6 +160,8 @@ function toRecyclePreview(breakdown: RecycleBreakdown, sources: RecycleSourceCon
       duplicates: breakdown.duplicates,
       rest_period_failures: breakdown.restPeriodFailures,
       nurture_exclusions: breakdown.nurtureExclusions,
+      untiered_exclusions: breakdown.untieredExclusions,
+      personalized_copy_blocks: breakdown.personalizedCopyBlocks,
       suppression_recontact_blocks: breakdown.suppressionRecontactBlocks,
       existing_target_enrollments: breakdown.existingTargetEnrollments,
       prior_content_conflicts: breakdown.priorContentConflicts,
@@ -180,6 +184,31 @@ export async function campaignsRoutes(app: FastifyInstance, services: AppService
   const r = app.withTypeProvider<ZodTypeProvider>();
   const { db, clock, store, sequences } = services;
   const enrollDeps = { db, store, clock, sequences };
+
+  r.get(
+    '/campaigns/:id/personalized-copy-coverage',
+    {
+      schema: {
+        params: idParamSchema,
+        response: { 200: personalizedCopyCoverageResponseSchema },
+      },
+    },
+    async (req) => {
+      if (!(await getCampaign(db, req.params.id))) throw AppError.notFound('campaign');
+      const coverage = await personalizedCopyCoverage(db, req.params.id);
+      return {
+        blocked_count: coverage.blockedCount,
+        steps: coverage.steps.map((step) => ({
+          step_no: step.stepNo,
+          ready: step.ready,
+          needs_review: step.needsReview,
+          missing: step.missing,
+          blocked: step.blocked,
+          total: step.total,
+        })),
+      };
+    },
+  );
 
   const validateDraftConfiguration = async (
     campaign: CampaignRow,
@@ -308,7 +337,11 @@ export async function campaignsRoutes(app: FastifyInstance, services: AppService
       const row = await createCampaign(db, {
         name: req.body.name,
         sequenceId: req.body.sequence_id,
-        tierEffortConfig: req.body.tier_effort_config,
+        tierEffortConfig: {
+          A: 'template_researched',
+          B: 'template_auto',
+          C: 'template_auto',
+        },
         rampConfig: req.body.ramp_config,
         rampStages: req.body.ramp_stages,
         variableOverrides: req.body.variable_overrides,
@@ -337,7 +370,6 @@ export async function campaignsRoutes(app: FastifyInstance, services: AppService
     async (req) => {
       const existing = await requireCampaign(req.params.id);
       const changesConfiguration =
-        req.body.tier_effort_config !== undefined ||
         req.body.ramp_stages !== undefined ||
         req.body.variable_overrides !== undefined ||
         req.body.auto_observation !== undefined;
@@ -350,7 +382,6 @@ export async function campaignsRoutes(app: FastifyInstance, services: AppService
       }
       if (changesConfiguration || (existing.status === 'draft' && req.body.status === 'active')) {
         await validateDraftConfiguration(existing, {
-          tierEffortConfig: req.body.tier_effort_config,
           rampStages: req.body.ramp_stages,
           autoObservation: req.body.auto_observation,
         });
@@ -378,7 +409,6 @@ export async function campaignsRoutes(app: FastifyInstance, services: AppService
       const row = await patchCampaign(db, req.params.id, {
         name: req.body.name,
         status: req.body.status,
-        tierEffortConfig: req.body.tier_effort_config,
         rampStages: req.body.ramp_stages,
         variableOverrides: req.body.variable_overrides,
         autoObservation: req.body.auto_observation,

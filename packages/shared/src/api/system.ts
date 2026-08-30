@@ -17,6 +17,7 @@ export const systemStatusResponseSchema = z
         .strict(),
     ),
     pending_jobs: z.number().int(),
+    personalized_copy_blocked_count: z.number().int().min(0),
     send_blockers: z.array(
       z
         .object({

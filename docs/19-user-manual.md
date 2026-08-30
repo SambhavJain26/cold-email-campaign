@@ -4,10 +4,10 @@
 
 **Application model:** single-operator, self-hosted cold-email campaign console
 
-**Manual version:** 2026-08-25, for branch `b8.3-local-canary`
+**Manual version:** 2026-08-30, for branch `canary`
 
-**Reconciled through:** the verified and deployed ten-workstream implementation through Stage 4.
-Spaceship production is pinned to application commit `f58b977`.
+**Reconciled through:** the locally verified Personalized Copy/two-tier/campaign-filter candidate.
+Spaceship production remains pinned to application code `6ca1183`; this candidate is not deployed.
 
 This manual explains the complete operator-facing application: what every screen does, how to use
 each action, what the system does automatically, and which safeguards or edge cases matter. It is a
@@ -27,6 +27,14 @@ the values displayed in your live session.
 > connected to real SMTP/IMAP; it does **not** mean domains are warmed, DNS is ready, a list is
 > lawful, or a campaign is safe to launch. Complete the pre-launch checklist in this manual before
 > sending to prospects.
+
+> **Candidate-versus-production warning:** the current `canary` code replaces Manual Compose
+> sending with sequence-only **Personalized Copy**, offers only current Tier A/Tier B/Untiered,
+> separates Nurture into an outreach hold, and adds Campaign Pool/Enrolled/Both lead filtering.
+> Older screenshots and historical passages that show Tier C, Nurture as a tier, Mode 1, or a
+> Manual Compose Send button describe the still-deployed predecessor. See
+> [the migration 0019 guide](22-personalized-copy-two-tier.md). Do not expect these candidate
+> controls in production until a separately authorized deployment is completed.
 
 ## Contents
 
@@ -144,15 +152,14 @@ does not change the stored login, and `.env.prod.example` must never contain rea
 
 | Tier | Intended use | Normal treatment |
 |---|---|---|
-| A | Best-fit, highest-value leads | Usually Mode 1, individually written in Manual compose |
-| B | Strong-fit leads worth research | Usually Mode 2 with a researched `custom_observation` |
-| C | Broader qualified segment | Usually Mode 2 with automatic template data |
-| Nurture | Not ready for ordinary outbound selection | Excluded from count-based enrollment |
-| Untiered | Newly imported or not yet reviewed | Eligible after A/B/C in count-based selection |
+| A | Best-fit, highest-value leads | Template steps use researched observation; personalized steps use saved copy |
+| B | Broader qualified segment | Template steps use campaign Auto Observation rules; personalized steps use saved copy |
+| Untiered | Newly imported or not yet reviewed | May be reserved in a campaign pool but cannot enroll |
 
-Tier is a prioritization and effort decision, not consent. Changing a lead's tier affects future
-enrollments. Each enrollment snapshots its tier and personalization mode, so historical analytics
-remain accurate after later tier edits.
+Nurture is a separate outreach status, not a tier. Nurture leads cannot enroll; restoring one from
+Nurture makes it Untiered. Tier is a prioritization and template-data decision, not consent.
+Changing a lead's tier affects future enrollments. Each enrollment snapshots its tier and mode, so
+historical Tier C/Nurture/human-written analytics remain accurate with a Legacy label.
 
 ### 4.2 Enrollment states
 
@@ -388,12 +395,15 @@ icon. Clicking a row opens the lead detail.
 
 Filters:
 
-- **Tier:** A, B, C, nurture, untiered, or all.
+- **Tier:** A, B, untiered, or all.
+- **Outreach status:** standard or Nurture.
 - **State:** latest enrollment state.
 - **Search:** case-insensitive email, name, or company search.
 - **Suppressed only:** shows leads that cannot receive email.
-- **Campaign context:** when the global campaign selector is set, the list is campaign-filtered.
-- **Campaign pool:** shows leads allocated to a particular campaign, including their pool status.
+- **Campaign:** choose the campaign whose leads you want to inspect or bulk-change.
+- **Campaign scope:** **Pool** shows currently available pool members, **Enrolled** shows every
+  enrollment state, and **Both** shows the deduplicated union (default). Released-only pool rows
+  are excluded unless they also have an enrollment.
 
 Filters reset pagination and selection. Long operational lists default to 25 rows. Use **Rows per
 page** below the list to choose 25, 50, or 100; changing it returns to page 1. The footer always
@@ -448,7 +458,7 @@ Requirements:
 Recognized header aliases include `email`, `e-mail`, `email_address`, `work_email`, common first
 and last-name variants, company/business, website/domain, city, state, phone, and notes.
 
-Two special optional columns create a reviewed manual opener workflow:
+Two optional columns create a global Personalized Copy source:
 
 ```csv
 email,first_name,company,manual_subject,manual_body
@@ -459,9 +469,11 @@ I noticed Acme's Austin expansion.
 Would comparing notes be useful?"
 ```
 
-`manual_subject` and `manual_body` must both be present on a row. Multiline bodies work when the
-whole CSV value is enclosed in double quotes; double an internal quote as `""`. These values are
-stored as a Step-1 draft, not as ordinary lead custom fields.
+`manual_subject` and `manual_body` must both be present on a row. They form the default source slot,
+not ordinary lead custom fields. Add `step_1_subject`/`step_1_body`,
+`step_3_subject`/`step_3_body`, and so on for explicit personalized-step mappings. An unescaped
+`\n` inside these copy cells becomes a line break; `\\n` stays literal. Quoted RFC multiline cells
+also work, and internal quotes are doubled as `""`.
 
 Preview categories:
 
@@ -495,41 +507,44 @@ erased, nurture, currently reserved, actively enrolled, recontact-blocked, and d
 conflicting leads are excluded. The preview shows the available/excluded totals and whether every
 exact request can be satisfied.
 
-When manual-draft columns are present, valid draft leads are reserved to the chosen draft campaign
-first and count inside that campaign's requested number. If 12 safe drafts belong to Campaign A,
-Campaign A's allocation must be at least 12; asking for 10 is refused.
+When personalized-copy columns are present, all accepted leads retain global source copy. Copies
+for allocated leads bind to the compatible personalized campaign steps without changing the
+global source. Generic copy auto-binds only when the campaign has one personalized step; multiple
+personalized steps require a selected step. Incompatible or conflicting mappings remain
+unassigned and are reported.
 
 Commit is all-or-nothing. The server rechecks every condition in one transaction. If another
 operation makes an exact count impossible after preview, no leads, drafts, or pool reservations
 from that commit are saved; refresh the preview and try again. Import History preserves each
 campaign's total, available, enrolled, and released allocation counts.
 
-#### Imported manual-draft workflow
+#### Imported Personalized Copy workflow
 
-When the preview detects valid manual drafts, select one target campaign before committing the
-import. The preview separates new leads, existing leads, valid/incomplete drafts, and conflicts
-with an existing unsent draft. Existing lead profile fields are preserved; an existing
-unsuppressed lead may still receive a new draft for the selected campaign.
+The preview separates new/existing leads, complete/incomplete sources, campaign-step bindings, and
+content conflicts. Complete copy starts as **needs review**; use **Mark all valid imported copy
+ready** only after reviewing the batch. Existing lead profile fields are preserved, and existing
+source or campaign copy remains unchanged unless replacement is explicitly selected.
 
-The default conflict action is **skip**. Select **Replace existing unsent drafts** only when the
-new CSV should overwrite those drafts. Suppressed or erased leads never receive drafts. The result
-separately reports leads created and drafts created, replaced, skipped, or invalid.
+The default conflict action is **keep existing**. Select replacement only when the new CSV should
+overwrite unsent source/campaign copy. Suppressed or erased leads never receive copy. The result
+reports created, replaced, skipped, invalid, assigned, conflicting, and unassigned totals.
 
-Imported drafts:
+Imported copy:
 
-- belong to one lead, one campaign, and Step 1;
+- creates one global source per lead/slot and independent campaign-step snapshots when assigned;
 - start as **needs review**;
 - never enroll a lead, activate a campaign, or send automatically; and
-- are shown in Manual compose with their source import.
+- appears in the lead's **Personalized Copy** editor with source-import provenance.
 
 ### 8.4 Bulk tiering
 
 Select individual rows or the whole visible page. If more filtered rows exist, choose **Select all
-N leads matching the current filter**. Then select A, B, C, nurture, or clear tier and choose
-**Apply**.
+N leads matching the current filter**. Set Tier A, Tier B, or Untiered, or use the separate Nurture
+and Restore-from-Nurture actions.
 
 “All matching” acts on the current server-side filter, not only the rows loaded in the browser.
-Review the filter before applying.
+When Campaign is selected, also choose Pool, Enrolled, or Both; the same predicate drives the list,
+untiered count, and bulk action, so the exact displayed campaign cohort is changed.
 
 ### 8.5 Lead detail
 
@@ -571,35 +586,27 @@ post-backup erasures before service resumes.
 
 This is not an undoable archive action. Use it only for a genuine privacy/erasure request.
 
-### 8.9 Manual compose
+### 8.9 Personalized Copy
 
-Manual compose is available only when the lead is not suppressed and has an active,
-manual-sendable enrollment.
+Personalized Copy saves subject/body for sequence use; it never sends directly.
 
-1. Select the active campaign enrollment.
-2. Confirm the displayed **Step N of M**, due time, personalization mode, and thread context.
-3. Review the lead's tier, observation, and notes.
-4. Start from an eligible saved Step-1 draft when one exists; otherwise the application renders
-   the lowest-ID active variant for the enrollment's actual due step.
-5. Choose **Auto-rotate** or a specific healthy mailbox.
-6. Review the copy checks.
-7. If the lead has replied before, select the explicit recontact acknowledgement only after
-   reviewing every prior reply and outcome.
-8. Choose **Send & log as manual**.
+1. Choose **Unassigned Source** to edit reusable global source copy, or choose a Campaign and one
+   of its Personalized Steps to edit the independent campaign snapshot.
+2. Review import provenance, readiness, preview, and copy-risk checks.
+3. Use **Save Draft** while editing. Any content edit resets readiness to **needs review**.
+4. Use **Mark Ready** only when both subject and body are valid and final.
+5. Use **Copy from Source** to create or explicitly replace an unsent campaign-step snapshot.
 
-For an imported draft, editing returns it to **needs review**. Use **Save Draft** to preserve work,
-then **Mark Ready** after review. **Send & log as manual** remains disabled until that draft is
-ready. A successful send marks it sent and links it to the recorded sent message.
+Personalized Step 1 must be ready before enrollment. Later personalized steps can be prepared after
+enrollment, but a due step without ready copy holds only that lead and raises a blocker. There is no
+template or Auto Observation fallback for a personalized step. Copy becomes read-only after send.
 
-The compliance footer is appended at send time. The server re-runs checks on the edited text.
-Fatal checks block the send. A manual send is logged like a normal campaign send, retains metrics
-and threading. Manual sending requires an existing active human-written enrollment; a draft alone
-never creates or starts one.
+All delivery happens through the scheduler, which appends the compliance footer and enforces copy
+checks, suppression, reply stopping, recontact rules, pacing, caps, send windows, mailbox pinning,
+threading, transport confirmation, and event logging. The old Manual Compose screenshot below is a
+legacy production reference and does not represent the migration 0019 candidate.
 
-The recontact acknowledgement never overrides suppression, an undispositioned reply, or a future
-“not now” date.
-
-![Manual composer showing campaign, mailbox choice, editable content, checks, footer guidance, and recontact acknowledgement](images/user-manual/18-manual-composer.png)
+![Legacy Manual Compose screen retained for predecessor reference](images/user-manual/18-manual-composer.png)
 
 ## 9. Mailboxes
 
@@ -798,13 +805,13 @@ Each spintax tag needs at least two options. Picks are deterministic for an enro
 variant, so a retry reproduces the same wording. The UI shows the total variation count across
 subject and body.
 
-### 10.4 Personalization modes
+### 10.4 Step content and tier behavior
 
-| Mode | Behavior |
+| Content/tier | Behavior |
 |---|---|
-| Mode 1 — human-written | Scheduler does not send the Tier-A opener. The operator uses Manual compose. |
-| Mode 2 — researched slot | `custom_observation` comes from the lead; a missing value falls back with a warning. |
-| Mode 2 — auto slot | Campaign segment/default observation data supplies the slot. |
+| Personalized step | No variants; scheduler loads the ready lead/campaign/step subject and body. |
+| Template step + Tier A | Uses `custom_observation` first, with the existing Auto Observation fallback warning. |
+| Template step + Tier B | Uses the campaign Auto Observation field/rules/default. |
 
 For Auto Slot, configure one **Auto Observation field** on the draft campaign—for example `state`,
 `city`, `industry`, or another imported custom field—then add exact-match rules plus a required
@@ -815,23 +822,21 @@ uses the Auto Slot but the field, rules, or default are invalid.
 
 #### Choosing the approach for different lead types
 
-The sequence contains the message structure; the campaign decides how much human effort each tier
-receives. You do not normally build one sequence per individual lead. Build a sequence around one
-audience, problem, offer, and angle, then use variants to test different wording within that same
-idea.
+The sequence decides which steps are Template and which are Personalized. Tier controls only how a
+Template step resolves its observation; it does not decide whether a personalized email sends.
 
 | Lead group | Recommended approach | What to prepare |
 |---|---|---|
-| A — a small set of highest-value accounts | Mode 1, human-written opener | Research each lead, open Manual compose, write a genuinely specific first message, and let later sequence steps provide the follow-up structure |
-| B — strong-fit leads where one researched fact matters | Mode 2, researched slot | Add a useful `custom_observation` on each lead and reference it with a fallback in the template |
-| C — broader qualified segment | Mode 2, automatic slot | Use reliable common fields such as name, company, city/state, and a campaign-level observation that remains truthful for the whole segment |
+| Any lead receiving an individual opener or later individual email | Personalized sequence step | Import or edit ready subject/body for that exact campaign step |
+| A — leads where one researched fact matters on template steps | Template step, researched behavior | Add a useful `custom_observation`; the campaign rule can serve as a warning fallback |
+| B — broader qualified segment | Template step, Auto behavior | Use reliable common fields and a campaign Auto Observation that remains truthful for the segment |
 | A distinct industry, persona, pain, offer, or language | Separate sequence and usually a separate campaign | Write a message and follow-up cadence designed for that audience; do not force unrelated groups through generic variants |
 | A copy experiment for the same audience and offer | Another active variant in the same step | Change one meaningful idea at a time so Analytics can compare variants coherently |
 | Rested completed leads receiving a genuinely new angle | New sequence in a Pass-2 campaign | Change the proposition/content enough to pass the content-hash guard; do not resend the old sequence |
 
-The **New campaign** dialog sets the initial Tier A/B/C mapping. While the campaign remains draft,
-the detail page can edit that mapping together with Auto Observation rules, sequence-variable
-overrides, and ramp stages. First activation freezes all of them permanently.
+The **New campaign** dialog displays fixed Tier A = Researched and Tier B = Auto behavior. While the
+campaign remains draft, configure Auto Observation rules, sequence-variable overrides, and ramp
+stages. First activation freezes those campaign settings permanently.
 
 ### 10.5 Live validation and copy-risk score
 
@@ -904,20 +909,18 @@ the next scheduler tick.
 
 Choose **New Campaign** and set:
 
-![New campaign dialog showing sequence selection, Tier A/B/C personalization modes, manual acknowledgement, and ramp](images/user-manual/10-new-campaign.png)
+![Legacy campaign dialog retained for predecessor reference](images/user-manual/10-new-campaign.png)
 
 - **Name**;
 - **Sequence**;
-- **Effort per tier** for A, B, and C; and
 - initial ramp settings; and
 - the permanent daily enrollment cap that applies after the ramp ends.
 
-Campaigns start as drafts. When Tier A uses human-written mode, you must acknowledge that the
-scheduler will never send those Tier-A openers and that you will use Manual compose.
+Campaigns start as drafts. There is no human-written acknowledgement or direct-send mode.
 
 On the draft campaign detail page, configure:
 
-- Tier A/B/C effort modes;
+- fixed Tier A = Researched and Tier B = Auto behavior;
 - staged new-enrollment caps;
 - the Auto Observation field, exact-match rules, and required default; and
 - sequence-variable campaign overrides.
@@ -975,14 +978,12 @@ evidence that the volume is safe for reputation.
 
 Enrollment into an active campaign can result in sends on the next scheduler tick.
 
-The count-based picker excludes suppressed/erased leads, nurture leads, prior human repliers,
-concurrent active enrollments, duplicate campaign enrollments, recontact holds, and content-hash
-conflicts. It orders Tier A → B → C → untiered. Legacy global campaigns then use oldest
-import first; pool-backed campaigns use allocation order. An empty pool reports no eligible pooled
-leads and never falls back to the global list. If fewer eligible leads exist, the result reports
-skipped buckets.
-
-Tier-A human-written enrollments become active manual work and do not send automatically.
+The count-based picker excludes suppressed/erased leads, Nurture and Untiered leads, prior human
+repliers, concurrent active enrollments, duplicate campaign enrollments, recontact holds,
+content-hash conflicts, and candidates lacking ready Personalized Step 1 copy. It orders Tier A →
+Tier B. Legacy global campaigns then use oldest import first; pool-backed campaigns use allocation
+order. An empty pool reports no eligible pooled leads and never falls back to the global list. If
+fewer eligible leads exist, the result reports precise skipped/blocker buckets.
 
 ### 11.6 Lead pools and automatic daily enrollment
 

@@ -14,9 +14,11 @@ export interface VariantDef {
 }
 
 export interface SequenceStepDef {
+  id?: number;
   stepNo: number; // 1-based
   waitDays: number; // days after the previous step's send (step 1: 0)
   inThread: boolean; // carries In-Reply-To/References (docs/07 §4)
+  contentSource?: 'template' | 'personalized';
   variants: VariantDef[]; // active variants only
 }
 

@@ -22,12 +22,19 @@ call planned work implemented.
 The Spaceship production infrastructure is live, but the project remains in **pre-prospect-send
 commissioning** until the operator completes the handoffs below:
 
-- **The only authorized feature scope** is the completed operator-approved 2026-08-15 list plus
+- **The authorized feature scope** includes the completed operator-approved 2026-08-15 list plus
   the 2026-08-20 pre-domain safety backlog: mandatory reply stopping; reply dispositions and
   conservative suppression; guarded cross-campaign recontact; broader opt-out phrases; findings
   20–25; alert history and mailbox filters; arbitrary custom-field editing; copy-risk rubric
   improvements; local verification; and runbook/documentation reconciliation. Outside that list,
   work is limited to testing, verification, diagnosis, and documentation.
+- The operator-approved 2026-08-30 Personalized Copy/two-tier/campaign-lead-filter release is
+  implemented and fully verified locally on `canary` through migration `0019`. It replaces direct
+  Manual Compose sending with sequence-only personalized steps, fixes current tiers at A/B,
+  separates Nurture status, adds global-source/campaign-step copy snapshots and blockers, and adds
+  exact Pool/Enrolled/Both filtering and bulk tiering. It is **not deployed**. Production remains
+  on application code `6ca1183`; deployment, activation, enrollment, and sending remain separately
+  unauthorized.
 - The operator-approved 2026-08-25 ten-workstream implementation is complete and deployed through
   Stages 1–4: operational pagination; due-step Manual Compose; in-app reminders; verified
   timezone/folder controls; imported manual drafts; Auto Observation/sequence variables; staged
@@ -101,6 +108,11 @@ commissioning** until the operator completes the handoffs below:
   custom-format dump/scratch restore/rebuild/zero-drift/self-check. Concurrent daily claims and a
   timezone change that moves the local date backward are covered. The verified candidate was
   subsequently deployed to Spaceship under separate operator approval.
+- The 2026-08-30 Personalized Copy/two-tier/campaign-filter gate passed type/lint/format; unit 345;
+  web 58; integration 168; API 138; GreenMail 29; golden exactly 47; mock E2E 61;
+  real-backend E2E 1; migration 0019 apply/down/apply; populated `checked 5 enrollments — 0
+  diff(s)`; self-check clean; production build; and a validated custom-format dump with scratch
+  restore/rebuild/zero-drift/self-check. This candidate is local only.
 
 ## Production deployments
 

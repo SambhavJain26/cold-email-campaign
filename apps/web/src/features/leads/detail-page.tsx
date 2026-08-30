@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { ArrowLeft, PenLine, Plus, Trash2 } from 'lucide-react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { toast } from 'sonner';
-import type { LeadDto, LeadTier } from '@coldemail/shared';
+import type { CurrentLeadTier, LeadDto } from '@coldemail/shared';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -22,7 +22,7 @@ import { StateBadge } from '@/components/shared/state-badge';
 import { TierBadge } from '@/components/shared/tier-badge';
 import { useLead } from '@/api/queries/leads';
 import { useEraseLead, usePatchLead, useRemoveSuppression } from '@/api/mutations/leads';
-import { ManualComposer } from './manual-composer';
+import { PersonalizedCopyEditor } from './personalized-copy-editor';
 import { Timeline } from './timeline';
 
 const UNTIERED = '__untiered__';
@@ -189,6 +189,7 @@ function EditCard({ lead }: { lead: LeadDto & { notes: string | null } }) {
   const [tier, setTier] = useState<string>(lead.tier ?? UNTIERED);
   const [notes, setNotes] = useState(lead.notes ?? '');
   const [observation, setObservation] = useState(lead.custom_fields.custom_observation ?? '');
+  const [outreachStatus, setOutreachStatus] = useState(lead.outreach_status);
   const [customFields, setCustomFields] = useState(() =>
     Object.entries(lead.custom_fields)
       .filter(([key]) => key !== 'custom_observation')
@@ -208,6 +209,7 @@ function EditCard({ lead }: { lead: LeadDto & { notes: string | null } }) {
   const invalidFields = customFields.some((field) => field.key.trim() === '') || duplicateKeys;
   const dirty =
     (lead.tier ?? UNTIERED) !== tier ||
+    lead.outreach_status !== outreachStatus ||
     (lead.notes ?? '') !== notes ||
     (lead.custom_fields.custom_observation ?? '') !== observation ||
     JSON.stringify(customFieldsObject) !==
@@ -222,7 +224,8 @@ function EditCard({ lead }: { lead: LeadDto & { notes: string | null } }) {
       {
         id: lead.id,
         body: {
-          tier: tier === UNTIERED ? null : (tier as LeadTier),
+          tier: tier === UNTIERED ? null : (tier as CurrentLeadTier),
+          outreach_status: outreachStatus,
           notes: notes === '' ? null : notes,
           custom_fields: (() => {
             const fields = { ...customFieldsObject };
@@ -251,8 +254,24 @@ function EditCard({ lead }: { lead: LeadDto & { notes: string | null } }) {
               <SelectItem value={UNTIERED}>— untiered</SelectItem>
               <SelectItem value="A">🟢 Tier A</SelectItem>
               <SelectItem value="B">🟡 Tier B</SelectItem>
-              <SelectItem value="C">⚪ Tier C</SelectItem>
-              <SelectItem value="nurture">🔵 Nurture</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+        <div className="space-y-1">
+          <Label>Outreach status</Label>
+          <Select
+            value={outreachStatus}
+            onValueChange={(value: 'standard' | 'nurture') => {
+              setOutreachStatus(value);
+              if (value === 'nurture') setTier(UNTIERED);
+            }}
+          >
+            <SelectTrigger size="sm" aria-label="Outreach status">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="standard">Standard</SelectItem>
+              <SelectItem value="nurture">Nurture (not enrollable)</SelectItem>
             </SelectContent>
           </Select>
         </div>
@@ -344,10 +363,10 @@ function EditCard({ lead }: { lead: LeadDto & { notes: string | null } }) {
             title={lead.is_suppressed ? 'Suppressed leads can never be sent to' : ''}
             onClick={() => setComposerOpen(true)}
           >
-            <PenLine className="size-4" /> Manual compose
+            <PenLine className="size-4" /> Personalized Copy
           </Button>
         </div>
-        <ManualComposer lead={lead} open={composerOpen} onOpenChange={setComposerOpen} />
+        <PersonalizedCopyEditor lead={lead} open={composerOpen} onOpenChange={setComposerOpen} />
       </CardContent>
     </Card>
   );

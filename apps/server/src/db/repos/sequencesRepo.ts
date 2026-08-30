@@ -5,6 +5,7 @@ import type { SequenceDef } from '../../domain/sequence';
 
 export type SequenceRow = typeof sequences.$inferSelect;
 export type StepVariantRow = typeof stepVariants.$inferSelect;
+export type SequenceStepRow = typeof sequenceSteps.$inferSelect;
 
 /** The sequence a campaign sends, or null if none assigned. */
 export async function sequenceIdForCampaign(
@@ -55,9 +56,11 @@ export async function loadSequenceDef(db: DbLike, sequenceId: number): Promise<S
     id: sequenceId,
     stopOnReply: seqRows[0]!.stopOnReply,
     steps: steps.map((s) => ({
+      id: s.id,
       stepNo: s.stepNo,
       waitDays: s.waitDays,
       inThread: s.inThread,
+      contentSource: s.contentSource,
       variants: variants
         .filter((v) => v.stepId === s.id && v.active)
         .map((v) => ({
@@ -84,6 +87,19 @@ export async function getStepId(
   return rows[0]?.id ?? null;
 }
 
+export async function getStepByNumber(
+  db: DbLike,
+  sequenceId: number,
+  stepNo: number,
+): Promise<SequenceStepRow | undefined> {
+  return (
+    await db
+      .select()
+      .from(sequenceSteps)
+      .where(and(eq(sequenceSteps.sequenceId, sequenceId), eq(sequenceSteps.stepNo, stepNo)))
+  )[0];
+}
+
 /** Full variant row by id — ignores `active` (bespoke/rotated-out lookups). */
 export async function getVariantById(
   db: DbLike,
@@ -103,6 +119,7 @@ export interface CreateSequenceInput {
     stepNo: number;
     waitDays: number;
     inThread: boolean;
+    contentSource?: 'template' | 'personalized';
     variants: Array<{
       label: string;
       subjectTemplate: string;
@@ -139,6 +156,7 @@ export async function createSequence(db: DbLike, input: CreateSequenceInput): Pr
         stepNo: step.stepNo,
         waitDays: step.waitDays,
         inThread: step.inThread,
+        contentSource: step.contentSource ?? 'template',
       })
       .returning({ id: sequenceSteps.id });
     for (const v of step.variants) {
@@ -264,6 +282,7 @@ export interface SequenceSaveInput {
     stepNo: number;
     waitDays: number;
     inThread: boolean;
+    contentSource: 'template' | 'personalized';
     variants: Array<{
       id?: number;
       label: string;
@@ -331,6 +350,14 @@ export async function updateSequenceReplaceSet(
       if (opts.retireOnly && s.id !== undefined && stepById.get(s.id)!.stepNo !== s.stepNo) {
         conflicts.push(`step ${stepById.get(s.id)!.stepNo} cannot be renumbered after sends`);
       }
+      if (
+        opts.retireOnly &&
+        s.id !== undefined &&
+        stepById.has(s.id) &&
+        stepById.get(s.id)!.contentSource !== s.contentSource
+      ) {
+        conflicts.push(`step ${s.stepNo} content source cannot change after sends`);
+      }
     }
     if (opts.retireOnly) {
       for (const s of existingSteps) {
@@ -359,13 +386,24 @@ export async function updateSequenceReplaceSet(
       if (stepId === undefined) {
         const [row] = await tx
           .insert(sequenceSteps)
-          .values({ sequenceId, stepNo: s.stepNo, waitDays: s.waitDays, inThread: s.inThread })
+          .values({
+            sequenceId,
+            stepNo: s.stepNo,
+            waitDays: s.waitDays,
+            inThread: s.inThread,
+            contentSource: s.contentSource,
+          })
           .returning({ id: sequenceSteps.id });
         stepId = row!.id;
       } else {
         await tx
           .update(sequenceSteps)
-          .set({ stepNo: s.stepNo, waitDays: s.waitDays, inThread: s.inThread })
+          .set({
+            stepNo: s.stepNo,
+            waitDays: s.waitDays,
+            inThread: s.inThread,
+            contentSource: s.contentSource,
+          })
           .where(eq(sequenceSteps.id, stepId));
       }
 

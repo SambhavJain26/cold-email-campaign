@@ -1,13 +1,16 @@
 import { and, eq, ilike, inArray, isNull, or, sql, type SQL } from 'drizzle-orm';
-import type { LeadTier } from '@coldemail/shared';
+import type { CurrentLeadTier, OutreachStatus } from '@coldemail/shared';
 import type { DbLike } from '../client';
 import {
   campaignLeadPool,
+  campaignPersonalizedCopies,
   campaigns,
   enrollments,
   importRows,
   incomingMessages,
   leads,
+  personalizedCopySources,
+  sentMessages,
 } from '../schema';
 
 export type LeadRow = typeof leads.$inferSelect;
@@ -91,15 +94,17 @@ export async function insertImportedLeads(
  * (B6.3) and bulk-tier-by-filter so "select all matching" is exact.
  */
 export interface LeadFilter {
-  tier?: LeadTier | 'untiered';
+  tier?: CurrentLeadTier | 'untiered';
   state?: string;
   /** Leads with an enrollment in this campaign. */
   campaignId?: number;
+  campaignScope?: 'pool' | 'enrolled' | 'both';
   /** Leads currently reserved in this campaign's available pool. */
   poolCampaignId?: number;
   /** Case-insensitive substring over email / first / last / company. */
   q?: string;
   suppressed?: boolean;
+  outreachStatus?: OutreachStatus;
 }
 
 export function leadFilterWhere(filter: LeadFilter): SQL | undefined {
@@ -124,6 +129,8 @@ export function leadFilterWhere(filter: LeadFilter): SQL | undefined {
     );
   }
   if (filter.suppressed !== undefined) conds.push(eq(leads.isSuppressed, filter.suppressed)!);
+  if (filter.outreachStatus !== undefined)
+    conds.push(eq(leads.outreachStatus, filter.outreachStatus)!);
   if (filter.q !== undefined && filter.q !== '') {
     const like = `%${filter.q}%`;
     conds.push(
@@ -136,10 +143,15 @@ export function leadFilterWhere(filter: LeadFilter): SQL | undefined {
     );
   }
   if (filter.campaignId !== undefined) {
-    conds.push(
-      sql`EXISTS (SELECT 1 FROM ${enrollments} e
-                  WHERE e.lead_id = ${leads.id} AND e.campaign_id = ${filter.campaignId})`,
-    );
+    const enrolled = sql`EXISTS (SELECT 1 FROM ${enrollments} e
+                  WHERE e.lead_id = ${leads.id} AND e.campaign_id = ${filter.campaignId})`;
+    const pooled = sql`EXISTS (SELECT 1 FROM ${campaignLeadPool} p
+                  WHERE p.lead_id = ${leads.id}
+                    AND p.campaign_id = ${filter.campaignId}
+                    AND p.status = 'available')`;
+    if (filter.campaignScope === 'pool') conds.push(pooled);
+    else if (filter.campaignScope === 'both') conds.push(sql`(${pooled} OR ${enrolled})`);
+    else conds.push(enrolled); // omitted preserves the legacy enrolled-only contract
   }
   if (filter.poolCampaignId !== undefined) {
     conds.push(
@@ -291,11 +303,16 @@ export async function latestEnrollmentLite(
 }
 
 /** The untiered banner number (decision R): importable leads awaiting a tier. */
-export async function untieredCount(db: DbLike): Promise<number> {
+export async function untieredCount(db: DbLike, filter: LeadFilter = {}): Promise<number> {
+  // Nurture is an intentional hold, not work waiting to be tiered. The banner
+  // therefore counts only standard-outreach leads, even when no explicit
+  // outreach filter is selected. A Nurture-only view correctly reports zero.
+  if (filter.outreachStatus === 'nurture') return 0;
+  const where = leadFilterWhere({ ...filter, tier: 'untiered', outreachStatus: 'standard' });
   const rows = await db
     .select({ n: sql<number>`count(*)::int` })
     .from(leads)
-    .where(and(isNull(leads.tier), eq(leads.isSuppressed, false), eq(leads.isErased, false)));
+    .where(where);
   return rows[0]?.n ?? 0;
 }
 
@@ -304,7 +321,8 @@ export async function patchLead(
   db: DbLike,
   id: number,
   patch: {
-    tier?: LeadTier | null;
+    tier?: CurrentLeadTier | null;
+    outreachStatus?: OutreachStatus;
     notes?: string | null;
     customFields?: Record<string, string>;
   },
@@ -314,6 +332,10 @@ export async function patchLead(
     .update(leads)
     .set({
       ...(patch.tier !== undefined && { tier: patch.tier }),
+      ...(patch.outreachStatus !== undefined && {
+        outreachStatus: patch.outreachStatus,
+        ...(patch.outreachStatus === 'nurture' && { tier: null }),
+      }),
       ...(patch.notes !== undefined && { notes: patch.notes }),
       ...(patch.customFields !== undefined && { customFields: patch.customFields }),
       updatedAt: at,
@@ -326,7 +348,7 @@ export async function patchLead(
 export async function updateTierByIds(
   db: DbLike,
   ids: readonly number[],
-  tier: LeadTier | null,
+  tier: CurrentLeadTier | null,
 ): Promise<number> {
   if (ids.length === 0) return 0;
   const rows = await db
@@ -340,14 +362,16 @@ export async function updateTierByIds(
 export async function updateTierByFilter(
   db: DbLike,
   filter: LeadFilter,
-  tier: LeadTier | null,
+  tier: CurrentLeadTier | null,
 ): Promise<number> {
   if (
     filter.tier === undefined &&
     filter.state === undefined &&
     filter.campaignId === undefined &&
+    filter.poolCampaignId === undefined &&
     filter.q === undefined &&
-    filter.suppressed === undefined
+    filter.suppressed === undefined &&
+    filter.outreachStatus === undefined
   ) {
     throw new Error('bulk-tier filter matched no constraints');
   }
@@ -355,6 +379,35 @@ export async function updateTierByFilter(
   // An empty filter would retier EVERY lead — refuse; that can't be intended.
   if (where === undefined) throw new Error('bulk-tier filter matched no constraints');
   const rows = await db.update(leads).set({ tier }).where(where).returning({ id: leads.id });
+  return rows.length;
+}
+
+export async function updateOutreachStatusByIds(
+  db: DbLike,
+  ids: readonly number[],
+  status: OutreachStatus,
+): Promise<number> {
+  if (ids.length === 0) return 0;
+  const rows = await db
+    .update(leads)
+    .set({ outreachStatus: status, tier: null })
+    .where(and(inArray(leads.id, [...ids]), eq(leads.isErased, false)))
+    .returning({ id: leads.id });
+  return rows.length;
+}
+
+export async function updateOutreachStatusByFilter(
+  db: DbLike,
+  filter: LeadFilter,
+  status: OutreachStatus,
+): Promise<number> {
+  const where = leadFilterWhere(filter);
+  if (!where) throw new Error('bulk outreach-status filter matched no constraints');
+  const rows = await db
+    .update(leads)
+    .set({ outreachStatus: status, tier: null })
+    .where(where)
+    .returning({ id: leads.id });
   return rows.length;
 }
 
@@ -395,6 +448,18 @@ export async function anonymizeLeadPii(
     .set({ raw: {}, emailNormalized: null })
     .where(eq(importRows.leadId, input.leadId));
   await db
+    .update(personalizedCopySources)
+    .set({ subject: '', body: '', status: 'needs_review', updatedAt: input.at })
+    .where(eq(personalizedCopySources.leadId, input.leadId));
+  await db
+    .update(campaignPersonalizedCopies)
+    .set({ subject: '', body: '', contentHash: null, updatedAt: input.at })
+    .where(eq(campaignPersonalizedCopies.leadId, input.leadId));
+  await db
+    .update(sentMessages)
+    .set({ renderedSubject: null, renderedBodyText: null, renderedBodyHtml: null })
+    .where(eq(sentMessages.leadId, input.leadId));
+  await db
     .update(leads)
     .set({
       email: `erased-lead-${input.leadId}@invalid.local`,
@@ -408,6 +473,7 @@ export async function anonymizeLeadPii(
       notes: null,
       customFields: {},
       tier: null,
+      outreachStatus: 'standard',
       isSuppressed: false,
       suppressionReason: null,
       suppressedAt: null,
@@ -420,7 +486,7 @@ export async function anonymizeLeadPii(
 
 export interface EligibleLead {
   id: number;
-  tier: LeadTier | null;
+  tier: CurrentLeadTier | null;
 }
 
 export interface RecontactStatus {
@@ -497,7 +563,7 @@ export async function selectEligibleLeads(
   campaignId: number,
   sequenceHashes: readonly string[],
   limit: number,
-  tier?: LeadTier,
+  tier?: CurrentLeadTier,
 ): Promise<EligibleLead[]> {
   const tierParam = tier ?? null;
   // sql.param keeps the array a single placeholder (bare interpolation would
@@ -514,7 +580,8 @@ export async function selectEligibleLeads(
     .from(leads)
     .where(
       sql`NOT ${leads.isSuppressed} AND NOT ${leads.isErased}
-        AND ${leads.tier} IS DISTINCT FROM 'nurture'
+        AND ${leads.outreachStatus} = 'standard'
+        AND ${leads.tier} IN ('A','B')
         AND (${tierParam}::lead_tier IS NULL OR ${leads.tier} = ${tierParam}::lead_tier)
         AND NOT EXISTS (
           SELECT 1 FROM enrollments e
@@ -525,12 +592,12 @@ export async function selectEligibleLeads(
         AND ${hashGuard}`,
     )
     .orderBy(
-      sql`CASE ${leads.tier} WHEN 'A' THEN 1 WHEN 'B' THEN 2 WHEN 'C' THEN 3 ELSE 4 END`,
+      sql`CASE ${leads.tier} WHEN 'A' THEN 1 WHEN 'B' THEN 2 ELSE 3 END`,
       leads.createdAt,
       leads.id,
     )
     .limit(limit);
-  return rows;
+  return rows.map((row) => ({ id: row.id, tier: row.tier as CurrentLeadTier }));
 }
 
 /** Leads currently in NEW/ACTIVE work for any campaign, used by pool allocation. */
@@ -564,7 +631,7 @@ export async function poolAllocationCandidates(
     SELECT l.id, l.tier
       FROM leads l
      WHERE NOT l.is_suppressed AND NOT l.is_erased
-       AND l.tier IS DISTINCT FROM 'nurture'
+       AND l.outreach_status = 'standard'
        AND (${sourceImportId ?? null}::bigint IS NULL OR l.import_id = ${sourceImportId ?? null})
        AND NOT EXISTS (
          SELECT 1 FROM campaign_lead_pool p
@@ -578,10 +645,10 @@ export async function poolAllocationCandidates(
          SELECT 1 FROM events hr
           WHERE hr.lead_id = l.id AND hr.type = 'human_reply'
        )
-     ORDER BY CASE l.tier WHEN 'A' THEN 1 WHEN 'B' THEN 2 WHEN 'C' THEN 3 ELSE 4 END,
+     ORDER BY CASE l.tier WHEN 'A' THEN 1 WHEN 'B' THEN 2 ELSE 3 END,
               l.created_at, l.id
      LIMIT ${limit} OFFSET ${offset}`);
-  return (result.rows as unknown as Array<{ id: number | string; tier: LeadTier | null }>).map(
-    (row) => ({ id: Number(row.id), tier: row.tier }),
-  );
+  return (
+    result.rows as unknown as Array<{ id: number | string; tier: CurrentLeadTier | null }>
+  ).map((row) => ({ id: Number(row.id), tier: row.tier }));
 }

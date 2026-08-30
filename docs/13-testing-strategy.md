@@ -1,5 +1,11 @@
 # Testing Strategy — Fixtures, Scenario Runner, Golden Cohort, Gates
 
+> **Migration 0019 gate:** preserve the locked 47-test historical golden cohort while adding
+> current A/B lead fixtures, personalized-step scheduler/blocker/retry coverage, 1,000-row
+> 100/100/800 binding, exact campaign membership filtering/bulk actions, migration
+> apply/down/apply, PII scrubbing, and retired-endpoint tests. Verified evidence is in docs/17 and
+> the full contract is in [docs/22](22-personalized-copy-two-tier.md).
+
 Implements plan §5. Test code layout: `apps/server/test/{unit,integration,fixtures,helpers}`, `apps/web/e2e`.
 
 ---

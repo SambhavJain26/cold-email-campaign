@@ -65,7 +65,7 @@ describe('B6.9 analytics + B6.12 system', () => {
     // show as rebuild drift now that completion is shape-derived (B7.3).
     await h.pool.query(`
       INSERT INTO leads (email, first_name, tier) VALUES
-        ('a1@x.dev', 'A1', 'C'), ('a2@x.dev', 'A2', 'C')`);
+        ('a1@x.dev', 'A1', 'B'), ('a2@x.dev', 'A2', 'B')`);
     const now = h.clock.now();
     await h.pool.query(
       `INSERT INTO enrollments (campaign_id, lead_id, current_state, current_step_no,
@@ -203,6 +203,7 @@ describe('B6.9 analytics + B6.12 system', () => {
     expect(status.scheduler_last_tick_at).toBeNull(); // no tick ran in this suite
     expect(status.pollers).toHaveLength(1);
     expect(status.pending_jobs).toBe(0);
+    expect(status.personalized_copy_blocked_count).toBe(0);
 
     const rebuild = (
       await h.inject({
@@ -262,7 +263,7 @@ describe('B6.12 SIMULATED_CLOCK advance-clock', () => {
     });
     await h.pool.query(`
       INSERT INTO leads (email, first_name, company, state, tier)
-      VALUES ('sim1@x.dev', 'Sim', 'SimCo', 'TX', 'C'), ('sim2@x.dev', 'Sam', 'SamCo', 'CO', 'C')`);
+      VALUES ('sim1@x.dev', 'Sim', 'SimCo', 'TX', 'B'), ('sim2@x.dev', 'Sam', 'SamCo', 'CO', 'B')`);
     const enroll = await h.inject({
       method: 'POST',
       url: `/api/v1/campaigns/${camp.id}/enroll`,

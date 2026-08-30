@@ -2,14 +2,18 @@ import { Link, useNavigate, useParams } from 'react-router-dom';
 import { toast } from 'sonner';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { ConfirmTypedDialog } from '@/components/shared/confirm-typed-dialog';
 import { Skeleton } from '@/components/ui/skeleton';
 import { CatchupBanner } from '@/components/shared/catchup-banner';
 import { EmptyState } from '@/components/shared/empty-state';
 import { EnrollPanel } from '@/components/shared/enroll-panel';
 import { StateBadge } from '@/components/shared/state-badge';
-import { useCampaignCapacity, useCampaignOutcomes, useCampaigns } from '@/api/queries/campaigns';
+import {
+  useCampaignCapacity,
+  useCampaignOutcomes,
+  useCampaigns,
+  usePersonalizedCopyCoverage,
+} from '@/api/queries/campaigns';
 import { useOverview } from '@/api/queries/analytics';
 import { useSequences } from '@/api/queries/sequences';
 import { useDeleteCampaign, usePatchCampaign } from '@/api/mutations/campaigns';
@@ -18,12 +22,6 @@ import { CampaignStatusBadge } from './status-badge';
 import { DraftConfigurationEditor } from './draft-configuration';
 import { useState } from 'react';
 import { LeadPoolPanel } from './lead-pool-panel';
-
-const MODE_LABEL: Record<string, string> = {
-  human_written: 'Mode 1 — human-written',
-  template_researched: 'Mode 2 — researched slot',
-  template_auto: 'Mode 2 — auto slot',
-};
 
 /** F5.2/F5.3 — Campaign detail (docs/12 §6): capacity + enroll, live state
  *  breakdown, and the Stage-9 completion panel once everything is terminal. */
@@ -36,6 +34,7 @@ export default function CampaignDetailPage() {
   const capacity = useCampaignCapacity(campaignId);
   const outcomes = useCampaignOutcomes(campaignId);
   const overview = useOverview(campaignId);
+  const copyCoverage = usePersonalizedCopyCoverage(campaignId);
   const patch = usePatchCampaign();
   const remove = useDeleteCampaign();
   const [archiveOpen, setArchiveOpen] = useState(false);
@@ -136,22 +135,27 @@ export default function CampaignDetailPage() {
 
       <LeadPoolPanel campaign={campaign} />
 
-      {campaign.tier_effort_config.A === 'human_written' && (
-        <Alert>
-          <AlertTitle>Tier A is manual-only</AlertTitle>
-          <AlertDescription>
-            The scheduler will not send {campaign.manual_only_count} active Tier A enrollment
-            {campaign.manual_only_count === 1 ? '' : 's'}. Open an individual Tier A lead and use
-            Manual compose to write and send it.{' '}
-            <Link
-              to={`/leads?campaign=${campaign.id}`}
-              className="font-medium underline underline-offset-2"
-            >
-              Open campaign leads
-            </Link>
-            .
-          </AlertDescription>
-        </Alert>
+      {(copyCoverage.data?.steps.length ?? 0) > 0 && (
+        <section className="rounded-lg border border-border bg-card p-4">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <h2 className="text-sm font-semibold">Personalized Copy coverage</h2>
+            <Badge variant="outline">
+              {copyCoverage.data?.blocked_count ?? 0} actively blocked
+            </Badge>
+          </div>
+          <div className="mt-3 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+            {copyCoverage.data?.steps.map((step) => (
+              <div key={step.step_no} className="rounded-md border border-border p-3 text-sm">
+                <p className="font-medium">Step {step.step_no}</p>
+                <p className="mt-1 text-muted-foreground">
+                  {step.ready} ready · {step.needs_review} review · {step.missing} missing ·{' '}
+                  {step.blocked} blocked
+                </p>
+                <p className="text-xs text-muted-foreground">{step.total} campaign leads</p>
+              </div>
+            ))}
+          </div>
+        </section>
       )}
 
       <div className="grid gap-4 lg:grid-cols-[minmax(0,340px)_minmax(0,1fr)]">
@@ -232,15 +236,14 @@ export default function CampaignDetailPage() {
                 <dt className="text-muted-foreground">Auto-enrollment</dt>
                 <dd>{campaign.auto_enroll_enabled ? 'Enabled' : 'Off'}</dd>
               </div>
-              {(['A', 'B', 'C'] as const).map((tier) => (
-                <div key={tier} className="flex justify-between gap-4">
-                  <dt className="text-muted-foreground">Tier {tier} effort</dt>
-                  <dd>
-                    {MODE_LABEL[campaign.tier_effort_config[tier]] ??
-                      campaign.tier_effort_config[tier]}
-                  </dd>
-                </div>
-              ))}
+              <div className="flex justify-between gap-4">
+                <dt className="text-muted-foreground">Tier A</dt>
+                <dd>Researched observation</dd>
+              </div>
+              <div className="flex justify-between gap-4">
+                <dt className="text-muted-foreground">Tier B</dt>
+                <dd>Auto Observation</dd>
+              </div>
               <div className="flex justify-between gap-4">
                 <dt className="text-muted-foreground">Ramp</dt>
                 <dd className="tabular-nums">

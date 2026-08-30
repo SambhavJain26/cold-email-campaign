@@ -129,6 +129,7 @@ export async function importsRoutes(app: FastifyInstance, services: AppServices)
             mode: req.body.mode,
             draftCampaignId: req.body.draft_campaign_id,
             replaceExistingDrafts: req.body.replace_existing_drafts,
+            markValidCopyReady: req.body.mark_valid_copy_ready,
             allocations: req.body.allocations.map((allocation) => ({
               campaignId: allocation.campaign_id,
               count: allocation.count,
@@ -150,6 +151,12 @@ export async function importsRoutes(app: FastifyInstance, services: AppServices)
         invalid_drafts: result.invalidDrafts,
         allocations_created: result.allocationsCreated,
         remaining_global: result.remainingGlobal,
+        sources_created: result.sourcesCreated,
+        sources_replaced: result.sourcesReplaced,
+        sources_skipped: result.sourcesSkipped,
+        copies_bound: result.copiesBound,
+        copy_conflicts: result.copyConflicts,
+        copies_unassigned: result.copiesUnassigned,
       };
     },
   );

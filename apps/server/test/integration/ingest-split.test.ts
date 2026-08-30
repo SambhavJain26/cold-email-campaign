@@ -60,6 +60,12 @@ describe('the 1000 → 885 fixture split (B5.8)', () => {
     expect(r).toEqual({
       inserted: 885,
       skipped: 0,
+      sourcesCreated: 0,
+      sourcesReplaced: 0,
+      sourcesSkipped: 0,
+      copiesBound: 0,
+      copiesUnassigned: 0,
+      copyConflicts: 0,
       draftsCreated: 0,
       draftsReplaced: 0,
       draftsSkipped: 0,
@@ -120,19 +126,20 @@ describe('remaining docs/09 §7 edges (B5.9)', () => {
     }
   });
 
-  it('nurture leads are excluded from auto-enroll selection (docs/06 §7)', async () => {
+  it('only current A/B leads enroll; nurture and untiered leads remain excluded', async () => {
     const clock = new VirtualClock('2026-03-02T15:00:00Z');
     const sequences = new StaticSequenceProvider();
     sequences.register(1, testSequence(1, [0]));
     await seedMailboxes(pool, 1);
     await pool.query(`INSERT INTO campaigns (name, status) VALUES ('c', 'active')`);
     await pool.query(
-      `INSERT INTO leads (email, tier) VALUES
-       ('a@x.dev', 'nurture'), ('b@x.dev', 'C'), ('c@x.dev', NULL)`,
+      `INSERT INTO leads (email, tier, outreach_status) VALUES
+       ('a@x.dev', NULL, 'nurture'), ('b@x.dev', 'B', 'standard'),
+       ('c@x.dev', NULL, 'standard')`,
     );
 
     const r = await enroll({ db, store, clock, sequences }, 1, 5, { force: true });
-    expect(r.enrolled).toBe(2);
-    expect(r.leadIds.sort()).toEqual([2, 3]); // the nurture lead stays out
+    expect(r.enrolled).toBe(1);
+    expect(r.leadIds).toEqual([2]);
   });
 });

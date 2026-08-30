@@ -115,7 +115,7 @@ describe('B6.3 leads', () => {
     const byFilter = await h.inject({
       method: 'POST',
       url: '/api/v1/leads/bulk-tier',
-      payload: { filter: { state: 'ACTIVE', tier: 'untiered' }, tier: 'C' },
+      payload: { filter: { state: 'ACTIVE', tier: 'untiered' }, tier: 'B' },
     });
     expect(byFilter.json()).toEqual({ updated: 1 }); // cara — the only untiered lead with an ACTIVE enrollment
 
@@ -187,6 +187,36 @@ describe('B6.3 leads', () => {
     await h.pool.query(`
       INSERT INTO alerts (kind, severity, payload)
       VALUES ('operator_note', 'warning', '{"email":"dana@delta.dev","note":"private"}')`);
+    const sourceId = (
+      await h.pool.query(`
+        INSERT INTO personalized_copy_sources
+          (lead_id, slot_no, subject, body, status)
+        VALUES (4, 1, 'Private source subject', 'Private source body', 'ready')
+        RETURNING id`)
+    ).rows[0].id as number;
+    const copyId = (
+      await h.pool.query(
+        `INSERT INTO campaign_personalized_copies
+          (lead_id, campaign_id, step_no, source_copy_id, subject, body, status, content_hash)
+         VALUES (4, 1, 3, $1, 'Private campaign subject', 'Private campaign body',
+                 'ready', 'private-copy-hash')
+         RETURNING id`,
+        [sourceId],
+      )
+    ).rows[0].id as number;
+    await h.pool.query(`
+      INSERT INTO mailboxes (display_name, from_address, smtp_host, imap_host)
+      VALUES ('Erase snapshot', 'erase-snapshot@test.dev', 'smtp.test.dev', 'imap.test.dev')`);
+    await h.pool.query(
+      `INSERT INTO sent_messages
+        (message_id, enrollment_id, lead_id, mailbox_id, step_no, content_hash,
+         rendered_subject, rendered_body_text, rendered_body_html, content_source,
+         personalized_copy_id, sent_at)
+       VALUES ('<erasure-snapshot@test.dev>', 2, 4, 1, 3, 'private-copy-hash',
+               'Private rendered subject', 'Private rendered text', '<p>Private rendered html</p>',
+               'personalized', $1, now())`,
+      [copyId],
+    );
     await suppressLead(h.services.db, 4, 'manual', h.clock.now());
 
     const wrong = await h.inject({
@@ -229,5 +259,24 @@ describe('B6.3 leads', () => {
     );
     const alert = await h.pool.query(`SELECT payload FROM alerts WHERE kind = 'operator_note'`);
     expect(alert.rows[0].payload).toEqual({ lead_id: 4 });
+    expect(
+      (await h.pool.query(`SELECT subject, body FROM personalized_copy_sources WHERE lead_id = 4`))
+        .rows[0],
+    ).toEqual({ subject: '', body: '' });
+    expect(
+      (
+        await h.pool.query(
+          `SELECT subject, body FROM campaign_personalized_copies WHERE lead_id = 4`,
+        )
+      ).rows[0],
+    ).toEqual({ subject: '', body: '' });
+    expect(
+      (
+        await h.pool.query(
+          `SELECT rendered_subject, rendered_body_text, rendered_body_html
+             FROM sent_messages WHERE lead_id = 4`,
+        )
+      ).rows[0],
+    ).toEqual({ rendered_subject: null, rendered_body_text: null, rendered_body_html: null });
   });
 });

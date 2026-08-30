@@ -1,6 +1,6 @@
 // F6.6 — unibox: tag → overview positive rate moves, meeting booked, the STOP
 // card's auto-unsub caption, the OOO tab, thread view, tag_only unsubscribe,
-// and the Mode-1 manual composer (docs/15 F6).
+// and sequence-only Personalized Copy editing (docs/15 F6).
 import { expect, test } from '@playwright/test';
 import { login } from './helpers';
 
@@ -90,41 +90,26 @@ test('tag_only mode adds the explicit unsubscribe on negative cards', async ({ p
   await expect(page.getByText('Lead unsubscribed and suppressed')).toBeVisible();
 });
 
-test('manual composer prefills the enrollment due step and sends as a manual send', async ({
+test('Personalized Copy saves a lead source and exposes no direct-send action', async ({
   page,
 }) => {
   await login(page);
-
-  // A campaign with a sequence, so there is something to prefill from.
-  await page.getByRole('link', { name: 'Campaigns' }).click();
-  await page.getByRole('button', { name: 'New Campaign' }).click();
-  await page.getByLabel('Name').fill('Manual send target');
-  await page.getByRole('checkbox').check();
-  await page.getByRole('button', { name: 'Create campaign' }).click();
-  await expect(page).toHaveURL(/\/campaigns\/\d+$/);
-
-  // exact: true — this is the only nav click made FROM a campaign detail page,
-  // which also renders "Open campaign leads". Substring matching (Playwright's
-  // default) hits both and trips strict mode.
-  await page.getByRole('link', { name: 'Leads', exact: true }).click();
+  await page.getByRole('link', { name: 'Leads' }).click();
   await page.getByPlaceholder('Search email, name, company…').fill('manual.eligible@example.com');
   await page.getByRole('table').getByRole('row').nth(1).click();
   await expect(page).toHaveURL(/\/leads\/\d+$/);
-  await page.getByRole('button', { name: 'Manual compose' }).click();
+  await page.getByRole('button', { name: 'Personalized Copy' }).click();
 
-  // Scope to the dialog — the top bar has its own campaign selector.
   const dialog = page.getByRole('dialog');
-  await expect(dialog.getByLabel('Campaign')).toContainText('Manual Send Fixture');
-
-  // Prefilled by the server for THIS enrollment's current due step.
-  await expect(dialog.getByText(/Step \d+ of 4/)).toBeVisible();
-  await expect(dialog.getByLabel('Subject')).toHaveValue(/Quick question about/);
-  await expect(dialog.getByLabel('Body')).toHaveValue(/Hi /);
-  await expect(page.getByTestId('composer-checks')).toBeVisible();
-
+  await expect(dialog).toContainText('Delivery happens only through a personalized sequence step');
+  await expect(dialog.getByText('Unassigned Source · default slot')).toBeVisible();
   await dialog.getByLabel('Subject').fill('Following up personally');
-  await page.getByRole('button', { name: 'Send & log as manual' }).click();
-  await expect(page.getByText('Sent and logged as a manual send')).toBeVisible();
+  await dialog
+    .getByLabel('Body')
+    .fill('Hi Manual,\n\nThis is saved for a personalized sequence step.\n\nBest,\nSam');
+  await dialog.getByRole('button', { name: 'Save Draft' }).click();
+  await expect(page.getByText('Source saved')).toBeVisible();
+  await expect(dialog.getByRole('button', { name: /send/i })).toHaveCount(0);
 });
 
 test('Not now creates an operator reminder without restarting the sequence', async ({ page }) => {

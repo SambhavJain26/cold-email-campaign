@@ -1,5 +1,10 @@
 # Ingest Spec — CSV Import, Hygiene, Tiering, Suppression, Recycling
 
+> **Migration 0019 overlay:** `manual_subject`/`manual_body` create global copy sources and
+> `step_N_subject`/`step_N_body` can bind exact personalized steps. Copy cells alone decode `\n`;
+> assignment snapshots are independent; current tiers are A/B/Untiered with separate Nurture
+> status. See [docs/22](22-personalized-copy-two-tier.md).
+
 Implements walkthrough Stages 1–2 + 9, plan Stage 5. Lives in `apps/server/src/ingest/`.
 
 ---

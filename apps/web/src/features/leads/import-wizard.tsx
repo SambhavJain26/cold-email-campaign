@@ -147,6 +147,7 @@ export function ImportWizard({
   const [expanded, setExpanded] = useState<ImportRowFlag | null>(null);
   const [draftCampaignId, setDraftCampaignId] = useState<number | undefined>();
   const [replaceDrafts, setReplaceDrafts] = useState(false);
+  const [markCopyReady, setMarkCopyReady] = useState(false);
   const [commitMode, setCommitMode] = useState<'drop_flagged' | 'import_all'>('drop_flagged');
   const [allocations, setAllocations] = useState<AllocationRow[]>([]);
   const campaigns = useCampaigns();
@@ -177,6 +178,7 @@ export function ImportWizard({
       setExpanded(null);
       setDraftCampaignId(undefined);
       setReplaceDrafts(false);
+      setMarkCopyReady(false);
       setCommitMode('drop_flagged');
       setAllocations([]);
     }
@@ -219,13 +221,14 @@ export function ImportWizard({
             count: allocation.count,
           })),
           replace_existing_drafts: replaceDrafts,
+          mark_valid_copy_ready: markCopyReady,
         },
       },
       {
         onSuccess: (commitResult) => {
           setResult(commitResult);
           toast.success(
-            `${commitResult.leads_created} leads and ${commitResult.drafts_created + commitResult.drafts_replaced} drafts saved`,
+            `${commitResult.leads_created} leads, ${commitResult.sources_created + commitResult.sources_replaced} copy sources saved`,
           );
         },
       },
@@ -352,10 +355,11 @@ export function ImportWizard({
             {(preview.draftCounts.valid_drafts > 0 || preview.draftCounts.invalid_drafts > 0) && (
               <section className="space-y-3 rounded-lg border border-info/40 bg-info/5 p-3">
                 <div>
-                  <p className="text-sm font-medium">Manual drafts detected</p>
+                  <p className="text-sm font-medium">Personalized Copy detected</p>
                   <p className="text-xs text-muted-foreground">
-                    {preview.draftCounts.valid_drafts} valid · {preview.draftCounts.invalid_drafts}{' '}
-                    incomplete. Drafts are Step 1 only and never enroll or send automatically.
+                    {preview.draftCounts.valid_drafts} complete ·{' '}
+                    {preview.draftCounts.invalid_drafts} incomplete or conflicting. Sources remain
+                    global unless a compatible campaign personalized step is selected or allocated.
                   </p>
                 </div>
                 <Select
@@ -388,7 +392,17 @@ export function ImportWizard({
                     onCheckedChange={(checked) => setReplaceDrafts(checked === true)}
                   />
                   <Label htmlFor="replace-imported-drafts" className="text-xs font-normal">
-                    Replace existing unsent drafts (default is skip)
+                    Replace existing source/campaign copy (default is keep)
+                  </Label>
+                </div>
+                <div className="flex items-center gap-2">
+                  <Checkbox
+                    id="mark-imported-copy-ready"
+                    checked={markCopyReady}
+                    onCheckedChange={(checked) => setMarkCopyReady(checked === true)}
+                  />
+                  <Label htmlFor="mark-imported-copy-ready" className="text-xs font-normal">
+                    Mark all valid imported copy ready
                   </Label>
                 </div>
               </section>
@@ -493,7 +507,6 @@ export function ImportWizard({
             <Button
               disabled={
                 commit.isPending ||
-                (preview.draftCounts.valid_drafts > 0 && draftCampaignId === undefined) ||
                 validAllocations.length !== allocations.length ||
                 (allocations.length > 0 &&
                   (allocationPreview.isPending ||

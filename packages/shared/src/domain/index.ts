@@ -60,8 +60,16 @@ export type ReplyDisposition = (typeof REPLY_DISPOSITIONS)[number];
 /** "Best" sentiment ordering for best_reply_sentiment: positive > neutral > negative. */
 export const SENTIMENT_RANK: Record<Sentiment, number> = { positive: 3, neutral: 2, negative: 1 };
 
-export const LEAD_TIERS = ['A', 'B', 'C', 'nurture'] as const;
-export type LeadTier = (typeof LEAD_TIERS)[number];
+/** Writable/current lead tiers. Historical enrollment snapshots may retain C/nurture. */
+export const CURRENT_LEAD_TIERS = ['A', 'B'] as const;
+export type CurrentLeadTier = (typeof CURRENT_LEAD_TIERS)[number];
+export const HISTORICAL_LEAD_TIERS = ['A', 'B', 'C', 'nurture'] as const;
+/** @deprecated Use CurrentLeadTier for lead writes; this remains for historical analytics. */
+export const LEAD_TIERS = HISTORICAL_LEAD_TIERS;
+export type LeadTier = (typeof HISTORICAL_LEAD_TIERS)[number];
+
+export const OUTREACH_STATUSES = ['standard', 'nurture'] as const;
+export type OutreachStatus = (typeof OUTREACH_STATUSES)[number];
 
 export const UNSUBSCRIBE_SOURCES = ['reply', 'link', 'manual'] as const;
 export type UnsubscribeSource = (typeof UNSUBSCRIBE_SOURCES)[number];

@@ -109,9 +109,10 @@ describe('migration runner', () => {
   });
 
   it('backfills the permanent cap from the final legacy ramp stage', async () => {
-    const latest = names.at(-1)!;
-    expect(latest).toBe('0018_campaign_pools_auto_enrollment');
-    await migrateDown(pool, MIGRATIONS_DIR, 1);
+    const targetMigration = '0018_campaign_pools_auto_enrollment';
+    const targetIndex = names.indexOf(targetMigration);
+    expect(targetIndex).toBeGreaterThanOrEqual(0);
+    await migrateDown(pool, MIGRATIONS_DIR, names.length - targetIndex);
     const campaignId = (
       await pool.query(
         `INSERT INTO campaigns (name, status, ramp_stages)
@@ -121,7 +122,7 @@ describe('migration runner', () => {
       )
     ).rows[0].id as number;
 
-    expect(await migrateUp(pool, MIGRATIONS_DIR)).toEqual([latest]);
+    expect(await migrateUp(pool, MIGRATIONS_DIR)).toEqual(names.slice(targetIndex));
     expect(
       (
         await pool.query(

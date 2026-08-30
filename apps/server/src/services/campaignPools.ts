@@ -19,6 +19,49 @@ import { leadsWithHashConflict } from '../db/repos/sentMessagesRepo';
 import { allContentHashes } from '../domain/sequence';
 import type { SequenceProvider } from '../scheduler/types';
 import { acquireEnrollmentCapacityLock } from '../db/repos/locksRepo';
+import {
+  campaignPersonalizedCopyReadiness,
+  createOrReplaceCampaignPersonalizedCopy,
+  personalizedCopySourcesForLeads,
+} from '../db/repos/manualDraftsRepo';
+import { contentHashOf } from '../render/hash';
+
+async function bindSourcesOnAssignment(
+  db: DbLike,
+  sequences: SequenceProvider,
+  campaignId: number,
+  leadIds: readonly number[],
+  now: Date,
+): Promise<void> {
+  const sequence = await sequences.sequenceFor(campaignId);
+  const personalizedSteps = sequence.steps.filter(
+    (step) => step.contentSource === 'personalized' && step.id !== undefined,
+  );
+  if (personalizedSteps.length === 0) return;
+  for (const source of await personalizedCopySourcesForLeads(db, leadIds)) {
+    const target =
+      source.targetStepNo === null
+        ? personalizedSteps.length === 1
+          ? personalizedSteps[0]
+          : undefined
+        : personalizedSteps.find((step) => step.stepNo === source.targetStepNo);
+    if (!target?.id) continue;
+    await createOrReplaceCampaignPersonalizedCopy(db, {
+      leadId: source.leadId,
+      campaignId,
+      sequenceStepId: target.id,
+      stepNo: target.stepNo,
+      sourceCopyId: source.id,
+      sourceImportId: source.sourceImportId,
+      subject: source.subject,
+      body: source.body,
+      contentHash: contentHashOf(source.subject, source.body),
+      status: source.status,
+      replace: false,
+      at: now,
+    });
+  }
+}
 
 export interface PoolAllocationRequest {
   campaignId: number;
@@ -44,6 +87,7 @@ export async function poolEligibility(
   campaignId: number,
   leadIds: readonly number[],
   now: Date,
+  options: { requireTier?: boolean } = {},
 ): Promise<PoolEligibilityResult> {
   const campaign = await getCampaign(db, campaignId);
   if (!campaign) throw new PoolAllocationError(`campaign ${campaignId} not found`);
@@ -59,6 +103,11 @@ export async function poolEligibility(
   const recontact = await recontactStatusByLeadIds(db, unique);
   const sequence = await sequences.sequenceFor(campaignId);
   const conflicts = await leadsWithHashConflict(db, unique, allContentHashes(sequence));
+  const firstStep = sequence.steps.find((step) => step.stepNo === 1);
+  const copyReadiness =
+    options.requireTier && firstStep?.contentSource === 'personalized' && firstStep.id
+      ? await campaignPersonalizedCopyReadiness(db, campaignId, firstStep.id, unique)
+      : new Map<number, string | null>();
 
   const eligible: PoolEligibilityResult['eligible'] = [];
   const reasons = new Map<number, string>();
@@ -68,7 +117,9 @@ export async function poolEligibility(
     if (!lead) reason = 'not_found';
     else if (lead.isSuppressed) reason = 'suppressed';
     else if (lead.isErased) reason = 'erased';
-    else if (lead.tier === 'nurture') reason = 'nurture';
+    else if (lead.outreachStatus === 'nurture') reason = 'nurture';
+    else if (options.requireTier && lead.tier !== 'A' && lead.tier !== 'B') reason = 'untiered';
+    else if (copyReadiness.get(id)) reason = copyReadiness.get(id)!;
     else if (reserved.has(id) && reserved.get(id) !== campaignId) reason = 'reserved_elsewhere';
     else if (activeElsewhere.has(id)) reason = 'active_enrollment_elsewhere';
     else if (already.has(id)) reason = 'already_enrolled';
@@ -89,6 +140,7 @@ export interface ExactPoolAllocationResult {
     requested: number;
     allocated: number;
     draftReserved: number;
+    leadIds: number[];
   }>;
   allocatedLeadIds: number[];
   exclusions: Record<string, number>;
@@ -103,6 +155,7 @@ export async function allocateExactPools(
     draftCampaignId?: number;
     draftLeadIds?: readonly number[];
     sourceImportId?: number;
+    bindPersonalizedCopy?: boolean;
     now: Date;
   },
 ): Promise<ExactPoolAllocationResult> {
@@ -155,6 +208,9 @@ export async function allocateExactPools(
       sourceImportId: input.sourceImportId,
       now: input.now,
     });
+    if (input.bindPersonalizedCopy !== false) {
+      await bindSourcesOnAssignment(db, sequences, request.campaignId, selected, input.now);
+    }
     await setCampaignPoolMode(db, request.campaignId);
     selected.forEach((id) => used.add(id));
     results.push({
@@ -162,6 +218,7 @@ export async function allocateExactPools(
       requested: request.count,
       allocated: selected.length,
       draftReserved: selected.filter((id) => pinned.includes(id)).length,
+      leadIds: selected,
     });
   }
   return { byCampaign: results, allocatedLeadIds: [...used], exclusions };
@@ -205,6 +262,7 @@ export async function addNextGlobalPoolLeads(
     );
   }
   await allocatePoolLeads(db, { ...input, leadIds: selected });
+  await bindSourcesOnAssignment(db, sequences, input.campaignId, selected, input.now);
   await setCampaignPoolMode(db, input.campaignId);
   return {
     changed: selected.length,
@@ -272,6 +330,7 @@ export async function reassignPoolLeads(
     leadIds: available,
     now: input.now,
   });
+  await bindSourcesOnAssignment(db, sequences, input.targetCampaignId, available, input.now);
   await setCampaignPoolMode(db, input.targetCampaignId);
   return available.length;
 }

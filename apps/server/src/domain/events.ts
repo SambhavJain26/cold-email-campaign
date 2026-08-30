@@ -33,6 +33,8 @@ const sent_ = base.extend({
   attributes: z.object({
     content_hash: z.string().min(1), // recycle guard (decision Q)
     variant_id: id.optional(),
+    content_source: z.enum(['template', 'personalized']).optional(),
+    personalized_copy_id: id.optional(),
     retry_no: z.number().int().min(1).optional(), // present when re-sending after a soft bounce
   }),
 });

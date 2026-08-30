@@ -24,6 +24,7 @@ export interface DraftStep {
   id?: number;
   wait_days: number;
   in_thread: boolean;
+  content_source: 'template' | 'personalized';
   variants: DraftVariant[];
 }
 
@@ -52,6 +53,7 @@ export function draftFromSequence(sequence: SequenceDto): SequenceDraft {
         id: step.id,
         wait_days: step.wait_days,
         in_thread: step.in_thread,
+        content_source: step.content_source,
         variants: step.variants.map((variant) => ({
           uid: draftUid('v'),
           id: variant.id,
@@ -73,6 +75,7 @@ export function blankStep(inThread: boolean, waitDays: number): DraftStep {
     uid: draftUid('s'),
     wait_days: waitDays,
     in_thread: inThread,
+    content_source: 'template',
     variants: [blankVariant('A')],
   };
 }
@@ -107,6 +110,7 @@ export function toWriteBody(draft: SequenceDraft): SequenceWriteBody {
       step_no: index + 1,
       wait_days: step.wait_days,
       in_thread: step.in_thread,
+      content_source: step.content_source,
       variants: step.variants.map((variant) => ({
         ...(variant.id === undefined ? {} : { id: variant.id }),
         label: variant.label,
@@ -130,7 +134,11 @@ export function draftBlockers(draft: SequenceDraft): string[] {
   }
   draft.steps.forEach((step, index) => {
     const stepNo = index + 1;
-    if (step.variants.length === 0) blockers.push(`Step ${stepNo} needs at least one variant`);
+    if (step.content_source === 'template' && step.variants.length === 0)
+      blockers.push(`Step ${stepNo} needs at least one variant`);
+    if (step.content_source === 'personalized' && step.variants.length > 0)
+      blockers.push(`Step ${stepNo} personalized copy cannot have variants`);
+    if (step.content_source === 'personalized') return;
     step.variants.forEach((variant) => {
       if (variant.subject_template.trim() === '')
         blockers.push(`Step ${stepNo} · variant ${variant.label}: subject is empty`);

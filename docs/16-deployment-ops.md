@@ -10,6 +10,13 @@ migration 0018, container health, public routes, served feature markers, self-ch
 dry-run, dormant send state, and post-deploy backup all pass. Oracle remains paused and unchanged.
 Deployment did not authorize campaign activation, enrollment, or sending.
 
+**Next candidate (local only):** migration `0019` and the Personalized Copy/two-tier/campaign-lead
+filter release are fully verified locally; see [docs/22](22-personalized-copy-two-tier.md). This is
+not a production status change. Before a separately authorized deploy, verify production has zero
+legacy `human_written` campaigns/enrollments, take and validate a fresh backup, confirm a clean
+fast-forward candidate, and repeat migration, health, route, zero-drift, self-check, dormant-state,
+and post-deploy backup gates. Do not activate, enroll, or send as part of that deployment.
+
 ---
 
 ## 1. Environment variables (complete list — zod-validated at boot, 02 §5)

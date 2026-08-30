@@ -16,7 +16,7 @@ describe('scenario runner skeleton', () => {
   it('seeds mailboxes, campaign, settings, leads and enrolls in tier order', async () => {
     s = await scenario({ mailboxes: 4, dailyCap: 30, sequence: fourStep, seed: 7 });
 
-    await s.importLeads(20, { tiers: { A: 5, B: 10, C: 5 } });
+    await s.importLeads(20, { tiers: { A: 5, B: 15 } });
     const mb = await s.pool.query(`SELECT count(*)::int n FROM mailboxes WHERE status = 'ok'`);
     expect(mb.rows[0].n).toBe(4);
 

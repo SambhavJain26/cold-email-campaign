@@ -1,12 +1,16 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import {
   bulkTierResponseSchema,
+  type BulkOutreachStatusBody,
   createLeadResponseSchema,
   leadSchema,
   okResponseSchema,
   type BulkTierBody,
   type CreateLeadBody,
   type PatchLeadBody,
+  campaignPersonalizedCopyWriteResponseSchema,
+  personalizedCopySourceWriteResponseSchema,
+  type PersonalizedCopyWriteBody,
 } from '@coldemail/shared';
 import { apiFetch } from '../client';
 import { invalidateOperational } from '../operational-cache';
@@ -40,6 +44,61 @@ export function useBulkTier() {
     mutationFn: (body: BulkTierBody) =>
       apiFetch('/leads/bulk-tier', bulkTierResponseSchema, { method: 'POST', body }),
     onSuccess: () => invalidateOperational(qc),
+  });
+}
+
+export function useBulkOutreachStatus() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (body: BulkOutreachStatusBody) =>
+      apiFetch('/leads/bulk-outreach-status', bulkTierResponseSchema, { method: 'POST', body }),
+    onSuccess: () => invalidateOperational(qc),
+  });
+}
+
+export function useSavePersonalizedCopySource() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({
+      leadId,
+      slotNo,
+      body,
+    }: {
+      leadId: number;
+      slotNo: number;
+      body: PersonalizedCopyWriteBody;
+    }) =>
+      apiFetch(
+        `/leads/${leadId}/personalized-copy-sources/${slotNo}`,
+        personalizedCopySourceWriteResponseSchema,
+        { method: 'PUT', body },
+      ),
+    onSuccess: (_result, input) =>
+      qc.invalidateQueries({ queryKey: ['leads', input.leadId, 'personalized-copies'] }),
+  });
+}
+
+export function useSaveCampaignPersonalizedCopy() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({
+      leadId,
+      campaignId,
+      stepNo,
+      body,
+    }: {
+      leadId: number;
+      campaignId: number;
+      stepNo: number;
+      body: PersonalizedCopyWriteBody;
+    }) =>
+      apiFetch(
+        `/leads/${leadId}/campaigns/${campaignId}/steps/${stepNo}/personalized-copy`,
+        campaignPersonalizedCopyWriteResponseSchema,
+        { method: 'PUT', body },
+      ),
+    onSuccess: (_result, input) =>
+      qc.invalidateQueries({ queryKey: ['leads', input.leadId, 'personalized-copies'] }),
   });
 }
 

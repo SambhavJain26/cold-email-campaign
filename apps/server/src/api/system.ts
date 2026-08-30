@@ -18,6 +18,7 @@ import { listIncoming, type IncomingMessageRow } from '../db/repos/incomingMessa
 import { listMailboxes } from '../db/repos/mailboxesRepo';
 import { getById as getEnrollmentById } from '../db/repos/enrollmentsRepo';
 import { getComplianceSettings, getSettings } from '../db/repos/settingsRepo';
+import { activePersonalizedCopyBlockerCount } from '../db/repos/manualDraftsRepo';
 import { runPreflight } from '../services/preflight';
 import { rebuildProjections } from '../services/rebuildProjections';
 import { loadCampaignShapes } from '../services/campaignShapes';
@@ -91,6 +92,7 @@ export async function systemRoutes(app: FastifyInstance, services: AppServices):
           last_successful_poll_at: mb.lastSuccessfulPollAt?.toISOString() ?? null,
         })),
         pending_jobs: await jobs.pendingCount(),
+        personalized_copy_blocked_count: await activePersonalizedCopyBlockerCount(db),
         send_blockers: [...scheduler.sendBlockers],
       };
     },

@@ -3,10 +3,10 @@ import { fileURLToPath } from 'node:url';
 import { defineConfig, devices } from '@playwright/test';
 
 // Real-backend walkthrough replay (docs/13 §5, closes M3). Two servers:
-//   - the Fastify app in SIMULATED_CLOCK mode on :3001 (VirtualClock + inline
+//   - the Fastify app in SIMULATED_CLOCK mode on :3011 (VirtualClock + inline
 //     jobs + POST /system/advance-clock + the transport-scripting hooks), its
 //     command migrates → resets → boots against the test DB;
-//   - the web app in real mode on :5174 (MSW off, /api proxied to :3001).
+//   - the web app in real mode on :5174 (MSW off, /api proxied to :3011).
 // Run: npm run e2e:real -w @coldemail/web  (needs docker Postgres on :5433).
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
 
@@ -27,7 +27,7 @@ const serverEnv: Record<string, string> = {
   NODE_ENV: 'development',
   ROLE: 'all',
   HOST: '127.0.0.1',
-  PORT: '3001',
+  PORT: '3011',
   LOG_LEVEL: 'warn',
 };
 
@@ -54,7 +54,7 @@ export default defineConfig({
         'npm run db:migrate -w @coldemail/server && npx tsx apps/server/test/ops/e2e-reset.ts && npm run start -w @coldemail/server',
       cwd: repoRoot,
       env: serverEnv,
-      url: 'http://localhost:3001/health',
+      url: 'http://localhost:3011/health',
       reuseExistingServer: false,
       timeout: 90_000,
       stdout: 'pipe',
@@ -62,7 +62,7 @@ export default defineConfig({
     },
     {
       command: 'npm run dev -- --port 5174 --strictPort',
-      env: { VITE_API_MODE: 'real', VITE_API_TARGET: 'http://localhost:3001' },
+      env: { VITE_API_MODE: 'real', VITE_API_TARGET: 'http://localhost:3011' },
       url: 'http://localhost:5174',
       reuseExistingServer: false,
       timeout: 60_000,

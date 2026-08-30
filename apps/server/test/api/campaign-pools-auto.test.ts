@@ -70,14 +70,35 @@ describe('campaign pools, automatic enrollment, and permanent caps', () => {
   afterAll(async () => h.close());
 
   it('allocates exact CSV counts in row order and leaves the remainder global', async () => {
-    const campaignA = await createCampaign(h, sequenceId, 'Allocation A');
-    const campaignB = await createCampaign(h, sequenceId, 'Allocation B');
+    const personalizedSequence = await h.inject({
+      method: 'POST',
+      url: '/api/v1/sequences',
+      payload: {
+        name: 'Personalized allocation sequence',
+        stop_on_reply: true,
+        stop_on_hard_bounce: true,
+        stop_on_unsubscribe: true,
+        steps: [
+          {
+            step_no: 1,
+            wait_days: 0,
+            in_thread: false,
+            content_source: 'personalized',
+            variants: [],
+          },
+        ],
+      },
+    });
+    expect(personalizedSequence.statusCode, personalizedSequence.body).toBe(200);
+    const personalizedSequenceId = personalizedSequence.json().id as number;
+    const campaignA = await createCampaign(h, personalizedSequenceId, 'Allocation A');
+    const campaignB = await createCampaign(h, personalizedSequenceId, 'Allocation B');
     const rows = Array.from(
       { length: 1000 },
       (_, index) =>
-        `pool${String(index + 1).padStart(4, '0')}@example.dev,Lead ${index + 1},Company ${index + 1}`,
+        `pool${String(index + 1).padStart(4, '0')}@example.dev,Lead ${index + 1},Company ${index + 1},Subject ${index + 1},Hi Lead ${index + 1}\\nA personal note.`,
     );
-    const csv = ['email,first_name,company', ...rows].join('\n');
+    const csv = ['email,first_name,company,manual_subject,manual_body', ...rows].join('\n');
     const multipart = multipartCsv(csv);
     const preview = await h.inject({
       method: 'POST',
@@ -120,7 +141,28 @@ describe('campaign pools, automatic enrollment, and permanent caps', () => {
       imported: 1000,
       allocations_created: 200,
       remaining_global: 800,
+      sources_created: 1000,
+      copies_bound: 200,
+      copies_unassigned: 800,
+      copy_conflicts: 0,
     });
+
+    expect(
+      (await h.pool.query(`SELECT count(*)::int n FROM personalized_copy_sources`)).rows[0].n,
+    ).toBe(1000);
+    expect(
+      (await h.pool.query(`SELECT count(*)::int n FROM campaign_personalized_copies`)).rows[0].n,
+    ).toBe(200);
+    expect(
+      (
+        await h.pool.query(
+          `SELECT count(*)::int n FROM personalized_copy_sources s
+            WHERE NOT EXISTS (
+              SELECT 1 FROM campaign_personalized_copies c WHERE c.source_copy_id = s.id
+            )`,
+        )
+      ).rows[0].n,
+    ).toBe(800);
 
     const counts = await h.pool.query(
       `SELECT campaign_id, count(*)::int AS n
@@ -140,6 +182,16 @@ describe('campaign pools, automatic enrollment, and permanent caps', () => {
     expect(bounds.rows[0]).toEqual({
       first_email: 'pool0001@example.dev',
       last_email: 'pool0100@example.dev',
+    });
+    const secondBounds = await h.pool.query(
+      `SELECT min(l.email) AS first_email, max(l.email) AS last_email
+         FROM campaign_lead_pool p JOIN leads l ON l.id = p.lead_id
+        WHERE p.campaign_id = $1`,
+      [campaignB.id],
+    );
+    expect(secondBounds.rows[0]).toEqual({
+      first_email: 'pool0101@example.dev',
+      last_email: 'pool0200@example.dev',
     });
 
     const filteredLeads = (
@@ -220,6 +272,9 @@ describe('campaign pools, automatic enrollment, and permanent caps', () => {
   });
 
   it('never falls back to unrelated global leads after a campaign becomes pool-backed', async () => {
+    await h.pool.query(
+      `UPDATE leads SET tier = 'B', outreach_status = 'standard' WHERE tier IS NULL OR tier NOT IN ('A','B')`,
+    );
     const campaign = await createCampaign(h, sequenceId, 'One-lead pool');
     const added = await h.inject({
       method: 'POST',

@@ -37,6 +37,10 @@ export const sequenceSteps = pgTable(
     stepNo: integer('step_no').notNull(),
     waitDays: integer('wait_days').notNull().default(0),
     inThread: boolean('in_thread').notNull().default(true),
+    contentSource: text('content_source')
+      .$type<'template' | 'personalized'>()
+      .notNull()
+      .default('template'),
   },
   (t) => [unique().on(t.sequenceId, t.stepNo)],
 );

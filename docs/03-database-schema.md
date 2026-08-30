@@ -1,5 +1,10 @@
 # Database Schema — Full DDL
 
+> **Migration 0019 overlay:** current copy/tier tables and compatibility rules are specified in
+> [docs/22](22-personalized-copy-two-tier.md). In particular, `personalized_copy_sources`,
+> `campaign_personalized_copies`, `personalized_copy_blockers`, step `content_source`, separate
+> `outreach_status`, and sent-content snapshots supersede conflicting pre-0019 excerpts below.
+
 The complete Postgres schema. Drizzle definitions in `apps/server/src/db/schema/` must mirror this file 1:1; this file is the human-readable source. Migration policy: §6. Spec traceability: events/enums map to spec Parts 2–3; settings values to Part 11.
 
 All timestamps are `timestamptz` (UTC). All emails stored normalized (decision L).

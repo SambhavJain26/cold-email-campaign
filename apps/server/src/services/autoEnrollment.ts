@@ -1,3 +1,4 @@
+import type { CurrentLeadTier } from '@coldemail/shared';
 import type { Db } from '../db/client';
 import type { Clock } from '../clock';
 import type { EventStore } from './eventStore';
@@ -140,12 +141,12 @@ export async function runAutoEnrollment(
             capRemaining: number;
             eligible: Array<{
               id: number;
-              tier: 'A' | 'B' | 'C' | 'nurture' | null;
+              tier: CurrentLeadTier;
               poolId: number;
             }>;
             selected: Array<{
               id: number;
-              tier: 'A' | 'B' | 'C' | 'nurture' | null;
+              tier: CurrentLeadTier;
               poolId: number;
             }>;
             skipped: Record<string, number>;
@@ -160,6 +161,7 @@ export async function runAutoEnrollment(
               campaign.id,
               candidates.map((candidate) => candidate.leadId),
               now,
+              { requireTier: true },
             );
             const allowed = new Set(checked.eligible.map((lead) => lead.id));
             const skipped: Record<string, number> = {};
@@ -171,13 +173,17 @@ export async function runAutoEnrollment(
             states.push({
               campaign,
               capRemaining: cap.campaignCapRemaining,
-              eligible: candidates
-                .filter((candidate) => allowed.has(candidate.leadId))
-                .map((candidate) => ({
-                  id: candidate.leadId,
-                  tier: candidate.tier,
-                  poolId: candidate.poolId,
-                })),
+              eligible: candidates.flatMap((candidate) =>
+                allowed.has(candidate.leadId) && (candidate.tier === 'A' || candidate.tier === 'B')
+                  ? [
+                      {
+                        id: candidate.leadId,
+                        tier: candidate.tier,
+                        poolId: candidate.poolId,
+                      },
+                    ]
+                  : [],
+              ),
               selected: [],
               skipped,
             });

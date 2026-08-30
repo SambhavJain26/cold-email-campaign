@@ -1,6 +1,11 @@
 # Render Engine Spec — Merge Tags, Spintax, Compliance Footer, Pre-send Checks
 
-Implements walkthrough Stage 4 + spec Part 8. Lives in `apps/server/src/render/`. Pure functions except the settings read; fully snapshot-testable. The renderer is the **only** producer of outbound message bodies — the scheduler, the preview endpoint, and the manual composer all call it.
+> **Migration 0019 overlay:** Template steps continue through this renderer. Personalized steps
+> use literal ready subject/body from the campaign-step snapshot, then run the shared footer and
+> checks. The Personalized Copy editor previews but never sends; old Manual Compose paths are
+> retired with `410 Gone`. See [docs/22](22-personalized-copy-two-tier.md).
+
+Implements walkthrough Stage 4 + spec Part 8. Lives in `apps/server/src/render/`. Pure functions except the settings read; fully snapshot-testable. The renderer is the **only** producer of template-step outbound bodies; personalized-step literal content joins the same footer/check pipeline in the scheduler and preview service.
 
 ---
 

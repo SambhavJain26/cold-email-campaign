@@ -20,7 +20,12 @@ import {
   leadsByEmails,
   type NewImportedLead,
 } from '../db/repos/leadsRepo';
-import { createOrReplaceManualDraft, unsentManualDraftLeadIds } from '../db/repos/manualDraftsRepo';
+import {
+  createOrReplaceCampaignPersonalizedCopy,
+  createOrReplacePersonalizedCopySource,
+  unsentManualDraftLeadIds,
+  type PersonalizedCopySourceRow,
+} from '../db/repos/manualDraftsRepo';
 import { suppressedAmong } from '../db/repos/suppressionsRepo';
 import type { ImportCounts } from '../db/schema';
 import { flagRows, normalizeEmail } from './hygiene';
@@ -33,6 +38,26 @@ import {
   type PoolAllocationRequest,
 } from '../services/campaignPools';
 import { getCampaign } from '../db/repos/campaignsRepo';
+import { contentHashOf } from '../render/hash';
+
+interface StoredImportRaw {
+  fields: Partial<Record<CanonicalField, string>>;
+  custom_fields: Record<string, string>;
+  copy_slots?: ParsedRow['copySlots'];
+  copy_conflicts?: string[];
+}
+
+function copySlotsOf(raw: StoredImportRaw): NonNullable<ParsedRow['copySlots']> {
+  if (raw.copy_slots) return raw.copy_slots;
+  if (!raw.fields.manual_subject && !raw.fields.manual_body) return {};
+  return {
+    1: {
+      subject: raw.fields.manual_subject,
+      body: raw.fields.manual_body,
+      targetStepNo: null,
+    },
+  };
+}
 
 export interface IngestDeps {
   db: Db;
@@ -96,7 +121,12 @@ export async function createImportPreview(
     flagged.map((r) => ({
       importId,
       rowNo: r.rowNo,
-      raw: { fields: r.fields, custom_fields: r.customFields },
+      raw: {
+        fields: r.fields,
+        custom_fields: r.customFields,
+        copy_slots: r.copySlots,
+        copy_conflicts: r.copyConflicts,
+      },
       emailNormalized: r.emailNormalized === '' ? null : r.emailNormalized,
       flag: r.flag,
     })),
@@ -109,7 +139,7 @@ export async function createImportPreview(
       samples[flag] = rows.map((r) => ({ rowNo: r.rowNo, email: r.emailNormalized }));
     }
   }
-  const hasDraft = (row: ParsedRow) => Boolean(row.fields.manual_subject || row.fields.manual_body);
+  const copyPairs = parsed.flatMap((row) => Object.values(row.copySlots ?? {}));
   return {
     importId,
     rowsTotal: parsed.length,
@@ -118,15 +148,20 @@ export async function createImportPreview(
     draftCounts: {
       newLeads: flagged.filter((row) => row.flag !== 'duplicate').length,
       existingLeads: flagged.filter((row) => row.flag === 'duplicate').length,
-      validDrafts: flagged.filter(
-        (row) =>
-          Boolean(row.fields.manual_subject && row.fields.manual_body) &&
-          row.flag !== 'suppressed' &&
-          row.flag !== 'invalid',
-      ).length,
-      invalidDrafts: flagged.filter(
-        (row) => hasDraft(row) && !(row.fields.manual_subject && row.fields.manual_body),
-      ).length,
+      validDrafts: flagged.reduce(
+        (sum, row) =>
+          sum +
+          (row.flag === 'suppressed' ||
+          row.flag === 'invalid' ||
+          (row.copyConflicts?.length ?? 0) > 0
+            ? 0
+            : Object.values(row.copySlots ?? {}).filter((copy) => copy.subject && copy.body)
+                .length),
+        0,
+      ),
+      invalidDrafts:
+        copyPairs.filter((copy) => !copy.subject || !copy.body).length +
+        parsed.reduce((sum, row) => sum + (row.copyConflicts?.length ?? 0), 0),
     },
   };
 }
@@ -141,6 +176,12 @@ export interface CommitResult {
   invalidDrafts: number;
   allocationsCreated: number;
   remainingGlobal: number;
+  sourcesCreated: number;
+  sourcesReplaced: number;
+  sourcesSkipped: number;
+  copiesBound: number;
+  copyConflicts: number;
+  copiesUnassigned: number;
 }
 
 export async function commitImport(
@@ -150,6 +191,7 @@ export async function commitImport(
     mode: CommitMode;
     draftCampaignId?: number;
     replaceExistingDrafts?: boolean;
+    markValidCopyReady?: boolean;
     allocations?: readonly PoolAllocationRequest[];
   },
 ): Promise<CommitResult> {
@@ -222,8 +264,8 @@ export async function commitImport(
       );
       const pairs = allRows.flatMap((row) => {
         const leadId = row.emailNormalized ? leadMap.get(row.emailNormalized)?.id : undefined;
-        const fields = (row.raw as { fields: Partial<Record<CanonicalField, string>> }).fields;
-        const carriesDraft = Boolean(fields.manual_subject || fields.manual_body);
+        const carriesDraft =
+          Object.keys(copySlotsOf(row.raw as unknown as StoredImportRaw)).length > 0;
         const wasInserted = insertedRowIds.has(row.id);
         const carriesAllocation = (input.allocations?.length ?? 0) > 0;
         return leadId === undefined || (!wasInserted && !carriesDraft && !carriesAllocation)
@@ -232,44 +274,55 @@ export async function commitImport(
       });
       await backfillLeadIds(tx, pairs);
 
-      const draftRows = allRows.filter((row) => {
-        const fields = (row.raw as { fields: Partial<Record<CanonicalField, string>> }).fields;
-        return Boolean(fields.manual_subject || fields.manual_body);
-      });
-      const invalidDrafts = draftRows.filter((row) => {
-        const fields = (row.raw as { fields: Partial<Record<CanonicalField, string>> }).fields;
-        return !fields.manual_subject || !fields.manual_body;
-      }).length;
-      const validDraftRows = draftRows.filter((row) => {
-        const fields = (row.raw as { fields: Partial<Record<CanonicalField, string>> }).fields;
+      const sourceCandidates = allRows.flatMap((row) => {
+        const raw = row.raw as unknown as StoredImportRaw;
         const lead = row.emailNormalized ? leadMap.get(row.emailNormalized) : undefined;
-        return (
-          Boolean(fields.manual_subject && fields.manual_body) &&
-          Boolean(lead && !lead.isSuppressed && !lead.isErased) &&
-          !nowSuppressed.has(row.emailNormalized!)
-        );
+        return Object.entries(copySlotsOf(raw)).map(([slotNo, copy]) => ({
+          row,
+          lead,
+          slotNo: Number(slotNo),
+          copy,
+          conflicted: (raw.copy_conflicts?.length ?? 0) > 0,
+        }));
       });
-      if (validDraftRows.length > 0 && input.draftCampaignId === undefined) {
-        throw new Error('select one target campaign before committing imported manual drafts');
-      }
-
-      let draftsCreated = 0;
-      let draftsReplaced = 0;
-      let draftsSkipped = draftRows.length - invalidDrafts - validDraftRows.length;
-      for (const row of validDraftRows) {
-        const fields = (row.raw as { fields: Partial<Record<CanonicalField, string>> }).fields;
-        const lead = leadMap.get(row.emailNormalized!)!;
-        const result = await createOrReplaceManualDraft(tx, {
-          leadId: lead.id,
-          campaignId: input.draftCampaignId!,
+      const invalidDrafts = sourceCandidates.filter(
+        (candidate) => candidate.conflicted || !candidate.copy.subject || !candidate.copy.body,
+      ).length;
+      const validSources = sourceCandidates.filter(
+        (candidate) =>
+          !candidate.conflicted &&
+          Boolean(candidate.copy.subject && candidate.copy.body) &&
+          Boolean(candidate.lead && !candidate.lead.isSuppressed && !candidate.lead.isErased) &&
+          !nowSuppressed.has(candidate.row.emailNormalized!),
+      );
+      let sourcesCreated = 0;
+      let sourcesReplaced = 0;
+      let sourcesSkipped = sourceCandidates.length - invalidDrafts - validSources.length;
+      const savedSources: Array<{
+        leadId: number;
+        source: PersonalizedCopySourceRow;
+        targetStepNo: number | null;
+      }> = [];
+      for (const candidate of validSources) {
+        const saved = await createOrReplacePersonalizedCopySource(tx, {
+          leadId: candidate.lead!.id,
+          slotNo: candidate.slotNo,
+          targetStepNo: candidate.copy.targetStepNo,
           sourceImportId: input.importId,
-          subject: fields.manual_subject!,
-          body: fields.manual_body!,
+          subject: candidate.copy.subject!,
+          body: candidate.copy.body!,
+          status: input.markValidCopyReady ? 'ready' : 'needs_review',
           replace: input.replaceExistingDrafts ?? false,
+          at: deps.clock?.now(),
         });
-        if (result === 'created') draftsCreated += 1;
-        else if (result === 'replaced') draftsReplaced += 1;
-        else draftsSkipped += 1;
+        if (saved.result === 'created') sourcesCreated += 1;
+        else if (saved.result === 'replaced') sourcesReplaced += 1;
+        else sourcesSkipped += 1;
+        savedSources.push({
+          leadId: candidate.lead!.id,
+          source: saved.source,
+          targetStepNo: candidate.copy.targetStepNo,
+        });
       }
 
       const allocationRequests = input.allocations ?? [];
@@ -288,36 +341,74 @@ export async function commitImport(
         })
         .filter((id, index, all) => all.indexOf(id) === index);
       let remainingGlobal = candidateLeadIds.length;
+      const campaignAssignments = new Map<number, number[]>();
       if (allocationRequests.length > 0) {
         if (!deps.clock || !deps.sequences) {
           throw new Error('campaign allocation requires clock and sequence dependencies');
         }
-        if (
-          validDraftRows.length > 0 &&
-          (input.draftCampaignId === undefined ||
-            !allocationRequests.some((request) => request.campaignId === input.draftCampaignId))
-        ) {
-          throw new PoolAllocationError(
-            'the imported-draft campaign must also have a campaign allocation',
-          );
-        }
-        const draftLeadIds = validDraftRows
-          .flatMap((row) => {
-            const leadId = row.emailNormalized ? leadMap.get(row.emailNormalized)?.id : undefined;
-            return leadId === undefined ? [] : [leadId];
-          })
-          .filter((id, index, all) => all.indexOf(id) === index);
         const allocated = await allocateExactPools(tx, deps.sequences, {
           requests: allocationRequests,
           candidateLeadIds,
-          draftCampaignId: input.draftCampaignId,
-          draftLeadIds,
           sourceImportId: input.importId,
+          bindPersonalizedCopy: false,
           now: deps.clock.now(),
         });
+        for (const assignment of allocated.byCampaign) {
+          campaignAssignments.set(assignment.campaignId, assignment.leadIds);
+        }
         allocationsCreated = allocated.allocatedLeadIds.length;
         remainingGlobal = Math.max(0, candidateLeadIds.length - allocationsCreated);
+      } else if (input.draftCampaignId !== undefined) {
+        campaignAssignments.set(input.draftCampaignId, [
+          ...new Set(savedSources.map((saved) => saved.leadId)),
+        ]);
       }
+
+      let copiesBound = 0;
+      let draftsReplaced = 0;
+      let draftsSkipped = 0;
+      const assignedSourceIds = new Set<number>();
+      if (campaignAssignments.size > 0 && !deps.sequences) {
+        throw new Error('campaign copy binding requires sequence dependencies');
+      }
+      for (const [campaignId, assignedLeadIds] of campaignAssignments) {
+        const sequence = await deps.sequences!.sequenceFor(campaignId);
+        const personalizedSteps = sequence.steps.filter(
+          (step) => step.contentSource === 'personalized' && step.id !== undefined,
+        );
+        const assigned = new Set(assignedLeadIds);
+        for (const saved of savedSources.filter((source) => assigned.has(source.leadId))) {
+          const target =
+            saved.targetStepNo === null
+              ? personalizedSteps.length === 1
+                ? personalizedSteps[0]
+                : undefined
+              : personalizedSteps.find((step) => step.stepNo === saved.targetStepNo);
+          if (!target?.id) continue;
+          const result = await createOrReplaceCampaignPersonalizedCopy(tx, {
+            leadId: saved.leadId,
+            campaignId,
+            sequenceStepId: target.id,
+            stepNo: target.stepNo,
+            sourceCopyId: saved.source.id,
+            sourceImportId: input.importId,
+            subject: saved.source.subject,
+            body: saved.source.body,
+            contentHash: contentHashOf(saved.source.subject, saved.source.body),
+            status: saved.source.status,
+            replace: input.replaceExistingDrafts ?? false,
+            at: deps.clock?.now(),
+          });
+          if (result === 'created') copiesBound += 1;
+          else if (result === 'replaced') draftsReplaced += 1;
+          else draftsSkipped += 1;
+          assignedSourceIds.add(saved.source.id);
+        }
+      }
+      const copiesUnassigned = savedSources.filter(
+        (saved) => !assignedSourceIds.has(saved.source.id),
+      ).length;
+      const draftsCreated = copiesBound;
 
       await markCommitted(tx, input.importId, input.mode);
       return {
@@ -329,6 +420,12 @@ export async function commitImport(
         invalidDrafts,
         allocationsCreated,
         remainingGlobal,
+        sourcesCreated,
+        sourcesReplaced,
+        sourcesSkipped,
+        copiesBound,
+        copyConflicts: sourceCandidates.filter((candidate) => candidate.conflicted).length,
+        copiesUnassigned,
       };
     },
     { isolationLevel: 'serializable' },
@@ -375,17 +472,6 @@ export async function previewImportAllocations(
       throw new PoolAllocationError(`campaign ${id} must be draft or paused`);
     }
   }
-  const hasDraftRows = rows.some((row) => {
-    const fields = (row.raw as { fields: Partial<Record<CanonicalField, string>> }).fields;
-    return Boolean(fields.manual_subject && fields.manual_body);
-  });
-  if (
-    hasDraftRows &&
-    (input.draftCampaignId === undefined || !campaignIds.includes(input.draftCampaignId))
-  ) {
-    throw new PoolAllocationError('the imported-draft campaign must also have an allocation');
-  }
-
   const emails = rows.flatMap((row) => (row.emailNormalized ? [row.emailNormalized] : []));
   const leadMap = await leadsByEmails(deps.db, emails);
   const admitted = new Set<ImportRowFlag>([
@@ -397,11 +483,11 @@ export async function previewImportAllocations(
   const candidates = rows
     .filter((row) => admitted.has(row.flag))
     .map((row) => {
-      const fields = (row.raw as { fields: Partial<Record<CanonicalField, string>> }).fields;
+      const raw = row.raw as unknown as StoredImportRaw;
       return {
         key: row.emailNormalized!,
         leadId: row.emailNormalized ? leadMap.get(row.emailNormalized)?.id : undefined,
-        isDraft: Boolean(fields.manual_subject && fields.manual_body),
+        isDraft: Object.values(copySlotsOf(raw)).some((copy) => copy.subject && copy.body),
       };
     })
     .filter((row, index, all) => all.findIndex((other) => other.key === row.key) === index);
@@ -472,22 +558,25 @@ export async function previewImportDrafts(
     deps.db,
     rows.flatMap((row) => (row.emailNormalized ? [row.emailNormalized] : [])),
   );
-  const draftRows = rows.filter((row) => {
-    const fields = (row.raw as { fields: Partial<Record<CanonicalField, string>> }).fields;
-    return Boolean(fields.manual_subject || fields.manual_body);
-  });
-  const valid = draftRows.filter((row) => {
-    const fields = (row.raw as { fields: Partial<Record<CanonicalField, string>> }).fields;
+  const draftRows = rows.flatMap((row) =>
+    Object.values(copySlotsOf(row.raw as unknown as StoredImportRaw)).map((copy) => ({
+      row,
+      copy,
+    })),
+  );
+  const valid = draftRows.filter(({ row, copy }) => {
+    const raw = row.raw as unknown as StoredImportRaw;
     const lead = row.emailNormalized ? leads.get(row.emailNormalized) : undefined;
     return Boolean(
-      fields.manual_subject &&
-      fields.manual_body &&
+      copy.subject &&
+      copy.body &&
+      (raw.copy_conflicts?.length ?? 0) === 0 &&
       row.flag !== 'invalid' &&
       row.flag !== 'suppressed' &&
       (!lead || (!lead.isSuppressed && !lead.isErased)),
     );
   });
-  const existingValidLeadIds = valid.flatMap((row) => {
+  const existingValidLeadIds = valid.flatMap(({ row }) => {
     const lead = row.emailNormalized ? leads.get(row.emailNormalized) : undefined;
     return lead ? [lead.id] : [];
   });

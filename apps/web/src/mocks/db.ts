@@ -70,8 +70,9 @@ const CITY_STATE: Array<[string, string]> = [
 
 /** 885-lead projection consistent with the outcomes fixture:
  *  1–47 REPLIED (first 28 positive) · 48–87 UNSUBSCRIBED · 88–105 BOUNCED ·
- *  106–885 COMPLETED. Tiers: A 255 / B 447 / C 165 contacted + 18 untiered
- *  (the bounced never got delivered — and give F3's untiered banner data). */
+ *  106–885 COMPLETED. Current tiers migrate the historic C cohort into B:
+ *  A 255 / B 612 contacted + 18 untiered. Historical analytics fixtures keep
+ *  their immutable C enrollment snapshots. */
 function buildLeads(): LeadDto[] {
   const leads: LeadDto[] = [];
   let tieredRank = 0; // rank among NON-bounced so tier totals hit A 255 / B 447 / C 165
@@ -80,7 +81,7 @@ function buildLeads(): LeadDto[] {
       i <= 47 ? 'REPLIED' : i <= 87 ? 'UNSUBSCRIBED' : i <= 105 ? 'BOUNCED' : 'COMPLETED';
     const bounced = state === 'BOUNCED';
     if (!bounced) tieredRank += 1;
-    const tier = bounced ? null : tieredRank <= 255 ? 'A' : tieredRank <= 702 ? 'B' : 'C';
+    const tier = bounced ? null : tieredRank <= 255 ? 'A' : 'B';
     const first = FIRST[i % FIRST.length]!;
     const last = LAST[i % LAST.length]!;
     const [city, st] = CITY_STATE[i % CITY_STATE.length]!;
@@ -93,6 +94,7 @@ function buildLeads(): LeadDto[] {
       city,
       state: st,
       tier,
+      outreach_status: 'standard',
       is_suppressed: state === 'UNSUBSCRIBED',
       custom_fields: i % 7 === 0 ? { listing_note: 'Saw the Elm St listing' } : {},
       latest_enrollment: {
@@ -103,8 +105,8 @@ function buildLeads(): LeadDto[] {
       },
     });
   }
-  // A separate active Mode-1 enrollment keeps the manual-composer path
-  // truthful: terminal golden-cohort leads cannot be manually sent again.
+  // A separate active legacy Mode-1 enrollment proves predecessor work stays
+  // held and readable while Personalized Copy is the only current workflow.
   leads.push({
     id: 886,
     email: 'manual.eligible@example.com',
@@ -113,9 +115,10 @@ function buildLeads(): LeadDto[] {
     company: 'Fixture Realty',
     city: 'Austin',
     state: 'TX',
-    // Kept out of the golden campaign's A/B/C distribution; its active
-    // Mode-1 enrollment is a separate manual-composer fixture.
-    tier: 'nurture',
+    // Kept out of the current A/B distribution; its active Mode-1 enrollment
+    // is a legacy compatibility fixture.
+    tier: null,
+    outreach_status: 'nurture',
     is_suppressed: false,
     custom_fields: {},
     latest_enrollment: {
@@ -179,6 +182,7 @@ function buildSequence(): SequenceDto {
         step_no: 1,
         wait_days: 0,
         in_thread: false,
+        content_source: 'template',
         variants: [
           {
             id: 1,
@@ -203,6 +207,7 @@ function buildSequence(): SequenceDto {
         step_no: 2,
         wait_days: 3,
         in_thread: true,
+        content_source: 'template',
         variants: [
           {
             id: 3,
@@ -218,6 +223,7 @@ function buildSequence(): SequenceDto {
         step_no: 3,
         wait_days: 4,
         in_thread: true,
+        content_source: 'template',
         variants: [
           {
             id: 4,
@@ -234,6 +240,7 @@ function buildSequence(): SequenceDto {
         step_no: 4,
         wait_days: 5,
         in_thread: true,
+        content_source: 'template',
         variants: [
           {
             id: 5,

@@ -47,16 +47,16 @@ describe('multi-source cold-storage recycling', () => {
        ('Combined Pass', 'draft', 1)`,
     );
     await pool.query(
-      `INSERT INTO leads (email, tier, is_suppressed) VALUES
-       ('both@example.test', 'A', false),
-       ('alpha-only@example.test', 'B', false),
-       ('resting@example.test', 'B', false),
-       ('nurture@example.test', 'nurture', false),
-       ('suppressed@example.test', 'B', true),
-       ('replied@example.test', 'B', false),
-       ('already-target@example.test', 'B', false),
-       ('conflict@example.test', 'B', false),
-       ('changes-after-preview@example.test', 'C', false)`,
+      `INSERT INTO leads (email, tier, outreach_status, is_suppressed) VALUES
+       ('both@example.test', 'A', 'standard', false),
+       ('alpha-only@example.test', 'B', 'standard', false),
+       ('resting@example.test', 'B', 'standard', false),
+       ('nurture@example.test', NULL, 'nurture', false),
+       ('suppressed@example.test', 'B', 'standard', true),
+       ('replied@example.test', 'B', 'standard', false),
+       ('already-target@example.test', 'B', 'standard', false),
+       ('conflict@example.test', 'B', 'standard', false),
+       ('changes-after-preview@example.test', 'B', 'standard', false)`,
     );
 
     const sourceRows = [
@@ -109,6 +109,8 @@ describe('multi-source cold-storage recycling', () => {
       duplicates: 1,
       restPeriodFailures: 1,
       nurtureExclusions: 1,
+      untieredExclusions: 0,
+      personalizedCopyBlocks: 0,
       suppressionRecontactBlocks: 2,
       existingTargetEnrollments: 1,
       priorContentConflicts: 1,

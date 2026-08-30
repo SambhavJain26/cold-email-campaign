@@ -50,7 +50,7 @@ test('13b steps: delivered/positives per step, WEAK verdict, positives reconcile
   );
 });
 
-test('13c tiers: contacted/meetings reconcile and Tier-C promotion runs', async ({ page }) => {
+test('13c tiers: current A/B plus legacy C analytics reconcile', async ({ page }) => {
   await login(page);
   await openTab(page, 'Tiers');
 
@@ -58,6 +58,7 @@ test('13c tiers: contacted/meetings reconcile and Tier-C promotion runs', async 
   await expect(page.getByTestId('tier-row-A')).toContainText('13'); // meetings
   await expect(page.getByTestId('tier-row-B')).toContainText('447');
   await expect(page.getByTestId('tier-row-C')).toContainText('165');
+  await expect(page.getByTestId('tier-row-C')).toContainText('Legacy');
 
   // 13 + 3 + 1 = 17 meetings; 255 + 447 + 165 = 867 contacted.
   const reconciliation = page.getByTestId('tiers-reconciliation');
@@ -66,8 +67,9 @@ test('13c tiers: contacted/meetings reconcile and Tier-C promotion runs', async 
 
   await expect(page.getByTestId('tier-insights')).toContainText('13 of 17 meetings');
 
-  await page.getByTestId('promote-tier-c').click();
-  await expect(page.getByText(/Promoted \d+ leads to Tier B/)).toBeVisible();
+  await expect(
+    page.getByText(/Current lead tier controls use only Tier A and Tier B/),
+  ).toBeVisible();
 });
 
 test('13d health: sparklines with thresholds and the watch-rule status', async ({ page }) => {
@@ -93,7 +95,6 @@ test('cold storage previews multi-source exclusions before confirmation', async 
   await page.getByRole('link', { name: 'Campaigns' }).click();
   await page.getByRole('button', { name: 'New Campaign' }).click();
   await page.getByLabel('Name').fill('Pass 2 — same message');
-  await page.getByRole('checkbox').check();
   await page.getByRole('button', { name: 'Create campaign' }).click();
   await expect(page).toHaveURL(/\/campaigns\/\d+$/);
 
@@ -131,7 +132,6 @@ test('recycling into a campaign with a new sequence succeeds', async ({ page }) 
   await page.getByLabel('Name').fill('Pass 2 — new angle');
   await page.getByLabel('Sequence').click();
   await page.getByRole('option', { name: /Listing automation angle/ }).click();
-  await page.getByRole('checkbox').check();
   await page.getByRole('button', { name: 'Create campaign' }).click();
 
   await page.getByRole('link', { name: 'Cold Storage' }).click();

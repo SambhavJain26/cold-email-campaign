@@ -122,10 +122,29 @@ export type CampaignDto = z.infer<typeof campaignSchema>;
 
 export const campaignsListResponseSchema = listOf(campaignSchema);
 
+export const personalizedCopyCoverageResponseSchema = z
+  .object({
+    blocked_count: z.number().int().min(0),
+    steps: z.array(
+      z
+        .object({
+          step_no: z.number().int().positive(),
+          ready: z.number().int().min(0),
+          needs_review: z.number().int().min(0),
+          missing: z.number().int().min(0),
+          blocked: z.number().int().min(0),
+          total: z.number().int().min(0),
+        })
+        .strict(),
+    ),
+  })
+  .strict();
+
 export const createCampaignBodySchema = z
   .object({
     name: z.string().min(1),
     sequence_id: z.number().int().positive(),
+    /** Deprecated compatibility input. The server always stores fixed A=researched/B=auto. */
     tier_effort_config: tierEffortConfigSchema.optional(),
     ramp_config: rampConfigSchema.optional(),
     ramp_stages: rampStagesSchema.default(DEFAULT_RAMP_STAGES.map((stage) => ({ ...stage }))),
@@ -133,28 +152,16 @@ export const createCampaignBodySchema = z
     auto_observation: autoObservationConfigSchema.optional(),
     steady_daily_enroll_cap: z.number().int().positive().optional(),
     auto_enroll_enabled: z.boolean().optional(),
+    /** Deprecated no-op retained for older clients during the sequence-only transition. */
     acknowledge_tier_a_manual: z.boolean().optional(),
   })
-  .strict()
-  .superRefine((value, ctx) => {
-    if (
-      (value.tier_effort_config?.A ?? 'human_written') === 'human_written' &&
-      value.acknowledge_tier_a_manual !== true
-    ) {
-      ctx.addIssue({
-        code: z.ZodIssueCode.custom,
-        path: ['acknowledge_tier_a_manual'],
-        message: 'Acknowledge that Tier A uses the manual composer',
-      });
-    }
-  });
+  .strict();
 export type CreateCampaignBody = z.infer<typeof createCampaignBodySchema>;
 
 export const patchCampaignBodySchema = z
   .object({
     name: z.string().min(1).optional(),
     status: z.enum(['active', 'paused', 'archived']).optional(),
-    tier_effort_config: tierEffortConfigSchema.optional(),
     ramp_stages: rampStagesSchema.optional(),
     variable_overrides: sequenceVariablesSchema.optional(),
     auto_observation: autoObservationConfigSchema.optional(),
@@ -309,6 +316,8 @@ export const recycleBreakdownSchema = z
     duplicates: z.number().int().min(0),
     rest_period_failures: z.number().int().min(0),
     nurture_exclusions: z.number().int().min(0),
+    untiered_exclusions: z.number().int().min(0),
+    personalized_copy_blocks: z.number().int().min(0),
     suppression_recontact_blocks: z.number().int().min(0),
     existing_target_enrollments: z.number().int().min(0),
     prior_content_conflicts: z.number().int().min(0),

@@ -2,14 +2,14 @@
 // filter — "select all N matching" without shipping N ids. Tier edits never
 // touch enrolled_tier (snapshotted at enrollment); they affect only future
 // enrollments.
-import type { LeadTier } from '@coldemail/shared';
+import type { CurrentLeadTier } from '@coldemail/shared';
 import type { DbLike } from '../db/client';
 import { updateTierByFilter, updateTierByIds, type LeadFilter } from '../db/repos/leadsRepo';
 
 export interface BulkTierInput {
   leadIds?: number[];
   filter?: LeadFilter;
-  tier: LeadTier | null; // null clears back to untiered
+  tier: CurrentLeadTier | null; // null clears back to untiered
 }
 
 export async function bulkTier(

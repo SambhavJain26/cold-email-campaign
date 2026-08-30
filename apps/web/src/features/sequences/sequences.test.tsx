@@ -26,6 +26,7 @@ const sequence: SequenceDto = {
       step_no: 2,
       wait_days: 3,
       in_thread: true,
+      content_source: 'template',
       variants: [
         { id: 31, label: 'A', subject_template: '(re)', body_template: 'bump', active: true },
       ],
@@ -35,6 +36,7 @@ const sequence: SequenceDto = {
       step_no: 1,
       wait_days: 0,
       in_thread: false,
+      content_source: 'template',
       variants: [
         {
           id: 11,
