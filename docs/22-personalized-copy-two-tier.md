@@ -1,8 +1,8 @@
 # Personalized Copy, Two Tiers, and Campaign Lead Filtering
 
-**Status:** implemented and verified locally on `canary` on 2026-08-30. This release is **not
-deployed**. Spaceship production remains on the previously deployed `6ca1183` application code.
-Deployment, activation, enrollment, and sending still require separate operator authorization.
+**Status:** implemented, verified, pushed, and deployed on Spaceship from `canary` commit `eb2ec7d`
+on 2026-08-30. Deployment is complete; campaign activation, enrollment, and sending still require
+separate operator authorization.
 
 This document is the authoritative specification for migration `0019` and supersedes older
 current-behavior descriptions of Manual Compose, human-written delivery mode, Tier C as a current
@@ -123,7 +123,7 @@ prefill, draft, and send endpoints return `410 Gone`.
 
 Migration `0019_personalized_copy_two_tiers` preserves IDs, provenance, readiness, sent linkage,
 timestamps, historical enrollment snapshots, and a reversible backup of previous current tiers.
-Before any authorized production deployment, verify production has zero legacy human-written
-campaigns/enrollments, take and validate a backup, run the migration drill, and repeat health,
-zero-drift, self-check, and dormant-send-state checks. Do not infer deploy or send permission from
-this local verification.
+The 2026-08-30 deployment verified zero legacy human-written campaigns/enrollments, validated
+pre/post backups, applied migration 0019, and repeated health, zero-drift, self-check, route, and
+dormant-send-state checks. Future deployments must repeat the same gates. Deployment never implies
+activation, enrollment, or send permission.

@@ -2,8 +2,7 @@
 
 This document answers the questions raised after reading [the main user manual](19-user-manual.md).
 It is a companion to that manual, not a replacement for it. The answers are reconciled through the
-locally verified 30 August 2026 migration `0019` candidate on `canary`. That candidate is not yet
-deployed; Spaceship remains on application code `6ca1183`.
+verified and deployed 30 August 2026 migration `0019` release on `canary` at `eb2ec7d`.
 
 > **Current correction:** Personalized copy is no longer a human-written tier or direct-send mode.
 > Sequence steps choose Template or Personalized Copy. Current tiers are only A/B/Untiered;

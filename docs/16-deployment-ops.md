@@ -3,19 +3,13 @@
 Single always-on VPS (finalized decision). Docker Compose primary; systemd alternative. Implemented
 in B7 and cut over to Spaceship production on 2026-08-22.
 
-**Production status (2026-08-30):** the ten-workstream implementation, pagination/settings UX
-hotfix, and campaign-pool/auto-enrollment/permanent-cap release are deployed on the one-word
-`canary` branch; application code remains commit `6ca1183`. The complete local gate, scratch restore, pre-deploy backup,
-migration 0018, container health, public routes, served feature markers, self-check, zero-drift
-dry-run, dormant send state, and post-deploy backup all pass. Oracle remains paused and unchanged.
-Deployment did not authorize campaign activation, enrollment, or sending.
-
-**Next candidate (local only):** migration `0019` and the Personalized Copy/two-tier/campaign-lead
-filter release are fully verified locally; see [docs/22](22-personalized-copy-two-tier.md). This is
-not a production status change. Before a separately authorized deploy, verify production has zero
-legacy `human_written` campaigns/enrollments, take and validate a fresh backup, confirm a clean
-fast-forward candidate, and repeat migration, health, route, zero-drift, self-check, dormant-state,
-and post-deploy backup gates. Do not activate, enroll, or send as part of that deployment.
+**Production status (2026-08-30):** migration `0019` and the Personalized Copy/two-tier/campaign-
+lead-filter release are deployed on the one-word `canary` branch at `eb2ec7d`. Zero-legacy
+preflight, reviewed bundle fast-forward, pre/post backup catalogs, migration, container/internal/
+public health, route matrix, served feature markers, self-check, zero-drift dry-run, failed-job
+check, and dormant send state all pass. Production has one unassigned global lead and no campaign
+or enrollment. Oracle remains paused and unchanged. Deployment did not authorize campaign
+activation, enrollment, or sending.
 
 ---
 
@@ -162,7 +156,7 @@ Remaining for a full **M3** close: the real-backend walkthrough replay (§5, `e2
 ## 8. Spaceship shared-VPS production — deployed 2026-08-22, latest rollout 2026-08-30
 
 Production is live at `https://sambhavpmtech.com/email-campaign/` on the existing Spaceship VM.
-The portfolio at `sambhavbuilds.com` remained online throughout. Code is pinned to `6ca1183` on
+The portfolio at `sambhavbuilds.com` remained online throughout. Code is pinned to `eb2ec7d` on
 `canary`; `main` was not merged. Oracle remains paused and unchanged as the temporary
 rollback environment.
 
@@ -218,6 +212,17 @@ self-check, zero projection drift, four healthy mailboxes, zero sendable state, 
 and zero failed jobs passed. Pre/post dumps `coldemail-20260830-090245.dump` (903,838 bytes) and
 `coldemail-20260830-090758.dump` (904,427 bytes) passed `pg_restore --list`. No campaign, lead,
 enrollment, send, DNS/Caddy, Oracle, or `main` change occurred.
+
+The later operator-approved Personalized Copy rollout pushed `canary` and fast-forwarded Spaceship
+by a reviewed, SHA-256-matched bundle to `eb2ec7d`. The zero-legacy preflight passed, images rebuilt,
+and migration `0019_personalized_copy_two_tiers` applied. Containers, internal/public health, route
+matrix, served Personalized Copy/Campaign scope/Nurture markers, self-check, zero drift, zero failed
+jobs/open alerts, and dormant send state pass. Production preserves one unassigned global lead,
+four healthy OAuth mailboxes, and has zero campaigns/enrollments/active or sendable work/pool
+availability/auto-enrollment/legacy rows. Pre/post dumps `coldemail-20260830-181912.dump` (935,334
+bytes) and `coldemail-20260830-182500.dump` (948,884 bytes) passed `pg_restore --list`. No campaign
+was activated, no lead was enrolled, and no email was sent; Oracle, `main`, DNS, Caddy, and mailbox
+configuration were unchanged.
 
 ### Unsubscribe URL and Gmail one-click — deployed, commissioning pending
 

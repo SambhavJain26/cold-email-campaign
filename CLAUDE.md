@@ -24,13 +24,13 @@ commissioning**:
   post-ramp campaign caps are implemented, fully verified, and deployed on Spaceship at `6ca1183`.
   Production still has no campaigns or leads; deployment does not authorize activation,
   enrollment, or sending.
-- **2026-08-30 local candidate:** the operator-approved Personalized Copy/two-tier/campaign-lead
-  filter release is implemented and fully verified through migration `0019`. Personalized copy is
-  now sequence content only; current tiers are A/B with separate Nurture status; imported global
-  sources bind to independent campaign-step snapshots; missing copy fails closed with durable
-  blockers; and Campaign Pool/Enrolled/Both filters drive exact bulk tiering. It is not deployed.
-  Spaceship remains on application code `6ca1183`; deploy, activation, enrollment, and sends remain
-  separately gated.
+- **2026-08-30 Personalized Copy production release:** the operator-approved Personalized
+  Copy/two-tier/campaign-lead filter release is implemented, fully verified, and deployed at
+  `eb2ec7d` through migration `0019`. Personalized copy is now sequence content only; current tiers
+  are A/B with separate Nurture status; imported global sources bind to independent campaign-step
+  snapshots; missing copy fails closed with durable blockers; and Campaign Pool/Enrolled/Both
+  filters drive exact bulk tiering. Production has one unassigned global lead and zero campaigns/
+  enrollments/sendable work. Activation, enrollment, and sends remain separately gated.
 - The operator-approved Spaceship deployment, subpath support, sender-domain unsubscribe routing,
   and individual Google Workspace OAuth implementation are complete. Do not extend production
   scope or change DNS/Caddy/mailboxes outside the approved commissioning steps without fresh
@@ -82,8 +82,8 @@ Treat the runbook as the **durable status record** — task chips and chat summa
 - The 2026-08-30 Personalized Copy/two-tier/campaign-filter gate passed type/lint/format; unit 345;
   web 58; integration 168; API 138; GreenMail 29; golden exactly 47; mock E2E 61;
   real-backend E2E 1; migration 0019 apply/down/apply; populated five-enrollment zero drift; clean
-  self-check; production build; and a validated custom-format dump/scratch restore. Production was
-  not changed.
+  self-check; production build; and a validated custom-format dump/scratch restore. The verified
+  candidate was subsequently deployed under separate operator approval.
 
 ## Production deployments
 
@@ -97,7 +97,7 @@ rollback/canary environment.
 - Stack: `docker-compose.spaceship.yml` with `.env.prod`
 - UI: `https://sambhavpmtech.com/email-campaign/`
 - Internal gateway: `127.0.0.1:18080`; host Caddy alone owns public 80/443
-- Deployed branch: `canary`; application code remains `6ca1183` with later documentation commits
+- Deployed branch/commit: `canary` at `eb2ec7d`
 
 The private repository currently has no GitHub deploy credential on the VPS. Until a read-only
 deploy key is deliberately installed, transfer a reviewed `git bundle`, fetch the pinned branch
@@ -151,19 +151,20 @@ After an authorized deploy, verify container health, `https://localhost/health`,
 - **Final canary wrap completed 2026-08-21:** the bounded owner-address catch-up scenario accepted four sends in two paced waves (two per mailbox, 925-second same-mailbox gap) after 10,833 seconds of app downtime and emitted `catchup_backlog`. The campaign was paused at the bound. Accelerated settings were restored, both mailboxes are healthy at cap 5 with no resume cap, and both Gmail test campaigns are paused.
 - **Oracle rollback canary:** `4e9e125` plus its documentation-only wrap; both campaigns remain
   paused. Health, self-check, backup, and `checked 24 enrollments — 0 diff(s)` are clean.
-- **Spaceship production:** deployed 2026-08-22 and advanced through the verified
-  campaign-pool/auto-enrollment/permanent-cap release `6ca1183` on 2026-08-30. It has four
-  `google_oauth` mailboxes in `ok` state and zero campaigns/leads/enrollments, available pooled
-  leads, auto-enrollment-enabled campaigns, active campaigns, or sendable enrollments. DNS, TLS,
+- **Spaceship production:** deployed 2026-08-22 and advanced through the verified Personalized
+  Copy/two-tier/campaign-filter release `eb2ec7d` on 2026-08-30. It has four
+  `google_oauth` mailboxes in `ok` state, one unassigned global lead, and zero campaigns/enrollments,
+  available pooled leads, auto-enrollment-enabled campaigns, active campaigns, or sendable
+  enrollments. DNS, TLS,
   the `/email-campaign/` SPA/API subpath, outreach
   redirects, and the two isolated unsubscribe hosts are live. Containers and health are green;
-  migration 0018, self-check, and zero drift pass; both deployment dumps passed catalog validation
+  migration 0019, self-check, and zero drift pass; both deployment dumps passed catalog validation
   and the local scratch restore drill passed; Spaceship AutoBackup has a five-backup limit. The
   portfolio remained online.
 - **2026-08-30 branch transition:** after explicit operator approval, local/GitHub and Spaceship
   moved to the one-word `canary` branch. Spaceship was rebuilt from documentation wrap `0299e42`;
   migrations, routes, self-check, zero drift, dormant state, and fresh backups all passed. The
-  application code remained `6ca1183`; Oracle and `main` were unchanged.
+  application code remained `6ca1183` at that checkpoint; Oracle and `main` were unchanged.
 - **Still open, deliberately:** obtain separate authorization for the one-message owner-address
   send/reply/unsubscribe canary. The business address, sender-domain unsubscribe template,
   production Internal Google OAuth credentials, and four account-matched OAuth mailboxes are

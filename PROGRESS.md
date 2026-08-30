@@ -5,11 +5,12 @@
 **Legend:** `[ ]` not started · `[~]` in progress · `[x]` done · `[!]` blocked (note why in the log)
 
 **Current focus:** → **Personalized Copy, current A/B tiers, separate Nurture status, and exact
-Campaign Pool/Enrolled/Both lead filtering are implemented and verified locally on `canary`.** The
-candidate is not deployed. Spaceship remains on application code `6ca1183` with no campaigns,
-leads, enrollments, available pooled leads, or auto-enrollment-enabled campaigns. No campaign
-activation, enrollment, outbound send, production/Oracle/DNS change, or `main` merge was performed.
-Every deploy, activation, enrollment, or owner/prospect send remains separately approval-gated.
+Campaign Pool/Enrolled/Both lead filtering are implemented, verified, pushed, and deployed on
+Spaceship at `eb2ec7d`.** Production has four healthy OAuth mailboxes, one unassigned global lead,
+and zero campaigns, enrollments, available pooled leads, active/sendable work, or auto-enrollment-
+enabled campaigns. No campaign activation, enrollment, outbound send, Oracle/DNS/Caddy change, or
+`main` merge was performed. Every activation, enrollment, or owner/prospect send remains separately
+approval-gated.
 
 **2026-08-30 Personalized Copy/two-tier implementation:** migration `0019` replaces direct Manual
 Compose sending with source and campaign-step Personalized Copy records used only by sequence
@@ -22,8 +23,21 @@ bulk tiering. The complete local gate passed: type/lint/format; unit 345; web 58
 API 138; GreenMail 29; golden exactly 47; mock E2E 61; real-backend E2E 1; production build;
 migration 0019 apply/down/apply; populated `checked 5 enrollments — 0 diff(s)`; clean self-check;
 and a 110,760-byte custom-format dump catalog/restore/rebuild/zero-drift/self-check drill. The
-scratch database and dump were removed. Production was not inspected or changed for deployment,
-and its required zero-legacy pre-deploy check remains a future deploy gate.
+scratch database and dump were removed.
+
+**2026-08-30 Personalized Copy production rollout:** after explicit operator approval, `canary`
+was pushed and Spaceship passed the zero-legacy preflight, then fast-forwarded by a reviewed,
+SHA-256-matched Git bundle from `f89274f` to `eb2ec7d`. Migration `0019` is applied. The app/db are
+healthy, all four containers run, public SPA/direct routes and health are 200, canonical/outreach
+redirects are 308, unsubscribe roots are 404, and the portfolio remains 200. The served asset
+contains Personalized Copy, Campaign membership scope, and Nurture controls. Production reports
+`checked 0 enrollments — 0 diff(s)`, clean self-check, zero failed jobs/open alerts/events/sent
+messages, four healthy OAuth mailboxes, one preserved unassigned global lead, and zero campaigns,
+enrollments, active/sendable work, pool availability, auto-enrollment, personalized-copy blockers,
+or legacy human-written rows. Pre-deploy dump `coldemail-20260830-181912.dump` (935,334 bytes) and
+post-deploy dump `coldemail-20260830-182500.dump` (948,884 bytes) passed `pg_restore --list`. No
+campaign was activated, no lead was enrolled, and no email was sent; Oracle, `main`, DNS, Caddy,
+and mailbox configuration were unchanged.
 
 > **⚠️ Superseded framing (corrected 2026-08-09).** This line previously read "No code work is outstanding" and "everything left in B8 … is *operations*, not code." **That was wrong.** Operating the canary against a real provider exposed genuine **code** defects — the reply/send race (finding 15), whole-mailbox history ingestion (16), plain-text-only mail (19), and a class of backend-implemented/UI-invisible gaps (3–9). All were fixed on `b8.3-local-canary`. Treat [docs/17](docs/17-local-canary-runbook.md) as the authoritative status record, not this header.
 

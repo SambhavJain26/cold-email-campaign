@@ -1,6 +1,6 @@
 # Local canary runbook (B8.3-local) — two-week validation on throwaway Gmail
 
-## 2026-08-30 Personalized Copy/two-tier candidate — locally verified, not deployed
+## 2026-08-30 Personalized Copy/two-tier release — verified and deployed
 
 The operator-approved migration `0019` release is complete on local branch `canary`: Manual
 Compose direct sending is retired in favor of sequence-only Personalized Copy steps; current lead
@@ -17,9 +17,25 @@ restored into the explicitly named `coldemail_0019_restore_drill` database, and 
 rebuild, five-enrollment zero-drift dry-run, and self-check. The scratch database and temporary dump
 were removed.
 
-No production/Oracle state, DNS, Caddy, mailbox configuration, campaign, enrollment, or message was
-changed. Spaceship remains deployed at application code `6ca1183`. Production zero-legacy checking,
-backup, migration, and deployment remain future gates requiring explicit deploy authorization.
+After separate operator approval, local `canary` was pushed and Spaceship passed a pre-deploy
+zero-legacy/dormant-state check. A reviewed Git bundle with matching local/remote SHA-256
+fast-forwarded the clean checkout from `f89274f` to `eb2ec7d`. Pre-deploy dump
+`coldemail-20260830-181912.dump` (935,334 bytes) passed `pg_restore --list`; the app, gateway, and
+backup images rebuilt successfully; and migration `0019_personalized_copy_two_tiers` applied before
+the app became healthy.
+
+Post-deploy evidence: app/database health and all four containers pass; internal and public health,
+SPA/login/direct Leads routes, canonical/outreach redirects, unsubscribe-host isolation, and the
+portfolio route pass; the served asset contains Personalized Copy, Campaign membership scope, and
+Nurture actions. Production reports `checked 0 enrollments — 0 diff(s)`, clean self-check, zero
+failed jobs/open alerts/events/sent messages, zero personalized blockers, zero legacy human-written
+campaigns/enrollments, four healthy OAuth mailboxes, one preserved unassigned global lead, and zero
+campaigns/enrollments/active or sendable work/pool availability/auto-enrollment. Post-deploy dump
+`coldemail-20260830-182500.dump` (948,884 bytes) passed `pg_restore --list`.
+
+No campaign was activated, no lead was enrolled, and no email was sent. Oracle, `main`, DNS, Caddy,
+and mailbox configuration were unchanged. The bounded owner-address canary remains separately
+operator-gated.
 
 ## 2026-08-30 branch transition — verified and deployed
 

@@ -6,8 +6,8 @@
 
 **Manual version:** 2026-08-30, for branch `canary`
 
-**Reconciled through:** the locally verified Personalized Copy/two-tier/campaign-filter candidate.
-Spaceship production remains pinned to application code `6ca1183`; this candidate is not deployed.
+**Reconciled through:** the deployed Personalized Copy/two-tier/campaign-filter release at
+Spaceship commit `eb2ec7d`.
 
 This manual explains the complete operator-facing application: what every screen does, how to use
 each action, what the system does automatically, and which safeguards or edge cases matter. It is a
@@ -28,13 +28,12 @@ the values displayed in your live session.
 > lawful, or a campaign is safe to launch. Complete the pre-launch checklist in this manual before
 > sending to prospects.
 
-> **Candidate-versus-production warning:** the current `canary` code replaces Manual Compose
-> sending with sequence-only **Personalized Copy**, offers only current Tier A/Tier B/Untiered,
-> separates Nurture into an outreach hold, and adds Campaign Pool/Enrolled/Both lead filtering.
-> Older screenshots and historical passages that show Tier C, Nurture as a tier, Mode 1, or a
-> Manual Compose Send button describe the still-deployed predecessor. See
-> [the migration 0019 guide](22-personalized-copy-two-tier.md). Do not expect these candidate
-> controls in production until a separately authorized deployment is completed.
+> **Current release note:** production replaces Manual Compose sending with sequence-only
+> **Personalized Copy**, offers only current Tier A/Tier B/Untiered, separates Nurture into an
+> outreach hold, and adds Campaign Pool/Enrolled/Both lead filtering. Older screenshots and
+> historical passages that show Tier C, Nurture as a tier, Mode 1, or a Manual Compose Send button
+> describe the predecessor and are retained only for audit. See
+> [the migration 0019 guide](22-personalized-copy-two-tier.md).
 
 ## Contents
 
@@ -604,7 +603,7 @@ template or Auto Observation fallback for a personalized step. Copy becomes read
 All delivery happens through the scheduler, which appends the compliance footer and enforces copy
 checks, suppression, reply stopping, recontact rules, pacing, caps, send windows, mailbox pinning,
 threading, transport confirmation, and event logging. The old Manual Compose screenshot below is a
-legacy production reference and does not represent the migration 0019 candidate.
+legacy predecessor reference and does not represent the current migration 0019 release.
 
 ![Legacy Manual Compose screen retained for predecessor reference](images/user-manual/18-manual-composer.png)
 
