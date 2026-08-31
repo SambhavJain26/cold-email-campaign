@@ -4,16 +4,18 @@
 
 **Legend:** `[ ]` not started · `[~]` in progress · `[x]` done · `[!]` blocked (note why in the log)
 
-**Current focus:** → **Personalized Copy, current A/B tiers, separate Nurture status, and exact
-Campaign Pool/Enrolled/Both lead filtering are implemented, verified, pushed, and deployed on
-Spaceship at `eb2ec7d`.** Production has four healthy OAuth mailboxes, one unassigned global lead,
-and zero campaigns, enrollments, available pooled leads, active/sendable work, or auto-enrollment-
+**Current focus:** → **Personalized Copy, current A/B tiers, separate Nurture status, exact
+Campaign Pool/Enrolled/Both filtering, and the clearer import wizard are implemented, verified,
+pushed, and deployed on Spaceship; application code is at `a15f70d`.** Production has four healthy
+OAuth mailboxes, one unassigned global lead, two draft campaigns, and zero enrollments, available
+pooled leads, active/sendable work, or auto-enrollment-
 enabled campaigns. No campaign activation, enrollment, outbound send, Oracle/DNS/Caddy change, or
 `main` merge was performed. Every activation, enrollment, or owner/prospect send remains separately
 approval-gated.
 
-**2026-08-31 import-wizard clarity follow-up:** implemented and locally verified on `canary`, not
-yet pushed or deployed. The misleading single Draft target campaign selector is removed. Address
+**2026-08-31 import-wizard clarity follow-up:** implemented, verified, pushed, and deployed on
+Spaceship at application commit `a15f70d`. The misleading single Draft target campaign selector is
+removed. Address
 admission and copy readiness/replacement use explained choices; each campaign allocation shows its
 generic Personalized Copy destination; one-step campaigns resolve automatically; multi-step
 campaigns require an explicit step; exact `step_N_*` columns map directly; and a named pre-commit
@@ -22,6 +24,16 @@ adds optional allocation `generic_copy_step_no` plus preview binding outcomes. N
 scheduler, transport, or live state changed. Verified: type/lint/format; unit 345; web 58;
 integration 168; API 140; GreenMail 29; golden exactly 47; mock E2E 62; real-backend E2E 1;
 production build; `checked 0 enrollments — 0 diff(s)`; clean self-check.
+
+Production rollout evidence: the preflight found two draft campaigns, one global lead, four
+healthy OAuth mailboxes, and no pool rows, enrollments, active campaigns, auto-enrollment, legacy
+human-written campaigns, or due work. A SHA-256-matched Git bundle fast-forwarded the clean VPS
+checkout from `eb2ec7d` to `a15f70d`; all four containers, internal/public health, route isolation,
+and served feature markers pass. Migration count remains 20 through `0019`; self-check is clean,
+projection dry-run is `checked 0 enrollments — 0 diff(s)`, and failed jobs are zero. Pre/post dumps
+`coldemail-20260831-133754.dump` (1,042,810 bytes) and `coldemail-20260831-134549.dump`
+(1,043,586 bytes) passed `pg_restore --list`. No campaign was activated, no lead was enrolled, and
+no email was sent; Oracle, `main`, DNS, Caddy, settings, and mailbox configuration were unchanged.
 
 **2026-08-30 Personalized Copy/two-tier implementation:** migration `0019` replaces direct Manual
 Compose sending with source and campaign-step Personalized Copy records used only by sequence

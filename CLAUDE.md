@@ -24,18 +24,19 @@ commissioning**:
   post-ramp campaign caps are implemented, fully verified, and deployed on Spaceship at `6ca1183`.
   Production still has no campaigns or leads; deployment does not authorize activation,
   enrollment, or sending.
-- **2026-08-30 Personalized Copy production release:** the operator-approved Personalized
-  Copy/two-tier/campaign-lead filter release is implemented, fully verified, and deployed at
-  `eb2ec7d` through migration `0019`. Personalized copy is now sequence content only; current tiers
+- **Personalized Copy production release:** the operator-approved Personalized Copy/two-tier/
+  campaign-lead filter release and 2026-08-31 import-wizard clarity follow-up are implemented,
+  fully verified, pushed, and deployed; application code is at `a15f70d` through migration `0019`.
+  Personalized copy is now sequence content only; current tiers
   are A/B with separate Nurture status; imported global sources bind to independent campaign-step
   snapshots; missing copy fails closed with durable blockers; and Campaign Pool/Enrolled/Both
-  filters drive exact bulk tiering. Production has one unassigned global lead and zero campaigns/
-  enrollments/sendable work. Activation, enrollment, and sends remain separately gated.
-- **2026-08-31 import-wizard clarity follow-up:** locally implemented and verified on `canary`,
-  not pushed or deployed. The wizard replaces its misleading single Draft target campaign with
+  filters drive exact bulk tiering. The follow-up replaces its misleading single Draft target
+  campaign with
   per-allocation generic-copy step selection, requires an explicit destination when a campaign has
   multiple Personalized Copy steps, preserves direct `step_N_*` mappings, and previews the exact
-  no-activation/no-enrollment/no-send outcome. No migration or live state changed.
+  no-activation/no-enrollment/no-send outcome. Production has one unassigned global lead, two draft
+  campaigns, and zero pool rows/enrollments/active or sendable work. Activation, enrollment, and
+  sends remain separately gated.
 - The operator-approved Spaceship deployment, subpath support, sender-domain unsubscribe routing,
   and individual Google Workspace OAuth implementation are complete. Do not extend production
   scope or change DNS/Caddy/mailboxes outside the approved commissioning steps without fresh
@@ -106,7 +107,7 @@ rollback/canary environment.
 - Stack: `docker-compose.spaceship.yml` with `.env.prod`
 - UI: `https://sambhavpmtech.com/email-campaign/`
 - Internal gateway: `127.0.0.1:18080`; host Caddy alone owns public 80/443
-- Deployed branch/commit: `canary` at `eb2ec7d`
+- Deployed application release: `canary` at `a15f70d`
 
 The private repository currently has no GitHub deploy credential on the VPS. Until a read-only
 deploy key is deliberately installed, transfer a reviewed `git bundle`, fetch the pinned branch
@@ -161,8 +162,9 @@ After an authorized deploy, verify container health, `https://localhost/health`,
 - **Oracle rollback canary:** `4e9e125` plus its documentation-only wrap; both campaigns remain
   paused. Health, self-check, backup, and `checked 24 enrollments — 0 diff(s)` are clean.
 - **Spaceship production:** deployed 2026-08-22 and advanced through the verified Personalized
-  Copy/two-tier/campaign-filter release `eb2ec7d` on 2026-08-30. It has four
-  `google_oauth` mailboxes in `ok` state, one unassigned global lead, and zero campaigns/enrollments,
+  Copy/two-tier/campaign-filter and import-wizard clarity release `a15f70d` on 2026-08-31. It has
+  four `google_oauth` mailboxes in `ok` state, one unassigned global lead, two draft campaigns, and
+  zero enrollments,
   available pooled leads, auto-enrollment-enabled campaigns, active campaigns, or sendable
   enrollments. DNS, TLS,
   the `/email-campaign/` SPA/API subpath, outreach

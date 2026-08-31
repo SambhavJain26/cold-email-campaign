@@ -3,12 +3,14 @@
 Single always-on VPS (finalized decision). Docker Compose primary; systemd alternative. Implemented
 in B7 and cut over to Spaceship production on 2026-08-22.
 
-**Production status (2026-08-30):** migration `0019` and the Personalized Copy/two-tier/campaign-
-lead-filter release are deployed on the one-word `canary` branch at `eb2ec7d`. Zero-legacy
+**Production status (2026-08-31):** migration `0019`, the Personalized Copy/two-tier/campaign-
+lead-filter release, and the clearer import wizard are deployed on the one-word `canary` branch;
+application code is at `a15f70d`. Zero-legacy
 preflight, reviewed bundle fast-forward, pre/post backup catalogs, migration, container/internal/
 public health, route matrix, served feature markers, self-check, zero-drift dry-run, failed-job
-check, and dormant send state all pass. Production has one unassigned global lead and no campaign
-or enrollment. Oracle remains paused and unchanged. Deployment did not authorize campaign
+check, and dormant send state all pass. Production has one unassigned global lead, two draft
+campaigns, and no enrollment, pool row, active campaign, or sendable work. Oracle remains paused
+and unchanged. Deployment did not authorize campaign
 activation, enrollment, or sending.
 
 ---
@@ -153,11 +155,11 @@ Full stack built and brought up from a clean state (`docker compose -f docker-co
 
 Remaining for a full **M3** close: the real-backend walkthrough replay (§5, `e2e/walkthrough.spec.ts` — Playwright web ⇄ real server + MockTransport + `advance-clock`), which the frontend track deferred here from F8.
 
-## 8. Spaceship shared-VPS production — deployed 2026-08-22, latest rollout 2026-08-30
+## 8. Spaceship shared-VPS production — deployed 2026-08-22, latest rollout 2026-08-31
 
 Production is live at `https://sambhavpmtech.com/email-campaign/` on the existing Spaceship VM.
-The portfolio at `sambhavbuilds.com` remained online throughout. Code is pinned to `eb2ec7d` on
-`canary`; `main` was not merged. Oracle remains paused and unchanged as the temporary
+The portfolio at `sambhavbuilds.com` remained online throughout. Application code is pinned to
+`a15f70d` on `canary`; `main` was not merged. Oracle remains paused and unchanged as the temporary
 rollback environment.
 
 - **Reverse proxy:** host Caddy is the only public 80/443 listener. The container gateway binds
@@ -223,6 +225,19 @@ availability/auto-enrollment/legacy rows. Pre/post dumps `coldemail-20260830-181
 bytes) and `coldemail-20260830-182500.dump` (948,884 bytes) passed `pg_restore --list`. No campaign
 was activated, no lead was enrolled, and no email was sent; Oracle, `main`, DNS, Caddy, and mailbox
 configuration were unchanged.
+
+The 2026-08-31 operator-approved import-wizard rollout pushed `canary` and fast-forwarded the clean
+VPS checkout by a reviewed, SHA-256-matched Git bundle from `eb2ec7d` to `a15f70d`. The app,
+gateway, and backup images rebuilt; no migration was added, so production remains at 20 migrations
+through `0019_personalized_copy_two_tiers`. All four containers, internal/public health, SPA/direct
+routes, canonical/outreach redirects, unsubscribe-host isolation, portfolio, and served import-
+wizard markers pass. Self-check is clean, the production projection dry-run is `checked 0
+enrollments — 0 diff(s)`, and failed jobs are zero. Production preserves four healthy OAuth
+mailboxes, one global lead, and two draft campaigns, with zero pool rows, enrollments, active
+campaigns, auto-enrollment, legacy human-written campaigns, or due work. Pre/post dumps
+`coldemail-20260831-133754.dump` (1,042,810 bytes) and `coldemail-20260831-134549.dump`
+(1,043,586 bytes) passed `pg_restore --list`. No campaign was activated, no lead was enrolled, and
+no email was sent; Oracle, `main`, DNS, Caddy, settings, and mailbox configuration were unchanged.
 
 ### Unsubscribe URL and Gmail one-click — deployed, commissioning pending
 

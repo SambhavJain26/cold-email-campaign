@@ -4,10 +4,10 @@
 
 **Application model:** single-operator, self-hosted cold-email campaign console
 
-**Manual version:** 2026-08-30, for branch `canary`
+**Manual version:** 2026-08-31, for branch `canary`
 
-**Reconciled through:** the deployed Personalized Copy/two-tier/campaign-filter release at
-Spaceship commit `eb2ec7d`.
+**Reconciled through:** the deployed Personalized Copy/two-tier/campaign-filter and import-wizard
+clarity application release at Spaceship commit `a15f70d`.
 
 This manual explains the complete operator-facing application: what every screen does, how to use
 each action, what the system does automatically, and which safeguards or edge cases matter. It is a
@@ -249,11 +249,11 @@ Recommended order:
 
 ### 5.1 Current Spaceship commissioning snapshot
 
-As of 2026-08-25, the production application, DNS/TLS routes, isolated unsubscribe hosts, logical
+As of 2026-08-31, the production application, DNS/TLS routes, isolated unsubscribe hosts, logical
 backups, restore drill, Spaceship AutoBackup, Internal Google OAuth client credentials, business
-postal address, and `https://unsubscribe.{sender_domain}` template are configured. One Workspace
-mailbox is connected through Google OAuth and is healthy, but production still has no campaigns,
-leads, or enrollments, so it has no work to send.
+postal address, and `https://unsubscribe.{sender_domain}` template are configured. Four Workspace
+mailboxes are connected through Google OAuth and healthy. Production currently has one global lead
+and two draft campaigns but no pool rows or enrollments, so it has no work to send.
 
 Before prospect outreach, the remaining application commissioning sequence is:
 

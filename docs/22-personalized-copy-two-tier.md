@@ -1,11 +1,9 @@
 # Personalized Copy, Two Tiers, and Campaign Lead Filtering
 
-**Status:** implemented, verified, pushed, and deployed on Spaceship from `canary` commit `eb2ec7d`
-on 2026-08-30. Deployment is complete; campaign activation, enrollment, and sending still require
-separate operator authorization.
-
-The 2026-08-31 import-wizard clarity follow-up is implemented and locally verified on `canary` but
-is not yet pushed or deployed. It changes no schema, campaign state, enrollment, or sending logic.
+**Status:** implemented, verified, pushed, and deployed on Spaceship. The migration `0019` release
+landed on 2026-08-30 and the import-wizard clarity application release `a15f70d` followed on
+2026-08-31. Campaign activation, enrollment, and sending still require separate operator
+authorization. The follow-up changed no schema, campaign state, enrollment, or sending logic.
 
 This document is the authoritative specification for migration `0019` and supersedes older
 current-behavior descriptions of Manual Compose, human-written delivery mode, Tier C as a current

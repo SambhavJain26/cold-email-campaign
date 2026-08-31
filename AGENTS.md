@@ -28,18 +28,18 @@ commissioning** until the operator completes the handoffs below:
   20–25; alert history and mailbox filters; arbitrary custom-field editing; copy-risk rubric
   improvements; local verification; and runbook/documentation reconciliation. Outside that list,
   work is limited to testing, verification, diagnosis, and documentation.
-- The operator-approved 2026-08-30 Personalized Copy/two-tier/campaign-lead-filter release is
-  implemented, fully verified, and deployed on Spaceship at `eb2ec7d` through migration `0019`.
+- The operator-approved Personalized Copy/two-tier/campaign-lead-filter release and its 2026-08-31
+  import-wizard clarity follow-up are implemented, fully verified, pushed, and deployed on
+  Spaceship; application code is at `a15f70d` through migration `0019`.
   It replaces direct Manual Compose sending with sequence-only personalized steps, fixes current
   tiers at A/B, separates Nurture status, adds global-source/campaign-step copy snapshots and
-  blockers, and adds exact Pool/Enrolled/Both filtering and bulk tiering. Production has one
-  unassigned global lead, zero campaigns/enrollments/sendable work, and four healthy OAuth
-  mailboxes. Activation, enrollment, and sending remain separately unauthorized.
-- The 2026-08-31 import-wizard clarity follow-up is locally implemented and verified on `canary`
-  but is not pushed or deployed. It replaces the misleading single Draft target campaign with
+  blockers, and adds exact Pool/Enrolled/Both filtering and bulk tiering. The follow-up replaces
+  the misleading single Draft target campaign with
   per-allocation generic-copy step selection, requires an explicit destination for campaigns with
   multiple Personalized Copy steps, preserves direct `step_N_*` mapping, and adds a named
-  no-activation/no-enrollment/no-send summary. It has no migration or live-state change.
+  no-activation/no-enrollment/no-send summary. Production has one unassigned global lead, two
+  draft campaigns, zero pool rows/enrollments/active or sendable work, and four healthy OAuth
+  mailboxes. Activation, enrollment, and sending remain separately unauthorized.
 - The operator-approved 2026-08-25 ten-workstream implementation is complete and deployed through
   Stages 1–4: operational pagination; due-step Manual Compose; in-app reminders; verified
   timezone/folder controls; imported manual drafts; Auto Observation/sequence variables; staged
@@ -135,7 +135,7 @@ temporary rollback/canary environment.
 - App: `/opt/email-campaign`; stack: `docker-compose.spaceship.yml` with `.env.prod`
 - Public UI: `https://sambhavpmtech.com/email-campaign/`
 - Internal gateway: `127.0.0.1:18080`; host Caddy is the only public 80/443 listener
-- Deployed branch/commit: `canary` at `eb2ec7d`
+- Deployed application release: `canary` at `a15f70d`
 
 The repository is private and the VPS currently has no GitHub deploy credential. Until a read-only
 deploy key is deliberately installed, transfer a reviewed `git bundle`, fetch the pinned branch
@@ -177,8 +177,9 @@ and password rotation.
 
 ## Live deployment state
 
-Spaceship production was deployed on 2026-08-22, advanced through Stage 4, campaign pools, and the
-Personalized Copy/two-tier/campaign-filter release `eb2ec7d` on 2026-08-30. The clean checkout is on
+Spaceship production was deployed on 2026-08-22 and advanced through Stage 4, campaign pools, the
+Personalized Copy/two-tier/campaign-filter release, and import-wizard clarity application release
+`a15f70d` on 2026-08-31. The clean checkout is on
 the one-word `canary` branch. DNS and TLS are live for the two outreach domains and their
 unsubscribe subdomains. The route matrix is
 verified: `/email-campaign/` and direct SPA routes return 200; the bare app path canonicalizes;
@@ -186,11 +187,14 @@ normal outreach-domain traffic redirects 308 to `https://sambhavbuilds.com/`; un
 serve only `/u/*` and return 404 elsewhere. The portfolio remains HTTP 200.
 
 - db/app/gateway/backup containers are healthy; only `127.0.0.1:18080` is published
-- production has four `google_oauth` mailboxes in `ok` state, one unassigned global lead, and zero
-  campaigns, enrollments, available pooled leads, auto-enrollment-enabled campaigns, active
-  campaigns, or sendable enrollments, so no message can be scheduled
+- production has four `google_oauth` mailboxes in `ok` state, one unassigned global lead, two
+  draft campaigns, and zero enrollments, available pooled leads, auto-enrollment-enabled
+  campaigns, active campaigns, or sendable enrollments, so no message can be scheduled
 - health and database checks pass; self-check is clean; projection dry-run is `0 diff(s)`
-- migrations through `0019_personalized_copy_two_tiers` are applied; the 0019 pre-deploy dump
+- migrations through `0019_personalized_copy_two_tiers` are applied; the 2026-08-31 pre/post dumps
+  `coldemail-20260831-133754.dump` (1,042,810 bytes) and
+  `coldemail-20260831-134549.dump` (1,043,586 bytes) passed `pg_restore --list`; the 0019
+  pre-deploy dump
   `coldemail-20260830-181912.dump` (935,334 bytes) and post-deploy dump
   `coldemail-20260830-182500.dump` (948,884 bytes) passed `pg_restore --list`; the earlier 0018
   pre-deploy dump

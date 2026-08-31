@@ -1,6 +1,6 @@
 # Local canary runbook (B8.3-local) — two-week validation on throwaway Gmail
 
-## 2026-08-31 import-wizard clarity follow-up — locally verified, not deployed
+## 2026-08-31 import-wizard clarity follow-up — verified and deployed
 
 The import preview no longer mixes a single Draft target campaign with multi-campaign allocation.
 It now separates address admission, personalized-email readiness/replacement, and campaign pool
@@ -19,7 +19,23 @@ Verified locally: typecheck/lint/format; unit 345/345; web 58/58; integration 16
 GreenMail 29/29; locked golden 47/47; mock browser 62/62; real-backend browser 1/1; production Vite
 build; `checked 0 enrollments — 0 diff(s)`; clean self-check. The initial real-browser run stopped
 only on the deliberately renamed import button; after updating that stale selector, the complete
-walkthrough passed. Push and Spaceship deployment remain separately operator-gated.
+walkthrough passed.
+
+After separate operator approval, `canary` was pushed and the production safety preflight found
+two draft campaigns, one global lead, four healthy OAuth mailboxes, and no pool rows, enrollments,
+active campaigns, auto-enrollment, legacy human-written campaigns, or due work. Pre-deploy dump
+`coldemail-20260831-133754.dump` (1,042,810 bytes) passed `pg_restore --list`. A reviewed Git bundle
+whose SHA-256 matched locally and remotely fast-forwarded the clean checkout from `eb2ec7d` to
+`a15f70d`; the app, gateway, and backup images rebuilt successfully.
+
+Post-deploy evidence: all four containers and internal/public health pass; SPA/login/direct Leads
+routes, canonical/outreach redirects, unsubscribe-host isolation, and the portfolio route pass; the
+served asset contains the new address-admission, personalized-email, and exact-summary markers.
+Production remains at 20 migrations through `0019_personalized_copy_two_tiers`; self-check is clean,
+the projection dry-run is `checked 0 enrollments — 0 diff(s)`, failed jobs are zero, and the dormant
+state is unchanged. Post-deploy dump `coldemail-20260831-134549.dump` (1,043,586 bytes) passed
+`pg_restore --list`. No campaign was activated, no lead was enrolled, and no email was sent;
+Oracle, `main`, DNS, Caddy, settings, and mailbox configuration were unchanged.
 
 ## 2026-08-30 Personalized Copy/two-tier release — verified and deployed
 
