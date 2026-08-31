@@ -67,6 +67,11 @@ export interface IngestDeps {
 
 export type CommitMode = 'drop_flagged' | 'import_all';
 
+export interface ImportAllocationRequest extends PoolAllocationRequest {
+  /** Destination for generic manual_subject/manual_body copy in this campaign. */
+  genericCopyStepNo?: number;
+}
+
 const SAMPLE_LIMIT = 20;
 
 export interface ImportPreview {
@@ -192,7 +197,7 @@ export async function commitImport(
     draftCampaignId?: number;
     replaceExistingDrafts?: boolean;
     markValidCopyReady?: boolean;
-    allocations?: readonly PoolAllocationRequest[];
+    allocations?: readonly ImportAllocationRequest[];
   },
 ): Promise<CommitResult> {
   const { db } = deps;
@@ -377,12 +382,35 @@ export async function commitImport(
           (step) => step.contentSource === 'personalized' && step.id !== undefined,
         );
         const assigned = new Set(assignedLeadIds);
-        for (const saved of savedSources.filter((source) => assigned.has(source.leadId))) {
+        const assignedSources = savedSources.filter((source) => assigned.has(source.leadId));
+        const requestedGenericStepNo = allocationRequests.find(
+          (request) => request.campaignId === campaignId,
+        )?.genericCopyStepNo;
+        if (
+          requestedGenericStepNo !== undefined &&
+          !personalizedSteps.some((step) => step.stepNo === requestedGenericStepNo)
+        ) {
+          throw new PoolAllocationError(
+            `campaign ${campaignId} step ${requestedGenericStepNo} must be a Personalized Copy step`,
+          );
+        }
+        if (
+          assignedSources.some((source) => source.targetStepNo === null) &&
+          personalizedSteps.length > 1 &&
+          requestedGenericStepNo === undefined
+        ) {
+          throw new PoolAllocationError(
+            `choose a Personalized Copy step for generic imported copy in campaign ${campaignId}`,
+          );
+        }
+        for (const saved of assignedSources) {
           const target =
             saved.targetStepNo === null
-              ? personalizedSteps.length === 1
-                ? personalizedSteps[0]
-                : undefined
+              ? requestedGenericStepNo !== undefined
+                ? personalizedSteps.find((step) => step.stepNo === requestedGenericStepNo)
+                : personalizedSteps.length === 1
+                  ? personalizedSteps[0]
+                  : undefined
               : personalizedSteps.find((step) => step.stepNo === saved.targetStepNo);
           if (!target?.id) continue;
           const result = await createOrReplaceCampaignPersonalizedCopy(tx, {
@@ -442,6 +470,12 @@ export interface AllocationPreviewResult {
     requested: number;
     allocatable: number;
     draftReserved: number;
+    personalizedSteps: number[];
+    genericCopies: number;
+    resolvedGenericCopyStepNo: number | null;
+    genericCopyStepRequired: boolean;
+    copiesBound: number;
+    copiesUnassigned: number;
   }>;
 }
 
@@ -450,7 +484,7 @@ export async function previewImportAllocations(
   input: {
     importId: number;
     mode: CommitMode;
-    requests: readonly PoolAllocationRequest[];
+    requests: readonly ImportAllocationRequest[];
     draftCampaignId?: number;
   },
 ): Promise<AllocationPreviewResult> {
@@ -487,7 +521,12 @@ export async function previewImportAllocations(
       return {
         key: row.emailNormalized!,
         leadId: row.emailNormalized ? leadMap.get(row.emailNormalized)?.id : undefined,
-        isDraft: Object.values(copySlotsOf(raw)).some((copy) => copy.subject && copy.body),
+        copyTargets:
+          (raw.copy_conflicts?.length ?? 0) > 0
+            ? []
+            : Object.values(copySlotsOf(raw)).flatMap((copy) =>
+                copy.subject && copy.body ? [copy.targetStepNo] : [],
+              ),
       };
     })
     .filter((row, index, all) => all.findIndex((other) => other.key === row.key) === index);
@@ -515,16 +554,43 @@ export async function previewImportAllocations(
     );
     const pinned =
       request.campaignId === input.draftCampaignId
-        ? eligible.filter((candidate) => candidate.isDraft)
+        ? eligible.filter((candidate) => candidate.copyTargets.length > 0)
         : [];
     const ordered = [...pinned, ...eligible.filter((candidate) => !pinned.includes(candidate))];
     const selected = ordered.slice(0, request.count);
     selected.forEach((candidate) => used.add(candidate.key));
+    const sequence = await deps.sequences.sequenceFor(request.campaignId);
+    const personalizedSteps = sequence.steps
+      .filter((step) => step.contentSource === 'personalized' && step.id !== undefined)
+      .map((step) => step.stepNo);
+    if (
+      request.genericCopyStepNo !== undefined &&
+      !personalizedSteps.includes(request.genericCopyStepNo)
+    ) {
+      throw new PoolAllocationError(
+        `campaign ${request.campaignId} step ${request.genericCopyStepNo} must be a Personalized Copy step`,
+      );
+    }
+    const selectedCopyTargets = selected.flatMap((candidate) => candidate.copyTargets);
+    const genericCopies = selectedCopyTargets.filter((stepNo) => stepNo === null).length;
+    const resolvedGenericCopyStepNo =
+      request.genericCopyStepNo ?? (personalizedSteps.length === 1 ? personalizedSteps[0]! : null);
+    const genericCopyStepRequired =
+      genericCopies > 0 && personalizedSteps.length > 1 && resolvedGenericCopyStepNo === null;
+    const copiesBound =
+      selectedCopyTargets.filter((stepNo) => stepNo !== null && personalizedSteps.includes(stepNo))
+        .length + (resolvedGenericCopyStepNo === null ? 0 : genericCopies);
     campaignResults.push({
       campaignId: request.campaignId,
       requested: request.count,
       allocatable: selected.length,
-      draftReserved: selected.filter((candidate) => candidate.isDraft).length,
+      draftReserved: selected.filter((candidate) => candidate.copyTargets.length > 0).length,
+      personalizedSteps,
+      genericCopies,
+      resolvedGenericCopyStepNo,
+      genericCopyStepRequired,
+      copiesBound,
+      copiesUnassigned: Math.max(0, selectedCopyTargets.length - copiesBound),
     });
   }
   return {

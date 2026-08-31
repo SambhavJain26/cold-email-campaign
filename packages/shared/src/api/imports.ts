@@ -68,7 +68,11 @@ export const commitImportBodySchema = z
     allocations: z
       .array(
         z
-          .object({ campaign_id: z.number().int().positive(), count: z.number().int().positive() })
+          .object({
+            campaign_id: z.number().int().positive(),
+            count: z.number().int().positive(),
+            generic_copy_step_no: z.number().int().positive().optional(),
+          })
           .strict(),
       )
       .default([]),
@@ -103,7 +107,11 @@ export const importAllocationPreviewBodySchema = z
     allocations: z
       .array(
         z
-          .object({ campaign_id: z.number().int().positive(), count: z.number().int().positive() })
+          .object({
+            campaign_id: z.number().int().positive(),
+            count: z.number().int().positive(),
+            generic_copy_step_no: z.number().int().positive().optional(),
+          })
           .strict(),
       )
       .min(1),
@@ -123,6 +131,12 @@ export const importAllocationPreviewResponseSchema = z
           requested: z.number().int().positive(),
           allocatable: z.number().int().min(0),
           draft_reserved: z.number().int().min(0),
+          personalized_steps: z.array(z.number().int().positive()),
+          generic_copies: z.number().int().min(0),
+          resolved_generic_copy_step_no: z.number().int().positive().nullable(),
+          generic_copy_step_required: z.boolean(),
+          copies_bound: z.number().int().min(0),
+          copies_unassigned: z.number().int().min(0),
         })
         .strict(),
     ),

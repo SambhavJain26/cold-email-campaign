@@ -12,6 +12,17 @@ enabled campaigns. No campaign activation, enrollment, outbound send, Oracle/DNS
 `main` merge was performed. Every activation, enrollment, or owner/prospect send remains separately
 approval-gated.
 
+**2026-08-31 import-wizard clarity follow-up:** implemented and locally verified on `canary`, not
+yet pushed or deployed. The misleading single Draft target campaign selector is removed. Address
+admission and copy readiness/replacement use explained choices; each campaign allocation shows its
+generic Personalized Copy destination; one-step campaigns resolve automatically; multi-step
+campaigns require an explicit step; exact `step_N_*` columns map directly; and a named pre-commit
+summary states the ordered allocations and that no activation, enrollment, or send occurs. The API
+adds optional allocation `generic_copy_step_no` plus preview binding outcomes. No migration, event,
+scheduler, transport, or live state changed. Verified: type/lint/format; unit 345; web 58;
+integration 168; API 140; GreenMail 29; golden exactly 47; mock E2E 62; real-backend E2E 1;
+production build; `checked 0 enrollments — 0 diff(s)`; clean self-check.
+
 **2026-08-30 Personalized Copy/two-tier implementation:** migration `0019` replaces direct Manual
 Compose sending with source and campaign-step Personalized Copy records used only by sequence
 steps. Template steps retain variants and fixed Tier A researched/Tier B Auto behavior;

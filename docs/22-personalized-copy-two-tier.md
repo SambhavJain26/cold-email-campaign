@@ -4,6 +4,9 @@
 on 2026-08-30. Deployment is complete; campaign activation, enrollment, and sending still require
 separate operator authorization.
 
+The 2026-08-31 import-wizard clarity follow-up is implemented and locally verified on `canary` but
+is not yet pushed or deployed. It changes no schema, campaign state, enrollment, or sending logic.
+
 This document is the authoritative specification for migration `0019` and supersedes older
 current-behavior descriptions of Manual Compose, human-written delivery mode, Tier C as a current
 lead choice, and Nurture as a tier. Historical records and legacy labels remain readable.
@@ -66,10 +69,13 @@ email,step_1_subject,step_1_body,step_3_subject,step_3_body
 alex@example.com,First subject,"First body",A later angle,"Later body"
 ```
 
-`manual_subject`/`manual_body` form the default source slot. They auto-bind when the selected
-campaign has exactly one personalized step; multiple personalized steps require an explicit target
-step. Incompatible mappings remain unassigned and are reported. Conflicting generic and Step 1
-values are reported rather than silently prioritized.
+`manual_subject`/`manual_body` form the default source slot. For every campaign allocation, the
+wizard shows where that generic pair will go. A campaign with exactly one personalized step binds
+it automatically. A campaign with multiple personalized steps requires an explicit target step
+before commit; the UI and API never guess. A campaign with no personalized step keeps the pair as
+reusable lead copy only. `step_N_*` pairs map directly to compatible Personalized Copy steps and do
+not need the generic destination selector. Incompatible mappings remain unassigned and are
+reported. Conflicting generic and Step 1 values are reported rather than silently prioritized.
 
 Within personalized-copy cells, an unescaped `\n` becomes a real line break and `\\n` remains the
 literal characters `\n`. This decoding does not affect normal lead/custom fields. RFC-compliant
@@ -79,6 +85,11 @@ Imports report created, replaced, skipped, invalid, assigned, conflicting, and u
 Existing source and bound copy wins unless replacement is explicitly requested. The representative
 1,000-row flow is atomic: all 1,000 global leads and sources can be created, 100 allocated/bound to
 Campaign 1, 100 allocated/bound to Campaign 2, and 800 left globally unassigned.
+
+The preview presents three decisions in order: safe-address admission, imported-copy review and
+replacement status, then campaign/count/copy destination per allocation. Its final summary uses
+campaign names and states exact row order, copy readiness, step bindings, global remainder, and
+that import does not activate, enroll, or send.
 
 ## 4. Leads page and exact bulk actions
 
@@ -120,6 +131,11 @@ The API accepts `campaign_id` plus `campaign_scope=pool|enrolled|both`; omitted 
 legacy enrolled-only meaning. `pool_campaign_id` remains temporarily supported. Personalized-copy
 APIs cover source and campaign-step create/edit/ready/copy/list/preview operations. Old manual
 prefill, draft, and send endpoints return `410 Gone`.
+
+Import allocation bodies accept optional `generic_copy_step_no`. Preview responses expose each
+campaign's personalized step numbers, resolved/required generic destination, and bound/unassigned
+copy totals. `draft_campaign_id` remains accepted for older clients but is absent from the current
+allocation UI.
 
 Migration `0019_personalized_copy_two_tiers` preserves IDs, provenance, readiness, sent linkage,
 timestamps, historical enrollment snapshots, and a reversible backup of previous current tiers.

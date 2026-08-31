@@ -83,7 +83,7 @@ test('real backend: import → enroll → advance → reply/STOP → tag → met
   });
 
   // 3 — Import the small CSV through the wizard (real ingest). 5 clean + 1
-  //     role-based → "Drop flagged & import 5".
+  //     role-based → "Import 5 leads" with the safe-address option selected.
   await page.getByRole('link', { name: 'Leads' }).click();
   await page.getByRole('button', { name: 'Import CSV' }).click();
   await page.getByTestId('upload-input').setInputFiles({
@@ -92,7 +92,7 @@ test('real backend: import → enroll → advance → reply/STOP → tag → met
     buffer: CSV,
   });
   await expect(page.getByTestId('count-ok')).toHaveText('5');
-  await page.getByRole('button', { name: /Drop flagged & import 5/ }).click();
+  await page.getByRole('button', { name: 'Import 5 leads' }).click();
   await expect(page.getByTestId('import-result')).toHaveText('5');
   await page.getByRole('button', { name: 'Go tier them' }).click(); // closes the wizard dialog
 

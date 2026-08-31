@@ -133,6 +133,7 @@ export async function importsRoutes(app: FastifyInstance, services: AppServices)
             allocations: req.body.allocations.map((allocation) => ({
               campaignId: allocation.campaign_id,
               count: allocation.count,
+              genericCopyStepNo: allocation.generic_copy_step_no,
             })),
           },
         );
@@ -182,6 +183,7 @@ export async function importsRoutes(app: FastifyInstance, services: AppServices)
             requests: req.body.allocations.map((allocation) => ({
               campaignId: allocation.campaign_id,
               count: allocation.count,
+              genericCopyStepNo: allocation.generic_copy_step_no,
             })),
           },
         );
@@ -195,6 +197,12 @@ export async function importsRoutes(app: FastifyInstance, services: AppServices)
             requested: campaign.requested,
             allocatable: campaign.allocatable,
             draft_reserved: campaign.draftReserved,
+            personalized_steps: campaign.personalizedSteps,
+            generic_copies: campaign.genericCopies,
+            resolved_generic_copy_step_no: campaign.resolvedGenericCopyStepNo,
+            generic_copy_step_required: campaign.genericCopyStepRequired,
+            copies_bound: campaign.copiesBound,
+            copies_unassigned: campaign.copiesUnassigned,
           })),
         };
       } catch (error) {

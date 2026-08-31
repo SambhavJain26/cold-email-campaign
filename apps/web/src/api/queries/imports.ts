@@ -18,8 +18,11 @@ export function useImportAllocationPreview(
   body:
     | {
         mode: 'drop_flagged' | 'import_all';
-        draft_campaign_id?: number;
-        allocations: Array<{ campaign_id: number; count: number }>;
+        allocations: Array<{
+          campaign_id: number;
+          count: number;
+          generic_copy_step_no?: number;
+        }>;
       }
     | undefined,
 ) {

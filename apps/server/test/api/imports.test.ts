@@ -228,6 +228,298 @@ describe('B6.4 imports', () => {
     ]);
   });
 
+  it('requires and applies a per-campaign destination for generic copy in multi-personalized-step sequences', async () => {
+    const oneStepSequence = (
+      await h.inject({
+        method: 'POST',
+        url: '/api/v1/sequences',
+        payload: {
+          name: 'Import one personalized step',
+          stop_on_reply: true,
+          steps: [
+            {
+              step_no: 1,
+              wait_days: 0,
+              in_thread: false,
+              content_source: 'personalized',
+              variants: [],
+            },
+          ],
+        },
+      })
+    ).json();
+    const multiStepSequence = (
+      await h.inject({
+        method: 'POST',
+        url: '/api/v1/sequences',
+        payload: {
+          name: 'Import two personalized steps',
+          stop_on_reply: true,
+          steps: [
+            {
+              step_no: 1,
+              wait_days: 0,
+              in_thread: false,
+              content_source: 'personalized',
+              variants: [],
+            },
+            {
+              step_no: 2,
+              wait_days: 1,
+              in_thread: true,
+              content_source: 'template',
+              variants: [
+                {
+                  label: 'A',
+                  subject_template: 'Template follow-up',
+                  body_template: 'Following up',
+                  active: true,
+                },
+              ],
+            },
+            {
+              step_no: 3,
+              wait_days: 1,
+              in_thread: true,
+              content_source: 'personalized',
+              variants: [],
+            },
+          ],
+        },
+      })
+    ).json();
+    const oneStepCampaign = (
+      await h.inject({
+        method: 'POST',
+        url: '/api/v1/campaigns',
+        payload: { name: 'Import Atlas', sequence_id: oneStepSequence.id },
+      })
+    ).json();
+    const multiStepCampaign = (
+      await h.inject({
+        method: 'POST',
+        url: '/api/v1/campaigns',
+        payload: { name: 'Import Beacon', sequence_id: multiStepSequence.id },
+      })
+    ).json();
+    const csv = Buffer.from(
+      [
+        'email,first_name,manual_subject,manual_body',
+        ...Array.from(
+          { length: 5 },
+          (_, index) =>
+            `import-binding-${index + 1}@example.dev,Lead ${index + 1},Subject ${index + 1},Body ${index + 1}`,
+        ),
+      ].join('\n'),
+    );
+    const multipart = multipartOf('generic-copy-binding.csv', csv);
+    const preview = await h.inject({
+      method: 'POST',
+      url: '/api/v1/imports',
+      headers: { 'content-type': multipart.contentType },
+      payload: multipart.payload,
+    });
+    expect(preview.statusCode, preview.body).toBe(200);
+    expect(preview.json().draft_counts).toMatchObject({
+      valid_drafts: 5,
+    });
+
+    const incompleteMapping = {
+      mode: 'drop_flagged' as const,
+      allocations: [
+        { campaign_id: oneStepCampaign.id, count: 2 },
+        { campaign_id: multiStepCampaign.id, count: 3 },
+      ],
+    };
+    const mappingPreview = await h.inject({
+      method: 'POST',
+      url: `/api/v1/imports/${preview.json().import_id}/allocation-preview`,
+      payload: incompleteMapping,
+    });
+    expect(mappingPreview.statusCode, mappingPreview.body).toBe(200);
+    expect(mappingPreview.json().campaigns).toEqual([
+      expect.objectContaining({
+        campaign_id: oneStepCampaign.id,
+        personalized_steps: [1],
+        generic_copies: 2,
+        resolved_generic_copy_step_no: 1,
+        generic_copy_step_required: false,
+        copies_bound: 2,
+      }),
+      expect.objectContaining({
+        campaign_id: multiStepCampaign.id,
+        personalized_steps: [1, 3],
+        generic_copies: 3,
+        resolved_generic_copy_step_no: null,
+        generic_copy_step_required: true,
+        copies_bound: 0,
+        copies_unassigned: 3,
+      }),
+    ]);
+
+    const refused = await h.inject({
+      method: 'POST',
+      url: `/api/v1/imports/${preview.json().import_id}/commit`,
+      payload: incompleteMapping,
+    });
+    expect(refused.statusCode, refused.body).toBe(409);
+    expect(
+      (
+        await h.pool.query(
+          `SELECT count(*)::int AS n FROM leads WHERE email LIKE 'import-binding-%'`,
+        )
+      ).rows[0].n,
+    ).toBe(0);
+
+    const invalidStep = await h.inject({
+      method: 'POST',
+      url: `/api/v1/imports/${preview.json().import_id}/allocation-preview`,
+      payload: {
+        ...incompleteMapping,
+        allocations: [
+          incompleteMapping.allocations[0],
+          { campaign_id: multiStepCampaign.id, count: 3, generic_copy_step_no: 2 },
+        ],
+      },
+    });
+    expect(invalidStep.statusCode, invalidStep.body).toBe(409);
+
+    const completeMapping = {
+      ...incompleteMapping,
+      allocations: [
+        incompleteMapping.allocations[0],
+        { campaign_id: multiStepCampaign.id, count: 3, generic_copy_step_no: 1 },
+      ],
+    };
+    const completePreview = await h.inject({
+      method: 'POST',
+      url: `/api/v1/imports/${preview.json().import_id}/allocation-preview`,
+      payload: completeMapping,
+    });
+    expect(completePreview.statusCode, completePreview.body).toBe(200);
+    expect(completePreview.json().campaigns[1]).toMatchObject({
+      resolved_generic_copy_step_no: 1,
+      generic_copy_step_required: false,
+      copies_bound: 3,
+      copies_unassigned: 0,
+    });
+
+    const commit = await h.inject({
+      method: 'POST',
+      url: `/api/v1/imports/${preview.json().import_id}/commit`,
+      payload: completeMapping,
+    });
+    expect(commit.statusCode, commit.body).toBe(200);
+    expect(commit.json()).toMatchObject({
+      leads_created: 5,
+      allocations_created: 5,
+      sources_created: 5,
+      copies_bound: 5,
+      copies_unassigned: 0,
+    });
+    expect(
+      (
+        await h.pool.query(
+          `SELECT campaign_id, step_no, count(*)::int AS n
+             FROM campaign_personalized_copies
+            WHERE campaign_id IN ($1, $2)
+            GROUP BY campaign_id, step_no
+            ORDER BY campaign_id`,
+          [oneStepCampaign.id, multiStepCampaign.id],
+        )
+      ).rows,
+    ).toEqual([
+      { campaign_id: oneStepCampaign.id, step_no: 1, n: 2 },
+      { campaign_id: multiStepCampaign.id, step_no: 1, n: 3 },
+    ]);
+  });
+
+  it('binds multiple step-specific subject/body pairs without a generic step choice', async () => {
+    const sequence = (
+      await h.inject({
+        method: 'POST',
+        url: '/api/v1/sequences',
+        payload: {
+          name: 'Import exact personalized steps',
+          stop_on_reply: true,
+          steps: [
+            {
+              step_no: 1,
+              wait_days: 0,
+              in_thread: false,
+              content_source: 'personalized',
+              variants: [],
+            },
+            {
+              step_no: 3,
+              wait_days: 1,
+              in_thread: true,
+              content_source: 'personalized',
+              variants: [],
+            },
+          ],
+        },
+      })
+    ).json();
+    const campaign = (
+      await h.inject({
+        method: 'POST',
+        url: '/api/v1/campaigns',
+        payload: { name: 'Import exact target', sequence_id: sequence.id },
+      })
+    ).json();
+    const csv = Buffer.from(
+      'email,step_1_subject,step_1_body,step_3_subject,step_3_body\n' +
+        'exact-copy@example.dev,First subject,First body,Third subject,Third body\n',
+    );
+    const multipart = multipartOf('exact-copy.csv', csv);
+    const preview = await h.inject({
+      method: 'POST',
+      url: '/api/v1/imports',
+      headers: { 'content-type': multipart.contentType },
+      payload: multipart.payload,
+    });
+    expect(preview.statusCode, preview.body).toBe(200);
+    expect(preview.json().draft_counts).toMatchObject({
+      valid_drafts: 2,
+    });
+    const body = {
+      mode: 'drop_flagged' as const,
+      allocations: [{ campaign_id: campaign.id, count: 1 }],
+    };
+    const allocationPreview = await h.inject({
+      method: 'POST',
+      url: `/api/v1/imports/${preview.json().import_id}/allocation-preview`,
+      payload: body,
+    });
+    expect(allocationPreview.statusCode, allocationPreview.body).toBe(200);
+    expect(allocationPreview.json().campaigns[0]).toMatchObject({
+      generic_copies: 0,
+      generic_copy_step_required: false,
+      copies_bound: 2,
+      copies_unassigned: 0,
+    });
+    const commit = await h.inject({
+      method: 'POST',
+      url: `/api/v1/imports/${preview.json().import_id}/commit`,
+      payload: body,
+    });
+    expect(commit.statusCode, commit.body).toBe(200);
+    expect(commit.json()).toMatchObject({ sources_created: 2, copies_bound: 2 });
+    expect(
+      (
+        await h.pool.query(
+          `SELECT step_no, subject, body FROM campaign_personalized_copies
+            WHERE campaign_id = $1 ORDER BY step_no`,
+          [campaign.id],
+        )
+      ).rows,
+    ).toEqual([
+      { step_no: 1, subject: 'First subject', body: 'First body' },
+      { step_no: 3, subject: 'Third subject', body: 'Third body' },
+    ]);
+  });
+
   it('aborts the entire import when exact allocation eligibility changes after preview', async () => {
     const sequence = (
       await h.inject({

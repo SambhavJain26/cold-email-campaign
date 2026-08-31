@@ -49,6 +49,8 @@ import {
 } from '@coldemail/shared';
 import { buildTimeline, db, persistSession, NOW } from './db';
 
+const importCopySummaries = new Map<number, { genericValid: number; stepSpecificValid: number }>();
+
 const BASE = '/api/v1';
 const mockPersonalizedSources = new Map<
   string,
@@ -648,6 +650,18 @@ export const handlers: RequestHandler[] = [
       const form = await request.formData().catch(() => null);
       const file = form?.get('file');
       if (!(file instanceof File)) return err('validation', 'file field required', 400);
+      const csvText = await file.text();
+      const [header = '', ...csvRows] = csvText.split(/\r?\n/).filter((line) => line.trim() !== '');
+      const headers = header.split(',').map((value) => value.trim().toLowerCase());
+      const csvLeadCount = csvRows.length;
+      const hasGeneric = headers.includes('manual_subject') && headers.includes('manual_body');
+      const stepSubjects = headers.flatMap((value) => {
+        const match = /^step_(\d+)_subject$/.exec(value);
+        return match ? [Number(match[1])] : [];
+      });
+      const stepPairCount = stepSubjects.filter((stepNo) =>
+        headers.includes(`step_${stepNo}_body`),
+      ).length;
       const importRow = {
         id: db.nextId++,
         filename: file.name,
@@ -665,6 +679,10 @@ export const handlers: RequestHandler[] = [
         pool_allocations: [],
         created_at: NOW,
       };
+      importCopySummaries.set(importRow.id, {
+        genericValid: hasGeneric ? csvLeadCount : 0,
+        stepSpecificValid: stepPairCount * csvLeadCount,
+      });
       db.imports.unshift(importRow);
       return HttpResponse.json({
         import_id: importRow.id,
@@ -675,7 +693,12 @@ export const handlers: RequestHandler[] = [
           duplicate: [{ row_no: 81, email: 'mike.kim7@example.com' }],
           missing_first_name: [{ row_no: 102, email: 'jbrooks@dwell.com' }],
         },
-        draft_counts: { new_leads: 885, existing_leads: 15, valid_drafts: 0, invalid_drafts: 0 },
+        draft_counts: {
+          new_leads: 885,
+          existing_leads: 15,
+          valid_drafts: (hasGeneric ? csvLeadCount : 0) + stepPairCount * csvLeadCount,
+          invalid_drafts: 0,
+        },
       });
     }),
   ),
@@ -772,18 +795,51 @@ export const handlers: RequestHandler[] = [
       if (body instanceof Response) return body;
       const total = body.mode === 'drop_flagged' ? 885 : 945;
       const requested = body.allocations.reduce((sum, allocation) => sum + allocation.count, 0);
+      const copySummary = importCopySummaries.get(Number(params.id)) ?? {
+        genericValid: 0,
+        stepSpecificValid: 0,
+      };
+      let genericRemaining = copySummary.genericValid;
+      let stepSpecificRemaining = copySummary.stepSpecificValid;
       return HttpResponse.json({
         available: total,
         existing_leads: 15,
         remaining_global: Math.max(0, total - requested),
         exclusions: {},
-        campaigns: body.allocations.map((allocation) => ({
-          campaign_id: allocation.campaign_id,
-          requested: allocation.count,
-          allocatable: requested <= total ? allocation.count : 0,
-          draft_reserved:
-            body.draft_campaign_id === allocation.campaign_id ? Math.min(3, allocation.count) : 0,
-        })),
+        campaigns: body.allocations.map((allocation) => {
+          const campaign = db.campaigns.find((item) => item.id === allocation.campaign_id);
+          const sequence = db.sequences.find((item) => item.id === campaign?.sequence_id);
+          const personalizedSteps =
+            sequence?.steps
+              .filter((step) => step.content_source === 'personalized')
+              .map((step) => step.step_no) ?? [];
+          const genericCopies = Math.min(genericRemaining, allocation.count);
+          genericRemaining -= genericCopies;
+          const stepSpecificCopies = Math.min(
+            stepSpecificRemaining,
+            allocation.count * Math.max(1, personalizedSteps.length),
+          );
+          stepSpecificRemaining -= stepSpecificCopies;
+          const resolvedGenericCopyStepNo =
+            allocation.generic_copy_step_no ??
+            (personalizedSteps.length === 1 ? personalizedSteps[0]! : null);
+          const genericCopyStepRequired =
+            genericCopies > 0 && personalizedSteps.length > 1 && resolvedGenericCopyStepNo === null;
+          const copiesBound =
+            stepSpecificCopies + (resolvedGenericCopyStepNo === null ? 0 : genericCopies);
+          return {
+            campaign_id: allocation.campaign_id,
+            requested: allocation.count,
+            allocatable: requested <= total ? allocation.count : 0,
+            draft_reserved: 0,
+            personalized_steps: personalizedSteps,
+            generic_copies: genericCopies,
+            resolved_generic_copy_step_no: resolvedGenericCopyStepNo,
+            generic_copy_step_required: genericCopyStepRequired,
+            copies_bound: copiesBound,
+            copies_unassigned: genericCopies + stepSpecificCopies - copiesBound,
+          };
+        }),
       });
     }),
   ),

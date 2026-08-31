@@ -506,11 +506,17 @@ erased, nurture, currently reserved, actively enrolled, recontact-blocked, and d
 conflicting leads are excluded. The preview shows the available/excluded totals and whether every
 exact request can be satisfied.
 
-When personalized-copy columns are present, all accepted leads retain global source copy. Copies
-for allocated leads bind to the compatible personalized campaign steps without changing the
-global source. Generic copy auto-binds only when the campaign has one personalized step; multiple
-personalized steps require a selected step. Incompatible or conflicting mappings remain
-unassigned and are reported.
+When personalized-copy columns are present, all accepted leads retain reusable source copy. Each
+campaign-allocation row also shows **Imported copy destination**:
+
+- one Personalized Copy step is selected automatically;
+- multiple Personalized Copy steps require you to choose the intended step before import;
+- no Personalized Copy step means the email remains reusable lead copy only; and
+- `step_N_subject`/`step_N_body` columns map directly to compatible Step N without that generic
+  choice.
+
+The wizard will not enable import while generic copy for a multi-step campaign lacks a destination.
+Incompatible or conflicting mappings remain unassigned and are reported.
 
 Commit is all-or-nothing. The server rechecks every condition in one transaction. If another
 operation makes an exact count impossible after preview, no leads, drafts, or pool reservations
@@ -520,9 +526,15 @@ campaign's total, available, enrolled, and released allocation counts.
 #### Imported Personalized Copy workflow
 
 The preview separates new/existing leads, complete/incomplete sources, campaign-step bindings, and
-content conflicts. Complete copy starts as **needs review**; use **Mark all valid imported copy
-ready** only after reviewing the batch. Existing lead profile fields are preserved, and existing
-source or campaign copy remains unchanged unless replacement is explicitly selected.
+content conflicts. It asks three plain-language questions: which addresses to import, whether copy
+needs review or is ready, and which campaign/step receives each allocation. Complete copy defaults
+to **Needs review — Recommended**; select **Ready for sequence use** only after reviewing the
+batch. Existing lead profile fields are preserved, and **Keep existing copy — Recommended** avoids
+replacement unless the operator deliberately selects **Replace existing unsent copy**.
+
+Before commit, **What will happen** names every campaign and shows its ordered lead count, resolved
+Personalized Copy step, copy readiness, remaining global leads, and an explicit reminder that the
+operation does not activate, enroll, or send.
 
 The default conflict action is **keep existing**. Select replacement only when the new CSV should
 overwrite unsent source/campaign copy. Suppressed or erased leads never receive copy. The result

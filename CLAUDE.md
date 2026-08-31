@@ -31,6 +31,11 @@ commissioning**:
   snapshots; missing copy fails closed with durable blockers; and Campaign Pool/Enrolled/Both
   filters drive exact bulk tiering. Production has one unassigned global lead and zero campaigns/
   enrollments/sendable work. Activation, enrollment, and sends remain separately gated.
+- **2026-08-31 import-wizard clarity follow-up:** locally implemented and verified on `canary`,
+  not pushed or deployed. The wizard replaces its misleading single Draft target campaign with
+  per-allocation generic-copy step selection, requires an explicit destination when a campaign has
+  multiple Personalized Copy steps, preserves direct `step_N_*` mappings, and previews the exact
+  no-activation/no-enrollment/no-send outcome. No migration or live state changed.
 - The operator-approved Spaceship deployment, subpath support, sender-domain unsubscribe routing,
   and individual Google Workspace OAuth implementation are complete. Do not extend production
   scope or change DNS/Caddy/mailboxes outside the approved commissioning steps without fresh
@@ -84,6 +89,10 @@ Treat the runbook as the **durable status record** — task chips and chat summa
   real-backend E2E 1; migration 0019 apply/down/apply; populated five-enrollment zero drift; clean
   self-check; production build; and a validated custom-format dump/scratch restore. The verified
   candidate was subsequently deployed under separate operator approval.
+- The 2026-08-31 import-wizard clarity gate passed type/lint/format; unit 345; web 58;
+  integration 168; API 140; GreenMail 29; golden exactly 47; mock E2E 62; real-backend E2E 1;
+  production build; `checked 0 enrollments — 0 diff(s)`; and clean self-check. No migration or
+  production mutation occurred.
 
 ## Production deployments
 

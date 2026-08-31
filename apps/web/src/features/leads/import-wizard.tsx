@@ -9,14 +9,25 @@ import {
 } from '@coldemail/shared';
 import { AppApiError } from '@/api/client';
 import { Button } from '@/components/ui/button';
-import { Checkbox } from '@/components/ui/checkbox';
-import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
 import {
+  Field,
+  FieldContent,
+  FieldDescription,
+  FieldError,
+  FieldGroup,
+  FieldLabel,
+  FieldLegend,
+  FieldSet,
+  FieldTitle,
+} from '@/components/ui/field';
+import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
+import {
   Select,
   SelectContent,
+  SelectGroup,
   SelectItem,
   SelectTrigger,
   SelectValue,
@@ -30,16 +41,14 @@ import {
 } from '@/components/ui/dialog';
 import { useCommitImport, useUploadImport } from '@/api/mutations/imports';
 import { useCampaigns } from '@/api/queries/campaigns';
-import {
-  useImportAllocationPreview,
-  useImportDraftPreview,
-  useImports,
-} from '@/api/queries/imports';
+import { useImportAllocationPreview, useImports } from '@/api/queries/imports';
+import { useSequences } from '@/api/queries/sequences';
 import { CollectionPagination } from '@/components/shared/collection-pagination';
 
 interface AllocationRow {
   campaignId?: number;
   count: number;
+  genericCopyStepNo?: number;
 }
 
 const MAX_BYTES = 10 * 1024 * 1024; // ingest cap (docs/09)
@@ -145,15 +154,14 @@ export function ImportWizard({
   const [result, setResult] = useState<CommitImportResponse | null>(null);
   const [uploadError, setUploadError] = useState<string | null>(null);
   const [expanded, setExpanded] = useState<ImportRowFlag | null>(null);
-  const [draftCampaignId, setDraftCampaignId] = useState<number | undefined>();
   const [replaceDrafts, setReplaceDrafts] = useState(false);
   const [markCopyReady, setMarkCopyReady] = useState(false);
   const [commitMode, setCommitMode] = useState<'drop_flagged' | 'import_all'>('drop_flagged');
   const [allocations, setAllocations] = useState<AllocationRow[]>([]);
   const campaigns = useCampaigns();
-  const draftPreview = useImportDraftPreview(preview?.importId, draftCampaignId);
+  const sequences = useSequences();
   const validAllocations = allocations.filter(
-    (allocation): allocation is { campaignId: number; count: number } =>
+    (allocation): allocation is { campaignId: number; count: number; genericCopyStepNo?: number } =>
       allocation.campaignId !== undefined && allocation.count > 0,
   );
   const allocationPreview = useImportAllocationPreview(
@@ -161,10 +169,12 @@ export function ImportWizard({
     validAllocations.length === allocations.length && allocations.length > 0
       ? {
           mode: commitMode,
-          ...(draftCampaignId !== undefined && { draft_campaign_id: draftCampaignId }),
           allocations: validAllocations.map((allocation) => ({
             campaign_id: allocation.campaignId,
             count: allocation.count,
+            ...(allocation.genericCopyStepNo !== undefined && {
+              generic_copy_step_no: allocation.genericCopyStepNo,
+            }),
           })),
         }
       : undefined,
@@ -176,7 +186,6 @@ export function ImportWizard({
       setResult(null);
       setUploadError(null);
       setExpanded(null);
-      setDraftCampaignId(undefined);
       setReplaceDrafts(false);
       setMarkCopyReady(false);
       setCommitMode('drop_flagged');
@@ -215,10 +224,12 @@ export function ImportWizard({
         importId: preview.importId,
         body: {
           mode,
-          ...(draftCampaignId !== undefined && { draft_campaign_id: draftCampaignId }),
           allocations: validAllocations.map((allocation) => ({
             campaign_id: allocation.campaignId,
             count: allocation.count,
+            ...(allocation.genericCopyStepNo !== undefined && {
+              generic_copy_step_no: allocation.genericCopyStepNo,
+            }),
           })),
           replace_existing_drafts: replaceDrafts,
           mark_valid_copy_ready: markCopyReady,
@@ -237,6 +248,25 @@ export function ImportWizard({
 
   const counts = preview?.counts;
   const importAllCount = counts ? counts.ok + counts.role_based : 0;
+  const acceptedCount = counts ? (commitMode === 'drop_flagged' ? counts.ok : importAllCount) : 0;
+  const missingGenericStep =
+    allocationPreview.data?.campaigns.some((campaign) => campaign.generic_copy_step_required) ??
+    false;
+  const campaignName = (campaignId: number): string =>
+    campaigns.data?.items.find((campaign) => campaign.id === campaignId)?.name ??
+    `Campaign ${campaignId}`;
+  const personalizedSteps = (campaignId: number | undefined): number[] => {
+    if (campaignId === undefined) return [];
+    const sequenceId = campaigns.data?.items.find(
+      (campaign) => campaign.id === campaignId,
+    )?.sequence_id;
+    return (
+      sequences.data?.items
+        .find((sequence) => sequence.id === sequenceId)
+        ?.steps.filter((step) => step.content_source === 'personalized')
+        .map((step) => step.step_no) ?? []
+    );
+  };
 
   return (
     <Dialog open={open} onOpenChange={handleOpenChange}>
@@ -328,151 +358,304 @@ export function ImportWizard({
                 either mode.
               </p>
             )}
-            <p className="text-xs text-muted-foreground">
-              Role-based + invalid addresses bounce more and hurt deliverability — dropping flagged
-              rows is the safe default.
-            </p>
-            <section className="flex flex-col gap-3 rounded-lg border border-border p-3">
-              <div>
-                <p className="text-sm font-medium">Import mode</p>
-                <p className="text-xs text-muted-foreground">
-                  Campaign allocation is calculated from this exact safe import set.
-                </p>
-              </div>
-              <Select
+            <FieldSet className="gap-3 rounded-lg border border-border p-3">
+              <FieldLegend>Which email addresses should be imported?</FieldLegend>
+              <FieldDescription>
+                Invalid, duplicate, and previously suppressed addresses are always excluded.
+                Campaign allocation uses the option selected here.
+              </FieldDescription>
+              <RadioGroup
                 value={commitMode}
                 onValueChange={(value) => setCommitMode(value as 'drop_flagged' | 'import_all')}
               >
-                <SelectTrigger aria-label="Import mode">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="drop_flagged">Drop role-based and invalid</SelectItem>
-                  <SelectItem value="import_all">Include role-based addresses</SelectItem>
-                </SelectContent>
-              </Select>
-            </section>
+                <FieldLabel htmlFor="import-safe-addresses">
+                  <Field orientation="horizontal">
+                    <RadioGroupItem id="import-safe-addresses" value="drop_flagged" />
+                    <FieldContent>
+                      <FieldTitle>Safe addresses only — Recommended</FieldTitle>
+                      <FieldDescription>
+                        Import {counts.ok} clean or usable addresses. Exclude {counts.role_based}{' '}
+                        role-based {counts.role_based === 1 ? 'address' : 'addresses'}.
+                      </FieldDescription>
+                    </FieldContent>
+                  </Field>
+                </FieldLabel>
+                <FieldLabel htmlFor="import-role-addresses">
+                  <Field orientation="horizontal">
+                    <RadioGroupItem id="import-role-addresses" value="import_all" />
+                    <FieldContent>
+                      <FieldTitle>Include role-based addresses</FieldTitle>
+                      <FieldDescription>
+                        Import {importAllCount} addresses, including shared inboxes such as info@ or
+                        office@. These generally carry more deliverability risk.
+                      </FieldDescription>
+                    </FieldContent>
+                  </Field>
+                </FieldLabel>
+              </RadioGroup>
+            </FieldSet>
             {(preview.draftCounts.valid_drafts > 0 || preview.draftCounts.invalid_drafts > 0) && (
-              <section className="space-y-3 rounded-lg border border-info/40 bg-info/5 p-3">
+              <section className="flex flex-col gap-4 rounded-lg border border-info/40 bg-info/5 p-3">
                 <div>
-                  <p className="text-sm font-medium">Personalized Copy detected</p>
-                  <p className="text-xs text-muted-foreground">
+                  <h3 className="text-sm font-medium">Personalized emails found in CSV</h3>
+                  <p className="text-sm text-muted-foreground">
                     {preview.draftCounts.valid_drafts} complete ·{' '}
-                    {preview.draftCounts.invalid_drafts} incomplete or conflicting. Sources remain
-                    global unless a compatible campaign personalized step is selected or allocated.
+                    {preview.draftCounts.invalid_drafts} incomplete or conflicting. Every complete
+                    subject/body pair is saved as reusable lead copy. Campaign and step assignment
+                    happens below.
+                  </p>
+                  <p className="mt-2 text-xs text-muted-foreground">
+                    Exact step_N_subject/body pairs map directly to compatible Personalized Copy
+                    steps and do not need a generic destination choice.
                   </p>
                 </div>
-                <Select
-                  value={draftCampaignId ? String(draftCampaignId) : ''}
-                  onValueChange={(value) => setDraftCampaignId(Number(value))}
-                >
-                  <SelectTrigger aria-label="Draft target campaign">
-                    <SelectValue placeholder="Select one target campaign…" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {(campaigns.data?.items ?? []).map((campaign) => (
-                      <SelectItem key={campaign.id} value={String(campaign.id)}>
-                        {campaign.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-                {draftPreview.data && (
-                  <p className="text-xs text-muted-foreground">
-                    {draftPreview.data.new_leads} new leads · {draftPreview.data.existing_leads}{' '}
-                    existing leads · {draftPreview.data.valid_drafts} valid drafts ·{' '}
-                    {draftPreview.data.invalid_drafts} invalid ·{' '}
-                    {draftPreview.data.existing_draft_conflicts} existing-draft conflicts
-                  </p>
-                )}
-                <div className="flex items-center gap-2">
-                  <Checkbox
-                    id="replace-imported-drafts"
-                    checked={replaceDrafts}
-                    onCheckedChange={(checked) => setReplaceDrafts(checked === true)}
-                  />
-                  <Label htmlFor="replace-imported-drafts" className="text-xs font-normal">
-                    Replace existing source/campaign copy (default is keep)
-                  </Label>
-                </div>
-                <div className="flex items-center gap-2">
-                  <Checkbox
-                    id="mark-imported-copy-ready"
-                    checked={markCopyReady}
-                    onCheckedChange={(checked) => setMarkCopyReady(checked === true)}
-                  />
-                  <Label htmlFor="mark-imported-copy-ready" className="text-xs font-normal">
-                    Mark all valid imported copy ready
-                  </Label>
-                </div>
+                <FieldGroup className="gap-4">
+                  <FieldSet className="gap-3">
+                    <FieldLegend variant="label">Review status</FieldLegend>
+                    <RadioGroup
+                      value={markCopyReady ? 'ready' : 'needs_review'}
+                      onValueChange={(value) => setMarkCopyReady(value === 'ready')}
+                    >
+                      <FieldLabel htmlFor="copy-needs-review">
+                        <Field orientation="horizontal">
+                          <RadioGroupItem id="copy-needs-review" value="needs_review" />
+                          <FieldContent>
+                            <FieldTitle>Needs review — Recommended</FieldTitle>
+                            <FieldDescription>
+                              Save the copy, but require a review before a sequence can use it.
+                            </FieldDescription>
+                          </FieldContent>
+                        </Field>
+                      </FieldLabel>
+                      <FieldLabel htmlFor="copy-ready">
+                        <Field orientation="horizontal">
+                          <RadioGroupItem id="copy-ready" value="ready" />
+                          <FieldContent>
+                            <FieldTitle>Ready for sequence use</FieldTitle>
+                            <FieldDescription>
+                              Mark every complete imported subject/body pair ready immediately.
+                            </FieldDescription>
+                          </FieldContent>
+                        </Field>
+                      </FieldLabel>
+                    </RadioGroup>
+                  </FieldSet>
+                  <FieldSet className="gap-3">
+                    <FieldLegend variant="label">If copy already exists</FieldLegend>
+                    <RadioGroup
+                      value={replaceDrafts ? 'replace' : 'keep'}
+                      onValueChange={(value) => setReplaceDrafts(value === 'replace')}
+                    >
+                      <FieldLabel htmlFor="copy-keep-existing">
+                        <Field orientation="horizontal">
+                          <RadioGroupItem id="copy-keep-existing" value="keep" />
+                          <FieldContent>
+                            <FieldTitle>Keep existing copy — Recommended</FieldTitle>
+                            <FieldDescription>
+                              Preserve any lead source or campaign copy already saved.
+                            </FieldDescription>
+                          </FieldContent>
+                        </Field>
+                      </FieldLabel>
+                      <FieldLabel htmlFor="copy-replace-existing">
+                        <Field orientation="horizontal">
+                          <RadioGroupItem id="copy-replace-existing" value="replace" />
+                          <FieldContent>
+                            <FieldTitle>Replace existing unsent copy</FieldTitle>
+                            <FieldDescription>
+                              Use this CSV instead. Sent campaign copy remains immutable.
+                            </FieldDescription>
+                          </FieldContent>
+                        </Field>
+                      </FieldLabel>
+                    </RadioGroup>
+                  </FieldSet>
+                </FieldGroup>
               </section>
             )}
             <section className="flex flex-col gap-3 rounded-lg border border-border p-3">
               <div>
-                <p className="text-sm font-medium">Campaign allocation (optional)</p>
-                <p className="text-xs text-muted-foreground">
-                  Reserve exact counts without enrolling or sending. Any remainder stays in the
-                  global Leads list.
+                <h3 className="text-sm font-medium">Assign leads to campaign pools — Optional</h3>
+                <p className="text-sm text-muted-foreground">
+                  Reserve accepted CSV rows in order. This does not enroll leads, activate a
+                  campaign, or send email.
                 </p>
               </div>
-              {allocations.map((allocation, index) => (
-                <div key={index} className="grid gap-2 sm:grid-cols-[minmax(0,1fr)_7rem_auto]">
-                  <Select
-                    value={allocation.campaignId ? String(allocation.campaignId) : ''}
-                    onValueChange={(value) =>
-                      setAllocations((current) =>
-                        current.map((row, rowIndex) =>
-                          rowIndex === index ? { ...row, campaignId: Number(value) } : row,
-                        ),
-                      )
-                    }
-                  >
-                    <SelectTrigger aria-label={`Allocation campaign ${index + 1}`}>
-                      <SelectValue placeholder="Campaign…" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {(campaigns.data?.items ?? [])
-                        .filter(
-                          (campaign) => campaign.status === 'draft' || campaign.status === 'paused',
-                        )
-                        .filter(
-                          (campaign) =>
-                            campaign.id === allocation.campaignId ||
-                            !allocations.some((row) => row.campaignId === campaign.id),
-                        )
-                        .map((campaign) => (
-                          <SelectItem key={campaign.id} value={String(campaign.id)}>
-                            {campaign.name}
-                          </SelectItem>
-                        ))}
-                    </SelectContent>
-                  </Select>
-                  <Input
-                    aria-label={`Allocation count ${index + 1}`}
-                    type="number"
-                    min={1}
-                    value={allocation.count}
-                    onChange={(event) =>
-                      setAllocations((current) =>
-                        current.map((row, rowIndex) =>
-                          rowIndex === index ? { ...row, count: Number(event.target.value) } : row,
-                        ),
-                      )
-                    }
-                  />
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    onClick={() =>
-                      setAllocations((current) =>
-                        current.filter((_, rowIndex) => rowIndex !== index),
-                      )
-                    }
-                  >
-                    Remove
-                  </Button>
-                </div>
-              ))}
+              <FieldGroup className="gap-3">
+                {allocations.map((allocation, index) => {
+                  const stepNos = personalizedSteps(allocation.campaignId);
+                  const campaignCopyPreview = allocationPreview.data?.campaigns.find(
+                    (campaign) => campaign.campaign_id === allocation.campaignId,
+                  );
+                  const showGenericStepSelector =
+                    allocation.genericCopyStepNo !== undefined ||
+                    Boolean(
+                      campaignCopyPreview &&
+                      campaignCopyPreview.generic_copies > 0 &&
+                      stepNos.length > 1,
+                    );
+                  return (
+                    <article
+                      key={index}
+                      className="grid gap-3 rounded-md border border-border p-3 sm:grid-cols-[minmax(0,1fr)_7rem_auto]"
+                    >
+                      <Field>
+                        <FieldLabel htmlFor={`allocation-campaign-${index + 1}`}>
+                          Campaign
+                        </FieldLabel>
+                        <Select
+                          value={allocation.campaignId ? String(allocation.campaignId) : ''}
+                          onValueChange={(value) =>
+                            setAllocations((current) =>
+                              current.map((row, rowIndex) =>
+                                rowIndex === index
+                                  ? {
+                                      ...row,
+                                      campaignId: Number(value),
+                                      genericCopyStepNo: undefined,
+                                    }
+                                  : row,
+                              ),
+                            )
+                          }
+                        >
+                          <SelectTrigger
+                            id={`allocation-campaign-${index + 1}`}
+                            aria-label={`Allocation campaign ${index + 1}`}
+                          >
+                            <SelectValue placeholder="Choose campaign…" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectGroup>
+                              {(campaigns.data?.items ?? [])
+                                .filter(
+                                  (campaign) =>
+                                    campaign.status === 'draft' || campaign.status === 'paused',
+                                )
+                                .filter(
+                                  (campaign) =>
+                                    campaign.id === allocation.campaignId ||
+                                    !allocations.some((row) => row.campaignId === campaign.id),
+                                )
+                                .map((campaign) => (
+                                  <SelectItem key={campaign.id} value={String(campaign.id)}>
+                                    {campaign.name}
+                                  </SelectItem>
+                                ))}
+                            </SelectGroup>
+                          </SelectContent>
+                        </Select>
+                      </Field>
+                      <Field>
+                        <FieldLabel htmlFor={`allocation-count-${index + 1}`}>Leads</FieldLabel>
+                        <Input
+                          id={`allocation-count-${index + 1}`}
+                          aria-label={`Allocation count ${index + 1}`}
+                          type="number"
+                          min={1}
+                          value={allocation.count}
+                          onChange={(event) =>
+                            setAllocations((current) =>
+                              current.map((row, rowIndex) =>
+                                rowIndex === index
+                                  ? { ...row, count: Number(event.target.value) }
+                                  : row,
+                              ),
+                            )
+                          }
+                        />
+                      </Field>
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        className="self-end"
+                        onClick={() =>
+                          setAllocations((current) =>
+                            current.filter((_, rowIndex) => rowIndex !== index),
+                          )
+                        }
+                      >
+                        Remove
+                      </Button>
+                      {allocation.campaignId !== undefined && (
+                        <Field
+                          className="sm:col-span-3"
+                          data-invalid={
+                            campaignCopyPreview?.generic_copy_step_required || undefined
+                          }
+                        >
+                          <FieldLabel htmlFor={`allocation-copy-step-${index + 1}`}>
+                            Imported copy destination
+                          </FieldLabel>
+                          {showGenericStepSelector ? (
+                            <Select
+                              value={
+                                allocation.genericCopyStepNo === undefined
+                                  ? ''
+                                  : String(allocation.genericCopyStepNo)
+                              }
+                              onValueChange={(value) =>
+                                setAllocations((current) =>
+                                  current.map((row, rowIndex) =>
+                                    rowIndex === index
+                                      ? { ...row, genericCopyStepNo: Number(value) }
+                                      : row,
+                                  ),
+                                )
+                              }
+                            >
+                              <SelectTrigger
+                                id={`allocation-copy-step-${index + 1}`}
+                                aria-label={`Imported copy destination ${index + 1}`}
+                                aria-invalid={
+                                  campaignCopyPreview?.generic_copy_step_required || undefined
+                                }
+                              >
+                                <SelectValue placeholder="Choose a Personalized Copy step…" />
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectGroup>
+                                  {stepNos.map((stepNo) => (
+                                    <SelectItem key={stepNo} value={String(stepNo)}>
+                                      Step {stepNo} — Personalized Copy
+                                    </SelectItem>
+                                  ))}
+                                </SelectGroup>
+                              </SelectContent>
+                            </Select>
+                          ) : stepNos.length === 1 &&
+                            (campaignCopyPreview?.generic_copies ?? 0) > 0 ? (
+                            <FieldDescription>
+                              Step {stepNos[0]} — Personalized Copy (assigned automatically)
+                            </FieldDescription>
+                          ) : stepNos.length === 0 &&
+                            (campaignCopyPreview?.generic_copies ?? 0) > 0 ? (
+                            <FieldDescription>
+                              This sequence has no Personalized Copy step. Imported email remains
+                              reusable lead copy only.
+                            </FieldDescription>
+                          ) : (campaignCopyPreview?.copies_bound ?? 0) > 0 ? (
+                            <FieldDescription>
+                              Exact step_N_subject/body columns map directly to compatible
+                              Personalized Copy steps.
+                            </FieldDescription>
+                          ) : (
+                            <FieldDescription>
+                              No personalized email was found to assign.
+                            </FieldDescription>
+                          )}
+                          {campaignCopyPreview?.generic_copy_step_required && (
+                            <FieldError>
+                              Choose the Personalized Copy step that should use the generic CSV
+                              subject and body.
+                            </FieldError>
+                          )}
+                        </Field>
+                      )}
+                    </article>
+                  );
+                })}
+              </FieldGroup>
               <Button
                 type="button"
                 variant="outline"
@@ -485,15 +668,50 @@ export function ImportWizard({
               )}
               {allocationPreview.data && (
                 <Alert>
-                  <AlertTitle>Allocation preview</AlertTitle>
+                  <AlertTitle>What will happen</AlertTitle>
                   <AlertDescription>
-                    {allocationPreview.data.campaigns
-                      .map(
-                        (item) =>
-                          `Campaign #${item.campaign_id}: ${item.allocatable}/${item.requested}`,
-                      )
-                      .join(' · ')}
-                    . {allocationPreview.data.remaining_global} lead(s) will remain global.
+                    <ul className="flex list-disc flex-col gap-1 pl-4">
+                      <li>{acceptedCount} leads will be imported.</li>
+                      {preview.draftCounts.valid_drafts > 0 && (
+                        <li>
+                          {preview.draftCounts.valid_drafts} reusable personalized emails will be
+                          saved as {markCopyReady ? 'Ready' : 'Needs review'}.
+                        </li>
+                      )}
+                      {allocationPreview.data.campaigns.map((item, index) => (
+                        <li key={item.campaign_id}>
+                          {campaignName(item.campaign_id)}: {index === 0 ? 'first' : 'next'}{' '}
+                          {item.requested} accepted leads
+                          {item.resolved_generic_copy_step_no !== null
+                            ? ` → Personalized Step ${item.resolved_generic_copy_step_no}`
+                            : item.generic_copy_step_required
+                              ? ' → choose a Personalized Copy step'
+                              : item.copies_bound > 0
+                                ? ` → ${item.copies_bound} step-specific copies mapped`
+                                : item.copies_unassigned > 0
+                                  ? ' → copy remains reusable lead copy only'
+                                  : ''}
+                          .
+                        </li>
+                      ))}
+                      <li>
+                        {allocationPreview.data.remaining_global} leads will remain outside campaign
+                        pools.
+                      </li>
+                      <li>This will not activate campaigns, enroll leads, or send email.</li>
+                    </ul>
+                  </AlertDescription>
+                </Alert>
+              )}
+              {allocations.length === 0 && (
+                <Alert>
+                  <AlertTitle>What will happen</AlertTitle>
+                  <AlertDescription>
+                    {acceptedCount} leads will be imported and remain outside campaign pools.
+                    {preview.draftCounts.valid_drafts > 0
+                      ? ` ${preview.draftCounts.valid_drafts} reusable personalized emails will be saved as ${markCopyReady ? 'Ready' : 'Needs review'}.`
+                      : ''}{' '}
+                    This will not activate campaigns, enroll leads, or send email.
                   </AlertDescription>
                 </Alert>
               )}
@@ -512,15 +730,14 @@ export function ImportWizard({
                   (allocationPreview.isPending ||
                     allocationPreview.isError ||
                     !allocationPreview.data ||
+                    missingGenericStep ||
                     allocationPreview.data.campaigns.some(
                       (item) => item.allocatable !== item.requested,
                     )))
               }
               onClick={() => doCommit(commitMode)}
             >
-              {commitMode === 'drop_flagged'
-                ? `Drop flagged & import ${counts.ok}`
-                : `Import all incl. role-based (${importAllCount})`}
+              Import {acceptedCount} leads
             </Button>
           </div>
         )}

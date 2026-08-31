@@ -30,19 +30,52 @@ test('upload → the exact preview split → commit 885 → result', async ({ pa
   await page.getByRole('button', { name: 'samples' }).first().click();
   await expect(page.getByText(/row \d+:/).first()).toBeVisible();
 
-  // The selected mode's commit button carries the exact count.
-  await expect(page.getByRole('button', { name: 'Drop flagged & import 885' })).toBeVisible();
-  await page.getByLabel('Import mode').click();
-  await page.getByRole('option', { name: 'Include role-based addresses' }).click();
-  await expect(
-    page.getByRole('button', { name: 'Import all incl. role-based (945)' }),
-  ).toBeVisible();
+  // The clear address choice and primary action carry the exact count.
+  await expect(page.getByRole('button', { name: 'Import 885 leads' })).toBeVisible();
+  await page.getByRole('radio', { name: /Include role-based addresses/ }).click();
+  await expect(page.getByRole('button', { name: 'Import 945 leads' })).toBeVisible();
 
-  await page.getByLabel('Import mode').click();
-  await page.getByRole('option', { name: 'Drop role-based and invalid' }).click();
-  await page.getByRole('button', { name: 'Drop flagged & import 885' }).click();
+  await page.getByRole('radio', { name: /Safe addresses only/ }).click();
+  await page.getByRole('button', { name: 'Import 885 leads' }).click();
   await expect(page.getByTestId('import-result')).toHaveText('885');
   await expect(page.getByText(/untiered \(decision R\)/)).toBeVisible();
+});
+
+test('generic personalized copy requires a destination for a multi-step campaign', async ({
+  page,
+}) => {
+  await login(page);
+  const campaignName = 'Beacon import mapping';
+
+  await page.getByRole('link', { name: 'Leads' }).click();
+  await page.getByRole('button', { name: 'Import CSV' }).click();
+  await page.getByTestId('upload-input').setInputFiles({
+    name: 'personalized.csv',
+    mimeType: 'text/csv',
+    buffer: Buffer.from(
+      'email,first_name,manual_subject,manual_body\nlead@example.com,Lead,A subject,A body\n',
+    ),
+  });
+
+  await expect(page.getByText('Personalized emails found in CSV')).toBeVisible();
+  await expect(page.getByLabel('Draft target campaign')).toHaveCount(0);
+  await page.getByRole('radio', { name: /Ready for sequence use/ }).click();
+  await page.getByRole('button', { name: 'Add campaign allocation' }).click();
+  await page.getByLabel('Allocation campaign 1').click();
+  await page.getByRole('option', { name: campaignName }).click();
+  await page.getByLabel('Allocation count 1').fill('1');
+
+  await expect(page.getByLabel('Imported copy destination 1')).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Import 885 leads' })).toBeDisabled();
+  await expect(page.getByText(/Choose the Personalized Copy step/)).toBeVisible();
+
+  await page.getByLabel('Imported copy destination 1').click();
+  await page.getByRole('option', { name: 'Step 1 — Personalized Copy' }).click();
+  await expect(page.getByText(/Beacon import mapping: first 1 accepted leads/)).toBeVisible();
+  await expect(
+    page.getByText(/This will not activate campaigns, enroll leads, or send email/),
+  ).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Import 885 leads' })).toBeEnabled();
 });
 
 test('oversize file is rejected client-side before upload', async ({ page }) => {

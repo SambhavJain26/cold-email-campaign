@@ -35,6 +35,11 @@ commissioning** until the operator completes the handoffs below:
   blockers, and adds exact Pool/Enrolled/Both filtering and bulk tiering. Production has one
   unassigned global lead, zero campaigns/enrollments/sendable work, and four healthy OAuth
   mailboxes. Activation, enrollment, and sending remain separately unauthorized.
+- The 2026-08-31 import-wizard clarity follow-up is locally implemented and verified on `canary`
+  but is not pushed or deployed. It replaces the misleading single Draft target campaign with
+  per-allocation generic-copy step selection, requires an explicit destination for campaigns with
+  multiple Personalized Copy steps, preserves direct `step_N_*` mapping, and adds a named
+  no-activation/no-enrollment/no-send summary. It has no migration or live-state change.
 - The operator-approved 2026-08-25 ten-workstream implementation is complete and deployed through
   Stages 1–4: operational pagination; due-step Manual Compose; in-app reminders; verified
   timezone/folder controls; imported manual drafts; Auto Observation/sequence variables; staged
@@ -114,6 +119,10 @@ commissioning** until the operator completes the handoffs below:
   diff(s)`; self-check clean; production build; and a validated custom-format dump with scratch
   restore/rebuild/zero-drift/self-check. The verified candidate was subsequently deployed to
   Spaceship under separate operator approval.
+- The 2026-08-31 import-wizard clarity gate passed type/lint/format; unit 345; web 58;
+  integration 168; API 140; GreenMail 29; golden exactly 47; mock E2E 62; real-backend E2E 1;
+  production build; `checked 0 enrollments — 0 diff(s)`; and clean self-check. No migration,
+  production mutation, activation, enrollment, or send was performed.
 
 ## Production deployments
 

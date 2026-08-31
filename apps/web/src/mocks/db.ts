@@ -256,6 +256,35 @@ function buildSequence(): SequenceDto {
   };
 }
 
+function buildImportMappingSequence(): SequenceDto {
+  return {
+    id: 2,
+    name: 'Import Mapping Sequence',
+    stop_on_reply: true,
+    stop_on_hard_bounce: true,
+    stop_on_unsubscribe: true,
+    variable_defaults: {},
+    steps: [
+      {
+        id: 20,
+        step_no: 1,
+        wait_days: 0,
+        in_thread: false,
+        content_source: 'personalized',
+        variants: [],
+      },
+      {
+        id: 21,
+        step_no: 3,
+        wait_days: 1,
+        in_thread: true,
+        content_source: 'personalized',
+        variants: [],
+      },
+    ],
+  };
+}
+
 /**
  * Keep the committed golden fixture byte-for-byte equal to the real API seed.
  * Mock-only relationships and the active Mode-1 example belong here instead
@@ -319,6 +348,40 @@ function buildCampaigns(): CampaignDto[] {
       enrolled_count: 1,
       contacted_count: 0,
       manual_only_count: 1,
+    },
+    {
+      id: 3,
+      name: 'Beacon import mapping',
+      status: 'draft',
+      sequence_id: 2,
+      tier_effort_config: {
+        A: 'template_researched',
+        B: 'template_auto',
+        C: 'template_auto',
+      },
+      ramp_config: { ramp_days: 7, ramp_daily_enroll_cap: 20 },
+      ramp_stages: [{ start_day: 1, end_day: 7, cap: 20 }],
+      first_activated_at: null,
+      variable_overrides: {},
+      resolved_variables: {},
+      auto_observation: { field: null, rules: {} },
+      lead_selection_mode: 'global',
+      auto_enroll_enabled: false,
+      steady_daily_enroll_cap: 20,
+      pool_summary: {
+        total: 0,
+        available: 0,
+        enrolled: 0,
+        released: 0,
+        temporarily_ineligible: 0,
+        source_imports: 0,
+      },
+      last_auto_enrollment_run: null,
+      recycle_sources: [],
+      recycled_from_campaign_id: null,
+      enrolled_count: 0,
+      contacted_count: 0,
+      manual_only_count: 0,
     },
   ];
 }
@@ -529,7 +592,7 @@ function build(): MockDb {
     mailboxes: buildMailboxes(),
     leads,
     leadNotes: new Map(),
-    sequences: [buildSequence()],
+    sequences: [buildSequence(), buildImportMappingSequence()],
     unibox: buildUnibox(leads),
     alerts: buildAlerts(),
     reminders: [],

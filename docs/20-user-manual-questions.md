@@ -150,9 +150,9 @@ timeline even if the current suppression record is removed.
 The current label is confusing. It does **not** add free-form labels such as `SaaS`, `Founder`, or
 `Jaipur`.
 
-**Current behavior:** clicking **Bulk tag** filters the Leads screen to untiered leads. You can
-then select the visible rows—or all leads matching the current filter—and assign Tier A, B, C,
-Nurture, or Untiered in one operation.
+**Current behavior:** the untiered banner opens the bulk-tier workflow. You can select visible rows
+or all leads matching the current filter and assign Tier A, Tier B, or Untiered. Nurture and
+Restore-from-Nurture are separate outreach-status actions.
 
 Example:
 
@@ -165,9 +165,9 @@ Example:
 tier**. If free-form labels are wanted later, that would be a separate **new feature** with a real
 tag taxonomy and tag filters.
 
-### 1.6 Can CSV research automatically prefill the manual composer?
+### 1.6 Can CSV research create personalized sequence emails?
 
-**Yes. This is now implemented for Step 1.** Use two CSV columns rather than JSON:
+**Yes.** A generic reusable email uses two CSV columns:
 
 ```csv
 email,first_name,company,manual_subject,manual_body,notes
@@ -188,16 +188,23 @@ alex@example.com,"Alex called the launch ""a major step"" in the interview.
 Would comparing notes be useful?"
 ```
 
-Both `manual_subject` and `manual_body` are required for a valid draft. After upload, select one
-target campaign. The preview shows new/existing leads, valid/incomplete drafts, and conflicts with
-an existing unsent draft. Conflicts skip by default; **Replace existing unsent drafts** is an
-explicit option. Existing lead profile data is preserved, while suppressed or erased leads never
-receive drafts.
+Both `manual_subject` and `manual_body` are required. The pair is saved as reusable lead copy. For
+each campaign allocation, the wizard shows **Imported copy destination**. If the sequence has one
+Personalized Copy step, it is assigned automatically. If it has several, you must choose Step 1,
+Step 3, or another compatible personalized step before import can continue.
 
-The stored draft belongs to that lead, campaign, and Step 1. It starts as **needs review** and does
-not enroll, activate, or send anything. In Manual Compose, use **Save Draft**, then **Mark Ready**.
-Only a ready draft can use **Send & log as manual**. The compliance footer remains outside the CSV
-body and is appended by the server.
+To supply more than one personalized email per lead, use exact step columns:
+
+```csv
+email,step_1_subject,step_1_body,step_3_subject,step_3_body
+alex@example.com,First subject,First body,Later subject,Later body
+```
+
+Those pairs map directly to the matching Personalized Copy steps and need no generic-step choice.
+The preview defaults to **Needs review — Recommended** and **Keep existing copy — Recommended**;
+the alternative choices mark valid copy ready or replace existing unsent copy. Import never
+activates a campaign, enrolls a lead, or sends an email. Review and edit the result through the
+lead's **Personalized Copy** editor; every actual send occurs through the sequence scheduler.
 
 ## 2. Mailboxes: controls, table columns, timezones, and polled folders
 

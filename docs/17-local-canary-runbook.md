@@ -1,5 +1,26 @@
 # Local canary runbook (B8.3-local) — two-week validation on throwaway Gmail
 
+## 2026-08-31 import-wizard clarity follow-up — locally verified, not deployed
+
+The import preview no longer mixes a single Draft target campaign with multi-campaign allocation.
+It now separates address admission, personalized-email readiness/replacement, and campaign pool
+assignment. Each allocation exposes its generic copy destination: one Personalized Copy step
+resolves automatically, multiple steps require an explicit choice, no personalized step leaves the
+copy reusable-only, and exact `step_N_*` columns continue to map directly. The final preview names
+campaigns and states exact ordered counts, readiness, destinations, remaining global leads, and
+that importing does not activate, enroll, or send.
+
+The API accepts optional per-allocation `generic_copy_step_no`, validates that it identifies a
+Personalized Copy step, reports binding outcomes during preview, and rejects a multi-step generic
+mapping atomically when the choice is missing. There is no database migration and no event,
+scheduler, mail-transport, or production-state change.
+
+Verified locally: typecheck/lint/format; unit 345/345; web 58/58; integration 168/168; API 140/140;
+GreenMail 29/29; locked golden 47/47; mock browser 62/62; real-backend browser 1/1; production Vite
+build; `checked 0 enrollments — 0 diff(s)`; clean self-check. The initial real-browser run stopped
+only on the deliberately renamed import button; after updating that stale selector, the complete
+walkthrough passed. Push and Spaceship deployment remain separately operator-gated.
+
 ## 2026-08-30 Personalized Copy/two-tier release — verified and deployed
 
 The operator-approved migration `0019` release is complete on local branch `canary`: Manual
