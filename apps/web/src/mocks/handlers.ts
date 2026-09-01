@@ -42,6 +42,7 @@ import {
   tagSentimentBodySchema,
   validateTemplateBodySchema,
   type ApiErrorCode,
+  type CampaignPersonalizedCopyDto,
   type LeadDto,
   type MailboxDto,
   type SequenceDto,
@@ -68,6 +69,7 @@ const mockPersonalizedSources = new Map<
     updated_at: string;
   }
 >();
+const mockCampaignPersonalizedCopies = new Map<string, CampaignPersonalizedCopyDto>();
 
 function err(code: ApiErrorCode, message: string, status: number, details?: unknown) {
   return HttpResponse.json(
@@ -475,6 +477,14 @@ export const handlers: RequestHandler[] = [
         untiered_count: filtered.filter(
           (lead) => lead.tier === null && lead.outreach_status === 'standard',
         ).length,
+        tier_counts: {
+          A: filtered.filter((lead) => lead.tier === 'A').length,
+          B: filtered.filter((lead) => lead.tier === 'B').length,
+          untiered: filtered.filter(
+            (lead) => lead.tier === null && lead.outreach_status === 'standard',
+          ).length,
+          nurture: filtered.filter((lead) => lead.outreach_status === 'nurture').length,
+        },
       });
     }),
   ),
@@ -508,7 +518,9 @@ export const handlers: RequestHandler[] = [
         sources: [...mockPersonalizedSources.values()].filter(
           (source) => source.lead_id === leadId,
         ),
-        campaign_copies: [],
+        campaign_copies: [...mockCampaignPersonalizedCopies.values()].filter(
+          (copy) => copy.lead_id === leadId,
+        ),
       });
     }),
   ),
@@ -540,6 +552,68 @@ export const handlers: RequestHandler[] = [
       };
       mockPersonalizedSources.set(key, source);
       return HttpResponse.json({ result: existing ? 'replaced' : 'created', source });
+    }),
+  ),
+  http.put(
+    `${BASE}/leads/:id/campaigns/:campaignId/steps/:stepNo/personalized-copy`,
+    authed(async ({ request, params }) => {
+      const leadId = Number(params.id);
+      const campaignId = Number(params.campaignId);
+      const stepNo = Number(params.stepNo);
+      if (!db.leads.some((lead) => lead.id === leadId)) return notFound('lead');
+      const campaign = db.campaigns.find((item) => item.id === campaignId);
+      const sequence = db.sequences.find((item) => item.id === campaign?.sequence_id);
+      const step = sequence?.steps.find((item) => item.step_no === stepNo);
+      if (!campaign || !sequence) return notFound('campaign sequence');
+      if (!step) return notFound('sequence step');
+      if (step.content_source !== 'personalized') {
+        return err('conflict', 'the selected sequence step uses template content', 409);
+      }
+      const body = await parseBody(request, personalizedCopyWriteBodySchema);
+      if (body instanceof Response) return body;
+      const key = `${leadId}:${campaignId}:${stepNo}`;
+      const existing = mockCampaignPersonalizedCopies.get(key);
+      if (existing?.status === 'sent') {
+        return err('conflict', 'sent personalized copy is immutable', 409);
+      }
+      const source =
+        body.action === 'copy_from_source'
+          ? mockPersonalizedSources.get(`${leadId}:${body.source_slot_no}`)
+          : undefined;
+      if (body.action === 'copy_from_source' && !source) {
+        return notFound('personalized copy source');
+      }
+      const subject = source?.subject ?? body.subject ?? '';
+      const copyBody = source?.body ?? body.body ?? '';
+      const status =
+        body.action === 'mark_ready' ||
+        (body.action === 'copy_from_source' && source?.status === 'ready')
+          ? ('ready' as const)
+          : ('needs_review' as const);
+      if (status === 'ready' && (!subject.trim() || !copyBody.trim())) {
+        return err('validation', 'subject and body are required before marking ready', 422);
+      }
+      const copy: CampaignPersonalizedCopyDto = {
+        id: existing?.id ?? leadId * 10_000 + campaignId * 100 + stepNo,
+        lead_id: leadId,
+        campaign_id: campaignId,
+        campaign_name: campaign.name,
+        sequence_step_id: step.id,
+        step_no: stepNo,
+        subject,
+        body: copyBody,
+        status,
+        source_copy_id: source?.id ?? existing?.source_copy_id ?? null,
+        source_import_id: source?.source_import_id ?? existing?.source_import_id ?? null,
+        content_hash: `mock-${leadId}-${campaignId}-${stepNo}-${subject.length}-${copyBody.length}`,
+        sent_event_id: null,
+        sent_message_id: null,
+        created_at: existing?.created_at ?? NOW,
+        updated_at: NOW,
+        sent_at: null,
+      };
+      mockCampaignPersonalizedCopies.set(key, copy);
+      return HttpResponse.json({ result: existing ? 'replaced' : 'created', copy });
     }),
   ),
   http.patch(
@@ -787,6 +861,19 @@ export const handlers: RequestHandler[] = [
       });
     }),
   ),
+  http.delete(
+    `${BASE}/imports/:id`,
+    authed(({ params }) => {
+      const index = db.imports.findIndex((item) => item.id === Number(params.id));
+      if (index === -1) return notFound('import');
+      if (db.imports[index]!.committed) {
+        return err('conflict', 'Committed import history cannot be discarded', 409);
+      }
+      db.imports.splice(index, 1);
+      importCopySummaries.delete(Number(params.id));
+      return HttpResponse.json({ ok: true });
+    }),
+  ),
   http.post(
     `${BASE}/imports/:id/allocation-preview`,
     authed(async ({ request, params }) => {
@@ -968,9 +1055,7 @@ export const handlers: RequestHandler[] = [
       // render/footer.ts appendFooter, including the dormant-URL fallback.
       const base = db.compliance.unsubscribe_base_url.trim();
       const optoutLine =
-        base === ''
-          ? db.compliance.optout_text
-          : `Unsubscribe: ${base}/u/preview-token or reply STOP`;
+        base === '' ? db.compliance.optout_text : `Unsubscribe: ${base}/u/preview-token`;
       const footer = `\n\n${optoutLine} | ${db.compliance.physical_address}`;
       return HttpResponse.json({
         subject,
@@ -1058,6 +1143,10 @@ export const handlers: RequestHandler[] = [
         recycled_from_campaign_id: null,
         enrolled_count: 0,
         contacted_count: 0,
+        delivery_confirmed_count: 0,
+        pending_delivery_confirmation_count: 0,
+        finished_count: 0,
+        finishing_count: 0,
         manual_only_count: 0,
       };
       db.campaigns.push(campaign);

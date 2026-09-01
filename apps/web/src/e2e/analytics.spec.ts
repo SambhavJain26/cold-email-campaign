@@ -60,10 +60,10 @@ test('13c tiers: current A/B plus legacy C analytics reconcile', async ({ page }
   await expect(page.getByTestId('tier-row-C')).toContainText('165');
   await expect(page.getByTestId('tier-row-C')).toContainText('Legacy');
 
-  // 13 + 3 + 1 = 17 meetings; 255 + 447 + 165 = 867 contacted.
+  // 13 + 3 + 1 = 17 meetings; contacted means the 885 leads with an accepted send.
   const reconciliation = page.getByTestId('tiers-reconciliation');
   await expect(reconciliation).toContainText('meetings sum to 17 — campaign 17 ✓');
-  await expect(reconciliation).toContainText('contacted sum to 867 — campaign 867 ✓');
+  await expect(reconciliation).toContainText('contacted sum to 885 — campaign 885 ✓');
 
   await expect(page.getByTestId('tier-insights')).toContainText('13 of 17 meetings');
 

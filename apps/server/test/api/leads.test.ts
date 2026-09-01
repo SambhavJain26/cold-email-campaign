@@ -40,6 +40,7 @@ describe('B6.3 leads', () => {
       campaign_name: 'Camp 1',
       current_state: 'ACTIVE',
       current_step_no: 2,
+      awaiting_completion: false,
     });
 
     const tierA = (await h.inject({ method: 'GET', url: '/api/v1/leads?tier=A' })).json();

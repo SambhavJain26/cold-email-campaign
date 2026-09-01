@@ -1,6 +1,6 @@
 // The metrics engine (docs/05): public API over db/repos/metricsRepo.
 // Every rate returns { numerator, denominator, value } so the UI can render
-// "72 / 867 = 8.3%" verbatim. value = percentage rounded to 1 decimal.
+// "72 / 885 = 8.1%" verbatim. value = percentage rounded to 1 decimal.
 import type { Db } from '../../db/client';
 import * as q from '../../db/repos/metricsRepo';
 import type { MetricScope } from '../../db/repos/metricsRepo';
@@ -26,7 +26,15 @@ export class MetricsEngine {
     return q.countContacted(this.db, scope);
   }
 
-  /** Reply rate = distinct human-reply leads ÷ contacted. Golden: 72/867 = 8.3%. */
+  deliveryConfirmed(scope: MetricScope = {}): Promise<number> {
+    return q.countDeliveryConfirmed(this.db, scope);
+  }
+
+  pendingDeliveryConfirmation(scope: MetricScope = {}): Promise<number> {
+    return q.countPendingDeliveryConfirmation(this.db, scope);
+  }
+
+  /** Reply rate = distinct human-reply leads ÷ accepted recipients. Golden: 72/885 = 8.1%. */
   async replyRate(scope: MetricScope = {}): Promise<Metric> {
     const [n, d] = await Promise.all([
       q.countDistinctRepliers(this.db, scope),
@@ -35,7 +43,7 @@ export class MetricsEngine {
     return pct(n, d);
   }
 
-  /** Positive rate = leads with an effectively-positive reply ÷ contacted. Golden: 28/867 = 3.2%. */
+  /** Positive rate = leads with an effectively-positive reply ÷ accepted recipients. */
   async positiveReplyRate(scope: MetricScope = {}): Promise<Metric> {
     const [n, d] = await Promise.all([
       q.countPositiveReplierLeads(this.db, scope),
@@ -44,7 +52,7 @@ export class MetricsEngine {
     return pct(n, d);
   }
 
-  /** Meetings booked (absolute) + per-100-contacted. Golden: 17, 2.0. */
+  /** Meetings booked (absolute) + per-100-contacted. Golden: 17, 1.9. */
   async meetings(scope: MetricScope = {}): Promise<{ count: number; per100: number }> {
     const [n, d] = await Promise.all([
       q.countEvents(this.db, 'meeting_booked', scope),
@@ -71,7 +79,7 @@ export class MetricsEngine {
     return pct(n, d);
   }
 
-  /** Unsubscribe rate = distinct unsubscribed leads ÷ contacted. Golden: 40/867 = 4.6%. */
+  /** Unsubscribe rate = distinct unsubscribed leads ÷ accepted recipients. Golden: 40/885. */
   async unsubscribeRate(scope: MetricScope = {}): Promise<Metric> {
     const [n, d] = await Promise.all([
       q.countUnsubscribedLeads(this.db, scope),
@@ -80,7 +88,7 @@ export class MetricsEngine {
     return pct(n, d);
   }
 
-  /** Progress = contacted ÷ total enrollments. Golden: 867/885. */
+  /** Progress = accepted recipients ÷ total enrollments. Golden: 885/885. */
   async progress(scope: MetricScope = {}): Promise<Metric> {
     const [n, d] = await Promise.all([
       q.countContacted(this.db, scope),
@@ -94,11 +102,13 @@ export class MetricsEngine {
     const rows = await q.stepStats(this.db, scope);
     return rows.map((r) => ({
       stepNo: r.step_no,
+      sent: r.sent,
       delivered: r.delivered,
+      pendingDeliveryConfirmation: r.pending,
       repliers: r.repliers,
       positiveRepliers: r.positive_repliers,
-      stepReplyRate: pct(r.repliers, r.delivered),
-      positiveRate: pct(r.positive_repliers, r.delivered),
+      stepReplyRate: pct(r.repliers, r.sent),
+      positiveRate: pct(r.positive_repliers, r.sent),
     }));
   }
 
@@ -108,6 +118,8 @@ export class MetricsEngine {
     return rows.map((r) => ({
       tier: r.tier,
       contacted: r.contacted,
+      delivered: r.delivered,
+      pendingDeliveryConfirmation: r.pending,
       replyRate: pct(r.repliers, r.contacted),
       positiveRate: pct(r.positive_repliers, r.contacted),
       meetings: r.meetings,

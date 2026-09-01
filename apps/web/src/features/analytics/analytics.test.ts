@@ -12,34 +12,76 @@ import {
 } from './reconciliation';
 
 const steps: StepAnalyticsRow[] = [
-  { step_no: 1, delivered: 867, positive_replies: 15, positive_rate: m(15, 867, 1.7) },
-  { step_no: 2, delivered: 831, positive_replies: 9, positive_rate: m(9, 831, 1.1) },
-  { step_no: 3, delivered: 801, positive_replies: 1, positive_rate: m(1, 801, 0.1) },
-  { step_no: 4, delivered: 789, positive_replies: 3, positive_rate: m(3, 789, 0.4) },
+  {
+    step_no: 1,
+    sent: 885,
+    delivered: 867,
+    pending_delivery_confirmation: 0,
+    replies: 30,
+    reply_rate: m(30, 885, 3.4),
+    positive_replies: 15,
+    positive_rate: m(15, 885, 1.7),
+  },
+  {
+    step_no: 2,
+    sent: 831,
+    delivered: 831,
+    pending_delivery_confirmation: 0,
+    replies: 25,
+    reply_rate: m(25, 831, 3),
+    positive_replies: 9,
+    positive_rate: m(9, 831, 1.1),
+  },
+  {
+    step_no: 3,
+    sent: 801,
+    delivered: 801,
+    pending_delivery_confirmation: 0,
+    replies: 10,
+    reply_rate: m(10, 801, 1.2),
+    positive_replies: 1,
+    positive_rate: m(1, 801, 0.1),
+  },
+  {
+    step_no: 4,
+    sent: 789,
+    delivered: 789,
+    pending_delivery_confirmation: 0,
+    replies: 7,
+    reply_rate: m(7, 789, 0.9),
+    positive_replies: 3,
+    positive_rate: m(3, 789, 0.4),
+  },
 ];
 
 const tiers: TierAnalyticsRow[] = [
   {
     tier: 'A',
-    contacted: 255,
-    reply_rate: m(33, 255, 12.9),
-    positive_rate: m(17, 255, 6.7),
+    contacted: 260,
+    delivered: 255,
+    pending_delivery_confirmation: 0,
+    reply_rate: m(33, 260, 12.7),
+    positive_rate: m(17, 260, 6.5),
     meetings: 13,
     mode: 'human_written',
   },
   {
     tier: 'B',
-    contacted: 447,
-    reply_rate: m(31, 447, 6.9),
-    positive_rate: m(8, 447, 1.8),
+    contacted: 455,
+    delivered: 447,
+    pending_delivery_confirmation: 0,
+    reply_rate: m(31, 455, 6.8),
+    positive_rate: m(8, 455, 1.8),
     meetings: 3,
     mode: 'template_researched',
   },
   {
     tier: 'C',
-    contacted: 165,
-    reply_rate: m(8, 165, 4.8),
-    positive_rate: m(3, 165, 1.8),
+    contacted: 170,
+    delivered: 165,
+    pending_delivery_confirmation: 0,
+    reply_rate: m(8, 170, 4.7),
+    positive_rate: m(3, 170, 1.8),
     meetings: 1,
     mode: 'template_auto',
   },
@@ -67,10 +109,10 @@ describe('reconciliation footers', () => {
     expect(stepsReconciliation(steps, null).ok).toBe(true);
   });
 
-  it('sums tier meetings and contacted (golden: 17 and 867)', () => {
-    expect(tiersReconciliation(tiers, 17, 867).map((c) => [c.label, c.sum, c.ok])).toEqual([
+  it('sums tier meetings and contacted (golden: 17 and 885)', () => {
+    expect(tiersReconciliation(tiers, 17, 885).map((c) => [c.label, c.sum, c.ok])).toEqual([
       ['meetings', 17, true],
-      ['contacted', 867, true],
+      ['contacted', 885, true],
     ]);
   });
 });

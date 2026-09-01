@@ -1,5 +1,14 @@
 import { useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { Skeleton } from '@/components/ui/skeleton';
+import {
+  Select,
+  SelectContent,
+  SelectGroup,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { EmptyState } from '@/components/shared/empty-state';
 import { useCampaignParam } from '@/components/layout/campaign-selector';
@@ -15,9 +24,9 @@ export default function AnalyticsPage() {
   const campaigns = useCampaigns();
   const selected = useCampaignParam();
   const campaignId = selected ?? campaigns.data?.items[0]?.id;
-  const campaign = campaigns.data?.items.find((c) => c.id === campaignId);
   const overview = useOverview(campaignId ?? 0);
   const [tab, setTab] = useState('variants');
+  const [searchParams, setSearchParams] = useSearchParams();
 
   if (campaigns.isPending) return <Skeleton className="m-6 h-64" />;
   if (campaignId === undefined) {
@@ -38,9 +47,29 @@ export default function AnalyticsPage() {
 
   return (
     <div className="space-y-4 p-4 sm:p-6">
-      <div className="flex items-baseline gap-2">
+      <div className="flex flex-wrap items-center justify-between gap-3">
         <h1 className="text-lg font-semibold">Analytics</h1>
-        {campaign && <span className="text-sm text-muted-foreground">· {campaign.name}</span>}
+        <Select
+          value={String(campaignId)}
+          onValueChange={(value) => {
+            const next = new URLSearchParams(searchParams);
+            next.set('campaign', value);
+            setSearchParams(next, { replace: true });
+          }}
+        >
+          <SelectTrigger size="sm" className="w-48" aria-label="Analytics campaign">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectGroup>
+              {(campaigns.data?.items ?? []).map((item) => (
+                <SelectItem key={item.id} value={String(item.id)}>
+                  {item.name}
+                </SelectItem>
+              ))}
+            </SelectGroup>
+          </SelectContent>
+        </Select>
       </div>
 
       <Tabs value={tab} onValueChange={setTab}>
@@ -54,12 +83,19 @@ export default function AnalyticsPage() {
         </div>
 
         <TabsContent value="variants" className="pt-4">
-          <VariantsTab campaignId={campaignId} campaignSequenceId={campaign?.sequence_id ?? null} />
+          <VariantsTab
+            campaignId={campaignId}
+            campaignSequenceId={
+              campaigns.data?.items.find((item) => item.id === campaignId)?.sequence_id ?? null
+            }
+          />
         </TabsContent>
         <TabsContent value="steps" className="pt-4">
           <StepsTab
             campaignId={campaignId}
-            sequenceId={campaign?.sequence_id ?? null}
+            sequenceId={
+              campaigns.data?.items.find((item) => item.id === campaignId)?.sequence_id ?? null
+            }
             campaignPositives={campaignPositives}
           />
         </TabsContent>

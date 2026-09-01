@@ -65,23 +65,40 @@ export async function analyticsRoutes(app: FastifyInstance, services: AppService
     async (req) => {
       await requireCampaign(req.query.campaign_id);
       const scope: MetricScope = { campaignId: req.query.campaign_id };
-      const [progress, reply, positive, meetings, hard, soft, unsub, cap, flags] =
-        await Promise.all([
-          metrics.progress(scope),
-          metrics.replyRate(scope),
-          metrics.positiveReplyRate(scope),
-          metrics.meetings(scope),
-          metrics.hardBounceRate(scope),
-          metrics.softBounceRate(scope),
-          metrics.unsubscribeRate(scope),
-          capacityToday({ db, clock }, req.query.campaign_id),
-          watchFlags(scope),
-        ]);
+      const [
+        progress,
+        deliveryConfirmed,
+        pendingDeliveryConfirmation,
+        reply,
+        positive,
+        meetings,
+        hard,
+        soft,
+        unsub,
+        cap,
+        flags,
+      ] = await Promise.all([
+        metrics.progress(scope),
+        metrics.deliveryConfirmed(scope),
+        metrics.pendingDeliveryConfirmation(scope),
+        metrics.replyRate(scope),
+        metrics.positiveReplyRate(scope),
+        metrics.meetings(scope),
+        metrics.hardBounceRate(scope),
+        metrics.softBounceRate(scope),
+        metrics.unsubscribeRate(scope),
+        capacityToday({ db, clock }, req.query.campaign_id),
+        watchFlags(scope),
+      ]);
       return {
         progress: {
           contacted: progress.numerator,
           total: progress.denominator,
           pct: progress.value,
+        },
+        delivery_confirmation: {
+          confirmed: deliveryConfirmed,
+          pending: pendingDeliveryConfirmation,
         },
         reply_rate: reply,
         positive_rate: positive,
@@ -210,11 +227,23 @@ export async function analyticsRoutes(app: FastifyInstance, services: AppService
       } else {
         campaignIds = await campaignIdsForSequence(db, req.query.sequence_id!);
       }
-      const byStep = new Map<number, { delivered: number; positive: number }>();
+      const byStep = new Map<
+        number,
+        { sent: number; delivered: number; pending: number; replies: number; positive: number }
+      >();
       for (const cid of campaignIds) {
         for (const s of await metrics.stepAnalytics({ campaignId: cid })) {
-          const agg = byStep.get(s.stepNo) ?? { delivered: 0, positive: 0 };
+          const agg = byStep.get(s.stepNo) ?? {
+            sent: 0,
+            delivered: 0,
+            pending: 0,
+            replies: 0,
+            positive: 0,
+          };
+          agg.sent += s.sent;
           agg.delivered += s.delivered;
+          agg.pending += s.pendingDeliveryConfirmation;
+          agg.replies += s.repliers;
           agg.positive += s.positiveRepliers;
           byStep.set(s.stepNo, agg);
         }
@@ -224,9 +253,13 @@ export async function analyticsRoutes(app: FastifyInstance, services: AppService
           .sort((a, b) => a[0] - b[0])
           .map(([step_no, agg]) => ({
             step_no,
+            sent: agg.sent,
             delivered: agg.delivered,
+            pending_delivery_confirmation: agg.pending,
+            replies: agg.replies,
+            reply_rate: pct(agg.replies, agg.sent),
             positive_replies: agg.positive,
-            positive_rate: pct(agg.positive, agg.delivered),
+            positive_rate: pct(agg.positive, agg.sent),
           })),
       };
     },
@@ -242,6 +275,8 @@ export async function analyticsRoutes(app: FastifyInstance, services: AppService
         // tierStats returns raw text columns; the response schema re-validates
         tier: t.tier as 'A' | 'B' | 'C' | 'nurture' | null,
         contacted: t.contacted,
+        delivered: t.delivered,
+        pending_delivery_confirmation: t.pendingDeliveryConfirmation,
         reply_rate: t.replyRate,
         positive_rate: t.positiveRate,
         meetings: t.meetings,

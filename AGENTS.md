@@ -37,9 +37,14 @@ commissioning** until the operator completes the handoffs below:
   the misleading single Draft target campaign with
   per-allocation generic-copy step selection, requires an explicit destination for campaigns with
   multiple Personalized Copy steps, preserves direct `step_N_*` mapping, and adds a named
-  no-activation/no-enrollment/no-send summary. Production has one unassigned global lead, two
-  draft campaigns, zero pool rows/enrollments/active or sendable work, and four healthy OAuth
-  mailboxes. Activation, enrollment, and sending remain separately unauthorized.
+  no-activation/no-enrollment/no-send summary. Those were the verified deployment-time baseline
+  facts; the later owner-controlled walkthrough changed live campaign/lead state under separate
+  authorization.
+- The 2026-09-01 owner-address walkthrough remediation is implemented and fully verified locally,
+  but not pushed or deployed. It closes the observed metric, analytics, campaign-progress,
+  campaign-context, Personalized Copy, import, timezone, unsubscribe, and rendering defects. No
+  migration or production mutation was made by this implementation. Gmail follow-up body-footer
+  visibility remains open for a separately approved owner-address canary.
 - The operator-approved 2026-08-25 ten-workstream implementation is complete and deployed through
   Stages 1–4: operational pagination; due-step Manual Compose; in-app reminders; verified
   timezone/folder controls; imported manual drafts; Auto Observation/sequence variables; staged
@@ -65,9 +70,9 @@ commissioning** until the operator completes the handoffs below:
 - The controlled Gmail acceptance batch is complete and the test campaign is **paused**. Do not
   resume it or create another test send without new per-send approval.
 - The two unsubscribe hosts, business postal address, and
-  `https://unsubscribe.{sender_domain}` template are configured. Do not claim the production Gmail
-  body link or RFC 8058 one-click behavior is verified until a separately approved owner-address
-  canary proves it.
+  `https://unsubscribe.{sender_domain}` template are configured. The production Gmail body-link
+  GET and confirm flow were verified with an owner-controlled address; RFC 8058 mailbox-client
+  one-click and follow-up body-footer visibility remain unverified.
 - Work on the current `canary` branch. Do not branch off, push to `main`, or merge to
   `main` without explicit authorization. Make surgical edits, preserve unrelated dirty-worktree
   changes, and commit each completed task on the current branch.
@@ -123,6 +128,11 @@ commissioning** until the operator completes the handoffs below:
   integration 168; API 140; GreenMail 29; golden exactly 47; mock E2E 62; real-backend E2E 1;
   production build; `checked 0 enrollments — 0 diff(s)`; and clean self-check. No migration,
   production mutation, activation, enrollment, or send was performed.
+- The 2026-09-01 walkthrough-remediation gate passed type/lint/format; unit 345; web 58;
+  integration 168; API 144; GreenMail 29; golden exactly 47; mock E2E 62; real-backend E2E 1;
+  production build; populated `checked 5 enrollments — 0 diff(s)`; clean self-check; and a
+  validated custom-format dump/scratch restore/rebuild/zero-drift/self-check. No migration,
+  production mutation, push, or deployment was performed.
 
 ## Production deployments
 
@@ -187,9 +197,12 @@ normal outreach-domain traffic redirects 308 to `https://sambhavbuilds.com/`; un
 serve only `/u/*` and return 404 elsewhere. The portfolio remains HTTP 200.
 
 - db/app/gateway/backup containers are healthy; only `127.0.0.1:18080` is published
-- production has four `google_oauth` mailboxes in `ok` state, one unassigned global lead, two
-  draft campaigns, and zero enrollments, available pooled leads, auto-enrollment-enabled
-  campaigns, active campaigns, or sendable enrollments, so no message can be scheduled
+- the 2026-08-31 deployment baseline was four healthy OAuth mailboxes, one global lead, two draft
+  campaigns, and zero enrollments. A later separately authorized walkthrough added five
+  operator-controlled leads across Atlas and Beacon and accepted 13 messages total; it also proved
+  body-link unsubscribe, reply `STOP`, global suppression, and reply ingestion. No prospect was
+  contacted. Inspect current live state before any operational action; do not infer it from the
+  earlier dormant snapshot
 - health and database checks pass; self-check is clean; projection dry-run is `0 diff(s)`
 - migrations through `0019_personalized_copy_two_tiers` are applied; the 2026-08-31 pre/post dumps
   `coldemail-20260831-133754.dump` (1,042,810 bytes) and
@@ -202,8 +215,9 @@ serve only `/u/*` and return 404 elsewhere. The portfolio remains HTTP 200.
   `coldemail-20260829-213315.dump` (816,236 bytes) passed `pg_restore --list`; the local 0018
   scratch restore drill passed; Spaceship AutoBackup remains configured with a five-backup limit
 - production Google OAuth credentials are configured on the VPS; never print or copy them
-- the business postal address and unsubscribe template are configured; the bounded owner-address
-  send/reply/unsubscribe canary remains separately operator-gated
+- the business postal address and unsubscribe template are configured; body-link confirmation is
+  proven on an owner-controlled address, while RFC 8058 client one-click and Gmail follow-up footer
+  visibility remain separately operator-gated
 
 The Oracle bounded catch-up/never-burst canary passed on 2026-08-20 UTC and remains paused. The
 accelerated settings were restored before the final deployment. Oracle is deployed on

@@ -13,11 +13,13 @@ import {
   importAllocationPreviewBodySchema,
   importAllocationPreviewResponseSchema,
   importsListResponseSchema,
+  okResponseSchema,
   pageQuerySchema,
   type ImportDto,
 } from '@coldemail/shared';
 import type { AppServices } from '../composition';
 import {
+  discardImportPreview,
   getImport,
   listImports,
   poolAllocationsByImportIds,
@@ -98,6 +100,27 @@ export async function importsRoutes(app: FastifyInstance, services: AppServices)
           invalid_drafts: preview.draftCounts.invalidDrafts,
         },
       };
+    },
+  );
+
+  r.delete(
+    '/imports/:id',
+    {
+      schema: {
+        params: idParamSchema,
+        response: { 200: okResponseSchema },
+      },
+    },
+    async (req) => {
+      const imp = await getImport(db, req.params.id);
+      if (!imp) throw AppError.notFound('import');
+      if (imp.committed) {
+        throw new AppError('conflict', 409, 'Committed import history cannot be discarded');
+      }
+      if (!(await discardImportPreview(db, imp.id))) {
+        throw new AppError('conflict', 409, 'Import preview changed and was not discarded');
+      }
+      return { ok: true } as const;
     },
   );
 

@@ -49,7 +49,21 @@ export function StepsTab({
       header: 'Step',
       cell: (row) => <span className="font-medium">Step {row.step_no}</span>,
     },
-    { key: 'delivered', header: 'Delivered', align: 'right', cell: (row) => row.delivered },
+    { key: 'sent', header: 'Sent', align: 'right', cell: (row) => row.sent },
+    { key: 'delivered', header: 'Confirmed', align: 'right', cell: (row) => row.delivered },
+    {
+      key: 'pending',
+      header: 'Pending',
+      align: 'right',
+      cell: (row) => row.pending_delivery_confirmation,
+    },
+    { key: 'replies', header: 'Replies', align: 'right', cell: (row) => row.replies },
+    {
+      key: 'reply-rate',
+      header: 'Reply %',
+      align: 'right',
+      cell: (row) => `${row.reply_rate.value}%`,
+    },
     {
       key: 'positive',
       header: 'Positive replies',
@@ -102,8 +116,8 @@ export function StepsTab({
         <div className="space-y-2 text-xs">
           <p>
             💡 Step {weakest.step_no}&apos;s positive rate is {weakest.positive_rate.value}% over{' '}
-            {weakest.delivered} delivered — dead weight. Removing it tightens the sequence without
-            losing real interest.
+            {weakest.sent} sent — dead weight. Removing it tightens the sequence without losing real
+            interest.
           </p>
           {sequenceId !== null ? (
             <Button variant="outline" size="sm" asChild>

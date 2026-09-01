@@ -29,6 +29,9 @@ test('bulk-tier the untiered cohort clears the banner', async ({ page }) => {
 
   await expect(page.getByText('18 leads re-tiered')).toBeVisible();
   await expect(page.getByTestId('untiered-banner')).not.toBeVisible();
+  await expect(page.getByTestId('tier-count-B')).toHaveText('0');
+  await expect(page.getByText(/They no longer match the current tier/)).toBeVisible();
+  await page.getByRole('button', { name: 'Show campaign leads' }).click();
   await expect(page.getByTestId('tier-count-B')).toHaveText('630');
 });
 

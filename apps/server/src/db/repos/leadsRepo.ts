@@ -10,6 +10,7 @@ import {
   incomingMessages,
   leads,
   personalizedCopySources,
+  sequenceSteps,
   sentMessages,
 } from '../schema';
 
@@ -171,6 +172,7 @@ export interface LeadListItem {
     campaignName: string;
     currentState: string;
     currentStepNo: number;
+    awaitingCompletion: boolean;
   } | null;
   poolAssignment: {
     campaignId: number;
@@ -204,7 +206,13 @@ export async function listLeads(
 
   const latestByLead = new Map<
     number,
-    { campaignId: number; campaignName: string; currentState: string; currentStepNo: number }
+    {
+      campaignId: number;
+      campaignName: string;
+      currentState: string;
+      currentStepNo: number;
+      awaitingCompletion: boolean;
+    }
   >();
   const poolByLead = new Map<
     number,
@@ -221,6 +229,12 @@ export async function listLeads(
         campaignId: enrollments.campaignId,
         currentState: enrollments.currentState,
         currentStepNo: enrollments.currentStepNo,
+        awaitingCompletion: sql<boolean>`${enrollments.currentState} = 'ACTIVE'
+          AND ${enrollments.nextSendAt} IS NULL
+          AND ${campaigns.sequenceId} IS NOT NULL
+          AND ${enrollments.currentStepNo} > COALESCE(
+            (SELECT max(ss.step_no) FROM ${sequenceSteps} ss
+             WHERE ss.sequence_id = ${campaigns.sequenceId}), 0)`,
         id: enrollments.id,
         campaignName: campaigns.name,
       })
@@ -248,6 +262,7 @@ export async function listLeads(
         campaignName: e.campaignName,
         currentState: e.currentState,
         currentStepNo: e.currentStepNo,
+        awaitingCompletion: e.awaitingCompletion,
       });
     }
     const poolRows = await db
@@ -293,6 +308,12 @@ export async function latestEnrollmentLite(
       campaignName: campaigns.name,
       currentState: enrollments.currentState,
       currentStepNo: enrollments.currentStepNo,
+      awaitingCompletion: sql<boolean>`${enrollments.currentState} = 'ACTIVE'
+        AND ${enrollments.nextSendAt} IS NULL
+        AND ${campaigns.sequenceId} IS NOT NULL
+        AND ${enrollments.currentStepNo} > COALESCE(
+          (SELECT max(ss.step_no) FROM ${sequenceSteps} ss
+           WHERE ss.sequence_id = ${campaigns.sequenceId}), 0)`,
     })
     .from(enrollments)
     .innerJoin(campaigns, eq(campaigns.id, enrollments.campaignId))
@@ -314,6 +335,29 @@ export async function untieredCount(db: DbLike, filter: LeadFilter = {}): Promis
     .from(leads)
     .where(where);
   return rows[0]?.n ?? 0;
+}
+
+export interface LeadTierCounts {
+  A: number;
+  B: number;
+  untiered: number;
+  nurture: number;
+}
+
+/** Filter-scoped distribution used by the Leads header and bulk-tier workflow. */
+export async function tierCounts(db: DbLike, filter: LeadFilter): Promise<LeadTierCounts> {
+  const where = leadFilterWhere(filter);
+  const rows = await db
+    .select({
+      A: sql<number>`count(*) FILTER (WHERE ${leads.tier} = 'A')::int`,
+      B: sql<number>`count(*) FILTER (WHERE ${leads.tier} = 'B')::int`,
+      untiered: sql<number>`count(*) FILTER (
+        WHERE ${leads.tier} IS NULL AND ${leads.outreachStatus} = 'standard')::int`,
+      nurture: sql<number>`count(*) FILTER (WHERE ${leads.outreachStatus} = 'nurture')::int`,
+    })
+    .from(leads)
+    .where(where);
+  return rows[0] ?? { A: 0, B: 0, untiered: 0, nurture: 0 };
 }
 
 /** B6.3 PATCH /leads/:id — tier, notes, custom_fields (custom_observation lives there). */

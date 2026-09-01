@@ -40,7 +40,11 @@
       "recycle_sources": [],
       "recycled_from_campaign_id": null,
       "enrolled_count": 885,
-      "contacted_count": 867,
+      "contacted_count": 885,
+      "delivery_confirmed_count": 867,
+      "pending_delivery_confirmation_count": 0,
+      "finished_count": 885,
+      "finishing_count": 0,
       "manual_only_count": 0
     }
   ],

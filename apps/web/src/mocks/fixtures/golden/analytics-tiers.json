@@ -1,31 +1,35 @@
 [
   {
     "tier": "A",
-    "contacted": 255,
+    "contacted": 260,
+    "delivered": 255,
+    "pending_delivery_confirmation": 0,
     "reply_rate": {
       "numerator": 33,
-      "denominator": 255,
-      "value": 12.9
+      "denominator": 260,
+      "value": 12.7
     },
     "positive_rate": {
       "numerator": 17,
-      "denominator": 255,
-      "value": 6.7
+      "denominator": 260,
+      "value": 6.5
     },
     "meetings": 13,
     "mode": "human_written"
   },
   {
     "tier": "B",
-    "contacted": 447,
+    "contacted": 455,
+    "delivered": 447,
+    "pending_delivery_confirmation": 0,
     "reply_rate": {
       "numerator": 31,
-      "denominator": 447,
-      "value": 6.9
+      "denominator": 455,
+      "value": 6.8
     },
     "positive_rate": {
       "numerator": 8,
-      "denominator": 447,
+      "denominator": 455,
       "value": 1.8
     },
     "meetings": 3,
@@ -33,15 +37,17 @@
   },
   {
     "tier": "C",
-    "contacted": 165,
+    "contacted": 170,
+    "delivered": 165,
+    "pending_delivery_confirmation": 0,
     "reply_rate": {
       "numerator": 8,
-      "denominator": 165,
-      "value": 4.8
+      "denominator": 170,
+      "value": 4.7
     },
     "positive_rate": {
       "numerator": 3,
-      "denominator": 165,
+      "denominator": 170,
       "value": 1.8
     },
     "meetings": 1,

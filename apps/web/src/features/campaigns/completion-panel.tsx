@@ -40,9 +40,10 @@ export function CompletionPanel({
       data-testid="completion-panel"
     >
       <div>
-        <h2 className="text-sm font-semibold">Campaign complete</h2>
+        <h2 className="text-sm font-semibold">Current enrollments finished</h2>
         <p className="text-xs text-muted-foreground">
-          Every enrollment reached a terminal state — nothing is scheduled to send.
+          Every current enrollment reached a terminal state, so nothing is scheduled to send. The
+          campaign can remain active for a future imported batch.
         </p>
       </div>
 

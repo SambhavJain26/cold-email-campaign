@@ -1,4 +1,4 @@
-import { eq, inArray } from 'drizzle-orm';
+import { eq, inArray, sql } from 'drizzle-orm';
 import type { DbLike } from '../client';
 import { mailboxes, mailboxSecrets } from '../schema';
 
@@ -33,6 +33,14 @@ export async function getMailbox(db: DbLike, id: number): Promise<MailboxRow | u
 
 export async function listMailboxes(db: DbLike): Promise<MailboxRow[]> {
   return db.select().from(mailboxes).orderBy(mailboxes.id);
+}
+
+/** PostgreSQL is the runtime consumer of persisted timezone identifiers. */
+export async function databaseAcceptsTimezone(db: DbLike, timezone: string): Promise<boolean> {
+  const result = await db.execute(
+    sql`SELECT EXISTS (SELECT 1 FROM pg_timezone_names WHERE name = ${timezone}) AS accepted`,
+  );
+  return (result.rows[0] as { accepted?: boolean } | undefined)?.accepted === true;
 }
 
 export async function listMailboxesByStatus(

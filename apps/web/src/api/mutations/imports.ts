@@ -2,6 +2,7 @@ import { useMutation, useQueryClient } from '@tanstack/react-query';
 import {
   commitImportResponseSchema,
   importPreviewResponseSchema,
+  okResponseSchema,
   type CommitImportBody,
 } from '@coldemail/shared';
 import { apiFetch } from '../client';
@@ -31,5 +32,14 @@ export function useCommitImport() {
     onSuccess: () => {
       invalidateOperational(qc);
     },
+  });
+}
+
+export function useDiscardImportPreview() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (importId: number) =>
+      apiFetch(`/imports/${importId}`, okResponseSchema, { method: 'DELETE' }),
+    onSuccess: () => void qc.invalidateQueries({ queryKey: ['imports'] }),
   });
 }

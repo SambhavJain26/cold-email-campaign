@@ -106,16 +106,36 @@ export default function CampaignsPage() {
       key: 'contacted',
       header: 'Contacted',
       align: 'right',
-      cell: (campaign) => campaign.contacted_count,
+      cell: (campaign) => (
+        <div className="text-right">
+          <div>{campaign.contacted_count}</div>
+          {campaign.pending_delivery_confirmation_count > 0 && (
+            <div className="text-xs text-muted-foreground">
+              {campaign.pending_delivery_confirmation_count} awaiting confirmation
+            </div>
+          )}
+        </div>
+      ),
     },
     {
       key: 'progress',
-      header: 'Progress',
+      header: 'Journey progress',
       cell: (campaign) => (
-        <ProgressBar
-          value={campaign.contacted_count}
-          max={campaign.enrolled_count === 0 ? null : campaign.enrolled_count}
-        />
+        <div className="flex min-w-36 flex-col gap-1">
+          <ProgressBar
+            label="Finished"
+            value={campaign.finished_count}
+            max={campaign.enrolled_count === 0 ? null : campaign.enrolled_count}
+          />
+          {campaign.enrolled_count > 0 && campaign.finished_count === campaign.enrolled_count && (
+            <span className="text-xs text-success">All current enrollments finished</span>
+          )}
+          {campaign.finishing_count > 0 && (
+            <span className="text-xs text-muted-foreground">
+              {campaign.finishing_count} finishing after the last step
+            </span>
+          )}
+        </div>
       ),
     },
     {

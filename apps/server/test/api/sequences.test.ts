@@ -253,6 +253,94 @@ describe('B6.5 sequences', () => {
     expect(missingVariant.statusCode).toBe(404); // variant belongs to step 1
   });
 
+  it('previews exact campaign copy and derives Tier B Auto Observation in campaign context', async () => {
+    const sequence = (
+      await h.inject({
+        method: 'POST',
+        url: '/api/v1/sequences',
+        payload: {
+          name: 'Personalized preview sequence',
+          stop_on_reply: true,
+          stop_on_hard_bounce: true,
+          stop_on_unsubscribe: true,
+          steps: [
+            {
+              step_no: 1,
+              wait_days: 0,
+              in_thread: false,
+              content_source: 'personalized',
+              variants: [],
+            },
+            {
+              step_no: 2,
+              wait_days: 1,
+              in_thread: true,
+              content_source: 'template',
+              variants: [
+                {
+                  label: 'A',
+                  subject_template: 'Follow-up',
+                  body_template: '{{custom_observation}}',
+                  active: true,
+                },
+              ],
+            },
+          ],
+        },
+      })
+    ).json();
+    const campaignId = (
+      await h.pool.query(
+        `INSERT INTO campaigns
+           (name, status, sequence_id, auto_observation_field, auto_observation_rules)
+         VALUES ('Preview campaign', 'draft', $1, 'state', '{"TX":"Tier B auto observation"}')
+         RETURNING id`,
+        [sequence.id],
+      )
+    ).rows[0].id as number;
+
+    const saved = await h.inject({
+      method: 'PUT',
+      url: `/api/v1/leads/1/campaigns/${campaignId}/steps/1/personalized-copy`,
+      payload: {
+        subject: 'Exact personalized subject',
+        body: 'Exact personalized body for Amy.',
+        action: 'mark_ready',
+        replace: true,
+      },
+    });
+    expect(saved.statusCode).toBe(200);
+
+    const personalized = await h.inject({
+      method: 'POST',
+      url: `/api/v1/sequences/${sequence.id}/preview`,
+      payload: { lead_id: 1, step_no: 1, campaign_id: campaignId },
+    });
+    expect(personalized.statusCode).toBe(200);
+    expect(personalized.json()).toMatchObject({
+      subject: 'Exact personalized subject',
+      personalized_copy_status: 'ready',
+      resolution_trace: { render_mode: 'template_auto' },
+    });
+    expect(personalized.json().body).toContain('Exact personalized body for Amy.');
+    expect(personalized.json().body).toContain('100 Test Street');
+
+    const template = await h.inject({
+      method: 'POST',
+      url: `/api/v1/sequences/${sequence.id}/preview`,
+      payload: {
+        lead_id: 1,
+        step_no: 2,
+        variant_id: sequence.steps[1].variants[0].id,
+        campaign_id: campaignId,
+      },
+    });
+    expect(template.statusCode).toBe(200);
+    expect(template.json().body).toContain('Tier B auto observation');
+    expect(template.json().body).not.toContain('your Dallas listings move fast');
+    expect(template.json().resolution_trace.render_mode).toBe('template_auto');
+  });
+
   it('validate-template returns tokens, errors, and the variation count', async () => {
     const ok = (
       await h.inject({

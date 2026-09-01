@@ -19,6 +19,15 @@ export async function getImport(db: DbLike, id: number): Promise<ImportRow | und
   return rows[0];
 }
 
+/** Remove an abandoned preview and its staged rows. Committed imports remain immutable. */
+export async function discardImportPreview(db: DbLike, id: number): Promise<boolean> {
+  const deleted = await db
+    .delete(imports)
+    .where(and(eq(imports.id, id), eq(imports.committed, false)))
+    .returning({ id: imports.id });
+  return deleted.length === 1;
+}
+
 export async function insertImportRows(
   db: DbLike,
   rows: Array<Omit<typeof importRows.$inferInsert, 'id' | 'leadId'>>,

@@ -34,22 +34,27 @@ commissioning**:
   campaign with
   per-allocation generic-copy step selection, requires an explicit destination when a campaign has
   multiple Personalized Copy steps, preserves direct `step_N_*` mappings, and previews the exact
-  no-activation/no-enrollment/no-send outcome. Production has one unassigned global lead, two draft
-  campaigns, and zero pool rows/enrollments/active or sendable work. Activation, enrollment, and
-  sends remain separately gated.
+  no-activation/no-enrollment/no-send outcome. Those were the deployment-time baseline facts; the
+  later owner-controlled walkthrough changed live campaign/lead state under separate authorization.
+- **2026-09-01 walkthrough remediation:** the owner-address findings are implemented and fully
+  verified locally, but not pushed or deployed. The candidate corrects metric/analytics semantics,
+  campaign progress/context, Personalized Copy scope/preview, import UX, timezone validation,
+  unsubscribe state, and email rendering. It adds no migration and made no production mutation.
+  Gmail follow-up body-footer visibility still requires a separately approved real-provider test.
 - The operator-approved Spaceship deployment, subpath support, sender-domain unsubscribe routing,
   and individual Google Workspace OAuth implementation are complete. Do not extend production
   scope or change DNS/Caddy/mailboxes outside the approved commissioning steps without fresh
   authorization.
 - The public unsubscribe hosts, business postal address, and sender-domain unsubscribe template are
-  configured. The production Gmail body link and one-click behavior still need the separately
-  approved owner-address canary.
+  configured. The Gmail body-link GET and confirm flow are verified on an owner-controlled address;
+  RFC 8058 mailbox-client one-click and Gmail follow-up footer visibility remain unverified.
 - Do not start a real cohort or send new external campaign mail without explicit approval for that specific send. This covers sending mail, activating or resuming a campaign, enrolling leads, altering live campaign state, and contacting prospects — each needs its own approval.
 - The approved, controlled Gmail acceptance batch is complete. The test campaign is paused; do not resume it or create additional test sends without new, per-send operator approval. Read the runbook for the authoritative recipient, outcome, and verification record.
 - The deployed production facts and remaining operator handoffs are recorded in
   [docs/16-deployment-ops.md](docs/16-deployment-ops.md) §8 and docs/17. The OAuth client, one
-  account-matched OAuth mailbox, business address, and unsubscribe template are configured; do not
-  call the production body link or one-click behavior proven until that live canary passes.
+  account-matched OAuth mailbox, business address, and unsubscribe template are configured. Do not
+  call RFC 8058 client one-click or Gmail follow-up footer visibility proven until a matching live
+  canary passes.
 - **Never ask the operator to paste passwords, app passwords, `SECRET_KEY`/`SESSION_KEY`, or `.env`/`.env.prod` contents.** App passwords are typed into the Mailboxes screen and sealed with libsodium; secrets never belong in chat, logs, or the repo.
 - Do not deploy unless the operator explicitly authorizes it (see Production deployments below).
 
@@ -94,6 +99,11 @@ Treat the runbook as the **durable status record** — task chips and chat summa
   integration 168; API 140; GreenMail 29; golden exactly 47; mock E2E 62; real-backend E2E 1;
   production build; `checked 0 enrollments — 0 diff(s)`; and clean self-check. No migration or
   production mutation occurred.
+- The 2026-09-01 walkthrough-remediation gate passed type/lint/format; unit 345; web 58;
+  integration 168; API 144; GreenMail 29; golden exactly 47; mock E2E 62; real-backend E2E 1;
+  production build; populated `checked 5 enrollments — 0 diff(s)`; clean self-check; and a
+  validated custom-format dump/scratch restore/rebuild/zero-drift/self-check. No migration,
+  production mutation, push, or deployment occurred.
 
 ## Production deployments
 
@@ -163,10 +173,11 @@ After an authorized deploy, verify container health, `https://localhost/health`,
   paused. Health, self-check, backup, and `checked 24 enrollments — 0 diff(s)` are clean.
 - **Spaceship production:** deployed 2026-08-22 and advanced through the verified Personalized
   Copy/two-tier/campaign-filter and import-wizard clarity release `a15f70d` on 2026-08-31. It has
-  four `google_oauth` mailboxes in `ok` state, one unassigned global lead, two draft campaigns, and
-  zero enrollments,
-  available pooled leads, auto-enrollment-enabled campaigns, active campaigns, or sendable
-  enrollments. DNS, TLS,
+  four `google_oauth` mailboxes. The 2026-08-31 deployment baseline had one global lead, two draft
+  campaigns, and zero enrollments; the separately authorized walkthrough later added five
+  operator-controlled leads across Atlas and Beacon and accepted 13 messages. Body-link
+  unsubscribe, reply `STOP`, global suppression, and reply ingestion were observed; no prospect
+  was contacted. Inspect current live state before operational work. DNS, TLS,
   the `/email-campaign/` SPA/API subpath, outreach
   redirects, and the two isolated unsubscribe hosts are live. Containers and health are green;
   migration 0019, self-check, and zero drift pass; both deployment dumps passed catalog validation
@@ -176,11 +187,11 @@ After an authorized deploy, verify container health, `https://localhost/health`,
   moved to the one-word `canary` branch. Spaceship was rebuilt from documentation wrap `0299e42`;
   migrations, routes, self-check, zero drift, dormant state, and fresh backups all passed. The
   application code remained `6ca1183` at that checkpoint; Oracle and `main` were unchanged.
-- **Still open, deliberately:** obtain separate authorization for the one-message owner-address
-  send/reply/unsubscribe canary. The business address, sender-domain unsubscribe template,
-  production Internal Google OAuth credentials, and four account-matched OAuth mailboxes are
-  configured.
-  Finding #12 still needs warmed-domain evidence; provider DSN/OOO fixture capture remains deferred.
+- **Still open, deliberately:** RFC 8058 mailbox-client one-click and Gmail follow-up body-footer
+  visibility need separately authorized owner-address evidence. The business address,
+  sender-domain unsubscribe template, production Internal Google OAuth credentials, and four
+  account-matched OAuth mailboxes are configured. Finding #12 still needs warmed-domain evidence;
+  provider DSN/OOO fixture capture remains deferred.
 
 **Build history:** M0 (docs), **B0–B7** (foundation → event log → metrics → mock transport/scheduler/poller → render → ingest → API layer → hardening/ops), **F0–F8** (full web track) and **B8.1–B8.2** (live `SmtpImapTransport` + the `MAIL_TRANSPORT` flag swap) are complete — **M1 proven core** ✅, **M2 operable workflow** ✅, **M3 full product (offline)** ✅. A post-M3 audit against docs/14/15 + the decision register (2026-07-25) closed the four specified-but-unbuilt items — decision E, `provider_blocked`, runtime mailbox poll registration, the password-reset CLI (sweep facts below). **Check [PROGRESS.md](PROGRESS.md) for the current task pointer before starting work** — but note its "no code work is outstanding" framing predates the 2026-08-09 correction.
 
@@ -194,7 +205,7 @@ Sweep facts that bite (2026-07-25): **decision E is live** — `SentimentSuggest
 
 B8 facts that bite: `SmtpImapTransport` (`transport/smtpImap/`) gets host/credentials/UID-high-water from an injected `MailboxConnectionProvider` (transport/ may not touch the DB) — `DbMailboxConnectionProvider` unseals the password per call, so a reconnect takes effect without a restart (the SMTP pool is keyed by a credential signature). **IMAP's `UID FETCH n:*` returns the LAST message when `n` is past the highest UID** — `fetchNew` MUST filter `uid > lastPollUid` client-side or every poll re-delivers the newest message. **A new or legacy-zero `last_poll_uid` is initialized from UIDNEXT** at create/reconnect (finding #16) — a zero default would ingest the mailbox's entire history (12,581 messages back to 2022 on the real canary). **mailparser puts the `message/delivery-status` part in `attachments`, not `text`** — `parse.ts` rebuilds `bodyText` from both parts or every DSN is unparseable. Unknown SMTP errors classify TRANSIENT on purpose (never terminal a lead on a guess); 5xx at RCPT/DATA (`EENVELOPE`/`EMESSAGE`) is recipient-scoped, everything else 5xx is mailbox-scoped. A late ImapFlow connection-close event could restart the worker — fixed in `5ae3265`. Test rig = **GreenMail in Docker** (`docker compose up -d greenmail`; `npm run test:mail`): user spec must be `<email>:<password>` so the login is the full address; auth is deliberately NOT disabled; `POST :18080/api/service/reset` purges between tests; the image has no curl/wget/nc (healthcheck uses bash `/dev/tcp`). GreenMail accepts EVERY recipient, so a 5xx-recipient rejection can only be proven at the real canary.
 
-Live-operation facts that bite (B8.3-local): **`scheduler-tick` and `imap-poll-*` used to share `*/5 * * * *`**, so a reply and its follow-up could interleave 193 ms apart with `stop_on_reply = true`. The offline suites structurally cannot catch this — the scenario runner drives jobs through an inline queue, so poll and tick never run concurrently. Fixed by an enrollment lock + a send-time projection re-read inside the append transaction, plus a staggered poll cron; keep both. **Reply stopping is per sequence** — with `stop_on_reply` disabled a human reply records metrics while later steps stay active; hard bounces and STOP/unsubscribe always end sending. `contacted` is the distinct-lead union of `delivered` and `human_reply` (a reply can precede its confirm window). Scheduler blockers are **database-backed episodes** so a worker restart cannot duplicate their alerts. Same-value `sentiment_tagged` is server-idempotent and the selected UI tag is disabled — genuine retagging still appends a new fact. A one-off operational script that appends a send **must start `Jobs`**, or the delayed confirm-delivery job is silently never scheduled (this happened live; the missing job had to be restored by hand). Canary evidence queries must group sends by the dedicated `events.mailbox_id` column, not `attributes.mailbox_id`; the latter produced a false burst failure during the final wrap. In the production backup container the executable is `/usr/local/bin/backup.sh`, not `/backup.sh`.
+Live-operation facts that bite (B8.3-local): **`scheduler-tick` and `imap-poll-*` used to share `*/5 * * * *`**, so a reply and its follow-up could interleave 193 ms apart with `stop_on_reply = true`. The offline suites structurally cannot catch this — the scenario runner drives jobs through an inline queue, so poll and tick never run concurrently. Fixed by an enrollment lock + a send-time projection re-read inside the append transaction, plus a staggered poll cron; keep both. **Reply stopping is per sequence** — with `stop_on_reply` disabled a human reply records metrics while later steps stay active; hard bounces and STOP/unsubscribe always end sending. `contacted` is the distinct-lead set with an accepted `sent` event; delivery-confirmed and confirmation-pending are separate states so early recipient actions cannot produce rates over 100%. Scheduler blockers are **database-backed episodes** so a worker restart cannot duplicate their alerts. Same-value `sentiment_tagged` is server-idempotent and the selected UI tag is disabled — genuine retagging still appends a new fact. A one-off operational script that appends a send **must start `Jobs`**, or the delayed confirm-delivery job is silently never scheduled (this happened live; the missing job had to be restored by hand). Canary evidence queries must group sends by the dedicated `events.mailbox_id` column, not `attributes.mailbox_id`; the latter produced a false burst failure during the final wrap. In the production backup container the executable is `/usr/local/bin/backup.sh`, not `/backup.sh`.
 
 Guardrail / preflight / folder facts that bite (0011–0012): **launch guardrails are ceilings on CONFIGURATION, not on behaviour** — `max_mailbox_daily_cap` (50) is checked on mailbox create AND patch; every draft campaign ramp-stage save is checked against `max_ramp_daily_enroll_cap` and `min_ramp_days`; `min_ramp_days=0` means not enforced and preflight reports that as not-launch-ready. The **preflight's DNS resolver is an injected port** (`services/preflight.ts` + `services/dnsResolver.ts`, wired in composition, `dns` on `AppServices`) so the report is unit-testable offline — **DKIM reports `unknown`, never `fail`**, because selectors cannot be enumerated over DNS and a miss is not evidence of absence. **IMAP UIDs are FOLDER-scoped** (0012): `mailbox_poll_cursors` is keyed `(mailbox_id, folder)`, `IncomingMessage.folder` is what the poller advances against, and `MailboxConnection.folders` replaced `lastPollUid` — treating a cursor as mailbox-wide is a bug. `mailboxes.last_poll_uid` is RETAINED (not dropped) purely so 0012's backfill is reversible. Folder discovery validates selected names, and every newly selected folder seeds from its OWN UIDNEXT in the save transaction (finding #16 applies per folder — adding Spam later would otherwise ingest that folder's whole history). `POST /leads` (finding #10) builds a one-row CSV and runs the SAME `createImportPreview`+`commitImport` as an upload in `drop_flagged` mode — never reimplement hygiene there; the cost is one `imports` row per lead, kept deliberately.
 
@@ -233,7 +244,7 @@ F3 facts that bite: `POST /auth/login` returns `{ok:true}` (the session cookie c
 
 F2 facts that bite: mutation-level `onSuccess` must NOT return the `invalidateQueries` promise — React Query awaits it before per-call callbacks, and if the refetch unmounts the calling component (failure panels that disappear on success), the caller's `mutate()` callbacks are silently skipped. Convention: `onSuccess: () => void qc.invalidateQueries(…)`. The react-hooks compiler rules (eslint) ban setState-inside-useEffect and ref-access-during-render — reset dialog-local state in event handlers (onOpenChange), track cross-component dirty state with guarded useState, not refs.
 
-F1 facts that bite: the shadcn registry now emits **React-19-style components (ref as a prop)** — on React 18 those refs are SILENTLY dropped (RHF `register()` sees `undefined` for every field; Radix `asChild` anchors lose their node). `ui/input.tsx`, `ui/textarea.tsx`, `ui/button.tsx` are converted to `forwardRef` — do the same for any newly-added primitive that receives external refs. Campaign context = URL `?campaign=` (read via `useCampaignParam()` from `components/layout/campaign-selector.tsx`; AppShell NavLinks preserve it) — the selector must **not** clear a valid deep link while the campaigns query is still loading, or Overview/Leads/Analytics silently switch to the first campaign. Mutation failures already toast globally (MutationCache in `queryClient.ts`) — don't double-toast in screens; e2e asserting an error message must scope to `role=alert` or the toast region or strict mode trips on the duplicate.
+F1 facts that bite: the shadcn registry now emits **React-19-style components (ref as a prop)** — on React 18 those refs are SILENTLY dropped (RHF `register()` sees `undefined` for every field; Radix `asChild` anchors lose their node). `ui/input.tsx`, `ui/textarea.tsx`, `ui/button.tsx` are converted to `forwardRef` — do the same for any newly-added primitive that receives external refs. Shared campaign context = URL `?campaign=` on Overview only (read via `useCampaignParam()`); global NavLinks do not propagate it. Leads and Analytics use explicit page-local campaign filters, and global screens stay unscoped. Mutation failures already toast globally (MutationCache in `queryClient.ts`) — don't double-toast in screens; e2e asserting an error message must scope to `role=alert` or the toast region or strict mode trips on the duplicate.
 
 F0 facts that bite: `apps/web` runs mock-first — MSW serves the full docs/10 contract from golden-fixture-derived state (`src/mocks/db.ts`); `VITE_API_MODE=real` disables the worker and proxies /api→:3001 (server PORT default). Mock session persists in sessionStorage `mock:auth`; failure fixtures (mailbox 3 auth_failed, 4 auto_paused, catchup alerts) toggle via localStorage `mock:failures`='1' — both read at db-build time, so toggling needs a reload. ALL server calls go through `api/client.ts` (zod-parses every response with the shared schema — client-side decision-H tripwire; 401 → central redirect, `skipUnauthorizedHandler` for /auth/me + login). Visible operational data refreshes every 30 seconds and operator actions invalidate dependent live views immediately. Version locks (decision S): react-router-dom **6** (not 7), recharts **2**, React **18**. jsdom tests: RTL auto-cleanup needs vitest globals (off) — setup.ts calls `cleanup()` per test; Radix dialogs leave `pointer-events:none` on body — setup scrubs it, and user-event inside open dialogs needs `pointerEventsCheck: 0`. Playwright: fresh contexts start logged out; never addInitScript-clear the session (re-runs on every navigation).
 
@@ -258,7 +269,7 @@ Read [docs/04-domain-events-state.md](docs/04-domain-events-state.md) and [docs/
 
 - **The `events` table is the only source of truth.** It is append-only — enforced physically (a trigger blocks UPDATE/DELETE, and the app's DB role lacks those grants). Never design a feature that mutates a past event; append a new one.
 - **Lead state is a projection**, derived by folding a pure reducer `applyEvent(state, event) → state` (in `apps/server/src/domain/`, no I/O) over an enrollment's events. Terminal-state precedence is `UNSUBSCRIBED > BOUNCED > REPLIED > COMPLETED`. `meeting_booked` is a milestone flag, not a state.
-- **Metrics are queries** over the log, each with an exact numerator/denominator ([docs/05-metrics-and-analytics.md](docs/05-metrics-and-analytics.md)). The denominator law is load-bearing: **campaign bounce rates ÷ distinct leads sent-to (Part 10's 18÷885); reply/positive/unsub/meeting rates ÷ `contacted` leads** (contacted = the distinct-lead union of `delivered` and `human_reply`, never `sent`). Per-mailbox auto-pause windows count send *events* (Part 11) — a different metric.
+- **Metrics are queries** over the log, each with an exact numerator/denominator ([docs/05-metrics-and-analytics.md](docs/05-metrics-and-analytics.md)). The denominator law is load-bearing: **campaign bounce/reply/positive/unsub/meeting rates ÷ `contacted` leads**, where contacted is the distinct-lead set with an accepted `sent` event. Delivery-confirmed and pending-confirmation are separate values. Per-mailbox auto-pause windows count send *events* (Part 11) — a different metric.
 - **The state machine lives on `enrollments`, not `leads`** — a lead can be `COMPLETED` in Pass 1 and `ACTIVE` in Pass 2. This per-campaign state is what makes recycling work.
 - All writes go through **one transactional chokepoint** (`eventStore.append`): it appends the event(s) *and* updates the affected projections in a single Postgres transaction. Nothing else writes `events` or `enrollments.current_state`. Concurrency guards (the reply/send race, finding #15) belong here too.
 - `rebuild-projections` replays the whole log to reconstruct every projection — this is both disaster recovery and the correctness audit. If a projection ever drifts from the log, rebuild.

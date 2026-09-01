@@ -40,6 +40,7 @@ export const leadSchema = z
         campaign_name: z.string(),
         current_state: z.enum(ENROLLMENT_STATES),
         current_step_no: z.number().int(),
+        awaiting_completion: z.boolean(),
       })
       .strict()
       .optional(),
@@ -64,6 +65,14 @@ export const leadsQuerySchema = pageQuerySchema.extend({
 /** List envelope + the untiered banner count (decision R). */
 export const leadsListResponseSchema = listOf(leadSchema).extend({
   untiered_count: z.number().int().min(0),
+  tier_counts: z
+    .object({
+      A: z.number().int().min(0),
+      B: z.number().int().min(0),
+      untiered: z.number().int().min(0),
+      nurture: z.number().int().min(0),
+    })
+    .strict(),
 });
 
 export const eventViewSchema = z

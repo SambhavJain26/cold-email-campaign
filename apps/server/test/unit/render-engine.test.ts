@@ -126,8 +126,9 @@ describe('footer is unconditional (docs/08 §4)', () => {
     const r = engine.render(
       input({ body: 'Hi {{first_name|there}}, <unsafe>\n\nSecond paragraph.' }),
     );
-    expect(r.bodyHtml).toContain('<p>Hi Jane, &lt;unsafe&gt;</p>');
-    expect(r.bodyHtml).toContain('<p>Second paragraph.</p>');
+    expect(r.bodyHtml).toContain('<p style="margin:0 0 16px">Hi Jane, &lt;unsafe&gt;</p>');
+    expect(r.bodyHtml).toContain('<p style="margin:0 0 0">Second paragraph.</p>');
+    expect(r.bodyHtml.startsWith('<p style="margin:0')).toBe(true);
     expect(r.bodyHtml).toContain('font-size:10px');
     expect(r.bodyHtml).toContain('color:#767676');
     expect(r.bodyHtml).toContain('margin:16px 0 0');
@@ -151,17 +152,18 @@ describe('unsubscribe link in the footer (0010, docs/16 §8)', () => {
     expect(r.bodyHtml).not.toContain('<a href');
   });
 
-  it('live: the plain-text part carries the raw URL and keeps the STOP fallback', () => {
-    expect(withLink().bodyText).toContain(
-      `Unsubscribe: ${URL} or reply STOP | ${compliance.physicalAddress}`,
-    );
+  it('live: the plain-text part carries only the raw URL and address', () => {
+    expect(withLink().bodyText).toContain(`Unsubscribe: ${URL} | ${compliance.physicalAddress}`);
+    expect(withLink().bodyText).not.toContain('or reply STOP');
   });
 
   it('live: the HTML part says the SAME thing with the word linked', () => {
     const html = withLink().bodyHtml;
     expect(html).toContain(
-      `<a href="${URL}" style="color:#767676;text-decoration:underline">Unsubscribe</a> or reply STOP | `,
+      `<a href="${URL}" style="color:#767676;text-decoration:underline">Unsubscribe</a>`,
     );
+    expect(html).not.toContain('or reply STOP');
+    expect(html).not.toContain('aria-hidden');
     expect(html).toContain(compliance.physicalAddress);
     // De-emphasised but legible — CAN-SPAM "clear and conspicuous".
     expect(html).toContain('font-size:10px');
@@ -171,7 +173,7 @@ describe('unsubscribe link in the footer (0010, docs/16 §8)', () => {
     const r = withLink();
     const textFooter = r.bodyText.slice(r.bodyText.lastIndexOf('\n\n') + 2);
     const htmlFooter = r.bodyHtml.slice(r.bodyHtml.lastIndexOf('<p style='));
-    for (const fragment of ['Unsubscribe', 'or reply STOP', compliance.physicalAddress, URL]) {
+    for (const fragment of ['Unsubscribe', compliance.physicalAddress, URL]) {
       expect(textFooter).toContain(fragment);
       expect(htmlFooter).toContain(fragment);
     }

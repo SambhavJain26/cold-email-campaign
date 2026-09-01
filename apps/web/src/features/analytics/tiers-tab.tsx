@@ -53,6 +53,13 @@ export function TiersTab({
       ),
     },
     { key: 'contacted', header: 'Contacted', align: 'right', cell: (row) => row.contacted },
+    { key: 'delivered', header: 'Confirmed', align: 'right', cell: (row) => row.delivered },
+    {
+      key: 'pending',
+      header: 'Pending',
+      align: 'right',
+      cell: (row) => row.pending_delivery_confirmation,
+    },
     {
       key: 'reply',
       header: 'Reply',

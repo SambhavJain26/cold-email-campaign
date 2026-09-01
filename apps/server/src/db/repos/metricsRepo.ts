@@ -56,21 +56,30 @@ const distinctLeads = async (db: DbLike, type: string, scope: MetricScope): Prom
     )
   ).n;
 
-/**
- * A lead is contacted as soon as we have either a delivery confirmation or a
- * human reply.  Replies can arrive before the delayed delivery-confirmation
- * job runs; counting the union makes that real-world outcome visible without
- * ever double-counting a lead when the confirmation arrives later.
- */
+/** A lead is contacted as soon as its first message is accepted for sending. */
 export async function countContacted(db: DbLike, scope: MetricScope): Promise<number> {
-  return (
-    await one<{ n: number }>(
-      db,
-      sql`SELECT count(DISTINCT e.lead_id)::int n FROM events e
-          WHERE e.type IN ('delivered', 'human_reply')${evFilter('e', scope)}`,
-    )
-  ).n;
+  return distinctLeads(db, 'sent', scope);
 }
+export const countDeliveryConfirmed = (db: DbLike, scope: MetricScope) =>
+  one<{ n: number }>(
+    db,
+    sql`SELECT count(DISTINCT e.lead_id)::int n FROM events e
+        WHERE e.type IN ('delivered', 'human_reply', 'unsubscribe')${evFilter('e', scope)}`,
+  ).then((row) => row.n);
+export const countPendingDeliveryConfirmation = (db: DbLike, scope: MetricScope) =>
+  one<{ n: number }>(
+    db,
+    sql`SELECT count(DISTINCT sent.lead_id)::int n
+        FROM events sent
+        WHERE sent.type = 'sent'${evFilter('sent', scope)}
+          AND NOT EXISTS (
+            SELECT 1 FROM events resolved
+            WHERE resolved.lead_id = sent.lead_id
+              AND resolved.campaign_id = sent.campaign_id
+              AND resolved.type IN ('delivered', 'hard_bounce', 'human_reply', 'unsubscribe')
+              ${scope.asOf != null ? sql`AND resolved.occurred_at <= ${scope.asOf}` : sql``}
+          )`,
+  ).then((row) => row.n);
 export const countLeadsSentTo = (db: DbLike, scope: MetricScope) =>
   distinctLeads(db, 'sent', scope);
 export const countDistinctRepliers = (db: DbLike, scope: MetricScope) =>
@@ -116,7 +125,9 @@ export async function countEnrollments(db: DbLike, campaignId: number | null): P
 
 export interface StepStatsRow {
   step_no: number;
+  sent: number;
   delivered: number;
+  pending: number;
   repliers: number;
   positive_repliers: number;
 }
@@ -125,22 +136,36 @@ export async function stepStats(db: DbLike, scope: MetricScope): Promise<StepSta
   return all<StepStatsRow>(
     db,
     sql`WITH ${replySentimentCte(scope)},
+      s AS (SELECT e.step_no, count(DISTINCT e.lead_id)::int sent FROM events e
+            WHERE e.type = 'sent'${evFilter('e', scope)} GROUP BY e.step_no),
       d AS (SELECT e.step_no, count(DISTINCT e.lead_id)::int delivered FROM events e
-            WHERE e.type = 'delivered'${evFilter('e', scope)} GROUP BY e.step_no),
+            WHERE e.type IN ('delivered', 'human_reply', 'unsubscribe')${evFilter('e', scope)} GROUP BY e.step_no),
+      p AS (SELECT e.step_no,
+                   count(DISTINCT e.lead_id) FILTER (WHERE NOT EXISTS (
+                     SELECT 1 FROM events resolved
+                     WHERE resolved.enrollment_id = e.enrollment_id
+                       AND resolved.type IN ('delivered', 'hard_bounce', 'human_reply', 'unsubscribe')
+                       AND (resolved.step_no = e.step_no OR resolved.type = 'hard_bounce')
+                       ${scope.asOf != null ? sql`AND resolved.occurred_at <= ${scope.asOf}` : sql``}
+                   ))::int pending
+            FROM events e WHERE e.type = 'sent'${evFilter('e', scope)} GROUP BY e.step_no),
       r AS (SELECT step_no, count(DISTINCT lead_id)::int repliers,
                    count(DISTINCT lead_id) FILTER (WHERE sentiment = 'positive')::int positive_repliers
             FROM reply_sentiment GROUP BY step_no)
-      SELECT d.step_no, d.delivered,
+      SELECT s.step_no, s.sent, COALESCE(d.delivered, 0)::int delivered,
+             COALESCE(p.pending, 0)::int pending,
              COALESCE(r.repliers, 0) repliers,
              COALESCE(r.positive_repliers, 0) positive_repliers
-      FROM d LEFT JOIN r USING (step_no)
-      ORDER BY d.step_no`,
+      FROM s LEFT JOIN d USING (step_no) LEFT JOIN p USING (step_no) LEFT JOIN r USING (step_no)
+      ORDER BY s.step_no`,
   );
 }
 
 export interface TierStatsRow {
   tier: string | null;
   contacted: number;
+  delivered: number;
+  pending: number;
   repliers: number;
   positive_repliers: number;
   meetings: number;
@@ -153,7 +178,13 @@ export async function tierStats(db: DbLike, scope: MetricScope): Promise<TierSta
     sql`WITH ${replySentimentCte(scope)},
       c AS (SELECT en.enrolled_tier tier, count(DISTINCT e.lead_id)::int contacted
             FROM events e JOIN enrollments en ON en.id = e.enrollment_id
-            WHERE e.type = 'delivered'${evFilter('e', scope)} GROUP BY 1),
+            WHERE e.type = 'sent'${evFilter('e', scope)} GROUP BY 1),
+      d AS (SELECT en.enrolled_tier tier, count(DISTINCT e.lead_id)::int delivered
+            FROM events e JOIN enrollments en ON en.id = e.enrollment_id
+            WHERE e.type IN ('delivered', 'human_reply', 'unsubscribe')${evFilter('e', scope)} GROUP BY 1),
+      resolved AS (SELECT en.enrolled_tier tier, count(DISTINCT e.lead_id)::int resolved
+            FROM events e JOIN enrollments en ON en.id = e.enrollment_id
+            WHERE e.type IN ('delivered', 'hard_bounce', 'human_reply', 'unsubscribe')${evFilter('e', scope)} GROUP BY 1),
       r AS (SELECT en.enrolled_tier tier, count(DISTINCT rs.lead_id)::int repliers,
                    count(DISTINCT rs.lead_id) FILTER (WHERE rs.sentiment = 'positive')::int positive_repliers
             FROM reply_sentiment rs JOIN enrollments en ON en.id = rs.enrollment_id GROUP BY 1),
@@ -165,12 +196,15 @@ export async function tierStats(db: DbLike, scope: MetricScope): Promise<TierSta
              FROM enrollments en JOIN ${leads} l ON l.id = en.lead_id AND NOT l.is_erased
              WHERE ${scope.campaignId != null ? sql`en.campaign_id = ${scope.campaignId}` : sql`true`}
              GROUP BY 1)
-      SELECT c.tier::text, c.contacted,
+      SELECT c.tier::text, c.contacted, COALESCE(d.delivered, 0)::int delivered,
+             greatest(0, c.contacted - COALESCE(resolved.resolved, 0))::int pending,
              COALESCE(r.repliers, 0) repliers,
              COALESCE(r.positive_repliers, 0) positive_repliers,
              COALESCE(m.meetings, 0) meetings,
              md.mode
       FROM c
+      LEFT JOIN d ON d.tier IS NOT DISTINCT FROM c.tier
+      LEFT JOIN resolved ON resolved.tier IS NOT DISTINCT FROM c.tier
       LEFT JOIN r ON r.tier IS NOT DISTINCT FROM c.tier
       LEFT JOIN m ON m.tier IS NOT DISTINCT FROM c.tier
       LEFT JOIN md ON md.tier IS NOT DISTINCT FROM c.tier
@@ -236,9 +270,7 @@ export async function variantStats(
       SELECT c.variant_id,
              sum(c.sent)::int sent,
              count(DISTINCT d.enrollment_id)::int direct_delivered,
-             count(DISTINCT c.enrollment_id) FILTER (
-               WHERE d.enrollment_id IS NOT NULL OR dr.enrollment_id IS NOT NULL
-             )::int direct_contacted,
+             count(DISTINCT c.enrollment_id)::int direct_contacted,
              count(DISTINCT dr.enrollment_id)::int direct_repliers,
              count(DISTINCT dr.enrollment_id) FILTER (WHERE dr.positive)::int
                direct_positive_repliers,

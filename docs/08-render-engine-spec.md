@@ -20,7 +20,9 @@ render(variant, lead, enrollment, opts) → { subject, bodyText, checks }
   5. run pre-send checks  // §5 (preview mode only; send path asserts the fatal ones)
 ```
 
-Output is **plain text only** (walkthrough: no images, no HTML). Subject gets steps 1–3 only (no footer).
+Output is matching plain text plus minimal escaped HTML (`multipart/alternative` in SMTP). The HTML
+exists only to preserve natural paragraph spacing and link the unsubscribe word; it contains no
+images, tracking, external CSS, or arbitrary template HTML. Subject gets steps 1–3 only (no footer).
 
 ## 2. Template grammar
 
@@ -39,13 +41,20 @@ field      := first_name | company | market | custom_observation
 - Escaping: `\{\{` renders literal braces. Unknown field with no fallback = fatal. Nested tags unsupported (parse error = fatal).
 - Parser: single-pass regex tokenizer + validator `parseTemplate(str) → {tokens, errors}`; exported separately for the Sequence-Builder live validation endpoint.
 
-## 3. Personalization modes (walkthrough Stage 4, corrected two-mode model)
+## 3. Current content sources and tier modes
 
-| Mode (`enrollments.personalization_mode`) | `{{custom_observation}}` source | Send path |
+Sequence steps choose the content source; tier does not choose whether the email is personalized:
+
+| Step source / enrollment mode | Content source | Send path |
 |---|---|---|
-| `human_written` (Mode 1, Tier A) | Whole email is bespoke: the **manual composer** submits final subject+body per lead. The server starts the editor from the active enrollment's actual due step (not always Step 1), preserving its thread and pinned mailbox. Stored as a one-off variant (`step_variants` row flagged `attributes.bespoke=true` — hash still computed, recycle guard still applies). | `GET /enrollments/:id/manual-compose-prefill` resolves the starting point; `POST /manual-sends` uses the same render pipeline with steps 1–3 skipped (already literal), footer + checks still applied |
-| `template_researched` (Mode 2a, Tier B) | `leads.custom_fields.custom_observation` — filled per lead by the operator (Leads screen inline edit). Empty → falls back to segment rule (below) + warning check | scheduler |
-| `template_auto` (Mode 2b, Tier C) | Campaign chooses one standard/custom lead field and an exact-match rule table with a required `default`; keys are trim/case-fold matched. | scheduler |
+| `personalized` | Ready subject/body from the exact lead + campaign + stable sequence-step snapshot. It is literal: merge tags and spintax are not reinterpreted. | scheduler only; direct Manual Compose sending is retired |
+| `template` + `template_researched` (Tier A) | `leads.custom_fields.custom_observation`; empty values retain the existing Auto Observation fallback warning behavior. | scheduler |
+| `template` + `template_auto` (Tier B) | Campaign chooses one standard/custom lead field and an exact-match rule table with a required `default`; keys are trim/case-fold matched. | scheduler |
+
+Untiered and Nurture leads cannot enroll. Historical `human_written`, Tier C, and Nurture-tier
+snapshots remain readable but cannot be selected for new work. The sequence preview derives Tier A
+or Tier B behavior from the selected lead when a campaign context is selected. Personalized steps
+preview the exact campaign-step copy and its readiness through the same literal footer/check path.
 
 Reusable non-lead variables use `{{sequence.key|fallback}}`. Defaults live on the sequence; a
 draft campaign may override them, and first activation freezes the resolved snapshot. Values are
@@ -59,7 +68,7 @@ matched observation rule, resolved variable source, fallbacks, and deterministic
 ```
 
 - Appended at render time, **after** all expansion; template text cannot alter or remove it (a template containing its own footer text just gets the canonical one appended anyway — check #6 warns on duplication).
-- The boundary is one blank paragraph rather than a visible divider. The minimal HTML alternative renders the footer at `10px`, `#767676`, `line-height:1.5`, with a 16px top gap; the plain-text alternative uses the same words after one blank line.
+- The boundary is one blank paragraph rather than a visible divider. Every HTML body paragraph uses explicit inline margins; the first starts at `margin-top:0`, intentional paragraph gaps remain 16px, and the footer renders at `10px`, `#767676`, `line-height:1.5`, with a 16px top gap. The plain-text alternative uses the same words after one blank line.
 - Fatal boot/send guard: `physical_address` empty → sends are refused globally, alert raised (CAN-SPAM requires it; empty address = non-compliant mail).
 
 ## 5. Pre-send checks + deliverability score (decision W)
@@ -83,8 +92,8 @@ matched observation rule, resolved variable source, fallbacks, and deterministic
 
 ## 6. Threading headers (with docs/07 §4)
 
-`render` returns text; the scheduler's `buildMime` adds: `Message-ID` (app-generated), `In-Reply-To`/`References` for in-thread steps, `Re: `-prefixed step-1 subject for follow-ups, `From: {display_name} <{from_address}>`. `List-Unsubscribe: <url>` **and** `List-Unsubscribe-Post: List-Unsubscribe=One-Click` (RFC 8058) when `compliance_settings.unsubscribe_base_url` is set — both headers or neither, emitted by the transport from `OutboundMessage.headers.listUnsubscribeUrl` so the pair cannot disagree. With no base URL configured the feature is dormant: no headers, no body link, and the footer carries the operator's `optout_text` reply-`STOP` wording alone. Reply-`STOP` remains a permanent fallback either way, because some clients strip links.
+`render` returns text and minimal HTML; the scheduler's `buildMime` adds: `Message-ID` (app-generated), `In-Reply-To`/`References` for in-thread steps, `Re: `-prefixed exact Step-1 subject for follow-ups, `From: {display_name} <{from_address}>`. `List-Unsubscribe: <url>` **and** `List-Unsubscribe-Post: List-Unsubscribe=One-Click` (RFC 8058) are emitted when `compliance_settings.unsubscribe_base_url` is set — both headers or neither, sourced from `OutboundMessage.headers.listUnsubscribeUrl` so the pair cannot disagree. With no base URL configured the feature is dormant: no headers or body link, and the footer carries the operator's `optout_text`. With a live URL, the visible footer contains only **Unsubscribe | postal address**. Inbound STOP/opt-out detection remains active and globally suppressive, but `or reply STOP` is not printed in the live-link footer.
 
 ## 7. Tests (B4)
 
-Snapshot renders (full matrix: lead-with-everything, missing first_name, missing company, missing custom_observation × 3 modes); footer-always-present including adversarial template; seed determinism (same enrollment/step/variant twice → identical output; different enrollment → different spintax pick eventually); variation count exact (walkthrough opener = 2×3×2×2 = 24); every check's positive+negative case; score rubric snapshots; manual-compose path gets footer + checks; threading headers correct for step 1 vs steps 2+.
+Snapshot renders (full matrix: lead-with-everything, missing first_name, missing company, missing custom_observation); footer-always-present including adversarial template; first-paragraph margin and intentional paragraph gaps; seed determinism (same enrollment/step/variant twice → identical output; different enrollment → different spintax pick eventually); variation count exact (walkthrough opener = 2×3×2×2 = 24); every check's positive+negative case; score rubric snapshots; literal Personalized Copy gets footer + checks; threading headers correct for step 1 vs steps 2+.

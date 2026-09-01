@@ -42,8 +42,16 @@ export function VariantsTab({
     () => sequence?.steps.map((step) => step.step_no).toSorted((a, b) => a - b) ?? [1],
     [sequence],
   );
-  const [stepNo, setStepNo] = useState(1);
-  const selectedStepNo = stepNumbers.includes(stepNo) ? stepNo : (stepNumbers[0] ?? 1);
+  const firstTemplateStep = sequence?.steps
+    .filter((step) => step.content_source === 'template')
+    .map((step) => step.step_no)
+    .toSorted((a, b) => a - b)[0];
+  const [stepNo, setStepNo] = useState<number | null>(null);
+  const selectedStepNo =
+    stepNo !== null && stepNumbers.includes(stepNo)
+      ? stepNo
+      : (firstTemplateStep ?? stepNumbers[0] ?? 1);
+  const selectedStep = sequence?.steps.find((step) => step.step_no === selectedStepNo);
 
   const { data, isPending, isError, refetch } = useVariantAnalytics(campaignId, selectedStepNo);
   const deactivate = useDeactivateVariant();
@@ -187,55 +195,65 @@ export function VariantsTab({
         </div>
       </div>
 
-      <section aria-labelledby="direct-heading" className="flex flex-col gap-2">
-        <div>
-          <h2 id="direct-heading" className="text-sm font-semibold">
-            Direct response
-          </h2>
-          <p className="text-xs text-muted-foreground">
-            Replies that directly reference a message sent at Step {selectedStepNo}.
-          </p>
-        </div>
-        <DataTable
-          columns={directColumns}
-          rows={rows}
-          rowKey={(row) => row.variant_id}
-          rowTestId={(row) => `variant-row-${row.label}`}
+      {selectedStep?.content_source === 'personalized' ? (
+        <EmptyState
+          title="Personalized Copy has no variants"
+          description="Every lead supplies its own subject and body for this step. Choose a Template step to compare variants."
         />
-      </section>
+      ) : (
+        <>
+          <section aria-labelledby="direct-heading" className="flex flex-col gap-2">
+            <div>
+              <h2 id="direct-heading" className="text-sm font-semibold">
+                Direct response
+              </h2>
+              <p className="text-xs text-muted-foreground">
+                Replies that directly reference a message sent at Step {selectedStepNo}.
+              </p>
+            </div>
+            <DataTable
+              columns={directColumns}
+              rows={rows}
+              rowKey={(row) => row.variant_id}
+              rowTestId={(row) => `variant-row-${row.label}`}
+            />
+          </section>
 
-      <section aria-labelledby="eventual-heading" className="flex flex-col gap-2">
-        <div>
-          <h2 id="eventual-heading" className="text-sm font-semibold">
-            Eventual outcome
-          </h2>
-          <p className="text-xs text-muted-foreground">
-            Any later reply or meeting from enrollments that received this Step {selectedStepNo}{' '}
-            variant.
-          </p>
-        </div>
-        <DataTable columns={eventualColumns} rows={rows} rowKey={(row) => row.variant_id} />
-      </section>
+          <section aria-labelledby="eventual-heading" className="flex flex-col gap-2">
+            <div>
+              <h2 id="eventual-heading" className="text-sm font-semibold">
+                Eventual outcome
+              </h2>
+              <p className="text-xs text-muted-foreground">
+                Any later reply or meeting from enrollments that received this Step {selectedStepNo}{' '}
+                variant.
+              </p>
+            </div>
+            <DataTable columns={eventualColumns} rows={rows} rowKey={(row) => row.variant_id} />
+          </section>
 
-      <div className="flex flex-col gap-1 text-xs" data-testid="variants-verdict">
-        {winner ? (
-          <p>
-            Variant {winner.label} leads on eventual meetings ({winner.eventual.meetings}), then
-            eventual positive rate ({winner.eventual.positive_rate.value}%).
-          </p>
-        ) : tied ? (
-          <p>No winner yet: the leading variants are tied on meetings and positive rate.</p>
-        ) : null}
-        <p className="text-muted-foreground">
-          These Step {selectedStepNo} cohorts account for {variantsMeetings(rows)} eventual
-          meetings.
-        </p>
-        {smallSample && (
-          <p className="text-warning" data-testid="small-sample">
-            Under {SMALL_SAMPLE} sends per automated variant — trust big gaps, not small wobbles.
-          </p>
-        )}
-      </div>
+          <div className="flex flex-col gap-1 text-xs" data-testid="variants-verdict">
+            {winner ? (
+              <p>
+                Variant {winner.label} leads on eventual meetings ({winner.eventual.meetings}), then
+                eventual positive rate ({winner.eventual.positive_rate.value}%).
+              </p>
+            ) : tied ? (
+              <p>No winner yet: the leading variants are tied on meetings and positive rate.</p>
+            ) : null}
+            <p className="text-muted-foreground">
+              These Step {selectedStepNo} cohorts account for {variantsMeetings(rows)} eventual
+              meetings.
+            </p>
+            {smallSample && (
+              <p className="text-warning" data-testid="small-sample">
+                Under {SMALL_SAMPLE} sends per automated variant — trust big gaps, not small
+                wobbles.
+              </p>
+            )}
+          </div>
+        </>
+      )}
 
       <Dialog open={confirmId !== null} onOpenChange={(open) => !open && setConfirmId(null)}>
         <DialogContent>

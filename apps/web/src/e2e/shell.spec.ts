@@ -31,16 +31,18 @@ test('every nav entry reaches its screen inside the shell', async ({ page }) => 
   }
 });
 
-test('campaign selection is URL-synced and survives navigation', async ({ page }) => {
+test('the shared campaign selector is scoped to Overview', async ({ page }) => {
   await login(page);
-  await page.getByRole('combobox', { name: 'Campaign' }).click();
+  await page.getByRole('combobox', { name: 'Campaign', exact: true }).click();
   await page.getByRole('option', { name: /Golden Pass 1/ }).click();
   await expect(page).toHaveURL(/\?campaign=1$/);
 
   await page.getByRole('link', { name: 'Analytics' }).click();
-  await expect(page).toHaveURL(/\/analytics\?campaign=1$/);
-  // Selector still shows the selection after navigating.
-  await expect(page.getByRole('combobox', { name: 'Campaign' })).toContainText('Golden Pass 1');
+  await expect(page).toHaveURL(/\/analytics$/);
+  await expect(page.getByRole('combobox', { name: 'Campaign', exact: true })).toHaveCount(0);
+  await expect(page.getByRole('combobox', { name: 'Analytics campaign' })).toContainText(
+    'Golden Pass 1',
+  );
 });
 
 test('a valid deep-linked campaign survives the initial campaigns load', async ({ page }) => {

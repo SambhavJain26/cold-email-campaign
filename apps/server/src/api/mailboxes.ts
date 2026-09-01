@@ -22,6 +22,7 @@ import {
 import type { AppServices } from '../composition';
 import {
   createMailbox,
+  databaseAcceptsTimezone,
   getMailbox,
   listMailboxes,
   patchMailbox,
@@ -151,11 +152,14 @@ async function assertDailyCapWithinGuardrail(db: Db, dailyCap: number | undefine
   if (violation) throw new AppError('validation', 422, violation);
 }
 
-function assertIanaTimezone(timezone: string): void {
+async function assertIanaTimezone(db: Db, timezone: string): Promise<void> {
   try {
     new Intl.DateTimeFormat('en-US', { timeZone: timezone });
   } catch {
     throw new AppError('validation', 400, 'timezone must be a valid IANA timezone');
+  }
+  if (!(await databaseAcceptsTimezone(db, timezone))) {
+    throw new AppError('validation', 400, 'timezone must be accepted by the database');
   }
 }
 
@@ -277,7 +281,7 @@ export async function mailboxesRoutes(app: FastifyInstance, services: AppService
     async (req) => {
       const b = req.body;
       const authType = b.auth_type ?? 'app_password';
-      if (b.timezone !== undefined) assertIanaTimezone(b.timezone);
+      if (b.timezone !== undefined) await assertIanaTimezone(db, b.timezone);
       await assertDailyCapWithinGuardrail(db, b.daily_cap);
       const pollFolders =
         b.poll_folders ?? (authType === 'google_oauth' ? ['INBOX', '[Gmail]/Spam'] : ['INBOX']);
@@ -350,7 +354,7 @@ export async function mailboxesRoutes(app: FastifyInstance, services: AppService
     },
     async (req) => {
       const existing = await requireMailbox(req.params.id);
-      if (req.body.timezone !== undefined) assertIanaTimezone(req.body.timezone);
+      if (req.body.timezone !== undefined) await assertIanaTimezone(db, req.body.timezone);
       await assertDailyCapWithinGuardrail(db, req.body.daily_cap);
       const cols = patchColumns(req.body);
       if (req.body.poll_folders !== undefined) {

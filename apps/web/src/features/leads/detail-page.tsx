@@ -124,10 +124,14 @@ export default function LeadDetailPage() {
           </CardContent>
         </Card>
 
-        {/* key remounts the edit card when the lead identity changes — state
-            initializers replace the setState-in-effect seeding pattern the
-            react-hooks compiler rule bans. */}
-        <EditCard key={lead.id} lead={lead} />
+        {/* Remount when authoritative editable data changes. This prevents a
+            cached detail form from submitting a tier that was changed by a
+            bulk action in another view. Unchanged polling responses preserve
+            in-progress edits because this key stays stable. */}
+        <EditCard
+          key={`${lead.id}:${lead.tier ?? 'untiered'}:${lead.outreach_status}:${lead.notes ?? ''}:${JSON.stringify(lead.custom_fields)}`}
+          lead={lead}
+        />
       </div>
 
       <Card>

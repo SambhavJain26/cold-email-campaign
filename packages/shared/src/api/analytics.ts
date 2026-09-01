@@ -17,6 +17,12 @@ export const overviewResponseSchema = z
         pct: z.number(),
       })
       .strict(),
+    delivery_confirmation: z
+      .object({
+        confirmed: z.number().int(),
+        pending: z.number().int(),
+      })
+      .strict(),
     reply_rate: metricSchema,
     positive_rate: metricSchema,
     meetings: z.object({ count: z.number().int(), per_100: z.number() }).strict(),
@@ -91,7 +97,11 @@ export const stepsQuerySchema = z
 export const stepAnalyticsRowSchema = z
   .object({
     step_no: z.number().int(),
+    sent: z.number().int(),
     delivered: z.number().int(),
+    pending_delivery_confirmation: z.number().int(),
+    replies: z.number().int(),
+    reply_rate: metricSchema,
     positive_replies: z.number().int(),
     positive_rate: metricSchema,
   })
@@ -109,6 +119,8 @@ export const tierAnalyticsRowSchema = z
   .object({
     tier: z.enum(LEAD_TIERS).nullable(),
     contacted: z.number().int(),
+    delivered: z.number().int(),
+    pending_delivery_confirmation: z.number().int(),
     reply_rate: metricSchema,
     positive_rate: metricSchema,
     meetings: z.number().int(),

@@ -8,12 +8,11 @@
 //
 // Shape:  {opt-out clause} | {physical address}
 //   dormant (no unsubscribe URL):  "{optout_text} | 12 Example St"
-//   live:  text  "Unsubscribe: https://…/u/tok or reply STOP | 12 Example St"
-//          html  "<a href=…>Unsubscribe</a> or reply STOP | 12 Example St"
+//   live:  text  "Unsubscribe: https://…/u/tok | 12 Example St"
+//          html  "<a href=…>Unsubscribe</a> | 12 Example St"
 //
-// "or reply STOP" is retained even when the link exists: some clients strip
-// links, and a reply is the lowest-friction opt-out there is. De-emphasised but
-// legible is the CAN-SPAM "clear and conspicuous" line — hidden would not be.
+// STOP detection remains active in the inbound pipeline, but the operator chose
+// to keep the visible footer to the link and postal address only.
 import { escapeHtml } from './html';
 
 // A blank paragraph is the least distracting visual boundary in both the
@@ -39,7 +38,7 @@ const liveUrl = (c: ComplianceInfo): string | undefined => {
 
 export function appendFooter(body: string, compliance: ComplianceInfo): string {
   const url = liveUrl(compliance);
-  const optout = url ? `Unsubscribe: ${url} or reply STOP` : compliance.optoutText;
+  const optout = url ? `Unsubscribe: ${url}` : compliance.optoutText;
   return `${body.trimEnd()}${FOOTER_SEPARATOR}${optout} | ${compliance.physicalAddress}`;
 }
 
@@ -47,7 +46,7 @@ export function appendFooter(body: string, compliance: ComplianceInfo): string {
 export function footerHtml(compliance: ComplianceInfo): string {
   const url = liveUrl(compliance);
   const optout = url
-    ? `<a href="${escapeHtml(url)}" style="color:#767676;text-decoration:underline">Unsubscribe</a> or reply STOP`
+    ? `<a href="${escapeHtml(url)}" style="color:#767676;text-decoration:underline">Unsubscribe</a>`
     : escapeHtml(compliance.optoutText);
   return `${optout} | ${escapeHtml(compliance.physicalAddress)}`;
 }

@@ -42,7 +42,7 @@ export function ComplianceTab({
   // Mirrors render/footer.ts appendFooter's content. The app preview stays at
   // an accessible UI size; delivered HTML renders this line at 10px/#767676.
   const optoutLine =
-    unsubBase.trim() === '' ? optout : `Unsubscribe: ${unsubBase.trim()}/u/⟨token⟩ or reply STOP`;
+    unsubBase.trim() === '' ? optout : `Unsubscribe: ${unsubBase.trim()}/u/⟨token⟩`;
 
   const onSubmit = (body: ComplianceDto) =>
     put.mutate(body, {
@@ -81,7 +81,7 @@ export function ComplianceTab({
             <Input id="compliance-optout" {...register('optout_text')} />
             <p className="text-xs text-muted-foreground">
               Used verbatim while no unsubscribe URL is set. Once one is, the footer switches to a
-              one-click link and keeps &ldquo;or reply STOP&rdquo; as the fallback.
+              one-click link. Replies containing STOP are still detected and honored automatically.
             </p>
             {errors.optout_text && (
               <p className="text-xs text-destructive">{errors.optout_text.message}</p>

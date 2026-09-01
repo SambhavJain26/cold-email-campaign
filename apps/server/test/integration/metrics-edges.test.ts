@@ -122,8 +122,8 @@ describe('metrics edge cases', () => {
     await pool.end();
   });
 
-  it('contacted excludes the hard-bounced lead but includes the soft-recovered one', async () => {
-    expect(await metrics.contacted()).toBe(5); // leads 2-6, not 1
+  it('contacted includes every lead with an accepted send, including a later hard bounce', async () => {
+    expect(await metrics.contacted()).toBe(6);
   });
 
   it('bounce denominators use leads sent-to (6), not sent events (8)', async () => {
@@ -137,7 +137,7 @@ describe('metrics edge cases', () => {
     const reply = await metrics.replyRate();
     expect(reply.numerator).toBe(4); // leads 3,4,5,6 — lead 4 counted once despite 3 replies
     const unsub = await metrics.unsubscribeRate();
-    expect(unsub).toEqual({ numerator: 1, denominator: 5, value: 20.0 });
+    expect(unsub).toEqual({ numerator: 1, denominator: 6, value: 16.7 });
     const state = (await pool.query(`SELECT current_state FROM enrollments WHERE id = 3`)).rows[0];
     expect(state.current_state).toBe('UNSUBSCRIBED');
   });
@@ -148,7 +148,7 @@ describe('metrics edge cases', () => {
   });
 
   it('meetings per 100 uses contacted', async () => {
-    expect(await metrics.meetings()).toEqual({ count: 1, per100: 20.0 });
+    expect(await metrics.meetings()).toEqual({ count: 1, per100: 16.7 });
   });
 
   it('variant analytics attribute cohorts to the opener variant', async () => {

@@ -101,20 +101,20 @@ describe('@golden L3 — full pipeline over ~47 virtual days', () => {
 
   // ── L2: every headline metric ──────────────────────────────────────────────
 
-  it('reply rate 72/867 = 8.3%', async () => {
-    expect(await m.replyRate(scope)).toEqual({ numerator: 72, denominator: 867, value: 8.3 });
+  it('reply rate 72/885 = 8.1%', async () => {
+    expect(await m.replyRate(scope)).toEqual({ numerator: 72, denominator: 885, value: 8.1 });
   });
 
-  it('positive reply rate 28/867 = 3.2%', async () => {
+  it('positive reply rate 28/885 = 3.2%', async () => {
     expect(await m.positiveReplyRate(scope)).toEqual({
       numerator: 28,
-      denominator: 867,
+      denominator: 885,
       value: 3.2,
     });
   });
 
-  it('unsubscribe rate 40/867 = 4.6% (25 via reply + 15 via link)', async () => {
-    expect(await m.unsubscribeRate(scope)).toEqual({ numerator: 40, denominator: 867, value: 4.6 });
+  it('unsubscribe rate 40/885 = 4.5% (25 via reply + 15 via link)', async () => {
+    expect(await m.unsubscribeRate(scope)).toEqual({ numerator: 40, denominator: 885, value: 4.5 });
     const bySource = await s.pool.query(
       `SELECT source, count(*)::int n FROM events WHERE type = 'unsubscribe' GROUP BY source`,
     );
@@ -128,9 +128,9 @@ describe('@golden L3 — full pipeline over ~47 virtual days', () => {
     expect(await m.softBounceRate(scope)).toEqual({ numerator: 9, denominator: 885, value: 1.0 });
   });
 
-  it('meetings 17 = 2.0 per 100 contacted; progress 867/885 = 98.0%', async () => {
-    expect(await m.meetings(scope)).toEqual({ count: 17, per100: 2.0 });
-    expect(await m.progress(scope)).toEqual({ numerator: 867, denominator: 885, value: 98.0 });
+  it('meetings 17 = 1.9 per 100 contacted; progress 885/885 = 100%', async () => {
+    expect(await m.meetings(scope)).toEqual({ count: 17, per100: 1.9 });
+    expect(await m.progress(scope)).toEqual({ numerator: 885, denominator: 885, value: 100 });
   });
 
   it('step analytics (13b): delivered 867/831/801/789, repliers 30/25/10/7, positives 15/9/1/3', async () => {
@@ -145,7 +145,7 @@ describe('@golden L3 — full pipeline over ~47 virtual days', () => {
     const byTier = Object.fromEntries(tiers.map((t) => [t.tier, t]));
     for (const t of ['A', 'B', 'C'] as const) {
       const want = GOLDEN.expected.perTier[t];
-      expect(byTier[t]!.contacted, `tier ${t} contacted`).toBe(want.contacted);
+      expect(byTier[t]!.contacted, `tier ${t} contacted`).toBe(want.enrolled);
       expect(byTier[t]!.replyRate.numerator, `tier ${t} repliers`).toBe(want.repliers);
       expect(byTier[t]!.positiveRate.numerator, `tier ${t} positives`).toBe(want.positives);
       expect(byTier[t]!.meetings, `tier ${t} meetings`).toBe(want.meetings);

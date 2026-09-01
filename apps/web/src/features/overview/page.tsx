@@ -135,6 +135,10 @@ export default function OverviewPage() {
           max={data.progress.total}
           className="max-w-xl"
         />
+        <p className="mt-2 text-xs text-muted-foreground">
+          {data.delivery_confirmation.confirmed} delivery confirmed ·{' '}
+          {data.delivery_confirmation.pending} awaiting confirmation
+        </p>
         {estimate && (
           <p
             className="mt-2 text-xs text-muted-foreground"

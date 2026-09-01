@@ -51,7 +51,7 @@ export function CapacityMeter({
   return (
     <div className={cn('space-y-3', className)} data-testid="capacity-meter">
       <ProgressBar
-        label="Sent today"
+        label="All campaigns sent today"
         value={capacity.sent_so_far_today}
         max={capacity.total_daily_capacity}
       />

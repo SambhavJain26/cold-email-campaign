@@ -1,22 +1,26 @@
 {
   "progress": {
-    "contacted": 867,
+    "contacted": 885,
     "total": 885,
-    "pct": 98
+    "pct": 100
+  },
+  "delivery_confirmation": {
+    "confirmed": 867,
+    "pending": 0
   },
   "reply_rate": {
     "numerator": 72,
-    "denominator": 867,
-    "value": 8.3
+    "denominator": 885,
+    "value": 8.1
   },
   "positive_rate": {
     "numerator": 28,
-    "denominator": 867,
+    "denominator": 885,
     "value": 3.2
   },
   "meetings": {
     "count": 17,
-    "per_100": 2
+    "per_100": 1.9
   },
   "hard_bounce_rate": {
     "numerator": 18,
@@ -30,8 +34,8 @@
   },
   "unsubscribe_rate": {
     "numerator": 40,
-    "denominator": 867,
-    "value": 4.6
+    "denominator": 885,
+    "value": 4.5
   },
   "capacity": {
     "total_daily_capacity": 120,

@@ -38,7 +38,7 @@ export function StepCard({
   saveErrors: Map<string, string>;
   onChange: (next: DraftStep) => void;
   onRemove: () => void;
-  onPreview: (stepNo: number, variant: DraftVariant) => void;
+  onPreview: (stepNo: number, variant: DraftVariant | null) => void;
 }) {
   const [activeUid, setActiveUid] = useState(step.variants[0]?.uid ?? '');
   const active = step.variants.find((v) => v.uid === activeUid) ?? step.variants[0];
@@ -141,7 +141,17 @@ export function StepCard({
 
       {step.content_source === 'personalized' ? (
         <div className="flex flex-col gap-2 rounded-md border border-border p-3 text-sm">
-          <p className="font-medium">Lead-specific sequence content</p>
+          <div className="flex items-center justify-between gap-2">
+            <p className="font-medium">Lead-specific sequence content</p>
+            <Button
+              variant="ghost"
+              size="xs"
+              aria-label={`Preview personalized step ${stepNo}`}
+              onClick={() => onPreview(stepNo, null)}
+            >
+              <Eye className="size-3.5" /> Preview
+            </Button>
+          </div>
           <p className="text-muted-foreground">
             Subject: <code>{'{{manual_subject}}'}</code>
           </p>
@@ -204,6 +214,17 @@ export function StepCard({
               </Button>
             </div>
           )}
+        </div>
+      )}
+
+      {stepNo > 1 && step.wait_days === 0 && (
+        <div className="flex items-start gap-2 rounded-md border border-warning/40 bg-warning/10 p-3 text-xs text-warning">
+          <span aria-hidden>⚠️</span>
+          <p>
+            This follow-up is due immediately after the previous send. Scheduler pacing may add
+            separation, but this setting does not. Pause between test waves if you expect a human
+            reply.
+          </p>
         </div>
       )}
 

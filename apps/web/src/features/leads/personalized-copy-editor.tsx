@@ -85,6 +85,7 @@ export function PersonalizedCopyEditor({
   ];
 
   const save = (action: 'save_draft' | 'mark_ready' | 'copy_from_source') => {
+    const targetScope = scope;
     if (scope.startsWith('source:')) {
       saveSource.mutate(
         {
@@ -93,8 +94,11 @@ export function PersonalizedCopyEditor({
           body: { subject: currentSubject, body: currentBody, action, replace: true },
         },
         {
-          onSuccess: () =>
-            toast.success(action === 'mark_ready' ? 'Source marked ready' : 'Source saved'),
+          onSuccess: () => {
+            setScope(targetScope);
+            setEditedScope(null);
+            toast.success(action === 'mark_ready' ? 'Source marked ready' : 'Source saved');
+          },
         },
       );
       return;
@@ -111,13 +115,29 @@ export function PersonalizedCopyEditor({
             : { subject: currentSubject, body: currentBody, action, replace: true },
       },
       {
-        onSuccess: () =>
+        onSuccess: () => {
+          // A copy mutation refetches every scope. Reassert the immutable
+          // target so a list reorder cannot move the editor to another
+          // campaign/step before the operator's next edit.
+          setScope(targetScope);
+          setEditedScope(null);
           toast.success(
             action === 'mark_ready' ? 'Campaign copy marked ready' : 'Campaign copy saved',
-          ),
+          );
+        },
       },
     );
   };
+
+  const scopeLabel = scope.startsWith('source:')
+    ? 'Reusable lead copy'
+    : (() => {
+        const [, campaignId, stepNo] = scope.split(':').map(Number);
+        const campaign = campaignSteps.find(
+          (item) => item.campaign.id === campaignId && item.step.step_no === stepNo,
+        )?.campaign;
+        return `${campaign?.name ?? `Campaign ${campaignId}`} · Step ${stepNo}`;
+      })();
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -125,8 +145,8 @@ export function PersonalizedCopyEditor({
         <DialogHeader>
           <DialogTitle>Personalized Copy</DialogTitle>
           <DialogDescription>
-            Save lead-specific subject and body here. Delivery happens only through a personalized
-            sequence step.
+            Reusable lead copy is stored once; campaign copy is the independent version a specific
+            Personalized Copy step will send. Nothing sends from this editor.
           </DialogDescription>
         </DialogHeader>
         <FieldGroup>
@@ -139,11 +159,13 @@ export function PersonalizedCopyEditor({
                 setEditedScope(null);
               }}
             >
-              <SelectTrigger>
+              <SelectTrigger aria-label="Copy scope">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="source:1">Unassigned Source · default slot</SelectItem>
+                <SelectItem value="source:1">
+                  Reusable lead copy · not assigned to a campaign
+                </SelectItem>
                 {campaignSteps.map(({ campaign, step }) => (
                   <SelectItem
                     key={`${campaign.id}:${step.id}`}
@@ -203,17 +225,17 @@ export function PersonalizedCopyEditor({
         <DialogFooter>
           {!scope.startsWith('source:') && !sent && (
             <Button variant="outline" onClick={() => save('copy_from_source')}>
-              Copy from Source
+              Copy reusable lead copy to {scopeLabel}
             </Button>
           )}
           <Button variant="outline" disabled={Boolean(sent)} onClick={() => save('save_draft')}>
-            Save Draft
+            Save Draft · {scopeLabel}
           </Button>
           <Button
             disabled={Boolean(sent) || !currentSubject.trim() || !currentBody.trim()}
             onClick={() => save('mark_ready')}
           >
-            Mark Ready
+            Mark Ready · {scopeLabel}
           </Button>
         </DialogFooter>
       </DialogContent>

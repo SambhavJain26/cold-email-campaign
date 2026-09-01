@@ -1,6 +1,6 @@
 # Metrics & Analytics Engine — Exact Queries
 
-Implements spec Part 5 (formulas), Part 10 (golden numbers), walkthrough §13 (analytics screens) and §15 (metric reference). Public API in `apps/server/src/services/metrics/`; the SQL lives in `db/repos/metrics*` (repos are the SQL boundary — docs/02 §1). **Denominator law: campaign bounce rates ÷ distinct `leads sent-to` (≥1 `sent` event — Part 10's 18÷885=2.0% only reconciles this way, since the log holds ~3,315 sent *events* incl. follow-ups); reply/positive/unsub/meetings rates ÷ `contacted` leads (≥1 `delivered` or `human_reply`). A human reply therefore counts immediately, even before the later delivery-confirmation job runs. Per-mailbox auto-pause windows (§5) remain over send events per Part 11 — that is a different, operational metric.**
+Implements spec Part 5 (formulas), Part 10 (golden numbers), walkthrough §13 (analytics screens) and §15 (metric reference). Public API in `apps/server/src/services/metrics/`; the SQL lives in `db/repos/metrics*` (repos are the SQL boundary — docs/02 §1). **Denominator law: `contacted` means a distinct lead with at least one accepted `sent` event. Reply, positive, unsubscribe, meeting-per-100, and campaign bounce rates all use this stable accepted-recipient cohort. Part 10 therefore reconciles reply as 72÷885=8.1%, unsubscribe as 40÷885=4.5%, and hard bounce as 18÷885=2.0%. Follow-up send events do not multiply the denominator. Per-mailbox auto-pause windows (§5) remain over individual send events per Part 11 — that is a different operational metric.**
 
 All queries take `(campaignId?)` — null = all campaigns — and are covered by the `ev_campaign` / `ev_mailbox` indexes.
 
@@ -9,14 +9,14 @@ All queries take `(campaignId?)` — null = all campaigns — and are covered by
 ## 1. Base building blocks
 
 ```sql
--- contacted: leads with ≥1 delivered OR human_reply (NOT merely sent)
--- golden: 885 - 18 = 867
+-- contacted: distinct leads with ≥1 accepted sent event
+-- golden: 885
 SELECT count(DISTINCT lead_id) FROM events
-WHERE type IN ('delivered', 'human_reply')
+WHERE type = 'sent'
   AND ($1::bigint IS NULL OR campaign_id = $1);
 
--- sent event count (denominator for bounce rates)          -- golden: 885+ (incl. follow-ups; step-1 sent = 885)
-SELECT count(*) FROM events WHERE type = 'sent' AND ...;
+-- delivery-confirmed: delivered, reply, or link/reply unsubscribe proves receipt
+-- pending: contacted minus any delivered/hard-bounce/reply/unsubscribe resolution
 ```
 
 **Effective sentiment per reply** (decision M) — reusable CTE:
@@ -38,17 +38,17 @@ WITH reply_sentiment AS (
 
 | Function | Numerator SQL | Denominator | Golden value |
 |----------|--------------|-------------|-------------:|
-| `replyRate` | `count(DISTINCT lead_id) FROM events WHERE type='human_reply'` | contacted | 72/867 = **8.3%** |
-| `positiveReplyRate` | `count(DISTINCT lead_id) FROM reply_sentiment WHERE sentiment='positive'` | contacted | 28/867 = **3.2%** |
+| `replyRate` | `count(DISTINCT lead_id) FROM events WHERE type='human_reply'` | contacted | 72/885 = **8.1%** |
+| `positiveReplyRate` | `count(DISTINCT lead_id) FROM reply_sentiment WHERE sentiment='positive'` | contacted | 28/885 = **3.2%** |
 | `meetingsBooked` | `count(*) FROM events WHERE type='meeting_booked'` | — | **17** |
-| `meetingsPer100` | meetings × 100 | contacted | **2.0** |
+| `meetingsPer100` | meetings × 100 | contacted | **1.9** |
 | `hardBounceRate` | `count(*) type='hard_bounce'` | leads sent-to | 18/885 = **2.0%** |
 | `softBounceRate` | `count(*) type='soft_bounce'` | leads sent-to | 9/885 = **1.0%** |
-| `unsubscribeRate` | `count(DISTINCT lead_id) type='unsubscribe'` | contacted | 40/867 = **4.6%** |
-| `progress` | contacted | `count(*) enrollments` | 867/885 |
-| `stepReplyRate(n)` | `count(DISTINCT lead_id) human_reply WHERE step_no=n` | `count(DISTINCT lead_id) delivered WHERE step_no=n` | walkthrough 13b |
+| `unsubscribeRate` | `count(DISTINCT lead_id) type='unsubscribe'` | contacted | 40/885 = **4.5%** |
+| `progress` | contacted | `count(*) enrollments` | 885/885 |
+| `stepReplyRate(n)` | `count(DISTINCT lead_id) human_reply WHERE step_no=n` | distinct leads sent at step N | walkthrough 13b |
 
-Every function returns `{ numerator, denominator, value }` so screens can show "72 / 867 = 8.3%" verbatim.
+Every rate function returns `{ numerator, denominator, value }` so screens can show "72 / 885 = 8.1%" verbatim. Overview additionally reports delivery-confirmed and pending-confirmation counts; a hard bounce resolves pending status without being counted as confirmed delivery.
 
 ## 3. Terminal-outcome breakdown + self-check (spec Part 1)
 
@@ -64,10 +64,9 @@ WHERE campaign_id = $1 GROUP BY current_state;
 **13a — per variant at any selected step:** join selected-step `sent` events through
 `attributes->>'variant_id'` and build one enrollment cohort per variant.
 
-- **Direct response:** sent/delivered at that step; a reply counts only when the persisted
-  `human_reply.step_no` points to that step's sent message. Its denominator is `delivered OR direct
-  reply`, so a reply received before delayed delivery confirmation cannot produce an impossible
-  rate.
+- **Direct response:** sent/delivery-confirmed at that step; a reply counts only when the persisted
+  `human_reply.step_no` points to that step's sent message. Its denominator is the sent variant
+  cohort, so early replies are visible immediately and cannot produce a rate above 100%.
 - **Eventual outcome:** denominator is every distinct enrollment that received the selected
   variant. Any human reply after that send, including a thread match to a later step, counts toward
   eventual reply/positive results; meetings are distinct enrollments with a later
@@ -76,9 +75,9 @@ WHERE campaign_id = $1 GROUP BY current_state;
   inactive historical variants remain visible, but bespoke rows are excluded from winner selection.
   Winner order is eventual meetings, then eventual positive rate; an exact tie is reported as a tie.
 
-**13b — per step:** delivered / distinct positive repliers / positive% per `step_no` (the "kill Step 3" table). Uses `stepReplyRate` with the `reply_sentiment` CTE filtered to positive.
+**13b — per step:** sent / delivery-confirmed / pending confirmation / replies / reply% / distinct positive repliers / positive% per `step_no` (the "kill Step 3" table). Rows anchor on `sent`, so the first six hours are not an empty screen.
 
-**13c — per tier:** group by `enrollments.enrolled_tier` (snapshot, not the lead's current tier — historical accuracy per plan §4.1): contacted, reply%, positive%, meetings, mode. NULL tier renders as "untiered".
+**13c — per tier:** group by `enrollments.enrolled_tier` (snapshot, not the lead's current tier — historical accuracy per plan §4.1): contacted/sent, delivery-confirmed, pending confirmation, reply%, positive%, meetings, mode. NULL tier renders as "untiered".
 
 **13d — health trend:** per-day time series over the last N days (default 30):
 
@@ -92,7 +91,7 @@ FROM events WHERE occurred_at >= $now - interval '30 days'
 GROUP BY 1 ORDER BY 1;
 ```
 
-plus cumulative rate series computed in TS (rates need running contacted denominators). **Watch rules** (walkthrough 13d) evaluated in TS: reply-rate 30-day drop ≥30% → warning; unsub-rate slope positive over 14 days → warning. Both surface as `alerts` rows.
+plus cumulative rate series computed in TS (rates use running distinct sent-recipient denominators). **Watch rules** (walkthrough 13d) evaluated in TS: reply-rate 30-day drop ≥30% → warning; unsub-rate slope positive over 14 days → warning. Both surface as `alerts` rows.
 
 **Per-mailbox volume (metric #5):**
 
@@ -128,7 +127,7 @@ Every metric accepts `asOf` (filters `occurred_at <= asOf`, including `sentiment
 ## 7. Test matrix (B2)
 
 - Golden cohort: every table above vs Part 10 / §13 numbers, exact.
-- Denominator edges: hard-bounce-on-step-1 lead is not `contacted`; soft-bounced-then-recovered lead **is** (delivered on retry); a lead with 3 replies counts once in reply rate.
+- Denominator edges: a hard-bounce-on-step-1 lead is contacted once its send is accepted and then moves out of pending confirmation; a soft-bounced-then-recovered lead remains one contacted lead; a lead with 3 replies counts once in reply rate.
 - Overlap: the 25 "remove me" leads appear in reply rate AND unsub rate; terminal breakdown counts them once (UNSUBSCRIBED).
 - Sentiment resolution: reply auto-tagged negative then human-retagged neutral → counted neutral (latest `sentiment_tagged` wins).
 - Self-check: inject an enrollment whose state contradicts its events → violation reported.

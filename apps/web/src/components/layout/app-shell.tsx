@@ -1,5 +1,5 @@
 import { useRef, useState } from 'react';
-import { NavLink, Outlet, useLocation, useSearchParams } from 'react-router-dom';
+import { NavLink, Outlet, useLocation } from 'react-router-dom';
 import {
   ArchiveRestore,
   BarChart3,
@@ -24,6 +24,7 @@ import {
 import { TopBar } from './top-bar';
 import { TransportChip } from './transport-chip';
 import { AlertsBell } from './alerts-bell';
+import { UpdateAvailableBanner } from './update-available-banner';
 
 /** The walkthrough's 9 entries + System, with their docs/11 §2 glyphs. */
 const NAV: Array<{ to: string; icon: LucideIcon; label: string }> = [
@@ -39,7 +40,7 @@ const NAV: Array<{ to: string; icon: LucideIcon; label: string }> = [
   { to: '/system', icon: MonitorCog, label: 'System' },
 ];
 
-function PrimaryNavigation({ search, onNavigate }: { search: string; onNavigate?: () => void }) {
+function PrimaryNavigation({ onNavigate }: { onNavigate?: () => void }) {
   return (
     <nav aria-label="Primary" className="min-h-0 flex-1 overflow-y-auto px-2 pb-4">
       <ul className="space-y-1">
@@ -48,7 +49,7 @@ function PrimaryNavigation({ search, onNavigate }: { search: string; onNavigate?
           return (
             <li key={entry.to}>
               <NavLink
-                to={{ pathname: entry.to, search }}
+                to={entry.to}
                 onClick={onNavigate}
                 className={({ isActive }) =>
                   cn(
@@ -69,10 +70,6 @@ function PrimaryNavigation({ search, onNavigate }: { search: string; onNavigate?
 }
 
 export function AppShell() {
-  // Keep the campaign context (?campaign=) when moving between screens.
-  const [searchParams] = useSearchParams();
-  const campaign = searchParams.get('campaign');
-  const search = campaign !== null ? `?campaign=${campaign}` : '';
   const [navigationOpen, setNavigationOpen] = useState(false);
   const navigationTriggerRef = useRef<HTMLButtonElement>(null);
   const location = useLocation();
@@ -95,7 +92,7 @@ export function AppShell() {
         <p className="shrink-0 px-4 py-4 text-sm font-semibold text-sidebar-foreground">
           Cold Email
         </p>
-        <PrimaryNavigation search={search} />
+        <PrimaryNavigation />
       </aside>
       <Sheet open={navigationOpen} onOpenChange={setNavigation}>
         <SheetContent
@@ -114,7 +111,7 @@ export function AppShell() {
               <AlertsBell />
             </div>
           </div>
-          <PrimaryNavigation search={search} onNavigate={() => setNavigation(false)} />
+          <PrimaryNavigation onNavigate={() => setNavigation(false)} />
         </SheetContent>
       </Sheet>
       <div className="flex min-w-0 flex-1 flex-col overflow-hidden">
@@ -122,6 +119,7 @@ export function AppShell() {
           onOpenNavigation={() => setNavigation(true)}
           navigationTriggerRef={navigationTriggerRef}
         />
+        <UpdateAvailableBanner />
         <main
           id="main-content"
           tabIndex={-1}

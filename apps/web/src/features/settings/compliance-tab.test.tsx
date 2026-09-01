@@ -33,11 +33,12 @@ describe('unsubscribe base URL field', () => {
     expect(preview()).not.toContain('https://');
   });
 
-  it('live: preview switches to the link form and keeps the STOP fallback', () => {
+  it('live: preview switches to the link-and-address form', () => {
     renderTab({ unsubscribe_base_url: 'https://unsubscribe.example.com' });
     expect(preview()).toContain(
-      'Unsubscribe: https://unsubscribe.example.com/u/⟨token⟩ or reply STOP | 106-460 Doyle Ave',
+      'Unsubscribe: https://unsubscribe.example.com/u/⟨token⟩ | 106-460 Doyle Ave',
     );
+    expect(preview()).not.toContain('reply STOP');
   });
 
   it('explains that blank means reply-STOP only', () => {

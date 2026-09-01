@@ -5,6 +5,14 @@ landed on 2026-08-30 and the import-wizard clarity application release `a15f70d`
 2026-08-31. Campaign activation, enrollment, and sending still require separate operator
 authorization. The follow-up changed no schema, campaign state, enrollment, or sending logic.
 
+**Post-walkthrough local corrections (2026-09-01):** the owner-address production walkthrough
+exposed clarity and early-metric defects around this model. The verified local candidate now keeps
+Personalized Copy scope fixed across Copy-from-Source/save refetches, names the exact target on
+actions, previews personalized steps from the Sequence screen, derives campaign preview mode from
+the selected lead's A/B tier, warns on zero-day follow-ups, and explains personalized steps have no
+variants in Analytics. These corrections are committed separately from migration `0019`; they are
+not a production release until separately authorized and deployed.
+
 This document is the authoritative specification for migration `0019` and supersedes older
 current-behavior descriptions of Manual Compose, human-written delivery mode, Tier C as a current
 lead choice, and Nurture as a tier. Historical records and legacy labels remain readable.
@@ -104,12 +112,17 @@ apply exactly to the displayed Campaign + scope cohort.
 
 Bulk actions set Tier A, Tier B, or Untiered, and separately set Nurture or restore from Nurture.
 Restoring from Nurture returns the lead to Untiered. The untiered banner/count is filter-scoped and
-preserves campaign membership scope when it opens bulk tiering.
+preserves campaign membership scope when it opens bulk tiering. The tier header is returned by the
+same complete server filter predicate as the list and select-all-matching action. If a successful
+bulk action makes the active filter empty, the page explains why and offers a one-click return to
+the campaign cohort.
 
 The lead Edit card keeps arbitrary custom fields, Custom Observation, Notes, suppression, PII
-erasure, and the event timeline. Its Personalized Copy editor selects Unassigned Source or a
-Campaign + Personalized Step and exposes subject/body, provenance, readiness, preview/risk checks,
-Save Draft, Mark Ready, and Copy from Source. Sent copy is read-only.
+erasure, and the event timeline. Its Personalized Copy editor selects **Reusable lead copy · not
+assigned to a campaign** or a Campaign + Personalized Step and exposes subject/body, provenance,
+readiness, preview/risk checks, target-named Save Draft/Mark Ready/Copy actions. Sent copy is
+read-only. Authoritative lead edits remount the form if tier/status/custom fields/notes changed, so
+an unrelated save cannot submit a stale tier after bulk editing.
 
 ## 5. Campaign and sequence behavior
 
@@ -117,7 +130,10 @@ The sequence editor requires variants for template steps and forbids variants fo
 steps. A step's content source cannot change after that sequence has sent mail. Campaign screens
 show the fixed A = Researched and B = Auto behavior, preserve Auto Observation configuration, and
 show per-personalized-step coverage: ready, needs review, missing, blocked, and total. Enrollment
-preview returns candidate-level blockers.
+preview returns candidate-level blockers. Sequence preview renders exact campaign-step
+Personalized Copy without inventing a variant; campaign-context template preview exposes the
+selected lead's resolved Tier A/Tier B mode. Non-first zero-day waits are explicitly labeled as
+immediately due.
 
 Campaign pool additions and reassignment apply copy-on-assignment without overwriting existing
 campaign copy unless replacement is explicit. Untiered leads may be reserved in pools and show an

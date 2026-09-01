@@ -1,6 +1,6 @@
 import type { RefObject } from 'react';
 import { LogOut, Menu } from 'lucide-react';
-import { useNavigate } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
 import { useMe } from '@/api/queries/auth';
@@ -19,6 +19,8 @@ export function TopBar({
   const { data: me } = useMe();
   const logout = useLogout();
   const navigate = useNavigate();
+  const location = useLocation();
+  const showCampaignSelector = location.pathname.startsWith('/overview');
 
   return (
     <header className="flex min-h-14 shrink-0 items-center gap-2 border-b border-border bg-card px-3 sm:gap-3 sm:px-4 md:min-h-12">
@@ -33,7 +35,7 @@ export function TopBar({
       >
         <Menu className="size-5" />
       </Button>
-      <CampaignSelector />
+      {showCampaignSelector && <CampaignSelector />}
       <div className="ml-auto flex items-center gap-2">
         <div className="hidden md:block">
           <TransportChip />

@@ -86,6 +86,17 @@ describe('B6.2 mailboxes', () => {
     ).toBe(404);
   });
 
+  it('canonicalizes the Calcutta alias before PostgreSQL stores or queries it', async () => {
+    const res = await h.inject({
+      method: 'PATCH',
+      url: '/api/v1/mailboxes/1',
+      payload: { timezone: 'Asia/Calcutta' },
+    });
+    expect(res.statusCode).toBe(200);
+    expect(res.json().timezone).toBe('Asia/Kolkata');
+    expect((await getMailbox(h.services.db, 1))!.timezone).toBe('Asia/Kolkata');
+  });
+
   it('test-connection returns the transport verify result', async () => {
     const ok = await h.inject({ method: 'POST', url: '/api/v1/mailboxes/1/test-connection' });
     expect(ok.statusCode).toBe(200);

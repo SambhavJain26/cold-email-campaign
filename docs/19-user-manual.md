@@ -4,10 +4,11 @@
 
 **Application model:** single-operator, self-hosted cold-email campaign console
 
-**Manual version:** 2026-08-31, for branch `canary`
+**Manual version:** 2026-09-01, for branch `canary`
 
 **Reconciled through:** the deployed Personalized Copy/two-tier/campaign-filter and import-wizard
-clarity application release at Spaceship commit `a15f70d`.
+clarity application release at Spaceship commit `a15f70d`, plus the verified local owner-walkthrough
+corrections awaiting separate push/deploy authorization.
 
 This manual explains the complete operator-facing application: what every screen does, how to use
 each action, what the system does automatically, and which safeguards or edge cases matter. It is a
@@ -181,8 +182,11 @@ unsubscribe remains an unsubscribe even if the enrollment had previously complet
 | `draft` | Safe construction state. Nothing sends. |
 | `active` | Enrolled due work may send on the next scheduler tick. |
 | `paused` | Future sends stop; already accepted email cannot be recalled. IMAP polling can continue. |
-| `completed` | All enrollments are terminal. Nothing remains scheduled. |
 | `archived` | Deliberately retired; future scheduling is stopped. |
+
+Campaigns do not have a `completed` status. When every current enrollment is terminal, the UI says
+**Current enrollments finished** and shows nothing scheduled. An active campaign may remain active
+so a later imported batch can be allocated and enrolled.
 
 ### 4.4 Mailbox statuses
 
@@ -201,8 +205,11 @@ unsubscribe remains an unsubscribe even if the enrollment had previously complet
 - `sent` means SMTP accepted the message attempt.
 - `delivered` is inferred after `delivery_confirm_hours` passes without a bounce. It is not a
   provider inbox-placement receipt.
-- `contacted` means the lead has at least one `delivered` event or a human reply. A reply can arrive
-  before the delivery-confirmation timer, so replies also count the lead as contacted.
+- `contacted` means the lead has at least one SMTP-accepted `sent` event in that campaign. It is a
+  distinct-lead count, so follow-ups do not multiply it.
+- `delivery confirmed` means the lead has a delivered, human-reply, or unsubscribe fact. The UI
+  separately shows accepted recipients still awaiting delivery confirmation. A hard bounce
+  resolves the pending state without becoming a confirmed delivery.
 
 ### 4.6 Suppression
 
@@ -277,8 +284,8 @@ Analytics, Cold Storage, Settings,** and **System**.
 
 On desktop and tablet, this navigation remains visible while the page content scrolls
 independently. On screens narrower than 768 px, use the menu button in the top bar. It opens the
-same ten sections in a focus-trapped drawer and closes after navigation. The campaign selector,
-alerts, transport status, and sign-out remain available on phones.
+same ten sections in a focus-trapped drawer and closes after navigation. Alerts, transport status,
+and sign-out remain available on phones; the campaign selector appears on Overview only.
 
 ![Phone navigation drawer showing all application sections, transport state, and alerts](images/user-manual/19-mobile-navigation.png)
 
@@ -288,13 +295,10 @@ control that opened them.
 
 ### Campaign selector
 
-The top-left selector establishes global campaign context. The selection is stored as
-`?campaign=<id>` in the URL and follows you between screens. Paused or draft campaigns are labeled
-in the selector. Screens that need a campaign use the selected campaign; when none is selected,
-many screens use the first available campaign.
-
-Before interpreting Overview, Analytics, Cold Storage, or a campaign-filtered Leads list, verify
-the selected campaign.
+The top-left selector scopes **Overview only** and stores its choice as `?campaign=<id>` on that
+page. Navigation does not carry this query onto unrelated global screens. **Leads** has its own
+Campaign + Pool/Enrolled/Both filters, and **Analytics** has its own campaign selector, so each
+screen states the scope it actually applies.
 
 ### Transport badge
 
@@ -353,19 +357,20 @@ increasing unsubscribes or deteriorating reply performance.
 
 ### Progress and estimated completion
 
-Progress is contacted leads divided by total enrollments. The estimated days remaining uses the
-last seven days' delivered pace. No estimate is shown when there is insufficient activity, no
+Progress is contacted (accepted-send) leads divided by total enrollments. Directly below it,
+Overview shows delivery-confirmed and pending-confirmation counts. The estimated days remaining
+uses the last seven days' delivered pace. No estimate is shown when there is insufficient activity, no
 remaining work, or no meaningful pace.
 
 ### Metric cards
 
 | Metric | Calculation |
 |---|---|
-| Reply rate | Distinct human repliers ÷ contacted leads |
-| Positive rate | Distinct leads with effective positive sentiment ÷ contacted leads |
-| Meetings | Count of meeting-booked events; also shown per 100 contacted |
+| Reply rate | Distinct human repliers ÷ distinct accepted-send recipients |
+| Positive rate | Distinct leads with effective positive sentiment ÷ accepted-send recipients |
+| Meetings | Count of meeting-booked events; also shown per 100 accepted recipients |
 | Hard-bounce rate | Hard bounces ÷ distinct leads sent to |
-| Unsubscribe rate | Distinct unsubscribed leads ÷ contacted leads |
+| Unsubscribe rate | Distinct unsubscribed leads ÷ accepted-send recipients |
 
 Rates are event-based and may overlap. A person may reply and later unsubscribe.
 
@@ -601,12 +606,14 @@ This is not an undoable archive action. Use it only for a genuine privacy/erasur
 
 Personalized Copy saves subject/body for sequence use; it never sends directly.
 
-1. Choose **Unassigned Source** to edit reusable global source copy, or choose a Campaign and one
-   of its Personalized Steps to edit the independent campaign snapshot.
+1. Choose **Reusable lead copy · not assigned to a campaign**, or choose a Campaign and one of its
+   Personalized Steps to edit the independent campaign snapshot.
 2. Review import provenance, readiness, preview, and copy-risk checks.
 3. Use **Save Draft** while editing. Any content edit resets readiness to **needs review**.
 4. Use **Mark Ready** only when both subject and body are valid and final.
-5. Use **Copy from Source** to create or explicitly replace an unsent campaign-step snapshot.
+5. Use the target-named **Copy reusable lead copy to Campaign · Step N** action to create or
+   explicitly replace an unsent campaign-step snapshot. The selected campaign/step remains fixed
+   after copy/save refetches.
 
 Personalized Step 1 must be ready before enrollment. Later personalized steps can be prepared after
 enrollment, but a due step without ready copy holds only that lead and raises a blocker. There is no
@@ -904,8 +911,10 @@ an optional reserved lead pool, and enrolled leads.
 
 ### 11.1 Campaign list
 
-The list shows status, sequence, enrollment/contact counts, progress, and the next safe status
-action. A “Pass 2” badge identifies a campaign created through recycling.
+The list shows status, sequence, enrollment/contact counts, pending delivery confirmation, terminal
+journey progress, and the next safe status action. **Finishing** means the last step was sent but
+the delivery-confirmation window has not yet derived the terminal state. A “Pass 2” badge
+identifies a campaign created through recycling.
 
 Primary actions:
 
@@ -1036,7 +1045,7 @@ and pace gap before any message is actually sent.
 
 ### 11.7 Completion report
 
-When nothing remains `NEW` or `ACTIVE`, the completion report shows mutually exclusive outcomes:
+When nothing remains `NEW` or `ACTIVE`, **Current enrollments finished** shows mutually exclusive outcomes:
 
 - replied positive;
 - replied neutral/negative;
@@ -1045,7 +1054,8 @@ When nothing remains `NEW` or `ACTIVE`, the completion report shows mutually exc
 - completed without reply.
 
 The rows must reconcile to total enrollment. The report separately shows event-based rates, which
-can overlap, and offers **Recycle cold storage** or **Import fresh leads**.
+can overlap, and offers **Recycle cold storage** or **Import fresh leads**. This does not change the
+campaign status; an active campaign can accept another imported batch later.
 
 ## 12. Unibox
 
@@ -1135,7 +1145,7 @@ compliance responsibility on the operator.
 
 ## 13. Analytics
 
-Analytics is scoped to the selected campaign and contains four tabs.
+Analytics has an explicit page-level campaign selector and contains four tabs.
 
 ![Analytics variant comparison showing sends, reply and positive rates, meetings, and winner guidance](images/user-manual/12-analytics.png)
 
@@ -1146,11 +1156,14 @@ have an accessible text view.
 
 ### 13.1 Variants
 
-Choose any sequence step from the step selector. The screen separates two questions:
+The selector defaults to the first Template step because Personalized Copy has no shared variants.
+Choosing a Personalized Copy step shows that explanation instead of an empty table. For Template
+steps, the screen separates two questions:
 
-- **Direct response:** how many messages at the selected step were sent/delivered, and how many
-  replies directly referenced that step's message. A reply received before delayed delivery
-  confirmation still counts as contacted, so the rate cannot exceed 100% for that reason.
+- **Direct response:** how many recipients received an accepted send at the selected step, how
+  many are delivery-confirmed/pending, and how many replies directly referenced that step's
+  message. The sent cohort is the denominator, so early replies appear immediately and cannot
+  produce a rate above 100%.
 - **Eventual outcome:** among all enrollments that received the selected variant, how many later
   replied, became positive, or booked a meeting—even when the reply referenced a later step.
 
@@ -1164,8 +1177,9 @@ active automated variant for a step.
 
 ### 13.2 Steps
 
-Shows delivered count, positive replies, positive rate, and verdict for each step. Fewer than 200
-deliveries is a small sample. A step below 0.5% positive rate with sufficient volume is labeled
+Shows sent, delivery-confirmed, pending-confirmation, reply, reply-rate, positive replies, positive
+rate, and verdict for each step. Rows appear as soon as sends exist rather than waiting for the
+delivery-confirmation timer. Fewer than 200 sends is a small sample. A step below 0.5% positive rate with sufficient volume is labeled
 weak. The footer reconciles per-step positives to the campaign total.
 
 Treat automated “remove weak step” guidance as analysis, not an instruction to rewrite sent
@@ -1173,8 +1187,9 @@ history. Sequence edits with history are constrained.
 
 ### 13.3 Tiers
 
-Shows contacted, reply rate, positive rate, meetings, and effort mode by the tier captured at
-enrollment. Reconciliation compares tier totals with campaign totals.
+Shows contacted/sent, delivery-confirmed, pending-confirmation, reply rate, positive rate, meetings,
+and effort mode by the tier captured at enrollment. Reconciliation compares tier totals with
+campaign totals.
 
 When replied Tier-C leads exist, **Promote engaged Tier-C → Tier B** updates their current lead tier
 for future campaigns. It does not alter past enrollment analytics.
@@ -1196,8 +1211,9 @@ unsubscribe trend. Pause and investigate trends; do not “solve” them by incr
 
 - Terminal outcome rows are mutually exclusive and should sum to enrollments.
 - Event rates overlap: one person can reply, book a meeting, and later unsubscribe.
-- Contacted is not identical to sent.
-- Delivery is delayed by the configured confirmation window.
+- Contacted is the distinct accepted-send cohort; the number of send events can be larger because
+  one lead can receive follow-ups.
+- Delivery confirmation is delayed by the configured window and is shown separately from pending.
 - Tier analytics uses enrolled tier, not the lead's current tier.
 
 ## 14. Cold Storage
@@ -1278,8 +1294,9 @@ The absolute rule can protect at low volume. Do not weaken thresholds to keep a 
 
 Validation ranges are: scheduler 1–60 minutes; IMAP poll 1–120 minutes; stale-poll and delivery
 confirmation 1–72 hours; soft retries 0–10; jitter 0–100%; and cold-storage rest 0 days or more.
-Choose a valid IANA timezone such as `America/New_York` or `UTC` from the searchable selector. Both
-the browser and server reject invalid names, so a mistyped timezone cannot be saved.
+Choose a valid IANA timezone such as `America/New_York`, `Asia/Kolkata`, or `UTC` from the
+searchable selector. The server validates names against both runtime Intl and PostgreSQL before
+saving; the legacy `Asia/Calcutta` alias is canonicalized to `Asia/Kolkata`.
 
 After the first send exists, `delivery_confirm_hours` is immutable. This preserves replay-stable
 completion times. Attempting to change it is refused by both application logic and the database.
@@ -1314,14 +1331,16 @@ that protection and is reported as not launch-ready.
   `sambhavpmops.com` receives links on the corresponding unsubscribe host. A fixed HTTPS origin is
   also accepted; no trailing slash, query, or fragment is allowed.
 
-When the base URL is blank, the app emits no unsubscribe link or `List-Unsubscribe` headers and the
-footer instructs the recipient to reply STOP. When configured, every send receives an opaque token,
-a body link, and the paired one-click headers while reply STOP remains available.
+When the base URL is blank, the app emits no unsubscribe link or `List-Unsubscribe` headers and
+uses the configured opt-out text. When configured, every send receives an opaque token, a body
+link, and the paired one-click headers. The visible footer contains only **Unsubscribe | postal
+address**. Inbound STOP and other opt-out phrases are still detected and honored automatically.
 
 The live preview shows the canonical words but stays at an accessible interface size. The delivered
 message is `multipart/alternative`:
 
-- the HTML alternative places the footer after a 16px top gap, at `10px`, color `#767676`, and
+- the HTML alternative starts the first body paragraph at zero top margin, preserves deliberate
+  16px paragraph gaps, and places the footer after a 16px top gap at `10px`, color `#767676`, and
   `line-height: 1.5`;
 - the unsubscribe destination is linked behind the word **Unsubscribe**—normal HTML-capable email
   clients do not display the full token URL;
@@ -1427,12 +1446,18 @@ When active:
    prevents security scanners from opting people out by prefetching.
 3. Selecting **Unsubscribe me**, or a supported mail client's one-click POST, records a global
    unsubscribe and suppression.
-4. Repeating the action is idempotent and does not create duplicate facts.
+4. Reopening any valid link for an already-unsubscribed enrollment shows **You are unsubscribed**
+   with no second confirmation form. Repeating POST is idempotent and does not create duplicate
+   facts.
 5. Unknown/expired tokens show the same generic success wording and reveal no recipient data.
 
-Offline and routing tests cover these mechanics, but the production Gmail body-link and RFC 8058
-one-click behavior are not considered live-verified until the separately approved owner-address
-canary is complete.
+The confirmation sentence is **Confirm, and I won’t send you any more emails.** There is no public
+resubscribe button: restoring contact permission is an operator-only correction because a recorded
+unsubscribe remains globally suppressive and auditable.
+
+The owner-address walkthrough verified the production body-link confirmation and unsubscribe
+result. RFC 8058 mail-client one-click behavior still requires separate client-side evidence; the
+headers remain covered by transport tests.
 
 Never paste or log a recipient unsubscribe URL. The token is a capability.
 
@@ -1697,14 +1722,14 @@ Do not send real prospect mail until every applicable item is complete.
 |---|---|
 | Alert acknowledgement | Marks an alert as seen; does not fix or delete it |
 | Campaign | Sequence + effort/ramp configuration + enrolled leads |
-| Contacted | Lead with inferred delivery or human reply |
+| Contacted | Distinct lead with at least one accepted send in the campaign |
 | Content hash | Fingerprint used to prevent identical second-pass resend |
 | Disposition | Operator-recorded business outcome of a human reply |
 | Effective cap | Current mailbox cap after any temporary resume reduction |
 | Enrollment | One lead's participation in one campaign |
 | Event ledger | Immutable chronological facts used to rebuild state |
 | IMAP | Protocol used to read replies, auto-replies, and DSNs |
-| Manual compose | Human-written Mode-1 send through normal logging/rotation |
+| Manual compose | Retired predecessor direct-send workflow; current personalized mail uses sequence steps |
 | OOO | Out-of-office/automatic reply; does not count as human engagement |
 | Pace gap | Minimum spacing between accepted sends from one mailbox |
 | Projection | Stored state derived from the event ledger |

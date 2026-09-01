@@ -106,7 +106,7 @@ describe('SmtpImapTransport over a real server (B8.1)', () => {
       mailboxId: CANARY_ID,
       to: LEAD.address,
       subject: 'A safe subject',
-      bodyText: `Hi Sarah\n\nUnsubscribe: ${url} or reply STOP | 123 Main St`,
+      bodyText: `Hi Sarah\n\nUnsubscribe: ${url} | 123 Main St`,
       headers: { messageId: '<ce-unsub-1@coldemail.test>', listUnsubscribeUrl: url },
     });
     const [stored] = await readInbox(LEAD);

@@ -136,6 +136,10 @@ function toCampaignDto(
     recycled_from_campaign_id: recycleSources.length === 1 ? recycleSources[0]!.campaignId : null,
     enrolled_count: counts.enrolledCount,
     contacted_count: counts.contactedCount,
+    delivery_confirmed_count: counts.deliveryConfirmedCount,
+    pending_delivery_confirmation_count: counts.pendingDeliveryConfirmationCount,
+    finished_count: counts.finishedCount,
+    finishing_count: counts.finishingCount,
     manual_only_count: counts.manualOnlyCount,
   };
 }
@@ -351,7 +355,15 @@ export async function campaignsRoutes(app: FastifyInstance, services: AppService
       });
       return toCampaignDto(
         row,
-        { enrolledCount: 0, contactedCount: 0, manualOnlyCount: 0 },
+        {
+          enrolledCount: 0,
+          contactedCount: 0,
+          deliveryConfirmedCount: 0,
+          pendingDeliveryConfirmationCount: 0,
+          finishedCount: 0,
+          finishingCount: 0,
+          manualOnlyCount: 0,
+        },
         [],
         await poolSummary(db, row.id),
       );

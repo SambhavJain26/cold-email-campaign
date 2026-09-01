@@ -102,6 +102,7 @@ function buildLeads(): LeadDto[] {
         campaign_name: 'Local mock campaign',
         current_state: state,
         current_step_no: bounced ? 1 : state === 'REPLIED' ? Math.min(1 + (i % 4), 4) : 4,
+        awaiting_completion: false,
       },
     });
   }
@@ -126,6 +127,7 @@ function buildLeads(): LeadDto[] {
       campaign_name: 'Manual Send Fixture',
       current_state: 'ACTIVE',
       current_step_no: 0,
+      awaiting_completion: false,
     },
   });
   return leads;
@@ -314,6 +316,10 @@ function buildCampaigns(): CampaignDto[] {
       },
       last_auto_enrollment_run: null,
       recycle_sources: [],
+      delivery_confirmed_count: golden!.contacted_count,
+      pending_delivery_confirmation_count: 0,
+      finished_count: golden!.contacted_count,
+      finishing_count: 0,
     },
     {
       id: 2,
@@ -347,6 +353,10 @@ function buildCampaigns(): CampaignDto[] {
       recycled_from_campaign_id: null,
       enrolled_count: 1,
       contacted_count: 0,
+      delivery_confirmed_count: 0,
+      pending_delivery_confirmation_count: 0,
+      finished_count: 0,
+      finishing_count: 0,
       manual_only_count: 1,
     },
     {
@@ -381,6 +391,10 @@ function buildCampaigns(): CampaignDto[] {
       recycled_from_campaign_id: null,
       enrolled_count: 0,
       contacted_count: 0,
+      delivery_confirmed_count: 0,
+      pending_delivery_confirmation_count: 0,
+      finished_count: 0,
+      finishing_count: 0,
       manual_only_count: 0,
     },
   ];

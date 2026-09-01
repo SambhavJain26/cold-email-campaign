@@ -11,7 +11,7 @@ test('list shows the golden campaign with its enrolled/contacted counts', async 
   await expect(row).toContainText('Golden Pass 1');
   await expect(row).toContainText('active');
   await expect(row).toContainText('885');
-  await expect(row).toContainText('867');
+  await expect(row).toContainText('All current enrollments finished');
 });
 
 test('completion panel reconciles the terminal outcomes to the enrolled total', async ({
@@ -29,9 +29,11 @@ test('completion panel reconciles the terminal outcomes to the enrolled total', 
 
   const panel = page.getByTestId('completion-panel');
   await expect(panel).toBeVisible();
+  await expect(panel).toContainText('Current enrollments finished');
+  await expect(panel).toContainText('can remain active for a future imported batch');
   // 28 + 19 + 40 + 18 + 780 = 885 — the sum IS the report.
   await expect(page.getByTestId('outcomes-total')).toContainText('885 / 885');
-  await expect(panel).toContainText('8.3%'); // reply rate off the same log
+  await expect(panel).toContainText('8.1%'); // 72 replies / 885 accepted-send recipients
   await expect(panel).toContainText('may overlap');
   await expect(panel.getByRole('link', { name: 'Recycle cold storage' })).toBeVisible();
 });

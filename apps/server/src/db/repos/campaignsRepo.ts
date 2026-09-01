@@ -1,7 +1,7 @@
 import { eq, sql } from 'drizzle-orm';
 import type { PersonalizationMode } from '@coldemail/shared';
 import type { DbLike } from '../client';
-import { campaigns, leads } from '../schema';
+import { campaigns, leads, sequenceSteps } from '../schema';
 
 export type CampaignRow = typeof campaigns.$inferSelect;
 
@@ -76,26 +76,70 @@ export function autoObservationsOf(c: CampaignRow): Record<string, string> | nul
 export interface CampaignCounts {
   enrolledCount: number;
   contactedCount: number;
+  deliveryConfirmedCount: number;
+  pendingDeliveryConfirmationCount: number;
+  finishedCount: number;
+  finishingCount: number;
   manualOnlyCount: number;
 }
 
-/** enrolled = enrollments rows; contacted = distinct leads with ≥1 delivered (the denominator law). */
+/** Contacted means a distinct lead with at least one accepted send. */
 export async function campaignCounts(db: DbLike, campaignId: number): Promise<CampaignCounts> {
   const res = await db.execute(sql`
     SELECT
       (SELECT count(*)::int FROM enrollments e JOIN ${leads} l ON l.id = e.lead_id AND NOT l.is_erased
         WHERE e.campaign_id = ${campaignId}) AS enrolled,
       (SELECT count(DISTINCT ev.lead_id)::int FROM events ev
-        WHERE ev.campaign_id = ${campaignId} AND ev.type = 'delivered'
+        WHERE ev.campaign_id = ${campaignId} AND ev.type = 'sent'
           AND EXISTS (SELECT 1 FROM ${leads} l WHERE l.id = ev.lead_id AND NOT l.is_erased)) AS contacted,
+      (SELECT count(DISTINCT ev.lead_id)::int FROM events ev
+        WHERE ev.campaign_id = ${campaignId}
+          AND ev.type IN ('delivered', 'human_reply', 'unsubscribe')
+          AND EXISTS (SELECT 1 FROM ${leads} l WHERE l.id = ev.lead_id AND NOT l.is_erased)) AS delivery_confirmed,
+      (SELECT count(DISTINCT sent.lead_id)::int FROM events sent
+        WHERE sent.campaign_id = ${campaignId} AND sent.type = 'sent'
+          AND EXISTS (SELECT 1 FROM ${leads} l WHERE l.id = sent.lead_id AND NOT l.is_erased)
+          AND NOT EXISTS (
+            SELECT 1 FROM events resolved
+            WHERE resolved.campaign_id = sent.campaign_id
+              AND resolved.lead_id = sent.lead_id
+              AND resolved.type IN ('delivered', 'hard_bounce', 'human_reply', 'unsubscribe')
+          )) AS pending_delivery_confirmation,
+      (SELECT count(*)::int FROM enrollments e JOIN ${leads} l ON l.id = e.lead_id AND NOT l.is_erased
+        WHERE e.campaign_id = ${campaignId}
+          AND e.current_state IN ('REPLIED', 'BOUNCED', 'UNSUBSCRIBED', 'COMPLETED')) AS finished,
+      (SELECT count(*)::int
+        FROM enrollments e
+        JOIN ${leads} l ON l.id = e.lead_id AND NOT l.is_erased
+        JOIN ${campaigns} c ON c.id = e.campaign_id
+        WHERE e.campaign_id = ${campaignId}
+          AND e.current_state = 'ACTIVE'
+          AND e.next_send_at IS NULL
+          AND c.sequence_id IS NOT NULL
+          AND e.current_step_no > (
+            SELECT coalesce(max(ss.step_no), 0) FROM ${sequenceSteps} ss
+            WHERE ss.sequence_id = c.sequence_id
+          )) AS finishing,
       (SELECT count(*)::int FROM enrollments e JOIN ${leads} l ON l.id = e.lead_id AND NOT l.is_erased
         WHERE e.campaign_id = ${campaignId}
           AND e.personalization_mode = 'human_written'
           AND e.current_state IN ('NEW', 'ACTIVE')) AS manual_only`);
-  const row = res.rows[0] as { enrolled: number; contacted: number; manual_only: number };
+  const row = res.rows[0] as {
+    enrolled: number;
+    contacted: number;
+    delivery_confirmed: number;
+    pending_delivery_confirmation: number;
+    finished: number;
+    finishing: number;
+    manual_only: number;
+  };
   return {
     enrolledCount: row.enrolled,
     contactedCount: row.contacted,
+    deliveryConfirmedCount: row.delivery_confirmed,
+    pendingDeliveryConfirmationCount: row.pending_delivery_confirmation,
+    finishedCount: row.finished,
+    finishingCount: row.finishing,
     manualOnlyCount: row.manual_only,
   };
 }

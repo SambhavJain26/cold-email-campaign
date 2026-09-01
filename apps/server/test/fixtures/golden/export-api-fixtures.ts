@@ -89,11 +89,17 @@ async function main(): Promise<void> {
     ]
       .filter((f) => f !== null)
       .map((f) => f.rule);
+    const deliveryConfirmed = await m.deliveryConfirmed(scope);
+    const pendingDeliveryConfirmation = await m.pendingDeliveryConfirmation(scope);
     const overview = {
       progress: {
         contacted: progress.numerator,
         total: progress.denominator,
         pct: progress.value,
+      },
+      delivery_confirmation: {
+        confirmed: deliveryConfirmed,
+        pending: pendingDeliveryConfirmation,
       },
       reply_rate: reply,
       positive_rate: positive,
@@ -115,13 +121,19 @@ async function main(): Promise<void> {
     // GET /analytics/steps + /analytics/tiers
     const steps = (await m.stepAnalytics(scope)).map((s) => ({
       step_no: s.stepNo,
+      sent: s.sent,
       delivered: s.delivered,
+      pending_delivery_confirmation: s.pendingDeliveryConfirmation,
+      replies: s.repliers,
+      reply_rate: s.stepReplyRate,
       positive_replies: s.positiveRepliers,
       positive_rate: s.positiveRate,
     }));
     const tiers = (await m.tierAnalytics(scope)).map((t) => ({
       tier: t.tier,
       contacted: t.contacted,
+      delivered: t.delivered,
+      pending_delivery_confirmation: t.pendingDeliveryConfirmation,
       reply_rate: t.replyRate,
       positive_rate: t.positiveRate,
       meetings: t.meetings,
@@ -190,6 +202,10 @@ async function main(): Promise<void> {
           recycled_from_campaign_id: campaignRow.recycled_from_campaign_id,
           enrolled_count: outcomes.total,
           contacted_count: progress.numerator,
+          delivery_confirmed_count: deliveryConfirmed,
+          pending_delivery_confirmation_count: pendingDeliveryConfirmation,
+          finished_count: outcomes.total,
+          finishing_count: 0,
           manual_only_count: 0, // golden replay config makes all tiers automated
         },
       ],

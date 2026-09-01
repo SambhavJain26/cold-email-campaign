@@ -33,6 +33,7 @@ import {
   latestEnrollmentLite,
   listLeads,
   patchLead,
+  tierCounts,
   untieredCount,
   updateOutreachStatusByFilter,
   updateOutreachStatusByIds,
@@ -91,6 +92,7 @@ function toLeadDto(
         campaign_name: latest.campaignName,
         current_state: latest.currentState as EnrollmentState,
         current_step_no: latest.currentStepNo,
+        awaiting_completion: latest.awaitingCompletion,
       },
     }),
   };
@@ -190,12 +192,14 @@ export async function leadsRoutes(app: FastifyInstance, services: AppServices): 
         outreachStatus: outreach_status,
       };
       const { items, total } = await listLeads(db, filter, page, per_page);
+      const counts = await tierCounts(db, filter);
       return {
         items: items.map((i) => toLeadDto(i.lead, i.latestEnrollment, i.poolAssignment)),
         total,
         page,
         per_page,
         untiered_count: await untieredCount(db, filter),
+        tier_counts: counts,
       };
     },
   );

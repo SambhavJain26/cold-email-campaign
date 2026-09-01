@@ -39,7 +39,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
-import { useCommitImport, useUploadImport } from '@/api/mutations/imports';
+import { useCommitImport, useDiscardImportPreview, useUploadImport } from '@/api/mutations/imports';
 import { useCampaigns } from '@/api/queries/campaigns';
 import { useImportAllocationPreview, useImports } from '@/api/queries/imports';
 import { useSequences } from '@/api/queries/sequences';
@@ -85,6 +85,7 @@ const FLAG_COPY: Record<ImportRowFlag, { label: string; hint: string }> = {
 function ImportHistory() {
   const [page, setPage] = useState(1);
   const history = useImports(page);
+  const discard = useDiscardImportPreview();
   if (history.isPending) {
     return <p className="text-xs text-muted-foreground">Loading import history…</p>;
   }
@@ -102,7 +103,8 @@ function ImportHistory() {
           Import history
         </h3>
         <p className="text-xs text-muted-foreground">
-          Campaign reservations remain visible even after leads enroll or are released.
+          Committed imports are durable. Preview-only attempts created no leads and can be safely
+          discarded.
         </p>
       </div>
       <div className="space-y-2">
@@ -110,7 +112,24 @@ function ImportHistory() {
           <article key={item.id} className="rounded-md border border-border p-3 text-xs">
             <div className="flex flex-wrap items-center justify-between gap-2">
               <span className="font-medium">{item.filename}</span>
-              <Badge variant="outline">{item.committed ? 'Committed' : 'Preview only'}</Badge>
+              <div className="flex items-center gap-2">
+                <Badge variant="outline">{item.committed ? 'Committed' : 'Preview only'}</Badge>
+                {!item.committed && (
+                  <Button
+                    type="button"
+                    size="xs"
+                    variant="ghost"
+                    disabled={discard.isPending}
+                    onClick={() =>
+                      discard.mutate(item.id, {
+                        onSuccess: () => toast.success('Preview discarded'),
+                      })
+                    }
+                  >
+                    Discard
+                  </Button>
+                )}
+              </div>
             </div>
             <p className="mt-1 text-muted-foreground">
               Import #{item.id} · {item.rows_total} rows ·{' '}
@@ -250,7 +269,8 @@ export function ImportWizard({
   const importAllCount = counts ? counts.ok + counts.role_based : 0;
   const acceptedCount = counts ? (commitMode === 'drop_flagged' ? counts.ok : importAllCount) : 0;
   const missingGenericStep =
-    allocationPreview.data?.campaigns.some((campaign) => campaign.generic_copy_step_required) ??
+    (!allocationPreview.isFetching &&
+      allocationPreview.data?.campaigns.some((campaign) => campaign.generic_copy_step_required)) ||
     false;
   const campaignName = (campaignId: number): string =>
     campaigns.data?.items.find((campaign) => campaign.id === campaignId)?.name ??
@@ -484,9 +504,11 @@ export function ImportWizard({
               <FieldGroup className="gap-3">
                 {allocations.map((allocation, index) => {
                   const stepNos = personalizedSteps(allocation.campaignId);
-                  const campaignCopyPreview = allocationPreview.data?.campaigns.find(
-                    (campaign) => campaign.campaign_id === allocation.campaignId,
-                  );
+                  const campaignCopyPreview = allocationPreview.isFetching
+                    ? undefined
+                    : allocationPreview.data?.campaigns.find(
+                        (campaign) => campaign.campaign_id === allocation.campaignId,
+                      );
                   const showGenericStepSelector =
                     allocation.genericCopyStepNo !== undefined ||
                     Boolean(
@@ -587,7 +609,9 @@ export function ImportWizard({
                           <FieldLabel htmlFor={`allocation-copy-step-${index + 1}`}>
                             Imported copy destination
                           </FieldLabel>
-                          {showGenericStepSelector ? (
+                          {allocationPreview.isFetching ? (
+                            <FieldDescription>Checking this allocation…</FieldDescription>
+                          ) : showGenericStepSelector ? (
                             <Select
                               value={
                                 allocation.genericCopyStepNo === undefined
@@ -663,10 +687,10 @@ export function ImportWizard({
               >
                 Add campaign allocation
               </Button>
-              {allocationPreview.isPending && allocations.length > 0 && (
+              {allocationPreview.isFetching && allocations.length > 0 && (
                 <p className="text-xs text-muted-foreground">Checking exact availability…</p>
               )}
-              {allocationPreview.data && (
+              {allocationPreview.data && !allocationPreview.isFetching && (
                 <Alert>
                   <AlertTitle>What will happen</AlertTitle>
                   <AlertDescription>
@@ -727,7 +751,7 @@ export function ImportWizard({
                 commit.isPending ||
                 validAllocations.length !== allocations.length ||
                 (allocations.length > 0 &&
-                  (allocationPreview.isPending ||
+                  (allocationPreview.isFetching ||
                     allocationPreview.isError ||
                     !allocationPreview.data ||
                     missingGenericStep ||

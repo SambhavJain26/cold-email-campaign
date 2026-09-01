@@ -1,43 +1,32 @@
-import { useQueries } from '@tanstack/react-query';
-import {
-  leadsListResponseSchema,
-  CURRENT_LEAD_TIERS,
-  type CurrentLeadTier,
-} from '@coldemail/shared';
+import { CURRENT_LEAD_TIERS, type CurrentLeadTier } from '@coldemail/shared';
 import { TierBadge } from '@/components/shared/tier-badge';
-import { apiFetch } from '@/api/client';
 
-/** F3.1 — the Stage-2 tier-distribution panel. The contract has no tier-counts
- *  meta, so each tier's `total` comes from a per_page=1 probe of the same
- *  filtered endpoint the table uses — counts can never drift from the list. */
-export function TierHeader({ total, untiered }: { total: number; untiered: number }) {
-  const probes = useQueries({
-    queries: CURRENT_LEAD_TIERS.map((tier) => ({
-      queryKey: ['leads', 'tier-count', tier],
-      queryFn: () =>
-        apiFetch('/leads', leadsListResponseSchema, { query: { tier, page: 1, per_page: 1 } }),
-      staleTime: 30_000,
-    })),
-  });
+type Counts = { A: number; B: number; untiered: number; nurture: number };
 
+/** Exact distribution for the active list filter, supplied by the same API query. */
+export function TierHeader({ total, counts }: { total: number; counts: Counts }) {
   return (
     <div className="flex flex-wrap items-center gap-x-6 gap-y-2 rounded-lg border border-border bg-card px-4 py-3">
-      {CURRENT_LEAD_TIERS.map((tier: CurrentLeadTier, i) => (
+      {CURRENT_LEAD_TIERS.map((tier: CurrentLeadTier) => (
         <div key={tier} className="flex items-center gap-2 text-sm">
           <TierBadge tier={tier} />
           <span className="font-semibold tabular-nums" data-testid={`tier-count-${tier}`}>
-            {probes[i]?.data?.total ?? '–'}
+            {counts[tier]}
           </span>
-          {total > 0 && probes[i]?.data && (
+          {total > 0 && (
             <span className="text-xs text-muted-foreground">
-              ({Math.round(((probes[i]!.data!.total ?? 0) / total) * 100)}%)
+              ({Math.round((counts[tier] / total) * 100)}%)
             </span>
           )}
         </div>
       ))}
       <div className="flex items-center gap-2 text-sm">
         <span className="text-muted-foreground">untiered</span>
-        <span className="font-semibold tabular-nums">{untiered}</span>
+        <span className="font-semibold tabular-nums">{counts.untiered}</span>
+      </div>
+      <div className="flex items-center gap-2 text-sm">
+        <span className="text-muted-foreground">Nurture</span>
+        <span className="font-semibold tabular-nums">{counts.nurture}</span>
       </div>
       <div className="ml-auto text-sm text-muted-foreground">
         {total} <span className="text-xs">total</span>

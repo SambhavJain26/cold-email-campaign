@@ -75,6 +75,14 @@ export const isoDate = z.iso.date();
  * IANA timezone shared by browser and server validation. `Intl` is available
  * in both runtimes and rejects misspellings instead of silently falling back.
  */
+const POSTGRES_TIMEZONE_ALIASES: Readonly<Record<string, string>> = {
+  'Asia/Calcutta': 'Asia/Kolkata',
+};
+
+export function canonicalizeIanaTimezone(value: string): string {
+  return POSTGRES_TIMEZONE_ALIASES[value] ?? value;
+}
+
 export const ianaTimezoneSchema = z
   .string()
   .min(1)
@@ -88,7 +96,8 @@ export const ianaTimezoneSchema = z
       }
     },
     { message: 'must be a valid IANA timezone such as Asia/Kolkata' },
-  );
+  )
+  .transform(canonicalizeIanaTimezone);
 
 /** Numeric path id (decision J — bigint identity, exposed as numbers). */
 export const idParamSchema = z.object({ id: z.coerce.number().int().positive() });

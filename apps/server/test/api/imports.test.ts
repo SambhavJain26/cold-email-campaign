@@ -123,6 +123,35 @@ describe('B6.4 imports', () => {
     expect(missing.statusCode).toBe(404);
   });
 
+  it('discards an abandoned preview but preserves committed history', async () => {
+    const wm = await eventWatermark(h.pool);
+    const { payload, contentType } = multipartOf(
+      'abandoned.csv',
+      Buffer.from('email\npreview-only@example.com\n'),
+    );
+    const preview = await h.inject({
+      method: 'POST',
+      url: '/api/v1/imports',
+      headers: { 'content-type': contentType },
+      payload,
+    });
+    expect(preview.statusCode).toBe(200);
+    const importId = preview.json().import_id as number;
+
+    const discarded = await h.inject({ method: 'DELETE', url: `/api/v1/imports/${importId}` });
+    expect(discarded.statusCode).toBe(200);
+    expect(discarded.json()).toEqual({ ok: true });
+    expect((await h.pool.query('SELECT 1 FROM imports WHERE id = $1', [importId])).rowCount).toBe(
+      0,
+    );
+
+    const committed = (await h.pool.query('SELECT id FROM imports WHERE committed LIMIT 1')).rows[0]
+      .id as number;
+    const refused = await h.inject({ method: 'DELETE', url: `/api/v1/imports/${committed}` });
+    expect(refused.statusCode).toBe(409);
+    await expectNoNewEvents(h.pool, wm);
+  });
+
   it('preserves an existing lead profile and reserves its imported manual draft first', async () => {
     const existing = (
       await h.pool.query(`SELECT id, email, first_name, company FROM leads ORDER BY id LIMIT 1`)

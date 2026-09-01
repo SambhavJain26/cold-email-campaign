@@ -27,20 +27,20 @@ describe('@golden L2 — metrics reproduce spec Part 10 exactly', () => {
     await pool.end();
   });
 
-  it('reply rate = 72 / 867 = 8.3%', async () => {
-    expect(await m.replyRate(scope)).toEqual({ numerator: 72, denominator: 867, value: 8.3 });
+  it('reply rate = 72 / 885 accepted recipients = 8.1%', async () => {
+    expect(await m.replyRate(scope)).toEqual({ numerator: 72, denominator: 885, value: 8.1 });
   });
 
-  it('positive reply rate = 28 / 867 = 3.2%', async () => {
+  it('positive reply rate = 28 / 885 = 3.2%', async () => {
     expect(await m.positiveReplyRate(scope)).toEqual({
       numerator: 28,
-      denominator: 867,
+      denominator: 885,
       value: 3.2,
     });
   });
 
-  it('unsubscribe rate = 40 / 867 = 4.6%', async () => {
-    expect(await m.unsubscribeRate(scope)).toEqual({ numerator: 40, denominator: 867, value: 4.6 });
+  it('unsubscribe rate = 40 / 885 = 4.5%', async () => {
+    expect(await m.unsubscribeRate(scope)).toEqual({ numerator: 40, denominator: 885, value: 4.5 });
   });
 
   it('hard-bounce rate = 18 / 885 leads sent-to = 2.0%', async () => {
@@ -51,19 +51,19 @@ describe('@golden L2 — metrics reproduce spec Part 10 exactly', () => {
     expect(await m.softBounceRate(scope)).toEqual({ numerator: 9, denominator: 885, value: 1.0 });
   });
 
-  it('meetings = 17 = 2.0 per 100 contacted', async () => {
-    expect(await m.meetings(scope)).toEqual({ count: 17, per100: 2.0 });
+  it('meetings = 17 = 1.9 per 100 contacted', async () => {
+    expect(await m.meetings(scope)).toEqual({ count: 17, per100: 1.9 });
   });
 
-  it('progress = 867 / 885 contacted', async () => {
-    expect(await m.progress(scope)).toEqual({ numerator: 867, denominator: 885, value: 98.0 });
+  it('progress = 885 / 885 accepted recipients', async () => {
+    expect(await m.progress(scope)).toEqual({ numerator: 885, denominator: 885, value: 100 });
   });
 
-  it('reply rate (8.3%) exceeds engaged-terminal share (47/867 = 5.4%) — the intended overlap', async () => {
+  it('reply rate exceeds engaged-terminal share (47/885) — the intended overlap', async () => {
     // The 25 negative "remove me" repliers count toward reply rate but ended
     // UNSUBSCRIBED — Part 10's explicit teaching point.
     const reply = await m.replyRate(scope);
-    expect(reply.value).toBeGreaterThan((47 / 867) * 100);
+    expect(reply.value).toBeGreaterThan((47 / 885) * 100);
   });
 
   it('step analytics (13b): delivered 867/831/801/789, positives 15/9/1/3 summing to 28', async () => {
@@ -79,13 +79,13 @@ describe('@golden L2 — metrics reproduce spec Part 10 exactly', () => {
     const byTier = Object.fromEntries(tiers.map((t) => [t.tier, t]));
     for (const t of ['A', 'B', 'C'] as const) {
       const want = GOLDEN.expected.perTier[t];
-      expect(byTier[t]!.contacted, `tier ${t} contacted`).toBe(want.contacted);
+      expect(byTier[t]!.contacted, `tier ${t} contacted`).toBe(want.enrolled);
       expect(byTier[t]!.replyRate.numerator, `tier ${t} repliers`).toBe(want.repliers);
       expect(byTier[t]!.positiveRate.numerator, `tier ${t} positives`).toBe(want.positives);
       expect(byTier[t]!.meetings, `tier ${t} meetings`).toBe(want.meetings);
     }
     expect(tiers.reduce((a, t) => a + t.meetings, 0)).toBe(17);
-    expect(tiers.reduce((a, t) => a + t.contacted, 0)).toBe(867);
+    expect(tiers.reduce((a, t) => a + t.contacted, 0)).toBe(885);
     expect(byTier.A!.mode).toBe('human_written');
     expect(byTier.C!.mode).toBe('template_auto');
   });
@@ -94,13 +94,13 @@ describe('@golden L2 — metrics reproduce spec Part 10 exactly', () => {
     const asOf = new Date('2026-01-20T00:00:00Z');
     const events = loadGoldenEvents().filter((e) => e.occurredAt.getTime() <= asOf.getTime());
     const expected = {
-      contacted: new Set(events.filter((e) => e.type === 'delivered').map((e) => e.leadId)).size,
+      contacted: new Set(events.filter((e) => e.type === 'sent').map((e) => e.leadId)).size,
       repliers: new Set(events.filter((e) => e.type === 'human_reply').map((e) => e.leadId)).size,
       meetings: events.filter((e) => e.type === 'meeting_booked').length,
       hard: events.filter((e) => e.type === 'hard_bounce').length,
     };
     expect(expected.contacted).toBeGreaterThan(0);
-    expect(expected.contacted).toBeLessThan(867); // genuinely mid-campaign
+    expect(expected.contacted).toBeLessThan(885); // genuinely mid-campaign
 
     const reply = await m.replyRate({ ...scope, asOf });
     expect(reply.numerator).toBe(expected.repliers);

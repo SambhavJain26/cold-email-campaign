@@ -239,14 +239,16 @@ campaigns, auto-enrollment, legacy human-written campaigns, or due work. Pre/pos
 (1,043,586 bytes) passed `pg_restore --list`. No campaign was activated, no lead was enrolled, and
 no email was sent; Oracle, `main`, DNS, Caddy, settings, and mailbox configuration were unchanged.
 
-### Unsubscribe URL and Gmail one-click — deployed, commissioning pending
+### Unsubscribe URL and Gmail one-click — body link proven, client one-click pending
 
 The hash-only token implementation and both public hosts are deployed. The valid business postal
 address and `https://unsubscribe.{sender_domain}` template are configured, so mail from each sender
 domain resolves to its matching unsubscribe host. `GET` confirms without unsubscribing;
 `POST` creates permanent global suppression; invalid/expired tokens reveal no recipient data.
-Reply `STOP` remains the fallback. The first owner-address link and RFC 8058 one-click proof needs
-separate send authorization.
+An owner-controlled Gmail walkthrough proved the body-link GET/confirm flow and idempotent global
+suppression. Reply `STOP` remains an inbound safety net even though it is no longer advertised in
+the visible footer. RFC 8058 mailbox-client one-click and follow-up footer visibility behind
+Gmail's trimming behavior still need separate send authorization.
 
 ### Post-canary build order — implemented, operator handoffs remain
 
@@ -256,6 +258,7 @@ OAuth uses authorization code + PKCE, hashed one-time state, encrypted refresh t
 matching, XOAUTH2 SMTP/IMAP, reconnect/revoke, and `auth_failed` pausing; it does not use domain-wide
 delegation.
 
-Production OAuth credentials and the compliance address/template are configured. The operator must
-still approve each outreach mailbox, run the first mailbox Test Connection, and separately approve
-the bounded owner-address send/reply/unsubscribe canary. None of this authorizes prospect mail.
+Production OAuth credentials, four account-matched mailboxes, and the compliance address/template
+are configured. The bounded owner-address walkthrough proved SMTP acceptance, reply/STOP ingestion,
+and body-link unsubscribe; it did not prove RFC 8058 client one-click or prospect readiness. Every
+additional owner-address batch and all prospect mail remain separately approval-gated.

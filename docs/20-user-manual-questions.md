@@ -15,6 +15,13 @@ verified and deployed migration `0019` plus the 31 August 2026 import-wizard cla
 > Compose, Mode 1, current Tier C, or Nurture-as-tier are predecessor behavior retained for audit;
 > use [docs/22](22-personalized-copy-two-tier.md) for the authoritative model.
 
+> **2026-09-01 walkthrough correction:** Contacted now means a distinct lead with an accepted send;
+> delivery-confirmed and pending are separate. Analytics shows sent cohorts and replies
+> immediately. The shared campaign selector appears only on Overview; Leads and Analytics use
+> explicit local filters. The live-link footer displays only Unsubscribe and the address while STOP
+> detection remains active. These changes are locally verified and require separate deployment
+> authorization before they become the production release.
+
 ## How to read the status labels
 
 - **Already supported** means the application can do this now.
@@ -557,16 +564,14 @@ Selection order is:
 
 1. Tier A
 2. Tier B
-3. Tier C
-4. Untiered
 
 Within each group, legacy global campaigns select older imports first. Pool-backed campaigns select
-only available reserved leads in allocation order. Nurture leads are excluded. Suppressed/erased
+only available reserved leads in allocation order. Untiered and Nurture leads are excluded. Suppressed/erased
 leads, active enrollments elsewhere, leads already in that campaign, disallowed prior repliers, and
 leads who would receive duplicate content are also excluded.
 
-Example: the eligible pool contains 3 Tier-A leads, 20 Tier-B leads, and 50 Tier-C leads. **Enroll
-next 10** selects the 3 Tier-A leads and the 7 oldest Tier-B leads.
+Example: the eligible pool contains 3 Tier-A leads and 20 Tier-B leads. **Enroll next 10** selects
+the 3 Tier-A leads and the 7 oldest Tier-B leads. Untiered and Nurture leads cannot enroll.
 
 The button does not use whichever checkboxes happen to be selected on the Leads screen. It uses
 the campaign's count-based priority order. Once a campaign has a lead pool, that pool becomes its
@@ -574,9 +579,9 @@ eligible source permanently; an empty pool never pulls unrelated leads from the 
 
 After enrollment:
 
-- An active campaign can make auto-mode Step 1 due on the next scheduler check.
+- An active campaign can make Step 1 due on the next scheduler check.
 - A draft or paused campaign sends nothing.
-- A human-written enrollment waits for Manual Compose.
+- A missing/unreviewed Personalized Step 1 blocks only that candidate.
 - Mailbox capacity, daily caps, send windows, pace gaps, and follow-ups due today still limit what
   can send.
 
@@ -623,7 +628,7 @@ first and count inside that campaign's requested number. The server shows exclus
 the whole commit if the exact counts cannot be revalidated; it never silently imports and underfills
 one campaign.
 
-Campaign detail lets you add the next N safe global leads using A → B → C → untiered,
+Campaign detail lets you add the next N safe global leads using A → B → untiered,
 oldest-first priority, or release/reassign selected **available** pool members while the campaign is
 draft or paused. Enrolled entries remain historical and cannot be moved. Leads and Import History
 show the current/durable pool relationship.
@@ -648,9 +653,10 @@ This section covers questions 4, 20, and 28.
 
 ### 5.1 How the main metrics are calculated
 
-A **contacted lead** is a distinct lead with a recorded delivery or a human reply. The reply is
-also accepted as evidence of contact when it arrives before the delayed delivery-confirmation job.
-The same lead is counted once, even after several steps.
+A **contacted lead** is a distinct lead with at least one accepted `sent` event in the campaign.
+Delivery-confirmed and pending-confirmation are displayed separately. The same lead is counted
+once even after several follow-up sends, so replies and unsubscribes use a stable denominator and
+cannot exceed 100% merely because the delivery-confirmation timer has not run.
 
 **Positive rate** is:
 

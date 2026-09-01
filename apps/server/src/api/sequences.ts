@@ -28,6 +28,7 @@ import {
   type NestedSequence,
 } from '../db/repos/sequencesRepo';
 import { getLeadById } from '../db/repos/leadsRepo';
+import { getCampaignPersonalizedCopy } from '../db/repos/manualDraftsRepo';
 import { getComplianceSettings } from '../db/repos/settingsRepo';
 import {
   autoObservationConfigOf,
@@ -40,6 +41,7 @@ import { parseTemplate, variationCount } from '../render/template';
 import { resolveObservation } from '../render/slots';
 import { seededPick } from '../render/spintax';
 import { spintaxRng } from '../render/seed';
+import type { RenderContext } from '../render/types';
 import { AppError } from './errors';
 import type { ZodTypeProvider } from './plugins/zodCompilers';
 
@@ -195,28 +197,8 @@ export async function sequencesRoutes(app: FastifyInstance, services: AppService
       if (!nested) throw AppError.notFound('sequence');
       const stepEntry = nested.steps.find((s) => s.step.stepNo === req.body.step_no);
       if (!stepEntry) throw AppError.notFound('step');
-      if (stepEntry.step.contentSource === 'personalized') {
-        throw new AppError(
-          'conflict',
-          409,
-          'Preview personalized copy from the lead Personalized Copy editor',
-        );
-      }
-      if (!req.body.variant_id) throw AppError.notFound('variant');
-      const variant = await getVariantById(db, req.body.variant_id);
-      if (!variant || variant.stepId !== stepEntry.step.id) throw AppError.notFound('variant');
       const lead = await getLeadById(db, req.body.lead_id);
       if (!lead) throw AppError.notFound('lead');
-
-      const customFields = (lead.customFields ?? {}) as Record<string, string>;
-      // Builder preview has no enrollment/campaign context: mirror what the
-      // operator would see — researched mode when the lead has a hand-filled
-      // custom_observation, else auto mode with no segment table (the
-      // observation_fallback warning then shows, which is honest).
-      const mode =
-        (customFields.custom_observation ?? '').trim() !== ''
-          ? 'template_researched'
-          : 'template_auto';
 
       const campaign = req.body.campaign_id
         ? await getCampaign(db, req.body.campaign_id)
@@ -224,20 +206,116 @@ export async function sequencesRoutes(app: FastifyInstance, services: AppService
       if (req.body.campaign_id && (!campaign || campaign.sequenceId !== nested.sequence.id)) {
         throw AppError.notFound('campaign');
       }
+
+      const customFields = (lead.customFields ?? {}) as Record<string, string>;
+      // Campaign preview mirrors fixed tier behavior. Without campaign context
+      // retain the useful sequence-only heuristic used by existing previews.
+      const mode: 'template_researched' | 'template_auto' = campaign
+        ? lead.tier === 'B'
+          ? 'template_auto'
+          : lead.tier === 'A'
+            ? 'template_researched'
+            : (customFields.custom_observation ?? '').trim() !== ''
+              ? 'template_researched'
+              : 'template_auto'
+        : (customFields.custom_observation ?? '').trim() !== ''
+          ? 'template_researched'
+          : 'template_auto';
       const autoConfig = campaign ? autoObservationConfigOf(campaign) : { field: null, rules: {} };
       const sequenceVariables = campaign
         ? campaign.firstActivatedAt
           ? resolvedVariablesOf(campaign)
           : { ...nested.sequence.variableDefaults, ...variableOverridesOf(campaign) }
         : nested.sequence.variableDefaults;
-      const renderContext = {
+      const renderContext: RenderContext = {
         mode,
         customFields,
         autoObservations: Object.keys(autoConfig.rules).length > 0 ? autoConfig.rules : null,
         autoObservationField: autoConfig.field,
         sequenceVariables,
         compliance: await getComplianceSettings(db),
-      } as const;
+      };
+
+      if (stepEntry.step.contentSource === 'personalized') {
+        if (!campaign) {
+          throw new AppError(
+            'conflict',
+            409,
+            'Choose a campaign context to preview this personalized step',
+          );
+        }
+        const copy = await getCampaignPersonalizedCopy(db, lead.id, campaign.id, stepEntry.step.id);
+        if (!copy) {
+          throw new AppError(
+            'conflict',
+            409,
+            `No campaign copy exists for lead ${lead.id}, campaign ${campaign.id}, step ${stepEntry.step.stepNo}`,
+          );
+        }
+        if (stepEntry.step.inThread && stepEntry.step.stepNo > 1) {
+          const firstStep = nested.steps.find((entry) => entry.step.stepNo === 1);
+          if (firstStep?.step.contentSource === 'personalized') {
+            const opener = await getCampaignPersonalizedCopy(
+              db,
+              lead.id,
+              campaign.id,
+              firstStep.step.id,
+            );
+            if (opener) renderContext.threadSubject = opener.subject;
+          }
+        }
+        const rendered = renderer.render({
+          variant: {
+            id: copy.id,
+            label: 'Personalized Copy',
+            contentHash: copy.contentHash ?? contentHashOf(copy.subject, copy.body),
+            subjectTemplate: copy.subject,
+            bodyTemplate: copy.body,
+          },
+          step: { stepNo: stepEntry.step.stepNo, inThread: stepEntry.step.inThread },
+          lead: {
+            id: lead.id,
+            email: lead.email,
+            firstName: lead.firstName,
+            company: lead.company,
+            website: lead.website,
+            city: lead.city,
+            state: lead.state,
+          },
+          enrollmentId: 0,
+          ctx: { ...renderContext, literal: true },
+        });
+        return {
+          subject: rendered.subject,
+          body: rendered.bodyText,
+          checks: rendered.checks,
+          personalized_copy_status: copy.status,
+          resolution_trace: {
+            render_mode: mode,
+            lead_values: {
+              first_name: lead.firstName,
+              company: lead.company,
+              website: lead.website,
+              city: lead.city,
+              state: lead.state,
+              ...Object.fromEntries(
+                Object.entries(customFields).map(([key, value]) => [key, value ?? null]),
+              ),
+            },
+            observation: { field: null, matched_rule: null, value: '' },
+            sequence_variables: {},
+            spintax_choices: [],
+            warnings:
+              copy.status === 'ready'
+                ? []
+                : [`Personalized copy is ${copy.status.replaceAll('_', ' ')} and cannot send yet.`],
+          },
+        };
+      }
+
+      if (!req.body.variant_id) throw AppError.notFound('variant');
+      const variant = await getVariantById(db, req.body.variant_id);
+      if (!variant || variant.stepId !== stepEntry.step.id) throw AppError.notFound('variant');
 
       const rendered = renderer.render({
         variant: {
@@ -321,6 +399,7 @@ export async function sequencesRoutes(app: FastifyInstance, services: AppService
         body: rendered.bodyText,
         checks: rendered.checks,
         resolution_trace: {
+          render_mode: mode,
           lead_values: {
             first_name: lead.firstName,
             company: lead.company,

@@ -40,9 +40,7 @@ function page(heading: string, body: string, form?: string): string {
 <body><main><h1>${heading}</h1><p>${body}</p>${form ?? ''}</main></body></html>`;
 }
 
-const CONFIRM_BODY =
-  'Confirm and you will not receive any further emails from us. ' +
-  'This applies to every campaign, not just the message you clicked from.';
+const CONFIRM_BODY = 'Confirm, and I won\u2019t send you any more emails.';
 
 const DONE = page('You are unsubscribed', 'You will not receive further emails from us.');
 
@@ -73,6 +71,10 @@ export async function publicUnsubscribeRoutes(
   app.get<{ Params: { token: string } }>('/u/:token', async (req, reply) => {
     const found = await resolveToken(db, req.params.token);
     if (!found) return reply.type('text/html; charset=utf-8').send(GENERIC);
+    const enrollment = await getEnrollmentById(db, found.enrollmentId);
+    if (enrollment?.currentState === 'UNSUBSCRIBED') {
+      return reply.type('text/html; charset=utf-8').send(DONE);
+    }
     // The token round-trips through the form so the POST needs no session.
     const action = `/u/${encodeURIComponent(req.params.token)}`;
     return reply

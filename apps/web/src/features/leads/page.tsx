@@ -8,6 +8,7 @@ import {
   type LeadDto,
 } from '@coldemail/shared';
 import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Input } from '@/components/ui/input';
 import {
@@ -56,6 +57,10 @@ export default function LeadsPage() {
   const [allMatching, setAllMatching] = useState(false);
   const [importOpen, setImportOpen] = useState(false);
   const [addOpen, setAddOpen] = useState(false);
+  const [lastBulkResult, setLastBulkResult] = useState<{
+    updated: number;
+    action: string;
+  } | null>(null);
 
   const query: LeadsQuery = {
     page,
@@ -79,6 +84,7 @@ export default function LeadsPage() {
     apply();
     setPage(1);
     clearSelection();
+    setLastBulkResult(null);
   };
 
   const pageIds = (data?.items ?? []).map((l) => l.id);
@@ -145,7 +151,15 @@ export default function LeadsPage() {
       key: 'state',
       header: 'State',
       cell: (l) =>
-        l.latest_enrollment ? <StateBadge state={l.latest_enrollment.current_state} /> : '—',
+        l.latest_enrollment ? (
+          l.latest_enrollment.awaiting_completion ? (
+            <Badge variant="secondary">Finishing</Badge>
+          ) : (
+            <StateBadge state={l.latest_enrollment.current_state} />
+          )
+        ) : (
+          '—'
+        ),
     },
     {
       key: 'suppressed',
@@ -186,7 +200,7 @@ export default function LeadsPage() {
       </div>
       <AddLeadDialog open={addOpen} onOpenChange={setAddOpen} />
 
-      <TierHeader total={data.total} untiered={data.untiered_count} />
+      <TierHeader total={data.total} counts={data.tier_counts} />
 
       {data.untiered_count > 0 && (
         <div
@@ -350,7 +364,29 @@ export default function LeadsPage() {
               : { outreach_status: status, lead_ids: [...selected] }
           }
           onDone={clearSelection}
+          onApplied={(updated, action) => setLastBulkResult({ updated, action })}
         />
+      )}
+
+      {data.total === 0 && lastBulkResult && (
+        <div className="flex flex-col items-start justify-between gap-2 rounded-lg border border-info/40 bg-info/10 px-4 py-3 text-sm sm:flex-row sm:items-center">
+          <p>
+            All {lastBulkResult.updated} matching leads were {lastBulkResult.action}. They no longer
+            match the current tier or outreach-status filter.
+          </p>
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={() =>
+              setFilter(() => {
+                setTier(ANY);
+                setOutreachStatus(ANY);
+              })
+            }
+          >
+            Show campaign leads
+          </Button>
+        </div>
       )}
 
       {allPageSelected && !allMatching && data.total > pageIds.length && (
@@ -414,9 +450,12 @@ export default function LeadsPage() {
             </div>
             <div className="flex flex-wrap items-center gap-2">
               <TierBadge tier={lead.tier} />
-              {lead.latest_enrollment && (
-                <StateBadge state={lead.latest_enrollment.current_state} />
-              )}
+              {lead.latest_enrollment &&
+                (lead.latest_enrollment.awaiting_completion ? (
+                  <Badge variant="secondary">Finishing</Badge>
+                ) : (
+                  <StateBadge state={lead.latest_enrollment.current_state} />
+                ))}
               <span className="text-xs text-muted-foreground">
                 {lead.pool_assignment ? `Pool: ${lead.pool_assignment.campaign_name}` : 'Global'}
               </span>

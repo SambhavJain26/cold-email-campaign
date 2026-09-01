@@ -4,14 +4,26 @@
 
 **Legend:** `[ ]` not started · `[~]` in progress · `[x]` done · `[!]` blocked (note why in the log)
 
-**Current focus:** → **Personalized Copy, current A/B tiers, separate Nurture status, exact
-Campaign Pool/Enrolled/Both filtering, and the clearer import wizard are implemented, verified,
-pushed, and deployed on Spaceship; application code is at `a15f70d`.** Production has four healthy
-OAuth mailboxes, one unassigned global lead, two draft campaigns, and zero enrollments, available
-pooled leads, active/sendable work, or auto-enrollment-
-enabled campaigns. No campaign activation, enrollment, outbound send, Oracle/DNS/Caddy change, or
-`main` merge was performed. Every activation, enrollment, or owner/prospect send remains separately
-approval-gated.
+**Current focus:** → **The 2026-09-01 owner-address walkthrough remediation is implemented and
+fully verified locally on `canary`; it remains unpushed and undeployed.** It
+resolves the observed metric, campaign-progress, analytics, campaign-context, Personalized Copy,
+import-preview, timezone, unsubscribe, footer, and email-spacing defects. Gmail follow-up footer
+visibility remains a separately gated real-provider verification item. Spaceship application code
+remains `a15f70d`.
+
+**2026-09-01 owner-address walkthrough and local remediation:** the bounded production walkthrough
+used five operator-controlled recipients and accepted 13 messages: Atlas 3 × one step and Beacon
+2 × five steps. Beacon pacing stayed at 299–301 seconds per lead with no same-enrollment double
+send. Body-link unsubscribe, reply `STOP`, global suppression, and two Step-2 replies were
+observed; no prospects were contacted. The local candidate now uses accepted sent recipients for
+Contacted and all rate denominators, separates delivery-confirmed/pending counts, surfaces sent
+cohorts immediately in analytics, uses journey completion for campaign progress, labels exhausted
+but confirmation-pending enrollments Finishing, and fixes the campaign, copy-scope, import,
+timezone, unsubscribe, and rendering UX found during the walkthrough. Final local gate:
+type/lint/format; unit 345; web 58; integration 168; API 144; GreenMail 29; locked golden exactly
+47; mock E2E 62; real-backend E2E 1; production build; populated `checked 5 enrollments — 0
+diff(s)`; clean self-check; validated backup/restore drill. No migration or production state change
+was made by this implementation. Push and deployment remain separately authorized.
 
 **2026-08-31 import-wizard clarity follow-up:** implemented, verified, pushed, and deployed on
 Spaceship at application commit `a15f70d`. The misleading single Draft target campaign selector is

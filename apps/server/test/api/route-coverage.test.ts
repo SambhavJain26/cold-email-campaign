@@ -44,6 +44,7 @@ const CONTRACT_ROUTES = [
   'PUT /api/v1/leads/:id/campaigns/:campaignId/steps/:stepNo/personalized-copy',
   'DELETE /api/v1/suppressions/:email',
   'POST /api/v1/imports',
+  'DELETE /api/v1/imports/:id',
   'POST /api/v1/imports/:id/commit',
   'POST /api/v1/imports/:id/allocation-preview',
   'GET /api/v1/imports',

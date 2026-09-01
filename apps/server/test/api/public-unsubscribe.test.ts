@@ -77,6 +77,8 @@ describe('GET /u/:token — confirmation only', () => {
     expect(res.statusCode).toBe(200);
     expect(res.headers['content-type']).toContain('text/html');
     expect(res.body).toContain('<form method="post"');
+    expect(res.body).toContain('Confirm, and I won\u2019t send you any more emails.');
+    expect(res.body).not.toContain('This applies to every campaign');
     // The whole point: a prefetching scanner must not opt anyone out.
     expect(await stateOf(enrollmentId)).toBe('ACTIVE');
     expect(await unsubEvents(enrollmentId)).toBe(0);
@@ -94,6 +96,20 @@ describe('GET /u/:token — confirmation only', () => {
     // Distinguishable only by the absence of a form — never by status or error.
     expect(fake.statusCode).toBe(real.statusCode);
     expect(fake.body).not.toMatch(/invalid|expired|unknown|not found/i);
+  });
+
+  it('shows the completed state instead of another confirmation after unsubscribe', async () => {
+    const ids = await seedEnrollment('already-unsubscribed@test.dev');
+    const first = await issueToken(h.services.db, { ...ids, stepNo: 1 });
+    const second = await issueToken(h.services.db, { ...ids, stepNo: 2 });
+
+    await h.app.inject({ method: 'POST', url: `/u/${first.raw}` });
+    const reopened = await h.app.inject({ method: 'GET', url: `/u/${second.raw}` });
+
+    expect(reopened.statusCode).toBe(200);
+    expect(reopened.body).toContain('You are unsubscribed');
+    expect(reopened.body).toContain('You will not receive further emails from us.');
+    expect(reopened.body).not.toContain('<form method="post"');
   });
 });
 

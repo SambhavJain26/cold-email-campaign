@@ -1,17 +1,33 @@
 [
   {
     "step_no": 1,
+    "sent": 885,
     "delivered": 867,
+    "pending_delivery_confirmation": 0,
+    "replies": 30,
+    "reply_rate": {
+      "numerator": 30,
+      "denominator": 885,
+      "value": 3.4
+    },
     "positive_replies": 15,
     "positive_rate": {
       "numerator": 15,
-      "denominator": 867,
+      "denominator": 885,
       "value": 1.7
     }
   },
   {
     "step_no": 2,
+    "sent": 831,
     "delivered": 831,
+    "pending_delivery_confirmation": 0,
+    "replies": 25,
+    "reply_rate": {
+      "numerator": 25,
+      "denominator": 831,
+      "value": 3
+    },
     "positive_replies": 9,
     "positive_rate": {
       "numerator": 9,
@@ -21,7 +37,15 @@
   },
   {
     "step_no": 3,
+    "sent": 801,
     "delivered": 801,
+    "pending_delivery_confirmation": 0,
+    "replies": 10,
+    "reply_rate": {
+      "numerator": 10,
+      "denominator": 801,
+      "value": 1.2
+    },
     "positive_replies": 1,
     "positive_rate": {
       "numerator": 1,
@@ -31,7 +55,15 @@
   },
   {
     "step_no": 4,
+    "sent": 789,
     "delivered": 789,
+    "pending_delivery_confirmation": 0,
+    "replies": 7,
+    "reply_rate": {
+      "numerator": 7,
+      "denominator": 789,
+      "value": 0.9
+    },
     "positive_replies": 3,
     "positive_rate": {
       "numerator": 3,

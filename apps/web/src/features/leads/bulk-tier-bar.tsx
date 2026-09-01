@@ -20,6 +20,7 @@ export function BulkTierBar({
   buildBody,
   buildOutreachBody,
   onDone,
+  onApplied,
 }: {
   selectedCount: number;
   /** True when "select all N matching filter" was chosen. */
@@ -29,6 +30,7 @@ export function BulkTierBar({
   buildBody: (tier: CurrentLeadTier | null) => BulkTierBody;
   buildOutreachBody: (status: 'standard' | 'nurture') => BulkOutreachStatusBody;
   onDone: () => void;
+  onApplied: (updated: number, action: string) => void;
 }) {
   const [tier, setTier] = useState<string>('');
   const bulkTier = useBulkTier();
@@ -61,6 +63,7 @@ export function BulkTierBar({
           bulkTier.mutate(buildBody(tier === 'clear' ? null : (tier as CurrentLeadTier)), {
             onSuccess: ({ updated }) => {
               toast.success(`${updated} leads re-tiered`);
+              onApplied(updated, 're-tiered');
               onDone();
             },
           })
@@ -79,6 +82,7 @@ export function BulkTierBar({
           bulkOutreach.mutate(buildOutreachBody('nurture'), {
             onSuccess: ({ updated }) => {
               toast.success(`${updated} leads moved to Nurture`);
+              onApplied(updated, 'moved to Nurture');
               onDone();
             },
           })
@@ -94,6 +98,7 @@ export function BulkTierBar({
           bulkOutreach.mutate(buildOutreachBody('standard'), {
             onSuccess: ({ updated }) => {
               toast.success(`${updated} leads restored as untiered`);
+              onApplied(updated, 'restored as untiered');
               onDone();
             },
           })

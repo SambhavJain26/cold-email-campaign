@@ -20,7 +20,7 @@ import {
 
 export interface PreviewTarget {
   stepNo: number;
-  variant: DraftVariant;
+  variant: DraftVariant | null;
 }
 
 const FOOTER_SEPARATOR = '\n\n';
@@ -54,7 +54,10 @@ export function PreviewPanel({
 
   const selectedLead = leads.data?.items.find((lead) => lead.id === leadId);
   const canPreview =
-    sequenceId !== null && target !== null && target.variant.id !== undefined && leadId !== null;
+    sequenceId !== null &&
+    target !== null &&
+    (target.variant === null ? campaignId !== null : target.variant.id !== undefined) &&
+    leadId !== null;
 
   const rendered = preview.data ? splitFooter(preview.data.body) : null;
   const checks = preview.data?.checks;
@@ -69,7 +72,8 @@ export function PreviewPanel({
         <h2 className="text-sm font-semibold">Preview &amp; pre-send</h2>
         {target && (
           <span className="text-xs text-muted-foreground">
-            Step {target.stepNo} · variant {target.variant.label}
+            Step {target.stepNo} ·{' '}
+            {target.variant === null ? 'Personalized Copy' : `variant ${target.variant.label}`}
           </span>
         )}
       </div>
@@ -152,7 +156,7 @@ export function PreviewPanel({
               preview.mutate({
                 lead_id: leadId,
                 step_no: target.stepNo,
-                variant_id: target.variant.id!,
+                ...(target.variant?.id !== undefined && { variant_id: target.variant.id }),
                 ...(campaignId !== null && { campaign_id: campaignId }),
               });
             }}
@@ -162,10 +166,12 @@ export function PreviewPanel({
           {!canPreview && (
             <p className="text-[11px] text-muted-foreground">
               {target === null
-                ? 'Pick a variant with the Preview button on a step card.'
-                : target.variant.id === undefined
-                  ? 'This variant is new — save the sequence before previewing it.'
-                  : 'Pick a lead to render against.'}
+                ? 'Choose Preview on a step card.'
+                : target.variant === null && campaignId === null
+                  ? 'Choose a campaign context for this personalized step.'
+                  : target.variant?.id === undefined
+                    ? 'This variant is new — save the sequence before previewing it.'
+                    : 'Pick a lead to render against.'}
             </p>
           )}
 
@@ -175,6 +181,11 @@ export function PreviewPanel({
                 <p className="text-[11px] text-muted-foreground">
                   Rendered for {selectedLead.email}
                 </p>
+              )}
+              {preview.data.personalized_copy_status && (
+                <Badge variant="outline">
+                  Personalized copy · {preview.data.personalized_copy_status.replaceAll('_', ' ')}
+                </Badge>
               )}
               <div className="space-y-1">
                 <p className="text-[11px] text-muted-foreground">Subject</p>
@@ -213,6 +224,14 @@ export function PreviewPanel({
                 <details className="rounded-md border border-border p-2 text-xs">
                   <summary className="cursor-pointer font-medium">Resolution details</summary>
                   <div className="mt-2 space-y-2 text-muted-foreground">
+                    <p>
+                      Rendering mode:{' '}
+                      <span className="text-foreground">
+                        {preview.data.resolution_trace.render_mode === 'template_researched'
+                          ? 'Tier A · Researched'
+                          : 'Tier B · Auto Observation'}
+                      </span>
+                    </p>
                     <p>
                       Observation: {preview.data.resolution_trace.observation.value || 'none'} ·
                       rule {preview.data.resolution_trace.observation.matched_rule ?? 'none'}

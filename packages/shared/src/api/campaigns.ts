@@ -115,6 +115,10 @@ export const campaignSchema = z
     recycled_from_campaign_id: z.number().int().nullable(),
     enrolled_count: z.number().int().min(0),
     contacted_count: z.number().int().min(0),
+    delivery_confirmed_count: z.number().int().min(0),
+    pending_delivery_confirmation_count: z.number().int().min(0),
+    finished_count: z.number().int().min(0),
+    finishing_count: z.number().int().min(0),
     manual_only_count: z.number().int().min(0),
   })
   .strict();

@@ -101,14 +101,31 @@ test('Personalized Copy saves a lead source and exposes no direct-send action', 
   await page.getByRole('button', { name: 'Personalized Copy' }).click();
 
   const dialog = page.getByRole('dialog');
-  await expect(dialog).toContainText('Delivery happens only through a personalized sequence step');
-  await expect(dialog.getByText('Unassigned Source · default slot')).toBeVisible();
+  await expect(dialog).toContainText('Nothing sends from this editor');
+  await expect(dialog.getByText('Reusable lead copy · not assigned to a campaign')).toBeVisible();
   await dialog.getByLabel('Subject').fill('Following up personally');
   await dialog
     .getByLabel('Body')
     .fill('Hi Manual,\n\nThis is saved for a personalized sequence step.\n\nBest,\nSam');
-  await dialog.getByRole('button', { name: 'Save Draft' }).click();
+  await dialog.getByRole('button', { name: /Save Draft · Reusable lead copy/ }).click();
   await expect(page.getByText('Source saved')).toBeVisible();
+
+  await dialog.getByLabel('Copy scope').click();
+  await page.getByRole('option', { name: 'Beacon import mapping · Personalized Step 3' }).click();
+  await dialog
+    .getByRole('button', { name: 'Copy reusable lead copy to Beacon import mapping · Step 3' })
+    .click();
+  await expect(page.getByText('Campaign copy saved')).toBeVisible();
+  await expect(dialog.getByLabel('Copy scope')).toContainText(
+    'Beacon import mapping · Personalized Step 3',
+  );
+  await dialog.getByLabel('Subject').fill('Step 3 stays in Beacon');
+  await dialog.getByRole('button', { name: 'Save Draft · Beacon import mapping · Step 3' }).click();
+  await expect(page.getByText('Campaign copy saved')).toBeVisible();
+  await expect(dialog.getByLabel('Copy scope')).toContainText(
+    'Beacon import mapping · Personalized Step 3',
+  );
+  await expect(dialog.getByLabel('Subject')).toHaveValue('Step 3 stays in Beacon');
   await expect(dialog.getByRole('button', { name: /send/i })).toHaveCount(0);
 });
 

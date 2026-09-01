@@ -1,5 +1,6 @@
 import { useMemo, useState } from 'react';
 import { Check, ChevronsUpDown } from 'lucide-react';
+import { canonicalizeIanaTimezone } from '@coldemail/shared';
 import { Button } from '@/components/ui/button';
 import {
   Command,
@@ -26,7 +27,13 @@ const FALLBACK_TIMEZONES = [
 
 function allTimezones(): string[] {
   const intl = Intl as typeof Intl & { supportedValuesOf?: (key: 'timeZone') => string[] };
-  return [...new Set(['UTC', ...(intl.supportedValuesOf?.('timeZone') ?? FALLBACK_TIMEZONES)])];
+  return [
+    ...new Set(
+      ['UTC', ...(intl.supportedValuesOf?.('timeZone') ?? FALLBACK_TIMEZONES)].map(
+        canonicalizeIanaTimezone,
+      ),
+    ),
+  ];
 }
 
 function offsetLabel(timeZone: string): string {
@@ -56,6 +63,7 @@ export function TimezoneCombobox({
 }) {
   const [open, setOpen] = useState(false);
   const zones = useMemo(() => allTimezones(), []);
+  const canonicalValue = canonicalizeIanaTimezone(value);
   return (
     <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger asChild>
@@ -68,7 +76,9 @@ export function TimezoneCombobox({
           disabled={disabled}
           className="min-h-9 w-full justify-between font-normal"
         >
-          <span className="truncate">{value ? offsetLabel(value) : 'Select timezone…'}</span>
+          <span className="truncate">
+            {canonicalValue ? offsetLabel(canonicalValue) : 'Select timezone…'}
+          </span>
           <ChevronsUpDown className="size-4 shrink-0 opacity-50" />
         </Button>
       </PopoverTrigger>
@@ -97,7 +107,9 @@ export function TimezoneCombobox({
                     setOpen(false);
                   }}
                 >
-                  <Check className={cn('size-4', value === zone ? 'opacity-100' : 'opacity-0')} />
+                  <Check
+                    className={cn('size-4', canonicalValue === zone ? 'opacity-100' : 'opacity-0')}
+                  />
                   {offsetLabel(zone)}
                 </CommandItem>
               ))}

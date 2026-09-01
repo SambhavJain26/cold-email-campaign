@@ -13,18 +13,24 @@ export const escapeHtml = (value: string) =>
  * verbatim, which is the dormant case.
  */
 export function htmlOfText(bodyText: string, footerHtml?: string): string {
-  const block = (text: string) =>
-    escapeHtml(text).replaceAll('\n\n', '</p><p>').replaceAll('\n', '<br>');
-  if (footerHtml === undefined) return `<p>${block(bodyText)}</p>`;
+  const paragraphs = (text: string) =>
+    text
+      .split('\n\n')
+      .map(
+        (paragraph, index, all) =>
+          `<p style="margin:0 0 ${index === all.length - 1 ? '0' : '16px'}">${escapeHtml(paragraph).replaceAll('\n', '<br>')}</p>`,
+      )
+      .join('');
+  if (footerHtml === undefined) return paragraphs(bodyText);
 
   // appendFooter uses one final blank paragraph as the visual boundary. Split
   // from the end so every earlier paragraph remains part of the message body.
   const separator = '\n\n';
   const footerAt = bodyText.lastIndexOf(separator);
-  if (footerAt === -1) return `<p>${block(bodyText)}</p>`;
+  if (footerAt === -1) return paragraphs(bodyText);
   const body = bodyText.slice(0, footerAt);
   const footer = bodyText.slice(footerAt + separator.length);
-  const bodyHtml = `<p>${block(body)}</p>`;
-  const inner = footerHtml ?? block(footer);
+  const bodyHtml = paragraphs(body);
+  const inner = footerHtml ?? escapeHtml(footer).replaceAll('\n', '<br>');
   return `${bodyHtml}<p style="margin:16px 0 0;font-size:10px;color:#767676;line-height:1.5">${inner}</p>`;
 }

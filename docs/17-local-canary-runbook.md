@@ -1,5 +1,47 @@
 # Local canary runbook (B8.3-local) — two-week validation on throwaway Gmail
 
+## 2026-09-01 owner-address walkthrough remediation — verified locally, not deployed
+
+The first complete Spaceship operator walkthrough used five operator-controlled recipients only:
+three Atlas leads received one message each and two Beacon leads received five messages each, for
+13 SMTP-accepted messages total. Beacon's per-lead gaps were 299–301 seconds and no enrollment
+received two steps on the same scheduler tick. The walkthrough also proved a body-link
+unsubscribe, a `STOP` reply that produced global suppression, and two replies to Beacon Step 2.
+No prospect address was used.
+
+The resulting remediation candidate closes findings F-W01–F-W16 and F-W18–F-W24 locally. It adds
+release-update notice, discardable preview imports, authoritative allocation loading states,
+post-bulk-tier guidance, exact filter-scoped tier totals, immutable campaign/step Personalized Copy
+editing, authoritative lead-form refresh, tier-faithful and Personalized Copy sequence previews,
+zero-day warnings, PostgreSQL-valid timezone canonicalization, Overview-only shared campaign
+context, one consistent sent-recipient definition of Contacted, separate delivery-confirmed and
+pending values, immediate sent-cohort analytics, template-step variant defaults, Finishing journey
+presentation, and true journey-finished campaign progress. Campaigns remain active after the
+current cohort finishes so later import batches can be added deliberately.
+
+The public unsubscribe page now uses `Confirm, and I won’t send you any more emails.` and a
+redeemed valid token renders the completed state without another form. Public resubscribe remains
+deliberately absent because unsubscribe is a durable global suppression. The visible footer keeps
+only Unsubscribe and the plain postal address; inbound `STOP` recognition remains active. HTML
+paragraphs now have explicit email-safe margins and the first paragraph has no top gap.
+
+Finding F-W17 is only partially closed: the requested footer wording/layout is implemented and
+synthetic text/HTML/GreenMail coverage passes, but whether Gmail still hides the repeated footer
+behind `Show trimmed content` can only be established by a newly approved real-Gmail follow-up.
+The attempted invisible-character workaround was removed because altering hidden content on every
+send is an undesirable deliverability tradeoff. Do not call Gmail follow-up footer visibility
+fixed until that canary passes. The body-link GET/confirm/idempotent behavior was observed live;
+RFC 8058 mailbox-client one-click remains unverified.
+
+Final local gate: typecheck/lint/format; unit 345/345; web 58/58; integration 168/168; API 144/144;
+GreenMail 29/29; locked golden exactly 47/47; mock browser 62/62; real-backend browser 1/1;
+production Vite build; populated `checked 5 enrollments — 0 diff(s)`; clean self-check; and a
+validated custom-format dump with scratch restore/rebuild/zero-drift/self-check. The initial real
+browser attempt was blocked before its test because Docker Desktop was closed; Docker was started
+locally and the complete journey passed. No schema migration was added. This implementation made
+no production mutation, activation, enrollment, send, push, or deployment; Spaceship remains on
+`a15f70d` until separate authorization.
+
 ## 2026-08-31 import-wizard clarity follow-up — verified and deployed
 
 The import preview no longer mixes a single Draft target campaign with multi-campaign allocation.
@@ -314,9 +356,10 @@ See §§6–7 for the exact evidence.
 ## UI data-consistency remediation (2026-08-10)
 
 The UI consistency implementation is deployed to Oracle and its database-backed verification gate
-is complete. `contacted` is now the distinct-lead union of `delivered` and
-`human_reply`, campaign analytics and lead state are correctly scoped, visible operational data
-refreshes every 30 seconds, and operator actions invalidate dependent live views immediately.
+is complete. At that 2026-08-10 release, `contacted` was the distinct-lead union of `delivered` and
+`human_reply`; the 2026-09-01 remediation at the top of this runbook supersedes that definition
+with distinct accepted-send recipients. Campaign analytics and lead state are correctly scoped,
+visible operational data refreshes every 30 seconds, and operator actions invalidate dependent live views immediately.
 Mailbox charts are chronological, zero-filled, timezone-aware all-campaign series. Scheduler
 blockers are database-backed episodes, so worker restarts cannot duplicate their alerts.
 

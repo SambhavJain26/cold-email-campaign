@@ -126,8 +126,10 @@ export const previewResponseSchema = z
     subject: z.string(),
     body: z.string(),
     checks: renderChecksSchema,
+    personalized_copy_status: z.enum(['needs_review', 'ready', 'sent']).optional(),
     resolution_trace: z
       .object({
+        render_mode: z.enum(['template_researched', 'template_auto']),
         lead_values: z.record(z.string(), z.string().nullable()),
         observation: z
           .object({

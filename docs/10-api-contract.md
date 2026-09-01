@@ -59,18 +59,21 @@ Shapes below in TS notation. `Metric = { numerator: number, denominator: number 
 | POST `/leads` | `{email, first_name?, last_name?, company?, website?, city?, state?, phone?, notes?}` → `{created, reason?}`. Finding 10. Runs the **same** preview+commit as a CSV upload (one-row CSV, `drop_flagged` mode) so normalization, dedup, hygiene and the commit-time suppression re-check cannot diverge from the bulk path — `created:false` carries the refusing flag (`invalid\|duplicate\|suppressed\|role_based`). Costs one `imports` row per lead, deliberately: it really is an import, and the audit trail stays whole |
 | PATCH `/leads/:id` | `{tier?, notes?, custom_fields?}` → `Lead` (edits `custom_observation` here) |
 | POST `/leads/bulk-tier` | `{lead_ids?: number[], filter?: LeadFilter, tier}` → `{updated: number}` |
-| POST `/imports` | multipart CSV → `{import_id, counts, samples, draft_counts}` (preview; nothing committed) |
-| GET `/imports/:id/draft-preview?campaign_id=` | → new/existing lead counts, valid/invalid draft counts, and existing-draft conflicts |
-| POST `/imports/:id/allocation-preview` | `{mode, draft_campaign_id?, allocations:[{campaign_id,count}]}` → requested/allocatable campaign totals, exclusions, safe existing leads, and global remainder. Read-only. |
-| POST `/imports/:id/commit` | `{mode, draft_campaign_id?, replace_existing_drafts?, allocations?}` → separate lead/draft/allocation counts and global remainder. Exact allocations are rechecked and committed atomically; drift aborts the whole commit. |
-| GET `/imports` | → import history rows including durable per-campaign pool allocation summaries |
+| POST `/imports` | multipart CSV → `{import_id, counts, samples, personalized_copy}` (preview; nothing committed) |
+| POST `/imports/:id/allocation-preview` | `{mode, allocations:[{campaign_id,count,generic_copy_step_no?}]}` → requested/allocatable campaign totals, exclusions, copy-binding outcomes, safe existing leads, and global remainder. Read-only. A multi-personalized-step campaign requires an explicit generic destination; a one-step campaign resolves it automatically. |
+| POST `/imports/:id/commit` | `{mode, copy_readiness?, replace_existing_copy?, allocations?}` → separate lead/source/campaign-copy/allocation counts and global remainder. Exact allocations and destinations are rechecked and committed atomically; drift aborts the whole commit. Legacy draft fields remain accepted for old clients only. |
+| GET `/imports` | → import history rows including durable per-campaign pool allocation summaries and preview-only attempts |
+| DELETE `/imports/:id` | → `{ok}` for an uncommitted preview and its staged rows. Committed import history returns 409 and is immutable. |
 | DELETE `/suppressions/:email` | `{confirm: string}` (must equal the email) → `{ok}` — decision U; audit alert emitted |
+| GET `/leads/:id/personalized-copies` | → reusable sources plus campaign/step snapshots, readiness, provenance, hashes, and sent state |
+| PUT `/leads/:id/personalized-copy-sources/:slot` | save draft or mark ready for reusable lead copy; never sends |
+| PUT `/leads/:id/campaigns/:campaignId/steps/:stepNo/personalized-copy` | save/ready/copy-from-source for an exact personalized step; sent copy is immutable |
 
 ## Sequences
 | | |
 |---|---|
 | GET `/sequences` · POST `/sequences` · PATCH `/sequences/:id` | `Sequence` includes `variable_defaults`; steps/variants remain nested replace-set writes¹ |
-| POST `/sequences/:id/preview` | `{lead_id, step_no, variant_id, campaign_id?}` → rendered content, checks, and optional resolution trace |
+| POST `/sequences/:id/preview` | `{lead_id, step_no, variant_id?, campaign_id?}` → rendered content, checks, readiness for personalized content, and a resolution trace containing the resolved Tier A researched/Tier B auto mode. Template preview requires a variant. Personalized preview requires campaign context and loads that lead's exact campaign-step copy. |
 | POST `/sequences/validate-template` | `{template}` → `{tokens, errors, variations}` — live builder validation |
 
 ¹ Replace-set is literal only while the sequence has **zero sends**. Once sends exist (2026-07-23 operator decision): variants missing from a save are **retired** (`active=false`, rows kept — deleting would orphan variant analytics and punch holes in the content-hash recycle guard), and steps can be edited/added but not deleted or renumbered (violations → 422 `sequence_invalid`). Bespoke (Mode-1) variant rows are never touched by saves. Existing rows are matched by `id`; rows without `id` are inserted.
@@ -78,7 +81,7 @@ Shapes below in TS notation. `Metric = { numerator: number, denominator: number 
 ## Campaigns
 | | |
 |---|---|
-| GET `/campaigns` · POST `/campaigns` · PATCH `/campaigns/:id` | Campaign includes effort, staged ramp, permanent daily cap, first activation, Auto Observation, variable overrides/frozen snapshot, lead-selection mode, pool summary, auto-enrollment status/last run, provenance, and counts. Personalization/ramp patches are draft-only; an activated permanent cap can decrease but not increase. |
+| GET `/campaigns` · POST `/campaigns` · PATCH `/campaigns/:id` | Campaign includes fixed A=Researched/B=Auto behavior, staged ramp, permanent daily cap, first activation, Auto Observation, variable overrides/frozen snapshot, lead-selection mode, pool summary, auto-enrollment status/last run, provenance, and counts: enrolled, contacted (accepted recipients), delivery-confirmed, pending confirmation, finished, and finishing. Personalization/ramp patches are draft-only; an activated permanent cap can decrease but not increase. |
 | GET `/campaigns/:id/capacity` | → capacity plus `ramp_day`, current `ramp_stage`, `effective_daily_enroll_cap`, `campaign_cap_remaining`, `pending_openers_today`, shared `room_for_new`, `pool_available`, and `enrolled_today` |
 | POST `/campaigns/:id/enroll` | `{count} \| {lead_ids, force?, allow_recontact?}` → `{enrolled, skipped: {reason, count}[]}`. Pool-backed count enrollment draws only from its available pool; legacy global campaigns retain the global selector. Manual and automatic enrollment share the effective daily cap. Explicit recontact requires `allow_recontact:true`, completed reply disposition, and an elapsed `not_now` date; suppression is never overrideable. |
 | GET `/campaigns/:id/pool?status=&page=&per_page=` | → paginated pool entries plus total/available/enrolled/released/temporarily-ineligible/source-import summary |
@@ -105,10 +108,7 @@ Shapes below in TS notation. `Metric = { numerator: number, denominator: number 
 | POST `/enrollments/:id/meeting-booked` | → `{ok}` — appends `meeting_booked` (state unchanged) |
 | POST `/enrollments/:id/snooze` | `{until}` → `{ok}` — backward-compatible ACTIVE-enrollment scheduling only; replied enrollments must use reminders |
 | POST `/enrollments/:id/unsubscribe` | → `{ok}` — manual unsubscribe (source `manual`), used with tag_only mode or by choice |
-| GET `/enrollments/:id/manual-compose-prefill` | → campaign, `step_no/step_count`, due date, personalization mode, rendered due-step subject/body, variant/draft identity, thread/pinned-mailbox context, and checks |
-| PATCH `/manual-drafts/:id` | `{subject?, body?, status?: needs_review\|ready}` → updated draft; editing never sends |
-| DELETE `/manual-drafts/:id` | removes an unsent draft only |
-| POST `/manual-sends` | `{lead_id, campaign_id, enrollment_id?, draft_id?, mailbox_id?, subject, body, allow_recontact?}` → `{enrollment_id, message_id, checks}`. Requires an existing active human-written enrollment; it never auto-enrolls. Prior human replies require explicit acknowledgement plus completed disposition review; suppression and future `not_now` dates always block. |
+| Legacy manual prefill/draft/send routes | Return `410 Gone` with sequence-only Personalized Copy guidance. Historical rows remain readable through current history/copy views. |
 
 ## Reply-detection debug (Stage-7 pending screen)
 | | |
@@ -118,11 +118,11 @@ Shapes below in TS notation. `Metric = { numerator: number, denominator: number 
 ## Analytics
 | | |
 |---|---|
-| GET `/analytics/overview?campaign_id=` | → `{progress: {contacted, total, pct}, reply_rate: Metric, positive_rate: Metric, meetings: {count, per_100}, hard_bounce_rate: Metric, soft_bounce_rate: Metric, unsubscribe_rate: Metric, capacity: Capacity, watch_flags: string[]}` |
+| GET `/analytics/overview?campaign_id=` | → `{progress: {contacted, total, pct}, delivery_confirmation:{confirmed,pending}, reply_rate: Metric, positive_rate: Metric, meetings: {count, per_100}, hard_bounce_rate: Metric, soft_bounce_rate: Metric, unsubscribe_rate: Metric, capacity: Capacity, watch_flags: string[]}`. Contacted is the distinct accepted-send cohort. |
 | GET `/analytics/variants?campaign_id=&step_no=` | → every automated, inactive historical, and sent bespoke variant for the selected step. Explicit `direct` metrics use replies whose persisted thread match points to that step; `eventual` metrics follow the complete enrollment cohort through later replies/meetings. Legacy top-level fields remain aliases. |
 | POST `/step-variants/:id/deactivate` | → `{ok}`; transactionally refuses bespoke variants and the final active automated variant for that step. Historical results remain visible. |
-| GET `/analytics/steps?sequence_id=` | → `{items: {step_no, delivered, positive_replies, positive_rate}[]}` (13b) — also accepts `?campaign_id=` (aggregates across a sequence's campaigns; the executable form since B6.13 — the golden campaign has no DB sequence) |
-| GET `/analytics/tiers?campaign_id=` | → per-tier `{tier, contacted, reply_rate, positive_rate, meetings, mode}` + `{promotable: {tier_c_engaged: number}}` (13c) |
+| GET `/analytics/steps?sequence_id=` | → `{items: {step_no, sent, delivered, pending_delivery_confirmation, replies, reply_rate, positive_replies, positive_rate}[]}` (13b) — also accepts `?campaign_id=`. Rows anchor on sent cohorts, so early replies appear before delayed confirmation. |
+| GET `/analytics/tiers?campaign_id=` | → per-tier `{tier, contacted, delivered, pending_delivery_confirmation, reply_rate, positive_rate, meetings, mode}` + legacy promotion metadata (13c) |
 | GET `/analytics/health-trend?days=30&campaign_id?=` | → `{items: DailySeries[], totals, watch_flags: {rule, message}[]}` (13d — executable form per B6.13) |
 
 ## Settings, compliance, alerts, system
@@ -132,7 +132,7 @@ Shapes below in TS notation. `Metric = { numerator: number, denominator: number 
 | GET/PUT `/compliance` | `{physical_address, optout_text, unsubscribe_base_url}` — PUT with empty address → 422 (sends would halt). `unsubscribe_base_url` is `''` (dormant), a fixed `https://` origin, or `https://unsubscribe.{sender_domain}`. The placeholder resolves from the mailbox From domain before `/u/<token>` is appended. |
 | GET `/alerts?unacked=true` · POST `/alerts/:id/ack` | `Alert = {id, kind, severity, payload, created_at, acknowledged_at}` — feeds banners: `catchup_backlog` → downtime panel; `mailbox_*` → failure panels |
 | GET `/health` | → `{ok, db, version}` (unauthenticated) |
-| GET `/u/:token` | **Not under `/api/v1`.** Unauthenticated, no CSRF. Returns an HTML confirmation page and **never unsubscribes** — scanners and privacy proxies prefetch links. An unknown token renders the same generic page as a valid one (no enumeration oracle) |
+| GET `/u/:token` | **Not under `/api/v1`.** Unauthenticated, no CSRF, and never unsubscribes. A valid active token shows `Confirm, and I won’t send you any more emails.`; a valid token for an already-unsubscribed enrollment shows the completed state with no form. Unknown tokens remain generic (no enumeration oracle). |
 | POST `/u/:token` | **Not under `/api/v1`.** Unauthenticated, no CSRF — Gmail's RFC 8058 one-click POST carries neither cookie nor custom header. Appends `unsubscribe` with `source: 'link'` and creates the global suppression; idempotent when the enrollment is already `UNSUBSCRIBED`. Returns HTML, not JSON. Never logs the token, email or lead id |
 | GET `/system/status` | → `{scheduler_last_tick_at, transport_mode, pollers: {mailbox_id, last_successful_poll_at}[], pending_jobs}` |
 | GET `/system/preflight` | → `{ready, checks: {id, label, status, detail}[]}` where `status` is `pass\|warn\|fail\|unknown`. Read-only domain-readiness report (docs/16 §8 item 3): SPF/DMARC/DKIM/MX per distinct sending domain plus compliance address, mailbox health, caps and staged enrollment. `ready` means nothing **failed** — it is not a deliverability promise, and DKIM reports `unknown` rather than `fail` because selectors cannot be enumerated over DNS |
@@ -142,7 +142,7 @@ Shapes below in TS notation. `Metric = { numerator: number, denominator: number 
 
 | Endpoint / DTO | Contract |
 |---|---|
-| Mailbox create, patch, response | `timezone`: validated IANA timezone; mailbox-local midnight resets its daily capacity. |
+| Mailbox create, patch, response | `timezone`: canonicalized IANA timezone and validated against both runtime Intl and PostgreSQL `pg_timezone_names`; mailbox-local midnight resets its daily capacity. `Asia/Calcutta` is stored as `Asia/Kolkata`. |
 | GET `/system/status` | Adds `send_blockers: {code, message}[]`; empty when no due work is blocked. |
 | POST `/leads/:id/erase` | `{confirm: current_email}`; irreversible PII anonymization, with an unsubscribe event for active work. |
 | DELETE `/campaigns/:id` | `{confirm: campaign_name}`; 409 if any event, enrollment, or dependency remains. |

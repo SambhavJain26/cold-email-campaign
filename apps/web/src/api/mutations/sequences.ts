@@ -37,7 +37,12 @@ export function useDeleteSequence() {
 /** POST-shaped read: render a variant for a real lead through THE renderer. */
 export function usePreviewSequence(sequenceId: number) {
   return useMutation({
-    mutationFn: (body: { lead_id: number; step_no: number; variant_id: number }) =>
+    mutationFn: (body: {
+      lead_id: number;
+      step_no: number;
+      variant_id?: number;
+      campaign_id?: number;
+    }) =>
       apiFetch(`/sequences/${sequenceId}/preview`, previewResponseSchema, {
         method: 'POST',
         body,
