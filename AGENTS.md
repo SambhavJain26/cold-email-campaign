@@ -71,8 +71,11 @@ commissioning** until the operator completes the handoffs below:
   resume it or create another test send without new per-send approval.
 - The two unsubscribe hosts, business postal address, and
   `https://unsubscribe.{sender_domain}` template are configured. The production Gmail body-link
-  GET and confirm flow were verified with an owner-controlled address; RFC 8058 mailbox-client
-  one-click and follow-up body-footer visibility remain unverified.
+  GET and confirm flow were verified with an owner-controlled address. The 2026-09-02
+  owner-address follow-up canary verified that Gmail collapses the body footer on desktop behind
+  **Show trimmed content** and on mobile behind **Show quoted text**; remediation remains open.
+  Gmail exposed no native unsubscribe control in the tested views, so RFC 8058 mailbox-client
+  one-click remains unverified (the missing UI does not prove that the headers were absent).
 - Work on the current `canary` branch. Do not branch off, push to `main`, or merge to
   `main` without explicit authorization. Make surgical edits, preserve unrelated dirty-worktree
   changes, and commit each completed task on the current branch.
@@ -216,8 +219,10 @@ serve only `/u/*` and return 404 elsewhere. The portfolio remains HTTP 200.
   scratch restore drill passed; Spaceship AutoBackup remains configured with a five-backup limit
 - production Google OAuth credentials are configured on the VPS; never print or copy them
 - the business postal address and unsubscribe template are configured; body-link confirmation is
-  proven on an owner-controlled address, while RFC 8058 client one-click and Gmail follow-up footer
-  visibility remain separately operator-gated
+  proven on an owner-controlled address. The 2026-09-02 owner-address canary verified the negative
+  Gmail result: follow-up footer content is collapsed on desktop and mobile, and no native
+  unsubscribe control appeared. Footer remediation is open and RFC 8058 client one-click remains
+  unverified
 
 The Oracle bounded catch-up/never-burst canary passed on 2026-08-20 UTC and remains paused. The
 accelerated settings were restored before the final deployment. Oracle is deployed on

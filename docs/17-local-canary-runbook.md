@@ -1,5 +1,21 @@
 # Local canary runbook (B8.3-local) — two-week validation on throwaway Gmail
 
+## 2026-09-02 owner-address follow-up visibility and reply canary
+
+The separately authorized owner-address Gmail canary produced a negative result for follow-up
+footer visibility. The footer was present in each message body, but Gmail collapsed it on both
+clients: desktop displayed the three-dot **Show trimmed content** control and mobile displayed
+**Show quoted text**. In both clients the operator had to expand the collapsed content to reach
+the Unsubscribe link and postal address. Treat F-W17 as open remediation before prospect sends;
+the provider result does not satisfy the intended always-visible footer UX.
+
+Gmail did not display a native unsubscribe control beside the sender or in the message header in
+the tested desktop/mobile views. This is a verified provider-UI result, not proof that the
+`List-Unsubscribe` headers were absent. Because Gmail offered no native control, the RFC 8058
+mailbox-client one-click path remains unverified. The body-link unsubscribe, reply `STOP`, and an
+ordinary interested reply were exercised; the live UI showed the corresponding `UNSUBSCRIBED`,
+auto-unsubscribe/sequence-stop, and `REPLIED`/sequence-stop outcomes. No prospect address was used.
+
 ## 2026-09-01 owner-address walkthrough remediation — verified and deployed
 
 The first complete Spaceship operator walkthrough used five operator-controlled recipients only:
