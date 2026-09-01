@@ -4,12 +4,11 @@
 
 **Legend:** `[ ]` not started · `[~]` in progress · `[x]` done · `[!]` blocked (note why in the log)
 
-**Current focus:** → **The 2026-09-01 owner-address walkthrough remediation is implemented and
-fully verified locally on `canary`; it remains unpushed and undeployed.** It
+**Current focus:** → **The 2026-09-01 owner-address walkthrough remediation is implemented,
+verified, pushed, and deployed on Spaceship at application commit `8ed86a4`.** It
 resolves the observed metric, campaign-progress, analytics, campaign-context, Personalized Copy,
 import-preview, timezone, unsubscribe, footer, and email-spacing defects. Gmail follow-up footer
-visibility remains a separately gated real-provider verification item. Spaceship application code
-remains `a15f70d`.
+visibility remains a separately gated real-provider verification item.
 
 **2026-09-01 owner-address walkthrough and local remediation:** the bounded production walkthrough
 used five operator-controlled recipients and accepted 13 messages: Atlas 3 × one step and Beacon
@@ -22,8 +21,19 @@ but confirmation-pending enrollments Finishing, and fixes the campaign, copy-sco
 timezone, unsubscribe, and rendering UX found during the walkthrough. Final local gate:
 type/lint/format; unit 345; web 58; integration 168; API 144; GreenMail 29; locked golden exactly
 47; mock E2E 62; real-backend E2E 1; production build; populated `checked 5 enrollments — 0
-diff(s)`; clean self-check; validated backup/restore drill. No migration or production state change
-was made by this implementation. Push and deployment remain separately authorized.
+diff(s)`; clean self-check; validated backup/restore drill. No migration or live
+campaign/enrollment state change was made by this implementation.
+
+Deployment evidence: the read-only preflight found two active campaigns but all five enrollments
+terminal, with zero due/future work, zero available pool leads, disabled auto-enrollment, and no
+legacy due work. Reviewed bundle SHA-256 matched on both hosts and fast-forwarded the clean checkout
+from `ef5174e` to `8ed86a4`; app/gateway/backup rebuilt and all containers are healthy. Public
+routing, served feature markers, 20 migrations through `0019`, four healthy mailboxes, zero failed
+jobs/open alerts/personalized blockers, `checked 5 enrollments — 0 diff(s)`, and self-check pass.
+The latest sent event remained 2026-08-31 22:35:24 IST, so deployment sent no mail. Pre/post dumps
+`coldemail-20260901-064856.dump` (1,170,101 bytes) and
+`coldemail-20260901-065547.dump` (1,170,993 bytes) passed `pg_restore --list`. Oracle and `main`
+were unchanged.
 
 **2026-08-31 import-wizard clarity follow-up:** implemented, verified, pushed, and deployed on
 Spaceship at application commit `a15f70d`. The misleading single Draft target campaign selector is

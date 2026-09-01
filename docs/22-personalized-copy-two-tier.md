@@ -5,13 +5,12 @@ landed on 2026-08-30 and the import-wizard clarity application release `a15f70d`
 2026-08-31. Campaign activation, enrollment, and sending still require separate operator
 authorization. The follow-up changed no schema, campaign state, enrollment, or sending logic.
 
-**Post-walkthrough local corrections (2026-09-01):** the owner-address production walkthrough
-exposed clarity and early-metric defects around this model. The verified local candidate now keeps
+**Post-walkthrough corrections (2026-09-01):** the owner-address production walkthrough exposed
+clarity and early-metric defects around this model. Deployed application commit `8ed86a4` now keeps
 Personalized Copy scope fixed across Copy-from-Source/save refetches, names the exact target on
 actions, previews personalized steps from the Sequence screen, derives campaign preview mode from
 the selected lead's A/B tier, warns on zero-day follow-ups, and explains personalized steps have no
-variants in Analytics. These corrections are committed separately from migration `0019`; they are
-not a production release until separately authorized and deployed.
+variants in Analytics. These corrections are application-only and add no migration.
 
 This document is the authoritative specification for migration `0019` and supersedes older
 current-behavior descriptions of Manual Compose, human-written delivery mode, Tier C as a current

@@ -26,7 +26,8 @@ commissioning**:
   enrollment, or sending.
 - **Personalized Copy production release:** the operator-approved Personalized Copy/two-tier/
   campaign-lead filter release and 2026-08-31 import-wizard clarity follow-up are implemented,
-  fully verified, pushed, and deployed; application code is at `a15f70d` through migration `0019`.
+  fully verified, pushed, and deployed; current application code is at `8ed86a4` through migration
+  `0019`.
   Personalized copy is now sequence content only; current tiers
   are A/B with separate Nurture status; imported global sources bind to independent campaign-step
   snapshots; missing copy fails closed with durable blockers; and Campaign Pool/Enrolled/Both
@@ -36,11 +37,12 @@ commissioning**:
   multiple Personalized Copy steps, preserves direct `step_N_*` mappings, and previews the exact
   no-activation/no-enrollment/no-send outcome. Those were the deployment-time baseline facts; the
   later owner-controlled walkthrough changed live campaign/lead state under separate authorization.
-- **2026-09-01 walkthrough remediation:** the owner-address findings are implemented and fully
-  verified locally, but not pushed or deployed. The candidate corrects metric/analytics semantics,
-  campaign progress/context, Personalized Copy scope/preview, import UX, timezone validation,
-  unsubscribe state, and email rendering. It adds no migration and made no production mutation.
-  Gmail follow-up body-footer visibility still requires a separately approved real-provider test.
+- **2026-09-01 walkthrough remediation:** the owner-address findings are implemented, fully
+  verified, pushed, and deployed on Spaceship at `8ed86a4`. The release corrects metric/analytics
+  semantics, campaign progress/context, Personalized Copy scope/preview, import UX, timezone
+  validation, unsubscribe state, and email rendering. It adds no migration and made no live
+  campaign/enrollment mutation. Gmail follow-up body-footer visibility still requires a separately
+  approved real-provider test.
 - The operator-approved Spaceship deployment, subpath support, sender-domain unsubscribe routing,
   and individual Google Workspace OAuth implementation are complete. Do not extend production
   scope or change DNS/Caddy/mailboxes outside the approved commissioning steps without fresh
@@ -117,7 +119,7 @@ rollback/canary environment.
 - Stack: `docker-compose.spaceship.yml` with `.env.prod`
 - UI: `https://sambhavpmtech.com/email-campaign/`
 - Internal gateway: `127.0.0.1:18080`; host Caddy alone owns public 80/443
-- Deployed application release: `canary` at `a15f70d`
+- Deployed application release: `canary` at `8ed86a4`
 
 The private repository currently has no GitHub deploy credential on the VPS. Until a read-only
 deploy key is deliberately installed, transfer a reviewed `git bundle`, fetch the pinned branch
@@ -172,7 +174,8 @@ After an authorized deploy, verify container health, `https://localhost/health`,
 - **Oracle rollback canary:** `4e9e125` plus its documentation-only wrap; both campaigns remain
   paused. Health, self-check, backup, and `checked 24 enrollments — 0 diff(s)` are clean.
 - **Spaceship production:** deployed 2026-08-22 and advanced through the verified Personalized
-  Copy/two-tier/campaign-filter and import-wizard clarity release `a15f70d` on 2026-08-31. It has
+  Copy/two-tier/campaign-filter and import-wizard clarity release `a15f70d` on 2026-08-31, then the
+  owner-walkthrough remediation `8ed86a4` on 2026-09-01. It has
   four `google_oauth` mailboxes. The 2026-08-31 deployment baseline had one global lead, two draft
   campaigns, and zero enrollments; the separately authorized walkthrough later added five
   operator-controlled leads across Atlas and Beacon and accepted 13 messages. Body-link

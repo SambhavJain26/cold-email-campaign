@@ -3,15 +3,13 @@
 Single always-on VPS (finalized decision). Docker Compose primary; systemd alternative. Implemented
 in B7 and cut over to Spaceship production on 2026-08-22.
 
-**Production status (2026-08-31):** migration `0019`, the Personalized Copy/two-tier/campaign-
-lead-filter release, and the clearer import wizard are deployed on the one-word `canary` branch;
-application code is at `a15f70d`. Zero-legacy
-preflight, reviewed bundle fast-forward, pre/post backup catalogs, migration, container/internal/
-public health, route matrix, served feature markers, self-check, zero-drift dry-run, failed-job
-check, and dormant send state all pass. Production has one unassigned global lead, two draft
-campaigns, and no enrollment, pool row, active campaign, or sendable work. Oracle remains paused
-and unchanged. Deployment did not authorize campaign
-activation, enrollment, or sending.
+**Production status (2026-09-01):** migration `0019` and the owner-walkthrough remediation are
+deployed on the one-word `canary` branch at application commit `8ed86a4`. Reviewed bundle
+fast-forward, pre/post backup catalogs, container/internal/public health, route matrix, served
+feature markers, self-check, five-enrollment zero-drift dry-run, failed-job check, and no-send
+preflight pass. The two live test campaigns have five terminal enrollments and zero due/future work;
+auto-enrollment is disabled and the pool has no available leads. Oracle remains paused and
+unchanged. Deployment did not authorize further activation, enrollment, or sending.
 
 ---
 
@@ -155,11 +153,11 @@ Full stack built and brought up from a clean state (`docker compose -f docker-co
 
 Remaining for a full **M3** close: the real-backend walkthrough replay (§5, `e2e/walkthrough.spec.ts` — Playwright web ⇄ real server + MockTransport + `advance-clock`), which the frontend track deferred here from F8.
 
-## 8. Spaceship shared-VPS production — deployed 2026-08-22, latest rollout 2026-08-31
+## 8. Spaceship shared-VPS production — deployed 2026-08-22, latest rollout 2026-09-01
 
 Production is live at `https://sambhavpmtech.com/email-campaign/` on the existing Spaceship VM.
 The portfolio at `sambhavbuilds.com` remained online throughout. Application code is pinned to
-`a15f70d` on `canary`; `main` was not merged. Oracle remains paused and unchanged as the temporary
+`8ed86a4` on `canary`; `main` was not merged. Oracle remains paused and unchanged as the temporary
 rollback environment.
 
 - **Reverse proxy:** host Caddy is the only public 80/443 listener. The container gateway binds

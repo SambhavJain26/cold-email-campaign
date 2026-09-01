@@ -2,8 +2,8 @@
 
 This document answers the questions raised after reading [the main user manual](19-user-manual.md).
 It is a companion to that manual, not a replacement for it. The answers are reconciled through the
-verified and deployed migration `0019` plus the 31 August 2026 import-wizard clarity release on
-`canary` at application commit `a15f70d`.
+verified and deployed migration `0019`, the 31 August 2026 import-wizard clarity release, and the
+1 September owner-walkthrough remediation on `canary` at application commit `8ed86a4`.
 
 > **Current correction:** Personalized copy is no longer a human-written tier or direct-send mode.
 > Sequence steps choose Template or Personalized Copy. Current tiers are only A/B/Untiered;

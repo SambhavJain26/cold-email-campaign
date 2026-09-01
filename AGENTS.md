@@ -30,7 +30,7 @@ commissioning** until the operator completes the handoffs below:
   work is limited to testing, verification, diagnosis, and documentation.
 - The operator-approved Personalized Copy/two-tier/campaign-lead-filter release and its 2026-08-31
   import-wizard clarity follow-up are implemented, fully verified, pushed, and deployed on
-  Spaceship; application code is at `a15f70d` through migration `0019`.
+  Spaceship; the current application code is at `8ed86a4` through migration `0019`.
   It replaces direct Manual Compose sending with sequence-only personalized steps, fixes current
   tiers at A/B, separates Nurture status, adds global-source/campaign-step copy snapshots and
   blockers, and adds exact Pool/Enrolled/Both filtering and bulk tiering. The follow-up replaces
@@ -40,11 +40,11 @@ commissioning** until the operator completes the handoffs below:
   no-activation/no-enrollment/no-send summary. Those were the verified deployment-time baseline
   facts; the later owner-controlled walkthrough changed live campaign/lead state under separate
   authorization.
-- The 2026-09-01 owner-address walkthrough remediation is implemented and fully verified locally,
-  but not pushed or deployed. It closes the observed metric, analytics, campaign-progress,
-  campaign-context, Personalized Copy, import, timezone, unsubscribe, and rendering defects. No
-  migration or production mutation was made by this implementation. Gmail follow-up body-footer
-  visibility remains open for a separately approved owner-address canary.
+- The 2026-09-01 owner-address walkthrough remediation is implemented, fully verified, pushed, and
+  deployed on Spaceship at `8ed86a4`. It closes the observed metric, analytics,
+  campaign-progress, campaign-context, Personalized Copy, import, timezone, unsubscribe, and
+  rendering defects. No migration or live campaign/enrollment mutation was required. Gmail
+  follow-up body-footer visibility remains open for a separately approved owner-address canary.
 - The operator-approved 2026-08-25 ten-workstream implementation is complete and deployed through
   Stages 1–4: operational pagination; due-step Manual Compose; in-app reminders; verified
   timezone/folder controls; imported manual drafts; Auto Observation/sequence variables; staged
@@ -145,7 +145,7 @@ temporary rollback/canary environment.
 - App: `/opt/email-campaign`; stack: `docker-compose.spaceship.yml` with `.env.prod`
 - Public UI: `https://sambhavpmtech.com/email-campaign/`
 - Internal gateway: `127.0.0.1:18080`; host Caddy is the only public 80/443 listener
-- Deployed application release: `canary` at `a15f70d`
+- Deployed application release: `canary` at `8ed86a4`
 
 The repository is private and the VPS currently has no GitHub deploy credential. Until a read-only
 deploy key is deliberately installed, transfer a reviewed `git bundle`, fetch the pinned branch
@@ -189,7 +189,7 @@ and password rotation.
 
 Spaceship production was deployed on 2026-08-22 and advanced through Stage 4, campaign pools, the
 Personalized Copy/two-tier/campaign-filter release, and import-wizard clarity application release
-`a15f70d` on 2026-08-31. The clean checkout is on
+`a15f70d` on 2026-08-31, then the owner-walkthrough remediation `8ed86a4` on 2026-09-01. The clean checkout is on
 the one-word `canary` branch. DNS and TLS are live for the two outreach domains and their
 unsubscribe subdomains. The route matrix is
 verified: `/email-campaign/` and direct SPA routes return 200; the bare app path canonicalizes;

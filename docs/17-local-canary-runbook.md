@@ -1,6 +1,6 @@
 # Local canary runbook (B8.3-local) — two-week validation on throwaway Gmail
 
-## 2026-09-01 owner-address walkthrough remediation — verified locally, not deployed
+## 2026-09-01 owner-address walkthrough remediation — verified and deployed
 
 The first complete Spaceship operator walkthrough used five operator-controlled recipients only:
 three Atlas leads received one message each and two Beacon leads received five messages each, for
@@ -39,8 +39,25 @@ production Vite build; populated `checked 5 enrollments — 0 diff(s)`; clean se
 validated custom-format dump with scratch restore/rebuild/zero-drift/self-check. The initial real
 browser attempt was blocked before its test because Docker Desktop was closed; Docker was started
 locally and the complete journey passed. No schema migration was added. This implementation made
-no production mutation, activation, enrollment, send, push, or deployment; Spaceship remains on
-`a15f70d` until separate authorization.
+no activation, enrollment, or send during local verification.
+
+After explicit operator authorization, `canary` was pushed and the production read-only preflight
+found two active campaigns but all five enrollments terminal: zero NEW/ACTIVE, due, or future
+scheduled enrollments; zero available pool leads; auto-enrollment disabled; and zero legacy due
+work. Pre-deploy dump `coldemail-20260901-064856.dump` (1,170,101 bytes) passed
+`pg_restore --list`. A reviewed bundle whose SHA-256 matched locally and remotely fast-forwarded
+the clean VPS checkout from `ef5174e` to exact application commit `8ed86a4`; app, gateway, and
+backup images rebuilt and the stack recreated successfully.
+
+Post-deploy evidence: all containers and internal/public health pass; the SPA, direct routes,
+canonical/outreach redirects, unsubscribe-host isolation, invalid-token page, and portfolio route
+pass; the served asset contains the update banner, pending-confirmation, Personalized Copy, and
+global-capacity markers. All 20 migrations through `0019` remain applied; four of four mailboxes
+are healthy; failed jobs, open alerts, personalized-copy blockers, and due work are zero;
+`checked 5 enrollments — 0 diff(s)` and self-check pass. The latest `sent` event remained the
+walkthrough message at 2026-08-31 22:35:24 IST, proving the deployment created no mail. Post-deploy
+dump `coldemail-20260901-065547.dump` (1,170,993 bytes) passed `pg_restore --list`. Oracle, `main`,
+DNS, Caddy, campaign state, enrollment state, and mailbox configuration were unchanged.
 
 ## 2026-08-31 import-wizard clarity follow-up — verified and deployed
 

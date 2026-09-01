@@ -6,9 +6,8 @@
 
 **Manual version:** 2026-09-01, for branch `canary`
 
-**Reconciled through:** the deployed Personalized Copy/two-tier/campaign-filter and import-wizard
-clarity application release at Spaceship commit `a15f70d`, plus the verified local owner-walkthrough
-corrections awaiting separate push/deploy authorization.
+**Reconciled through:** the deployed Personalized Copy/two-tier/campaign-filter, import-wizard
+clarity, and owner-walkthrough remediation at Spaceship application commit `8ed86a4`.
 
 This manual explains the complete operator-facing application: what every screen does, how to use
 each action, what the system does automatically, and which safeguards or edge cases matter. It is a
