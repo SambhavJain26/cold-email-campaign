@@ -16,6 +16,19 @@ mailbox-client one-click path remains unverified. The body-link unsubscribe, rep
 ordinary interested reply were exercised; the live UI showed the corresponding `UNSUBSCRIBED`,
 auto-unsubscribe/sequence-stop, and `REPLIED`/sequence-stop outcomes. No prospect address was used.
 
+Operator-approved remediation presentation: retain the compact **10px** footer size; render only
+**Unsubscribe** as a conventional blue, underlined link (`#1155cc`); use `#595959` for the postal
+address; keep a 1.5 line height; and increase the footer's top separation to 20px. Presentation
+changes do not close F-W17 by themselves. The implementation must also keep each follow-up's
+footer in Gmail's immediately visible new-message content without invisible-character variation,
+then pass another owner-address desktop/mobile Gmail canary.
+
+Read-only production reconciliation after the recipient actions found both canary campaigns
+paused. Aurora Canary has two `UNSUBSCRIBED` enrollments and one untouched control waiting at Step
+3; Comet Canary has one `REPLIED` enrollment and one untouched control waiting at Step 3. Further
+pre-fix mail would add little evidence while the footer defect is known, so the remaining controls
+stay paused for post-remediation verification.
+
 ## 2026-09-01 owner-address walkthrough remediation — verified and deployed
 
 The first complete Spaceship operator walkthrough used five operator-controlled recipients only:
