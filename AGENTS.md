@@ -89,9 +89,10 @@ commissioning** until the operator completes the handoffs below:
   accepted exactly once; its immutable snapshot proves the production HTML/text renderer is
   correct, and the campaign was paused before Step 4. The operator's desktop observation proved the
   full redesigned footer remains behind **Show trimmed content**; mobile remains pending. Gmail
-  exposed no native unsubscribe control, so RFC 8058 mailbox-client one-click remains unverified
-  (the missing UI does not prove that the headers were absent). The Promotions placement is an
-  observation, not proof of domain-reputation damage.
+  exposed no native unsubscribe control. Gmail's **Show original** source proves SPF/DKIM/DMARC
+  passed, both RFC 8058 headers arrived, and the passing domain DKIM signature covered both. The
+  native provider UI and resulting mailbox-client POST remain unverified because Gmail withheld
+  the control. The Promotions placement is an observation, not proof of domain-reputation damage.
 - Work on the current `canary` branch. Do not branch off, push to `main`, or merge to
   `main` without explicit authorization. Make surgical edits, preserve unrelated dirty-worktree
   changes, and commit each completed task on the current branch.
@@ -240,8 +241,9 @@ A transient DNSSEC `SERVFAIL` observed during the rollout cleared without a conf
   proven on an owner-controlled address. The 2026-09-02 owner-address canary verified the negative
   Gmail result: follow-up footer content is collapsed on desktop and mobile, and no native
   unsubscribe control appeared. The footer remediation is deployed and the post-deployment sent
-  snapshot is correct; desktop post-deployment visibility failed, mobile remains pending, and RFC
-  8058 client one-click remains unverified
+  snapshot is correct; desktop post-deployment visibility failed and mobile remains pending. The
+  received original verifies RFC 8058 header presence and DKIM coverage, while Gmail's native UI
+  and client-initiated POST remain unverified
 
 The Oracle bounded catch-up/never-burst canary passed on 2026-08-20 UTC and remains paused. The
 accelerated settings were restored before the final deployment. Oracle is deployed on

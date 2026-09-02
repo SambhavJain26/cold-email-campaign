@@ -66,9 +66,10 @@ commissioning**:
   accepted exactly once and its immutable text/HTML snapshot is correct; Aurora was paused before
   Step 4. The desktop recipient result is negative: the full redesigned footer remains behind
   **Show trimmed content**; mobile post-remediation visibility remains pending. Gmail exposed no
-  native unsubscribe control, so RFC 8058 mailbox-client one-click remains unverified (the missing
-  UI does not prove that the headers were absent). The Promotions placement is an observation, not
-  proof of domain-reputation damage.
+  native unsubscribe control. Gmail's **Show original** source proves SPF/DKIM/DMARC passed, both
+  RFC 8058 headers arrived, and the passing domain DKIM signature covered both. The native provider
+  UI and resulting mailbox-client POST remain unverified because Gmail withheld the control. The
+  Promotions placement is an observation, not proof of domain-reputation damage.
 - Do not start a real cohort or send new external campaign mail without explicit approval for that specific send. This covers sending mail, activating or resuming a campaign, enrolling leads, altering live campaign state, and contacting prospects — each needs its own approval.
 - The approved, controlled Gmail acceptance batch is complete. The test campaign is paused; do not resume it or create additional test sends without new, per-send operator approval. Read the runbook for the authoritative recipient, outcome, and verification record.
 - The deployed production facts and remaining operator handoffs are recorded in
@@ -217,7 +218,8 @@ After an authorized deploy, verify container health, `https://localhost/health`,
   the follow-up body footer on desktop and mobile and displayed no native unsubscribe control.
   The footer remediation is deployed, and one post-deployment sent snapshot proves the production
   renderer is correct, but the post-deployment desktop recipient check still failed and mobile
-  remains pending; RFC 8058 mailbox-client one-click remains unverified. The business address,
+  remains pending. The received original verifies RFC 8058 header presence and DKIM coverage,
+  while Gmail's native UI and client-initiated POST remain unverified. The business address,
   sender-domain unsubscribe template, production Internal Google
   OAuth credentials, and four account-matched OAuth mailboxes are configured. Finding #12 still
   needs warmed-domain evidence; provider DSN/OOO fixture capture remains deferred.

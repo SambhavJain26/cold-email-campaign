@@ -19,14 +19,19 @@ pending before the six-hour confirmation job. Public health is 200, all four mai
 healthy, projection dry-run is 0 diffs, self-check has no invariant violations, and there are no
 open error-severity alerts.
 
-The operator then inspected the received message in Gmail desktop. Gmail kept the complete
+The operator then inspected the received message and Gmail's **Show original** source on desktop.
+Gmail kept the complete
 two-line footer behind the three-dot **Show trimmed content** control; after expansion, the blue
 Unsubscribe link and postal address rendered exactly as intended. Gmail exposed no native
 unsubscribe control beside the sender, and the message landed in Promotions. This proves that the
 presentation-table remediation did not defeat Gmail's repeated/footer-content trimming heuristic.
-It does not prove that the RFC 8058 headers were absent, and a single Promotions placement is not
-evidence of domain-reputation damage. Post-remediation mobile visibility remains untested. F-W17
-therefore remains open.
+The original source proves SPF, DKIM, and DMARC all passed; both `List-Unsubscribe` and
+`List-Unsubscribe-Post: List-Unsubscribe=One-Click` reached Gmail; and the valid domain DKIM
+signature's `h=` list covers both headers. It also proves the expected multipart text/HTML body,
+TLS transport, and thread headers. RFC 8058 transport/header conformance is therefore verified on
+the live message, while Gmail's native UI and resulting client-initiated POST remain unverified
+because Gmail withheld the control. A single Promotions placement is not evidence of
+domain-reputation damage. Post-remediation mobile visibility remains untested. F-W17 remains open.
 
 The walkthrough normalized the application default timezone and all four mailbox fallbacks to
 `Asia/Kolkata`, with a consistent Mon–Fri 10:00–18:00 send window. Aurora and Comet remain paused;
@@ -54,9 +59,10 @@ the Unsubscribe link and postal address. Treat F-W17 as open remediation before 
 the provider result does not satisfy the intended always-visible footer UX.
 
 Gmail did not display a native unsubscribe control beside the sender or in the message header in
-the tested desktop/mobile views. This is a verified provider-UI result, not proof that the
-`List-Unsubscribe` headers were absent. Because Gmail offered no native control, the RFC 8058
-mailbox-client one-click path remains unverified. The body-link unsubscribe, reply `STOP`, and an
+the tested desktop/mobile views. The later post-remediation **Show original** evidence proves that
+both RFC 8058 headers were present and covered by the passing domain DKIM signature. Because Gmail
+offered no native control, only the provider UI and mailbox-client POST remain unverified. The
+body-link unsubscribe, reply `STOP`, and an
 ordinary interested reply were exercised; the live UI showed the corresponding `UNSUBSCRIBED`,
 auto-unsubscribe/sequence-stop, and `REPLIED`/sequence-stop outcomes. No prospect address was used.
 
@@ -134,9 +140,10 @@ Finding F-W17 remains open: the requested footer wording/layout is implemented a
 text/HTML/GreenMail coverage passes, but the post-deployment real-Gmail desktop follow-up still
 hid the repeated footer behind `Show trimmed content`. The attempted invisible-character
 workaround was removed because altering hidden content on every send is an undesirable
-deliverability tradeoff. The body-link GET/confirm/idempotent behavior was observed live; RFC 8058
-mailbox-client one-click remains unverified because Gmail showed no native control. Mobile
-post-remediation visibility remains to be checked.
+deliverability tradeoff. The body-link GET/confirm/idempotent behavior was observed live, and the
+received original proves correct live RFC 8058 headers plus DKIM coverage. Gmail showed no native
+control, so its provider UI and client-initiated POST remain unverified. Mobile post-remediation
+visibility remains to be checked.
 
 Final local gate: typecheck/lint/format; unit 345/345; web 58/58; integration 168/168; API 144/144;
 GreenMail 29/29; locked golden exactly 47/47; mock browser 62/62; real-backend browser 1/1;
