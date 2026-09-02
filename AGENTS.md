@@ -46,8 +46,11 @@ commissioning** until the operator completes the handoffs below:
   rendering defects. No migration or live campaign/enrollment mutation was required. Gmail
   follow-up body-footer visibility remains open for a separately approved owner-address canary.
 - The 2026-09-02 Gmail footer remediation is implemented, fully verified, pushed, and deployed at
-  `c31d73b`. No migration, campaign/enrollment mutation, or send occurred. A new owner-controlled
-  Gmail follow-up is still required to prove visibility. Deployment verification briefly observed
+  `c31d73b`. No migration, campaign/enrollment mutation, or send occurred. A separately authorized
+  post-deployment owner-controlled follow-up proved that Gmail desktop still collapses the complete
+  redesigned footer behind **Show trimmed content** and exposes no native unsubscribe control; the
+  message landed in Promotions. Post-remediation mobile visibility remains pending. Deployment
+  verification briefly observed
   DNSSEC `SERVFAIL` on both Spaceship-managed outreach domains. Registrar DS values exactly matched
   the served DNSKEY tags/digests, and Google, Cloudflare, Quad9, system resolution, and the complete
   public route matrix recovered without a configuration change. Keep DNSSEC enabled; treat this as
@@ -84,10 +87,11 @@ commissioning** until the operator completes the handoffs below:
   a two-line presentation-table footer with the operator-approved 10px/blue-link/dark-gray
   treatment and no hidden variation. A separately authorized post-deployment Aurora Step 3 was
   accepted exactly once; its immutable snapshot proves the production HTML/text renderer is
-  correct, and the campaign was paused before Step 4. The operator's recipient-side desktop/mobile
-  visibility check is still pending. Gmail previously exposed no native unsubscribe control, so
-  RFC 8058 mailbox-client one-click remains unverified (the missing UI does not prove that the
-  headers were absent).
+  correct, and the campaign was paused before Step 4. The operator's desktop observation proved the
+  full redesigned footer remains behind **Show trimmed content**; mobile remains pending. Gmail
+  exposed no native unsubscribe control, so RFC 8058 mailbox-client one-click remains unverified
+  (the missing UI does not prove that the headers were absent). The Promotions placement is an
+  observation, not proof of domain-reputation damage.
 - Work on the current `canary` branch. Do not branch off, push to `main`, or merge to
   `main` without explicit authorization. Make surgical edits, preserve unrelated dirty-worktree
   changes, and commit each completed task on the current branch.
@@ -236,8 +240,8 @@ A transient DNSSEC `SERVFAIL` observed during the rollout cleared without a conf
   proven on an owner-controlled address. The 2026-09-02 owner-address canary verified the negative
   Gmail result: follow-up footer content is collapsed on desktop and mobile, and no native
   unsubscribe control appeared. The footer remediation is deployed and the post-deployment sent
-  snapshot is correct; recipient-side post-deployment visibility remains pending, and RFC 8058
-  client one-click remains unverified
+  snapshot is correct; desktop post-deployment visibility failed, mobile remains pending, and RFC
+  8058 client one-click remains unverified
 
 The Oracle bounded catch-up/never-burst canary passed on 2026-08-20 UTC and remains paused. The
 accelerated settings were restored before the final deployment. Oracle is deployed on
