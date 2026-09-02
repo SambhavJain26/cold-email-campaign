@@ -15,8 +15,9 @@ all pass. Production containers, internal health, direct-IP public routes, 20 mi
 healthy mailboxes, zero failed jobs/open alerts/sendable work, `checked 10 enrollments — 0
 diff(s)`, self-check, and both backup catalogs pass; the sent watermark remained 23. Gmail
 visibility remains unproven until an owner-address follow-up stays visible on desktop and mobile.
-The deployment also exposed an independent DNSSEC `SERVFAIL` on both outreach domains: direct-IP
-HTTPS is healthy, but ordinary public UI and unsubscribe resolution require DNS repair.
+The deployment briefly encountered DNSSEC `SERVFAIL` on both Spaceship-managed outreach domains,
+but the DS/DNSKEY tags and digests matched and Google, Cloudflare, Quad9, system resolution, and the
+full public route matrix recovered without any configuration change. DNSSEC remains enabled.
 
 **2026-09-01 owner-address walkthrough and local remediation:** the bounded production walkthrough
 used five operator-controlled recipients and accepted 13 messages: Atlas 3 × one step and Beacon

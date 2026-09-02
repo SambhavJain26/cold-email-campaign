@@ -9,10 +9,10 @@ fast-forward, pre/post backup catalogs, container/internal/public health, route 
 feature markers, self-check, five-enrollment zero-drift dry-run, failed-job check, and no-send
 preflight pass. Production has ten enrollments, with zero due/future work in active campaigns;
 auto-enrollment is disabled and the pool has no available leads. The deployment emitted no mail.
-Both outreach domains currently return DNSSEC `SERVFAIL` from validating public resolvers despite
-healthy direct-IP HTTPS; repair DNS before treating the public UI or unsubscribe hosts as
-available. Oracle remains paused and unchanged. Deployment did not authorize further activation,
-enrollment, or sending.
+Both Spaceship-managed outreach domains briefly returned DNSSEC `SERVFAIL`, but their DS and
+DNSKEY tags/digests matched and validating public resolvers plus the full route matrix recovered
+without a configuration change. DNSSEC remains enabled. Oracle remains paused and unchanged.
+Deployment did not authorize further activation, enrollment, or sending.
 
 ---
 
@@ -170,9 +170,10 @@ rollback environment.
 - **Routing:** `/email-campaign` canonicalizes to `/email-campaign/`; direct SPA routes and the
   subpath API work. Other outreach-domain paths redirect 308 to the portfolio homepage. Each
   unsubscribe host proxies only `/u/*` and returns 404 elsewhere.
-- **DNS/TLS:** the records still return `104.207.93.174` with validation disabled and direct-IP TLS
-  passes, but validating resolvers currently return DNSSEC `SERVFAIL` for both outreach domains.
-  Existing MX/SPF/DKIM/DMARC/site-verification records were not changed by the deployment.
+- **DNS/TLS:** both outreach domains return authenticated DNSSEC answers for `104.207.93.174` and
+  public TLS passes. A transient DNSSEC `SERVFAIL` during the footer rollout cleared without a
+  configuration change after DS/DNSKEY equivalence was verified. Existing
+  MX/SPF/DKIM/DMARC/site-verification records were not changed by the deployment.
 - **Database recovery:** the nightly logical-backup sidecar is active. A fresh custom-format dump
   passed `pg_restore --list`; a scratch restore, projection rebuild/dry-run, and self-check passed,
   and the scratch database was removed.
@@ -252,8 +253,10 @@ dry-run reports `checked 10 enrollments — 0 diff(s)` and self-check is clean. 
 and watermark remained 23 and 2026-09-02 01:30:35 IST, proving the deployment emitted no email.
 Pre/post dumps `coldemail-20260902-082320.dump` (1,320,418 bytes) and
 `coldemail-20260902-083432.dump` (1,321,580 bytes) passed `pg_restore --list`. Public DNS validation
-currently fails independently with DNSSEC `SERVFAIL` for both outreach domains; direct-IP HTTPS is
-healthy, so do not roll back application code for that DNS incident.
+briefly failed with DNSSEC `SERVFAIL` for both Spaceship-managed outreach domains. The registrar DS
+records exactly matched the authoritative DNSKEY tags and SHA-256 digests. Google, Cloudflare,
+Quad9, system resolution, and the public route matrix recovered without any registrar/DNS change,
+so DNSSEC remained enabled and application rollback was unnecessary.
 
 ### Unsubscribe URL and Gmail one-click — body link proven, client one-click pending
 

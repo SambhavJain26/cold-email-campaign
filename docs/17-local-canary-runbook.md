@@ -47,10 +47,13 @@ sent-event count and watermark remained 23 and 2026-09-02 01:30:35 IST, proving 
 no mail. Pre/post dumps `coldemail-20260902-082320.dump` (1,320,418 bytes) and
 `coldemail-20260902-083432.dump` (1,321,580 bytes) passed catalog validation.
 
-The same verification discovered an independent DNS outage: Google and Cloudflare validating
-resolvers return DNSSEC `SERVFAIL` for both outreach domains, while queries with validation disabled
-still return `104.207.93.174` and direct-IP HTTPS is healthy. This was not caused by the application
-release, but ordinary public UI and unsubscribe resolution are unavailable until DNS is repaired.
+The same verification briefly encountered DNSSEC `SERVFAIL` for both Spaceship-managed outreach
+domains. Inspection in Spaceship proved DNSSEC was enabled automatically, and the registrar DS
+records exactly matched the authoritative DNSKEY key tags and SHA-256 digests for each domain.
+Fresh Google/Cloudflare query types then validated, followed by Google and Cloudflare A lookups,
+Quad9, system resolution, and the complete public route matrix. No DNS setting was changed; DNSSEC
+remained enabled. Record this as a transient provider incident, not a stale-DS repair, unless it
+recurs with contradictory evidence.
 
 Read-only production reconciliation after the recipient actions found both canary campaigns
 paused. Aurora Canary has two `UNSUBSCRIBED` enrollments and one untouched control waiting at Step

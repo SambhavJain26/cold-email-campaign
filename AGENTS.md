@@ -47,10 +47,11 @@ commissioning** until the operator completes the handoffs below:
   follow-up body-footer visibility remains open for a separately approved owner-address canary.
 - The 2026-09-02 Gmail footer remediation is implemented, fully verified, pushed, and deployed at
   `c31d73b`. No migration, campaign/enrollment mutation, or send occurred. A new owner-controlled
-  Gmail follow-up is still required to prove visibility. Deployment verification also discovered
-  an independent DNSSEC `SERVFAIL` affecting both outreach domains; the app is healthy when pinned
-  to the VPS IP, but ordinary public resolution must be repaired before the UI or unsubscribe
-  hosts can be considered publicly available.
+  Gmail follow-up is still required to prove visibility. Deployment verification briefly observed
+  DNSSEC `SERVFAIL` on both Spaceship-managed outreach domains. Registrar DS values exactly matched
+  the served DNSKEY tags/digests, and Google, Cloudflare, Quad9, system resolution, and the complete
+  public route matrix recovered without a configuration change. Keep DNSSEC enabled; treat this as
+  a transient provider incident unless it recurs.
 - The operator-approved 2026-08-25 ten-workstream implementation is complete and deployed through
   Stages 1–4: operational pagination; due-step Manual Compose; in-app reminders; verified
   timezone/folder controls; imported manual drafts; Auto Observation/sequence variables; staged
@@ -202,11 +203,10 @@ and password rotation.
 Spaceship production was deployed on 2026-08-22 and advanced through Stage 4, campaign pools, the
 Personalized Copy/two-tier/campaign-filter release, import-wizard clarity, owner-walkthrough
 remediation, and the 2026-09-02 footer remediation at `c31d73b`. The clean checkout is on the
-one-word `canary` branch. Direct-IP HTTPS verification proves the app route returns 200, direct
-SPA routes return 200, the bare app path canonicalizes, normal outreach traffic redirects 308,
-and unsubscribe roots return 404. However, both outreach domains currently fail ordinary public
-resolution with DNSSEC `SERVFAIL`; treat public UI and unsubscribe routing as unavailable until
-DNS is repaired. The portfolio remains HTTP 200.
+one-word `canary` branch. Public DNSSEC validation and the route matrix are healthy: the app route
+and direct SPA routes return 200; the bare app path canonicalizes; both outreach roots redirect
+308 to `https://sambhavbuilds.com/`; unsubscribe roots return 404; and the portfolio returns 200.
+A transient DNSSEC `SERVFAIL` observed during the rollout cleared without a configuration change.
 
 - db/app/gateway/backup containers are healthy; only `127.0.0.1:18080` is published
 - the 2026-08-31 deployment baseline was four healthy OAuth mailboxes, one global lead, two draft

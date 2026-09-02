@@ -45,10 +45,11 @@ commissioning**:
   approved real-provider test.
 - **2026-09-02 footer remediation:** the two-line 10px presentation-table footer is fully verified,
   pushed, and deployed at `c31d73b`; deployment added no migration and emitted no mail. A new
-  owner-controlled Gmail follow-up remains required to prove visibility. The deployment check also
-  found an independent DNSSEC `SERVFAIL` on both outreach domains. Direct-IP HTTPS and the
-  application are healthy, but normal public UI and unsubscribe resolution are unavailable until
-  DNS is repaired.
+  owner-controlled Gmail follow-up remains required to prove visibility. The deployment check
+  briefly saw DNSSEC `SERVFAIL` on both Spaceship-managed outreach domains. The registrar DS values
+  exactly matched the served DNSKEY tags/digests, and validating public resolvers plus the full
+  route matrix recovered without a configuration change. Keep DNSSEC enabled and treat it as a
+  transient provider incident unless it recurs.
 - The operator-approved Spaceship deployment, subpath support, sender-domain unsubscribe routing,
   and individual Google Workspace OAuth implementation are complete. Do not extend production
   scope or change DNS/Caddy/mailboxes outside the approved commissioning steps without fresh
@@ -192,11 +193,10 @@ After an authorized deploy, verify container health, `https://localhost/health`,
   campaigns, and zero enrollments; the separately authorized walkthrough later added five
   operator-controlled leads across Atlas and Beacon and accepted 13 messages. Body-link
   unsubscribe, reply `STOP`, global suppression, and reply ingestion were observed; no prospect
-  was contacted. Inspect current live state before operational work. Containers, TLS when pinned
-  to the VPS IP, the `/email-campaign/` SPA/API subpath, outreach redirects, and the isolated
-  unsubscribe routes are healthy. Ordinary public DNS currently fails DNSSEC validation for both
-  outreach domains and must be repaired before those routes are publicly available. Containers
-  and health are green;
+  was contacted. Inspect current live state before operational work. Containers, public DNSSEC,
+  TLS, the `/email-campaign/` SPA/API subpath, outreach redirects, and the isolated unsubscribe
+  routes are healthy. A transient DNSSEC `SERVFAIL` during the 2026-09-02 rollout cleared without
+  configuration changes. Containers and health are green;
   migration 0019, self-check, and zero drift pass; both deployment dumps passed catalog validation
   and the local scratch restore drill passed; Spaceship AutoBackup has a five-backup limit. The
   portfolio remained online.
