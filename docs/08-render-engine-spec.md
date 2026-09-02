@@ -68,7 +68,7 @@ matched observation rule, resolved variable source, fallbacks, and deterministic
 ```
 
 - Appended at render time, **after** all expansion; template text cannot alter or remove it (a template containing its own footer text just gets the canonical one appended anyway — check #6 warns on duplication).
-- The boundary is one blank paragraph rather than a visible divider. Every HTML body paragraph uses explicit inline margins; the first starts at `margin-top:0`, intentional paragraph gaps remain 16px, and the footer renders at `10px`, `#767676`, `line-height:1.5`, with a 16px top gap. The plain-text alternative uses the same words after one blank line.
+- The boundary is one blank paragraph rather than a visible divider. Every HTML body paragraph uses explicit inline margins; the first starts at `margin-top:0` and intentional paragraph gaps remain 16px. The footer is a one-cell, email-safe presentation table 20px below the body, rendered at `10px` and `line-height:1.5`. **Unsubscribe** is a blue (`#1155cc`), underlined link; the postal address is `#595959` on the next line. The plain-text alternative carries the same two visible lines after one blank line. The footer contains no blockquote/signature marker, hidden content, or invisible-character variation; Gmail visibility remains a real-provider canary result rather than an offline guarantee.
 - Fatal boot/send guard: `physical_address` empty → sends are refused globally, alert raised (CAN-SPAM requires it; empty address = non-compliant mail).
 
 ## 5. Pre-send checks + deliverability score (decision W)
@@ -92,7 +92,7 @@ matched observation rule, resolved variable source, fallbacks, and deterministic
 
 ## 6. Threading headers (with docs/07 §4)
 
-`render` returns text and minimal HTML; the scheduler's `buildMime` adds: `Message-ID` (app-generated), `In-Reply-To`/`References` for in-thread steps, `Re: `-prefixed exact Step-1 subject for follow-ups, `From: {display_name} <{from_address}>`. `List-Unsubscribe: <url>` **and** `List-Unsubscribe-Post: List-Unsubscribe=One-Click` (RFC 8058) are emitted when `compliance_settings.unsubscribe_base_url` is set — both headers or neither, sourced from `OutboundMessage.headers.listUnsubscribeUrl` so the pair cannot disagree. With no base URL configured the feature is dormant: no headers or body link, and the footer carries the operator's `optout_text`. With a live URL, the visible footer contains only **Unsubscribe | postal address**. Inbound STOP/opt-out detection remains active and globally suppressive, but `or reply STOP` is not printed in the live-link footer.
+`render` returns text and minimal HTML; the scheduler's `buildMime` adds: `Message-ID` (app-generated), `In-Reply-To`/`References` for in-thread steps, `Re: `-prefixed exact Step-1 subject for follow-ups, `From: {display_name} <{from_address}>`. `List-Unsubscribe: <url>` **and** `List-Unsubscribe-Post: List-Unsubscribe=One-Click` (RFC 8058) are emitted when `compliance_settings.unsubscribe_base_url` is set — both headers or neither, sourced from `OutboundMessage.headers.listUnsubscribeUrl` so the pair cannot disagree. With no base URL configured the feature is dormant: no headers or body link, and the footer carries the operator's `optout_text`. With a live URL, the visible footer contains only **Unsubscribe** and the postal address on separate lines. Inbound STOP/opt-out detection remains active and globally suppressive, but `or reply STOP` is not printed in the live-link footer.
 
 ## 7. Tests (B4)
 

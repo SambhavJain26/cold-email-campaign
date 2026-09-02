@@ -1056,7 +1056,7 @@ export const handlers: RequestHandler[] = [
       const base = db.compliance.unsubscribe_base_url.trim();
       const optoutLine =
         base === '' ? db.compliance.optout_text : `Unsubscribe: ${base}/u/preview-token`;
-      const footer = `\n\n${optoutLine} | ${db.compliance.physical_address}`;
+      const footer = `\n\n${optoutLine}\n${db.compliance.physical_address}`;
       return HttpResponse.json({
         subject,
         body: bodyPreFooter + footer,

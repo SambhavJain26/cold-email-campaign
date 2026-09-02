@@ -39,10 +39,8 @@ export function ComplianceTab({
   const unsubBase = useWatch({ control, name: 'unsubscribe_base_url' });
   const addressEmpty = address.trim() === '';
 
-  // Mirrors render/footer.ts appendFooter's content. The app preview stays at
-  // an accessible UI size; delivered HTML renders this line at 10px/#767676.
-  const optoutLine =
-    unsubBase.trim() === '' ? optout : `Unsubscribe: ${unsubBase.trim()}/u/⟨token⟩`;
+  // Mirrors render/footer.ts: opt-out and address are separate visible lines.
+  const hasLiveLink = unsubBase.trim() !== '';
 
   const onSubmit = (body: ComplianceDto) =>
     put.mutate(body, {
@@ -114,13 +112,22 @@ export function ComplianceTab({
         </CardHeader>
         <CardContent>
           <div
-            className="rounded-md border border-dashed border-border bg-muted/30 p-3 font-mono text-xs whitespace-pre-wrap text-muted-foreground"
+            className="rounded-md border border-dashed border-border bg-muted/30 p-3"
             data-testid="footer-preview"
           >
-            {`${optoutLine} | ${address || '⟨no address — sends blocked⟩'}`}
+            <div className="font-mono text-[10px] leading-[15px] text-[#595959]">
+              {hasLiveLink ? (
+                <span className="text-[#1155cc] underline">Unsubscribe</span>
+              ) : (
+                <span>{optout}</span>
+              )}
+              <br />
+              <span>{address || '⟨no address — sends blocked⟩'}</span>
+            </div>
           </div>
           <p className="mt-2 text-xs text-muted-foreground">
-            Delivered after a blank line in 10px light gray text. No visible divider is added.
+            Delivered 20px below the message in 10px text. Unsubscribe is blue and underlined; the
+            address is dark gray. No visible divider is added.
           </p>
         </CardContent>
       </Card>

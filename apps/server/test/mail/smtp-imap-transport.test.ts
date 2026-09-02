@@ -91,7 +91,7 @@ describe('SmtpImapTransport over a real server (B8.1)', () => {
       subject: 'A safe subject',
       bodyText: 'Hi Sarah\n\n123 Main St\nReply STOP',
       bodyHtml:
-        '<p>Hi Sarah</p><p style="margin:16px 0 0;font-size:10px;color:#767676;line-height:1.5">123 Main St<br>Reply STOP</p>',
+        '<p>Hi Sarah</p><table role="presentation" style="margin-top:20px"><tr><td style="font-size:10px;color:#595959;line-height:1.5">Reply STOP<br>123 Main St</td></tr></table>',
       headers: { messageId: '<ce-html-1@coldemail.test>' },
     });
     const [stored] = await readInbox(LEAD);
@@ -106,7 +106,7 @@ describe('SmtpImapTransport over a real server (B8.1)', () => {
       mailboxId: CANARY_ID,
       to: LEAD.address,
       subject: 'A safe subject',
-      bodyText: `Hi Sarah\n\nUnsubscribe: ${url} | 123 Main St`,
+      bodyText: `Hi Sarah\n\nUnsubscribe: ${url}\n123 Main St`,
       headers: { messageId: '<ce-unsub-1@coldemail.test>', listUnsubscribeUrl: url },
     });
     const [stored] = await readInbox(LEAD);
@@ -121,7 +121,7 @@ describe('SmtpImapTransport over a real server (B8.1)', () => {
       mailboxId: CANARY_ID,
       to: LEAD.address,
       subject: 'A safe subject',
-      bodyText: 'Hi Sarah\n\nReply STOP to unsubscribe | 123 Main St',
+      bodyText: 'Hi Sarah\n\nReply STOP to unsubscribe\n123 Main St',
       headers: { messageId: '<ce-unsub-2@coldemail.test>' },
     });
     const [stored] = await readInbox(LEAD);

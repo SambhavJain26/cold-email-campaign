@@ -6,10 +6,10 @@
 // text and the HTML alternative must stay semantically identical, and keeping
 // them adjacent is what stops one from being changed without the other.
 //
-// Shape:  {opt-out clause} | {physical address}
-//   dormant (no unsubscribe URL):  "{optout_text} | 12 Example St"
-//   live:  text  "Unsubscribe: https://…/u/tok | 12 Example St"
-//          html  "<a href=…>Unsubscribe</a> | 12 Example St"
+// Shape:  {opt-out clause}\n{physical address}
+//   dormant (no unsubscribe URL):  "{optout_text}\n12 Example St"
+//   live:  text  "Unsubscribe: https://…/u/tok\n12 Example St"
+//          html  "<a href=…>Unsubscribe</a><br>12 Example St"
 //
 // STOP detection remains active in the inbound pipeline, but the operator chose
 // to keep the visible footer to the link and postal address only.
@@ -39,14 +39,15 @@ const liveUrl = (c: ComplianceInfo): string | undefined => {
 export function appendFooter(body: string, compliance: ComplianceInfo): string {
   const url = liveUrl(compliance);
   const optout = url ? `Unsubscribe: ${url}` : compliance.optoutText;
-  return `${body.trimEnd()}${FOOTER_SEPARATOR}${optout} | ${compliance.physicalAddress}`;
+  return `${body.trimEnd()}${FOOTER_SEPARATOR}${optout}\n${compliance.physicalAddress}`;
 }
 
 /** The HTML twin of appendFooter's trailing line — same words, linked. */
 export function footerHtml(compliance: ComplianceInfo): string {
   const url = liveUrl(compliance);
   const optout = url
-    ? `<a href="${escapeHtml(url)}" style="color:#767676;text-decoration:underline">Unsubscribe</a>`
+    ? `<a href="${escapeHtml(url)}" style="color:#1155cc;text-decoration:underline">Unsubscribe</a>`
     : escapeHtml(compliance.optoutText);
-  return `${optout} | ${escapeHtml(compliance.physicalAddress)}`;
+  const address = escapeHtml(compliance.physicalAddress).replaceAll('\n', '<br>');
+  return `${optout}<br>${address}`;
 }

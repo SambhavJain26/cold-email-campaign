@@ -4,11 +4,15 @@
 
 **Legend:** `[ ]` not started · `[~]` in progress · `[x]` done · `[!]` blocked (note why in the log)
 
-**Current focus:** → **The 2026-09-01 owner-address walkthrough remediation is implemented,
-verified, pushed, and deployed on Spaceship at application commit `8ed86a4`.** It
-resolves the observed metric, campaign-progress, analytics, campaign-context, Personalized Copy,
-import-preview, timezone, unsubscribe, footer, and email-spacing defects. Gmail follow-up footer
-visibility remains a separately gated real-provider verification item.
+**Current focus:** → **The 2026-09-02 Gmail follow-up footer remediation is implemented locally and
+has passed its non-Docker gate.** The footer remains 10px but now uses two visible lines in an
+email-safe presentation table, a blue underlined Unsubscribe link, a dark-gray address, 1.5 line
+height, and 20px top separation, with no hidden or invisible variation. Renderer, plain-text,
+Settings/Sequence previews, mocks, tests, specifications, and manual agree. Typecheck/lint/format,
+unit 346, web 60, focused tests, and production build pass. Per operator instruction Docker was not
+started, so DB-backed/GreenMail/golden/browser gates remain pending; Gmail visibility remains
+unproven until a deployed owner-address follow-up stays visible on desktop and mobile. The
+2026-09-01 broader walkthrough remediation remains deployed at application commit `8ed86a4`.
 
 **2026-09-01 owner-address walkthrough and local remediation:** the bounded production walkthrough
 used five operator-controlled recipients and accepted 13 messages: Atlas 3 × one step and Beacon

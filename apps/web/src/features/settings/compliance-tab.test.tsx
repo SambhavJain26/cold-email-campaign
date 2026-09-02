@@ -29,16 +29,16 @@ const preview = () => screen.getByTestId('footer-preview').textContent ?? '';
 describe('unsubscribe base URL field', () => {
   it('dormant: preview shows the operator opt-out text and no link', () => {
     renderTab();
-    expect(preview()).toContain('Reply STOP to unsubscribe. | 106-460 Doyle Ave');
+    expect(preview()).toContain('Reply STOP to unsubscribe.106-460 Doyle Ave');
     expect(preview()).not.toContain('https://');
   });
 
   it('live: preview switches to the link-and-address form', () => {
     renderTab({ unsubscribe_base_url: 'https://unsubscribe.example.com' });
-    expect(preview()).toContain(
-      'Unsubscribe: https://unsubscribe.example.com/u/⟨token⟩ | 106-460 Doyle Ave',
-    );
+    expect(preview()).toContain('Unsubscribe106-460 Doyle Ave');
+    expect(screen.getByText('Unsubscribe')).toHaveClass('text-[#1155cc]', 'underline');
     expect(preview()).not.toContain('reply STOP');
+    expect(preview()).not.toContain('⟨token⟩');
   });
 
   it('explains that blank means reply-STOP only', () => {
@@ -71,6 +71,6 @@ describe('unsubscribe base URL field', () => {
 
   it('accepts the sender-domain host template used by multiple outreach domains', () => {
     renderTab({ unsubscribe_base_url: 'https://unsubscribe.{sender_domain}' });
-    expect(preview()).toContain('https://unsubscribe.{sender_domain}/u/⟨token⟩');
+    expect(screen.getByText('Unsubscribe')).toHaveClass('text-[#1155cc]', 'underline');
   });
 });

@@ -33,6 +33,22 @@ export function splitFooter(body: string): { body: string; footer: string | null
   return { body: body.slice(0, index), footer: body.slice(index + FOOTER_SEPARATOR.length) };
 }
 
+/** Convert the plain-text preview footer into the appearance used by the HTML
+ *  alternative. The raw capability URL intentionally stays out of the UI. */
+export function footerPreviewParts(footer: string): {
+  optout: string;
+  address: string;
+  linked: boolean;
+} {
+  const [firstLine = '', ...addressLines] = footer.split('\n');
+  const linked = firstLine.startsWith('Unsubscribe: ');
+  return {
+    optout: linked ? 'Unsubscribe' : firstLine,
+    address: addressLines.join('\n'),
+    linked,
+  };
+}
+
 /** F4.4 — Preview & pre-send panel (docs/12 §5): lead picker → POST preview →
  *  rendered output with the locked footer block + the checklist verbatim. */
 export function PreviewPanel({
@@ -60,6 +76,7 @@ export function PreviewPanel({
     leadId !== null;
 
   const rendered = preview.data ? splitFooter(preview.data.body) : null;
+  const renderedFooter = rendered?.footer ? footerPreviewParts(rendered.footer) : null;
   const checks = preview.data?.checks;
 
   return (
@@ -215,7 +232,15 @@ export function PreviewPanel({
                         edit in Compliance settings
                       </Link>
                     </p>
-                    <pre className="font-mono text-xs whitespace-pre-wrap">{rendered.footer}</pre>
+                    {renderedFooter && (
+                      <div className="mt-5 font-mono text-[10px] leading-[15px] whitespace-pre-wrap text-[#595959]">
+                        <span className={renderedFooter.linked ? 'text-[#1155cc] underline' : ''}>
+                          {renderedFooter.optout}
+                        </span>
+                        <br />
+                        <span>{renderedFooter.address}</span>
+                      </div>
+                    )}
                   </div>
                 )}
               </div>

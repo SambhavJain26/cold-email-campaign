@@ -32,5 +32,10 @@ export function htmlOfText(bodyText: string, footerHtml?: string): string {
   const footer = bodyText.slice(footerAt + separator.length);
   const bodyHtml = paragraphs(body);
   const inner = footerHtml ?? escapeHtml(footer).replaceAll('\n', '<br>');
-  return `${bodyHtml}<p style="margin:16px 0 0;font-size:10px;color:#767676;line-height:1.5">${inner}</p>`;
+  // A one-cell presentation table is deliberately used instead of a trailing
+  // signature-like paragraph. It is robust across email clients, keeps the
+  // two required lines in the new message's HTML, and adds no hidden or
+  // recipient-specific variation. Gmail visibility still requires a live
+  // provider canary; no offline renderer can promise a client's trim policy.
+  return `${bodyHtml}<table role="presentation" cellpadding="0" cellspacing="0" border="0" style="margin-top:20px;border-collapse:collapse"><tbody><tr><td style="padding:0;font-size:10px;color:#595959;line-height:1.5">${inner}</td></tr></tbody></table>`;
 }

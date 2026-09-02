@@ -11,7 +11,7 @@ import {
   parseSaveErrors,
   toWriteBody,
 } from './draft';
-import { splitFooter } from './preview-panel';
+import { footerPreviewParts, splitFooter } from './preview-panel';
 
 const sequence: SequenceDto = {
   id: 7,
@@ -140,5 +140,23 @@ describe('splitFooter', () => {
 
   it('returns a null footer when the separator is absent', () => {
     expect(splitFooter('no footer here')).toEqual({ body: 'no footer here', footer: null });
+  });
+});
+
+describe('footerPreviewParts', () => {
+  it('shows the live capability URL as a conventional link label', () => {
+    expect(
+      footerPreviewParts(
+        'Unsubscribe: https://unsubscribe.example/u/private-token\n4517 Congress Ave',
+      ),
+    ).toEqual({ optout: 'Unsubscribe', address: '4517 Congress Ave', linked: true });
+  });
+
+  it('keeps dormant opt-out wording and multiline addresses visible', () => {
+    expect(footerPreviewParts('Reply STOP.\n4517 Congress Ave\nAustin, TX')).toEqual({
+      optout: 'Reply STOP.',
+      address: '4517 Congress Ave\nAustin, TX',
+      linked: false,
+    });
   });
 });

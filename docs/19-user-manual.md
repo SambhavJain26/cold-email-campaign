@@ -1318,8 +1318,8 @@ that protection and is reported as not launch-ready.
 ![Compliance settings showing postal address, opt-out wording, unsubscribe URL, and live footer preview](images/user-manual/15-settings-compliance.png)
 
 > **Current footer preview:** the visible em-dash divider shown in this representative screenshot
-> has been removed. The current screen states that delivery uses a blank line followed by 10px light
-> gray text with no visible divider.
+> has been removed. The current screen shows the delivered 10px treatment: a blue, underlined
+> **Unsubscribe** link and the dark-gray address on the next line, with no visible divider.
 
 - **Physical address:** legally valid business postal address appended to every send. Empty blocks
   all sending. Use a registered office, PO box, coworking address, or legitimate commercial mailbox
@@ -1332,21 +1332,23 @@ that protection and is reported as not launch-ready.
 
 When the base URL is blank, the app emits no unsubscribe link or `List-Unsubscribe` headers and
 uses the configured opt-out text. When configured, every send receives an opaque token, a body
-link, and the paired one-click headers. The visible footer contains only **Unsubscribe | postal
-address**. Inbound STOP and other opt-out phrases are still detected and honored automatically.
+link, and the paired one-click headers. The visible footer contains only **Unsubscribe** and the
+postal address on separate lines. Inbound STOP and other opt-out phrases are still detected and
+honored automatically.
 
-The live preview shows the canonical words but stays at an accessible interface size. The delivered
-message is `multipart/alternative`:
+The live preview mirrors the canonical styling. The delivered message is `multipart/alternative`:
 
 - the HTML alternative starts the first body paragraph at zero top margin, preserves deliberate
-  16px paragraph gaps, and places the footer after a 16px top gap at `10px`, color `#767676`, and
-  `line-height: 1.5`;
-- the unsubscribe destination is linked behind the word **Unsubscribe**—normal HTML-capable email
-  clients do not display the full token URL;
+  16px paragraph gaps, and places the footer in a one-cell presentation table after a 20px top gap
+  at `10px` and `line-height: 1.5`;
+- the unsubscribe destination is linked behind a blue (`#1155cc`), underlined **Unsubscribe**;
+  the address appears below it in dark gray (`#595959`), and normal HTML-capable email clients do
+  not display the full token URL;
 - the plain-text alternative shows the complete URL because plain text cannot hide a destination
-  behind linked words; and
-- both alternatives contain the same opt-out meaning and postal address after one blank line, with
-  no `---` or em-dash divider.
+  behind linked words;
+- both alternatives contain the same opt-out meaning and postal address on two lines after one
+  blank line, with no `---` or em-dash divider; and
+- the HTML contains no quote/signature marker, hidden element, or invisible-character variation.
 
 Templates cannot remove or restyle this server-appended footer. It intentionally has no images,
 tracking pixels, click tracking, external fonts, or complex HTML.

@@ -20,7 +20,7 @@ const compliance = {
   optoutText: "Don't want future emails? Reply STOP and I'll remove you immediately.",
 };
 
-const FOOTER = `\n\n${compliance.optoutText} | ${compliance.physicalAddress}`;
+const FOOTER = `\n\n${compliance.optoutText}\n${compliance.physicalAddress}`;
 
 const SUBJECT = 'Quick question about {{company|your listings}}';
 const BODY =
@@ -122,16 +122,17 @@ describe('footer is unconditional (docs/08 §4)', () => {
     expect(engine.render(input({})).subject).not.toContain('---');
   });
 
-  it('creates a matching escaped minimal HTML alternative with a legible footer', () => {
+  it('creates a matching escaped minimal HTML alternative with an email-safe footer block', () => {
     const r = engine.render(
       input({ body: 'Hi {{first_name|there}}, <unsafe>\n\nSecond paragraph.' }),
     );
     expect(r.bodyHtml).toContain('<p style="margin:0 0 16px">Hi Jane, &lt;unsafe&gt;</p>');
     expect(r.bodyHtml).toContain('<p style="margin:0 0 0">Second paragraph.</p>');
     expect(r.bodyHtml.startsWith('<p style="margin:0')).toBe(true);
+    expect(r.bodyHtml).toContain('<table role="presentation"');
     expect(r.bodyHtml).toContain('font-size:10px');
-    expect(r.bodyHtml).toContain('color:#767676');
-    expect(r.bodyHtml).toContain('margin:16px 0 0');
+    expect(r.bodyHtml).toContain('color:#595959');
+    expect(r.bodyHtml).toContain('margin-top:20px');
     expect(r.bodyHtml).toContain('123 Main St');
     expect(r.bodyHtml).not.toContain('<unsafe>');
   });
@@ -147,21 +148,22 @@ describe('unsubscribe link in the footer (0010, docs/16 §8)', () => {
 
   it('dormant: no URL configured → operator opt-out text, no link, no scheme', () => {
     const r = engine.render(input({}));
-    expect(r.bodyText).toContain(`${compliance.optoutText} | ${compliance.physicalAddress}`);
+    expect(r.bodyText).toContain(`${compliance.optoutText}\n${compliance.physicalAddress}`);
     expect(r.bodyText).not.toContain('https://');
     expect(r.bodyHtml).not.toContain('<a href');
   });
 
   it('live: the plain-text part carries only the raw URL and address', () => {
-    expect(withLink().bodyText).toContain(`Unsubscribe: ${URL} | ${compliance.physicalAddress}`);
+    expect(withLink().bodyText).toContain(`Unsubscribe: ${URL}\n${compliance.physicalAddress}`);
     expect(withLink().bodyText).not.toContain('or reply STOP');
   });
 
   it('live: the HTML part says the SAME thing with the word linked', () => {
     const html = withLink().bodyHtml;
     expect(html).toContain(
-      `<a href="${URL}" style="color:#767676;text-decoration:underline">Unsubscribe</a>`,
+      `<a href="${URL}" style="color:#1155cc;text-decoration:underline">Unsubscribe</a>`,
     );
+    expect(html).toContain(`</a><br>${compliance.physicalAddress}`);
     expect(html).not.toContain('or reply STOP');
     expect(html).not.toContain('aria-hidden');
     expect(html).toContain(compliance.physicalAddress);
@@ -172,11 +174,20 @@ describe('unsubscribe link in the footer (0010, docs/16 §8)', () => {
   it('the two parts stay semantically identical (finding 19)', () => {
     const r = withLink();
     const textFooter = r.bodyText.slice(r.bodyText.lastIndexOf('\n\n') + 2);
-    const htmlFooter = r.bodyHtml.slice(r.bodyHtml.lastIndexOf('<p style='));
+    const htmlFooter = r.bodyHtml.slice(r.bodyHtml.lastIndexOf('<table role='));
     for (const fragment of ['Unsubscribe', compliance.physicalAddress, URL]) {
       expect(textFooter).toContain(fragment);
       expect(htmlFooter).toContain(fragment);
     }
+  });
+
+  it('uses no quote/signature marker, hidden content, or invisible-character variation', () => {
+    const html = withLink().bodyHtml;
+    expect(html).not.toContain('<blockquote');
+    expect(html).not.toContain('gmail_quote');
+    expect(html).not.toContain('display:none');
+    expect(html).not.toMatch(/[\u200B\u200C\u200D\u2060\uFEFF]/u);
+    expect(html).toContain('<table role="presentation"');
   });
 
   it('a hostile URL cannot break out of the anchor', () => {
