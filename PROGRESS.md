@@ -4,14 +4,15 @@
 
 **Legend:** `[ ]` not started · `[~]` in progress · `[x]` done · `[!]` blocked (note why in the log)
 
-**Current focus:** → **The 2026-09-02 Gmail follow-up footer remediation is implemented locally and
-has passed its non-Docker gate.** The footer remains 10px but now uses two visible lines in an
+**Current focus:** → **The 2026-09-02 Gmail follow-up footer remediation is implemented and fully
+verified locally.** The footer remains 10px but now uses two visible lines in an
 email-safe presentation table, a blue underlined Unsubscribe link, a dark-gray address, 1.5 line
 height, and 20px top separation, with no hidden or invisible variation. Renderer, plain-text,
 Settings/Sequence previews, mocks, tests, specifications, and manual agree. Typecheck/lint/format,
-unit 346, web 60, focused tests, and production build pass. Per operator instruction Docker was not
-started, so DB-backed/GreenMail/golden/browser gates remain pending; Gmail visibility remains
-unproven until a deployed owner-address follow-up stays visible on desktop and mobile. The
+unit 346, web 60, integration 168, API 144, GreenMail 29, locked golden exactly 47, mock E2E 62,
+real-backend E2E 1, production build, populated `checked 5 enrollments — 0 diff(s)`, and self-check
+all pass. Gmail visibility remains unproven until a deployed owner-address follow-up stays visible
+on desktop and mobile. The
 2026-09-01 broader walkthrough remediation remains deployed at application commit `8ed86a4`.
 
 **2026-09-01 owner-address walkthrough and local remediation:** the bounded production walkthrough

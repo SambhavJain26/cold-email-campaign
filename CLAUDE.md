@@ -198,9 +198,9 @@ After an authorized deploy, verify container health, `https://localhost/health`,
   application code remained `6ca1183` at that checkpoint; Oracle and `main` were unchanged.
 - **Still open, deliberately:** the 2026-09-02 owner-address evidence verified that Gmail collapses
   the follow-up body footer on desktop and mobile and displayed no native unsubscribe control.
-  The local footer-remediation candidate has passed its non-Docker checks but still needs its
-  Docker-backed gate and a post-deployment Gmail canary; RFC 8058 mailbox-client one-click remains
-  unverified. The business address, sender-domain unsubscribe template, production Internal Google
+  The footer-remediation candidate is fully verified locally but still needs a post-deployment
+  Gmail canary; RFC 8058 mailbox-client one-click remains unverified. The business address,
+  sender-domain unsubscribe template, production Internal Google
   OAuth credentials, and four account-matched OAuth mailboxes are configured. Finding #12 still
   needs warmed-domain evidence; provider DSN/OOO fixture capture remains deferred.
 
