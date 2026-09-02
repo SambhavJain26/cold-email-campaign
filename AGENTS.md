@@ -80,12 +80,14 @@ commissioning** until the operator completes the handoffs below:
   `https://unsubscribe.{sender_domain}` template are configured. The production Gmail body-link
   GET and confirm flow were verified with an owner-controlled address. The 2026-09-02
   owner-address follow-up canary verified that Gmail collapses the body footer on desktop behind
-  **Show trimmed content** and on mobile behind **Show quoted text**. A local remediation candidate
-  now uses a two-line presentation-table footer with the operator-approved 10px/blue-link/dark-gray
-  treatment and no hidden variation; its non-Docker gate passes, but DB/GreenMail verification and
-  a post-deployment Gmail canary remain pending. Gmail exposed no native unsubscribe control in
-  the tested views, so RFC 8058 mailbox-client one-click remains unverified (the missing UI does
-  not prove that the headers were absent).
+  **Show trimmed content** and on mobile behind **Show quoted text**. The deployed remediation uses
+  a two-line presentation-table footer with the operator-approved 10px/blue-link/dark-gray
+  treatment and no hidden variation. A separately authorized post-deployment Aurora Step 3 was
+  accepted exactly once; its immutable snapshot proves the production HTML/text renderer is
+  correct, and the campaign was paused before Step 4. The operator's recipient-side desktop/mobile
+  visibility check is still pending. Gmail previously exposed no native unsubscribe control, so
+  RFC 8058 mailbox-client one-click remains unverified (the missing UI does not prove that the
+  headers were absent).
 - Work on the current `canary` branch. Do not branch off, push to `main`, or merge to
   `main` without explicit authorization. Make surgical edits, preserve unrelated dirty-worktree
   changes, and commit each completed task on the current branch.
@@ -158,7 +160,7 @@ temporary rollback/canary environment.
 - App: `/opt/email-campaign`; stack: `docker-compose.spaceship.yml` with `.env.prod`
 - Public UI: `https://sambhavpmtech.com/email-campaign/`
 - Internal gateway: `127.0.0.1:18080`; host Caddy is the only public 80/443 listener
-- Deployed application release: `canary` at `8ed86a4`
+- Deployed application release: `canary` at `c31d73b`
 
 The repository is private and the VPS currently has no GitHub deploy credential. Until a read-only
 deploy key is deliberately installed, transfer a reviewed `git bundle`, fetch the pinned branch
@@ -210,11 +212,12 @@ A transient DNSSEC `SERVFAIL` observed during the rollout cleared without a conf
 
 - db/app/gateway/backup containers are healthy; only `127.0.0.1:18080` is published
 - the 2026-08-31 deployment baseline was four healthy OAuth mailboxes, one global lead, two draft
-  campaigns, and zero enrollments. A later separately authorized walkthrough added five
-  operator-controlled leads across Atlas and Beacon and accepted 13 messages total; it also proved
-  body-link unsubscribe, reply `STOP`, global suppression, and reply ingestion. No prospect was
-  contacted. Inspect current live state before any operational action; do not infer it from the
-  earlier dormant snapshot
+  campaigns, and zero enrollments. Later separately authorized owner-address walkthroughs produced
+  24 sent events total; the latest was exactly one Aurora Personalized Step 3 at 2026-09-02
+  15:10:36 IST. Aurora was paused before the following scheduler tick and Step 4 remains held.
+  Earlier runs proved body-link unsubscribe, reply `STOP`, global suppression, and reply ingestion.
+  No prospect was contacted. Inspect current live state before any operational action; do not infer
+  it from the earlier dormant snapshot
 - health and database checks pass; self-check is clean; projection dry-run is `0 diff(s)`
 - migrations through `0019_personalized_copy_two_tiers` are applied; the 2026-08-31 pre/post dumps
   `coldemail-20260831-133754.dump` (1,042,810 bytes) and
@@ -227,11 +230,14 @@ A transient DNSSEC `SERVFAIL` observed during the rollout cleared without a conf
   `coldemail-20260829-213315.dump` (816,236 bytes) passed `pg_restore --list`; the local 0018
   scratch restore drill passed; Spaceship AutoBackup remains configured with a five-backup limit
 - production Google OAuth credentials are configured on the VPS; never print or copy them
+- production application and mailbox fallback timezones are `Asia/Kolkata`; all four mailboxes use
+  the same Mon–Fri 10:00–18:00 send window as of the latest walkthrough
 - the business postal address and unsubscribe template are configured; body-link confirmation is
   proven on an owner-controlled address. The 2026-09-02 owner-address canary verified the negative
   Gmail result: follow-up footer content is collapsed on desktop and mobile, and no native
-  unsubscribe control appeared. The footer remediation is deployed; post-deployment Gmail
-  verification remains pending, and RFC 8058 client one-click remains unverified
+  unsubscribe control appeared. The footer remediation is deployed and the post-deployment sent
+  snapshot is correct; recipient-side post-deployment visibility remains pending, and RFC 8058
+  client one-click remains unverified
 
 The Oracle bounded catch-up/never-burst canary passed on 2026-08-20 UTC and remains paused. The
 accelerated settings were restored before the final deployment. Oracle is deployed on

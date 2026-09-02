@@ -14,6 +14,15 @@ DNSKEY tags/digests matched and validating public resolvers plus the full route 
 without a configuration change. DNSSEC remains enabled. Oracle remains paused and unchanged.
 Deployment did not authorize further activation, enrollment, or sending.
 
+After a separate per-send authorization, the 2026-09-02 post-deployment owner-address retest
+accepted exactly one Aurora Personalized Step 3 at 15:10:36 IST. Aurora was paused before the next
+scheduler boundary; the sent ledger stayed at 24 and Step 4 remains held. Its immutable snapshot
+contains the deployed 10px two-line link-only footer, while recipient-side Gmail visibility remains
+pending. Production health, 0-diff projection replay, and self-check remain clean. The application
+default and all four mailbox fallbacks are `Asia/Kolkata`; all mailbox windows are now aligned to
+Mon–Fri 10:00–18:00. The System warning created while the earlier midnight-only window was closed
+is retained unacknowledged as incident history.
+
 ---
 
 ## 1. Environment variables (complete list — zod-validated at boot, 02 §5)

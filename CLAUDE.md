@@ -59,8 +59,9 @@ commissioning**:
   The 2026-09-02 owner-address follow-up canary verified that Gmail collapses the footer behind
   **Show trimmed content** on desktop and **Show quoted text** on mobile. The deployed remediation
   uses a two-line presentation-table footer with the operator-approved 10px/blue-link/dark-gray
-  treatment and no hidden variation; its complete local gate passes, but a post-deployment Gmail
-  canary remains pending. Gmail exposed no
+  treatment and no hidden variation. A separately authorized post-deployment Aurora Step 3 was
+  accepted exactly once and its immutable text/HTML snapshot is correct; Aurora was paused before
+  Step 4. Recipient-side desktop/mobile visibility remains pending. Gmail exposed no
   native unsubscribe control in the tested views, so RFC 8058 mailbox-client one-click remains
   unverified (the missing UI does not prove that the headers were absent).
 - Do not start a real cohort or send new external campaign mail without explicit approval for that specific send. This covers sending mail, activating or resuming a campaign, enrolling leads, altering live campaign state, and contacting prospects — each needs its own approval.
@@ -132,7 +133,7 @@ rollback/canary environment.
 - Stack: `docker-compose.spaceship.yml` with `.env.prod`
 - UI: `https://sambhavpmtech.com/email-campaign/`
 - Internal gateway: `127.0.0.1:18080`; host Caddy alone owns public 80/443
-- Deployed application release: `canary` at `8ed86a4`
+- Deployed application release: `canary` at `c31d73b`
 
 The private repository currently has no GitHub deploy credential on the VPS. Until a read-only
 deploy key is deliberately installed, transfer a reviewed `git bundle`, fetch the pinned branch
@@ -190,10 +191,13 @@ After an authorized deploy, verify container health, `https://localhost/health`,
   Copy/two-tier/campaign-filter and import-wizard clarity release `a15f70d` on 2026-08-31, then the
   owner-walkthrough remediation `8ed86a4` and footer remediation `c31d73b`. It has
   four `google_oauth` mailboxes. The 2026-08-31 deployment baseline had one global lead, two draft
-  campaigns, and zero enrollments; the separately authorized walkthrough later added five
-  operator-controlled leads across Atlas and Beacon and accepted 13 messages. Body-link
-  unsubscribe, reply `STOP`, global suppression, and reply ingestion were observed; no prospect
-  was contacted. Inspect current live state before operational work. Containers, public DNSSEC,
+  campaigns, and zero enrollments; later separately authorized owner-address walkthroughs produced
+  24 sent events total. The latest was one Aurora Personalized Step 3 at 2026-09-02 15:10:36 IST;
+  Aurora was paused before the next tick and Step 4 remains held. Body-link unsubscribe, reply
+  `STOP`, global suppression, and reply ingestion were observed; no prospect was contacted. The
+  application default and all mailbox fallback timezones are `Asia/Kolkata`, and all four mailbox
+  windows are Mon–Fri 10:00–18:00. Inspect current live state before operational work. Containers,
+  public DNSSEC,
   TLS, the `/email-campaign/` SPA/API subpath, outreach redirects, and the isolated unsubscribe
   routes are healthy. A transient DNSSEC `SERVFAIL` during the 2026-09-02 rollout cleared without
   configuration changes. Containers and health are green;
@@ -206,8 +210,9 @@ After an authorized deploy, verify container health, `https://localhost/health`,
   application code remained `6ca1183` at that checkpoint; Oracle and `main` were unchanged.
 - **Still open, deliberately:** the 2026-09-02 owner-address evidence verified that Gmail collapses
   the follow-up body footer on desktop and mobile and displayed no native unsubscribe control.
-  The footer-remediation candidate is fully verified locally but still needs a post-deployment
-  Gmail canary; RFC 8058 mailbox-client one-click remains unverified. The business address,
+  The footer remediation is deployed, and one post-deployment sent snapshot proves the production
+  renderer is correct, but the operator's recipient-side visibility check is still pending; RFC
+  8058 mailbox-client one-click remains unverified. The business address,
   sender-domain unsubscribe template, production Internal Google
   OAuth credentials, and four account-matched OAuth mailboxes are configured. Finding #12 still
   needs warmed-domain evidence; provider DSN/OOO fixture capture remains deferred.
