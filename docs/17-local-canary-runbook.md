@@ -160,6 +160,19 @@ Verification passes: full typecheck, lint, and format check; web 62/62; focused 
 26/26; sequence browser E2E 3/3; and the production web build. No Docker, database, migration,
 production mutation, campaign action, enrollment, or send was required.
 
+After explicit operator authorization, `canary` was pushed and a reviewed 4,435,092-byte Git
+bundle with matching local/remote SHA-256 fast-forwarded the clean Spaceship checkout from
+`47a2422` to exact application commit `6c2c390`. The app, gateway, and backup images rebuilt and
+the stack recreated without a migration. All containers and internal health pass; the application,
+direct Sequence route, health route, canonical/outreach redirects, unsubscribe-host isolation, and
+portfolio route pass; and the served production asset contains **Continue existing conversation**.
+All 20 migrations through `0019` remain applied. Production reports `checked 10 enrollments — 0
+diff(s)`, clean self-check, four healthy mailboxes, zero failed jobs, and zero sendable active work.
+The sent ledger remained at 24 events with the same 2026-09-02 15:10:35 IST watermark, proving the
+deployment emitted no mail. Pre/post dumps `coldemail-20260902-122531.dump` (1,353,563 bytes) and
+`coldemail-20260902-123021.dump` (1,354,270 bytes) passed `pg_restore --list`. Campaign,
+enrollment, mailbox, DNS/Caddy, Oracle, and `main` state were not changed.
+
 Final local gate: typecheck/lint/format; unit 345/345; web 58/58; integration 168/168; API 144/144;
 GreenMail 29/29; locked golden exactly 47/47; mock browser 62/62; real-backend browser 1/1;
 production Vite build; populated `checked 5 enrollments — 0 diff(s)`; clean self-check; and a

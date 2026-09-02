@@ -4,15 +4,19 @@
 
 **Legend:** `[ ]` not started · `[~]` in progress · `[x]` done · `[!]` blocked (note why in the log)
 
-**Current focus:** → **The post-canary conversation-choice clarification is implemented and
-locally verified; it is not yet pushed or deployed.** The sequence builder preserves the existing
+**Current focus:** → **The post-canary conversation-choice clarification is implemented, verified,
+pushed, and deployed at `6c2c390`.** The sequence builder preserves the existing
 `in_thread` contract but replaces the ambiguous **Reply in thread** switch with explicit,
 accessible **Continue existing conversation** and **Start new conversation** choices. Step 1
 states that it always starts a conversation. The descriptions explain the real subject/header and
 Gmail-footer tradeoff without promising placement or visibility. The footer, RFC 8058 headers, and
 sales copy are unchanged. Verified: full typecheck; full lint; full format check; web 62/62; focused
 renderer unit 26/26; sequence-browser E2E 3/3; and production web build. No Docker, database,
-migration, production mutation, campaign action, enrollment, or send was needed.
+migration, production mutation, campaign action, enrollment, or send was needed. Production
+verification passed all containers, internal/public health and route isolation, the served UI
+marker, all 20 migrations, `checked 10 enrollments — 0 diff(s)`, clean self-check, four healthy
+mailboxes, zero failed jobs/sendable active work, an unchanged 24-event sent watermark, and a
+validated 1,354,270-byte post-deploy dump.
 
 **Production baseline:** → **The 2026-09-02 Gmail follow-up footer remediation is implemented, fully
 verified, pushed, and deployed at `c31d73b`.** The footer remains 10px but now uses two visible lines in an

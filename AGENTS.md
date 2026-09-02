@@ -30,7 +30,7 @@ commissioning** until the operator completes the handoffs below:
   work is limited to testing, verification, diagnosis, and documentation.
 - The operator-approved Personalized Copy/two-tier/campaign-lead-filter release and its 2026-08-31
   import-wizard clarity follow-up are implemented, fully verified, pushed, and deployed on
-  Spaceship; production is now at footer-remediation release `c31d73b` through migration `0019`.
+  Spaceship; production is now at conversation-choice release `6c2c390` through migration `0019`.
   It replaces direct Manual Compose sending with sequence-only personalized steps, fixes current
   tiers at A/B, separates Nurture status, adds global-source/campaign-step copy snapshots and
   blockers, and adds exact Pool/Enrolled/Both filtering and bulk tiering. The follow-up replaces
@@ -95,7 +95,7 @@ commissioning** until the operator completes the handoffs below:
   passed, both RFC 8058 headers arrived, and the passing domain DKIM signature covered both. The
   native provider UI and resulting mailbox-client POST remain unverified because Gmail withheld
   the control. The Promotions placement is an observation, not proof of domain-reputation damage.
-  A locally verified, undeployed UI clarification preserves the existing `in_thread` behavior but
+  The deployed UI clarification preserves the existing `in_thread` behavior but
   replaces its ambiguous switch with explicit **Continue existing conversation** and **Start new
   conversation** choices; it does not alter the footer, headers, renderer, scheduler, or sales copy.
 - Work on the current `canary` branch. Do not branch off, push to `main`, or merge to
@@ -170,7 +170,7 @@ temporary rollback/canary environment.
 - App: `/opt/email-campaign`; stack: `docker-compose.spaceship.yml` with `.env.prod`
 - Public UI: `https://sambhavpmtech.com/email-campaign/`
 - Internal gateway: `127.0.0.1:18080`; host Caddy is the only public 80/443 listener
-- Deployed application release: `canary` at `c31d73b`
+- Deployed application release: `canary` at `6c2c390`
 
 The repository is private and the VPS currently has no GitHub deploy credential. Until a read-only
 deploy key is deliberately installed, transfer a reviewed `git bundle`, fetch the pinned branch
@@ -214,7 +214,8 @@ and password rotation.
 
 Spaceship production was deployed on 2026-08-22 and advanced through Stage 4, campaign pools, the
 Personalized Copy/two-tier/campaign-filter release, import-wizard clarity, owner-walkthrough
-remediation, and the 2026-09-02 footer remediation at `c31d73b`. The clean checkout is on the
+remediation, the 2026-09-02 footer remediation at `c31d73b`, and the conversation-choice
+clarification at `6c2c390`. The clean checkout is on the
 one-word `canary` branch. Public DNSSEC validation and the route matrix are healthy: the app route
 and direct SPA routes return 200; the bare app path canonicalizes; both outreach roots redirect
 308 to `https://sambhavbuilds.com/`; unsubscribe roots return 404; and the portfolio returns 200.

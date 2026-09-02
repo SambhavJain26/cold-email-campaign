@@ -26,7 +26,7 @@ commissioning**:
   enrollment, or sending.
 - **Personalized Copy production release:** the operator-approved Personalized Copy/two-tier/
   campaign-lead filter release and 2026-08-31 import-wizard clarity follow-up are implemented,
-  fully verified, pushed, and deployed; production is at `c31d73b` through migration
+  fully verified, pushed, and deployed; production is at `6c2c390` through migration
   `0019`.
   Personalized copy is now sequence content only; current tiers
   are A/B with separate Nurture status; imported global sources bind to independent campaign-step
@@ -71,8 +71,8 @@ commissioning**:
   proves SPF/DKIM/DMARC passed, both
   RFC 8058 headers arrived, and the passing domain DKIM signature covered both. The native provider
   UI and resulting mailbox-client POST remain unverified because Gmail withheld the control. The
-  Promotions placement is an observation, not proof of domain-reputation damage. A locally
-  verified, undeployed UI clarification preserves the existing `in_thread` behavior but replaces
+  Promotions placement is an observation, not proof of domain-reputation damage. The deployed UI
+  clarification preserves the existing `in_thread` behavior but replaces
   its ambiguous switch with explicit **Continue existing conversation** and **Start new
   conversation** choices; it does not alter the footer, headers, renderer, scheduler, or sales copy.
 - Do not start a real cohort or send new external campaign mail without explicit approval for that specific send. This covers sending mail, activating or resuming a campaign, enrolling leads, altering live campaign state, and contacting prospects — each needs its own approval.
@@ -144,7 +144,7 @@ rollback/canary environment.
 - Stack: `docker-compose.spaceship.yml` with `.env.prod`
 - UI: `https://sambhavpmtech.com/email-campaign/`
 - Internal gateway: `127.0.0.1:18080`; host Caddy alone owns public 80/443
-- Deployed application release: `canary` at `c31d73b`
+- Deployed application release: `canary` at `6c2c390`
 
 The private repository currently has no GitHub deploy credential on the VPS. Until a read-only
 deploy key is deliberately installed, transfer a reviewed `git bundle`, fetch the pinned branch
@@ -200,7 +200,8 @@ After an authorized deploy, verify container health, `https://localhost/health`,
   paused. Health, self-check, backup, and `checked 24 enrollments — 0 diff(s)` are clean.
 - **Spaceship production:** deployed 2026-08-22 and advanced through the verified Personalized
   Copy/two-tier/campaign-filter and import-wizard clarity release `a15f70d` on 2026-08-31, then the
-  owner-walkthrough remediation `8ed86a4` and footer remediation `c31d73b`. It has
+  owner-walkthrough remediation `8ed86a4`, footer remediation `c31d73b`, and conversation-choice
+  clarification `6c2c390`. It has
   four `google_oauth` mailboxes. The 2026-08-31 deployment baseline had one global lead, two draft
   campaigns, and zero enrollments; later separately authorized owner-address walkthroughs produced
   24 sent events total. The latest was one Aurora Personalized Step 3 at 2026-09-02 15:10:36 IST;
