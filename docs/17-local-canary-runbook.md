@@ -52,6 +52,7 @@ window was closed; it remains open for operator acknowledgement as historical ev
 | F-W29 | The sent Aurora Step 3 record was correctly immutable, but its Personalized Copy editor preview displayed the saved audit subject (`A second Northstar angle`) rather than the actual in-thread subject (`Re: Aanya, a quick Northstar idea`). | Show both saved audit subject and effective send subject, clearly labeled. |
 | F-W30 | A bare Overview route rendered the default campaign's metrics while the selector still displayed “Select campaign…”; selecting a campaign corrected the value. | Resolve and display the default campaign in the selector whenever default campaign data is shown. |
 | F-W31 | During Sequence preview, selecting a campaign before selecting a lead briefly showed “This variant is new — save the sequence before previewing it” for an existing Personalized Copy step. | Replace it with a lead-selection prompt and reserve the unsaved-variant message for genuinely new template variants. |
+| F-W32 | In the deployed Sequence builder, changing a later step from **Continue existing conversation** to **Start new conversation** and then restoring the original choice still left the **Unsaved changes** banner visible. | Derive dirty state from the current draft versus its saved baseline so reverting a change clears the warning. |
 
 The separately authorized owner-address Gmail canary produced a negative result for follow-up
 footer visibility. The footer was present in each message body, but Gmail collapsed it on both
@@ -172,6 +173,15 @@ The sent ledger remained at 24 events with the same 2026-09-02 15:10:35 IST wate
 deployment emitted no mail. Pre/post dumps `coldemail-20260902-122531.dump` (1,353,563 bytes) and
 `coldemail-20260902-123021.dump` (1,354,270 bytes) passed `pg_restore --list`. Campaign,
 enrollment, mailbox, DNS/Caddy, Oracle, and `main` state were not changed.
+
+A post-deployment read-only browser pass verified that Step 1 explains its new-conversation
+behavior; every later Beacon step exposes both conversation choices with the intended descriptions;
+the saved threaded choice loads selected; temporarily choosing a new conversation changes the
+subject label; and the saved threaded preview renders `Re: <Step 1 subject>`. At a 390px viewport,
+the page had no horizontal overflow, and the browser console reported no warnings or errors. The
+pass made no save, campaign action, enrollment, or send. It reconfirmed open finding F-W25 (preview
+still shows the fallback Reply STOP footer) and added F-W32 for dirty state that remains after a
+conversation-choice change is reverted.
 
 Final local gate: typecheck/lint/format; unit 345/345; web 58/58; integration 168/168; API 144/144;
 GreenMail 29/29; locked golden exactly 47/47; mock browser 62/62; real-backend browser 1/1;
