@@ -186,7 +186,7 @@ describe('unsubscribe link in the footer (0010, docs/16 §8)', () => {
     expect(html).not.toContain('<blockquote');
     expect(html).not.toContain('gmail_quote');
     expect(html).not.toContain('display:none');
-    expect(html).not.toMatch(/[\u200B\u200C\u200D\u2060\uFEFF]/u);
+    expect(html).not.toMatch(/(?:\u200B|\u200C|\u200D|\u2060|\uFEFF)/u);
     expect(html).toContain('<table role="presentation"');
   });
 

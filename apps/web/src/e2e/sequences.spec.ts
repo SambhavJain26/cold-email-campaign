@@ -61,6 +61,8 @@ test('build a sequence: 24 variations, fatal link in step 1, fix, save', async (
   await page.getByRole('button', { name: 'Add step' }).click();
   const step2 = page.getByTestId('step-card-2');
   await expect(step2.getByLabel('Wait')).toHaveValue('3');
+  await expect(step2.getByRole('radio', { name: 'Continue existing conversation' })).toBeChecked();
+  await expect(step2.getByRole('radio', { name: 'Start new conversation' })).not.toBeChecked();
   await step2.getByLabel('Subject', { exact: false }).fill('(re-anchored)');
   await step2.getByLabel('Body').fill('Hi {{first_name|there}} — floating this back up.');
 

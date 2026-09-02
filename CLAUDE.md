@@ -47,8 +47,9 @@ commissioning**:
   pushed, and deployed at `c31d73b`; deployment added no migration and emitted no mail. A
   separately authorized post-deployment owner-controlled follow-up proved that Gmail desktop still
   collapses the complete redesigned footer behind **Show trimmed content**, exposes no native
-  unsubscribe control, and classified the message as Promotions. Mobile post-remediation
-  visibility remains pending. The deployment check
+  unsubscribe control, and classified the message as Promotions. The operator accepts Gmail
+  trimming as a provider-controlled limitation, retains the footer and RFC 8058 headers unchanged,
+  and does not want duplicate unsubscribe language inside the sales copy. The deployment check
   briefly saw DNSSEC `SERVFAIL` on both Spaceship-managed outreach domains. The registrar DS values
   exactly matched the served DNSKEY tags/digests, and validating public resolvers plus the full
   route matrix recovered without a configuration change. Keep DNSSEC enabled and treat it as a
@@ -65,11 +66,15 @@ commissioning**:
   treatment and no hidden variation. A separately authorized post-deployment Aurora Step 3 was
   accepted exactly once and its immutable text/HTML snapshot is correct; Aurora was paused before
   Step 4. The desktop recipient result is negative: the full redesigned footer remains behind
-  **Show trimmed content**; mobile post-remediation visibility remains pending. Gmail exposed no
-  native unsubscribe control. Gmail's **Show original** source proves SPF/DKIM/DMARC passed, both
+  **Show trimmed content**. This is now an accepted provider limitation rather than an open
+  renderer defect. Gmail exposed no native unsubscribe control. Gmail's **Show original** source
+  proves SPF/DKIM/DMARC passed, both
   RFC 8058 headers arrived, and the passing domain DKIM signature covered both. The native provider
   UI and resulting mailbox-client POST remain unverified because Gmail withheld the control. The
-  Promotions placement is an observation, not proof of domain-reputation damage.
+  Promotions placement is an observation, not proof of domain-reputation damage. A locally
+  verified, undeployed UI clarification preserves the existing `in_thread` behavior but replaces
+  its ambiguous switch with explicit **Continue existing conversation** and **Start new
+  conversation** choices; it does not alter the footer, headers, renderer, scheduler, or sales copy.
 - Do not start a real cohort or send new external campaign mail without explicit approval for that specific send. This covers sending mail, activating or resuming a campaign, enrolling leads, altering live campaign state, and contacting prospects — each needs its own approval.
 - The approved, controlled Gmail acceptance batch is complete. The test campaign is paused; do not resume it or create additional test sends without new, per-send operator approval. Read the runbook for the authoritative recipient, outcome, and verification record.
 - The deployed production facts and remaining operator handoffs are recorded in
@@ -217,8 +222,8 @@ After an authorized deploy, verify container health, `https://localhost/health`,
 - **Still open, deliberately:** the 2026-09-02 owner-address evidence verified that Gmail collapses
   the follow-up body footer on desktop and mobile and displayed no native unsubscribe control.
   The footer remediation is deployed, and one post-deployment sent snapshot proves the production
-  renderer is correct, but the post-deployment desktop recipient check still failed and mobile
-  remains pending. The received original verifies RFC 8058 header presence and DKIM coverage,
+  renderer is correct, but the post-deployment desktop recipient check still failed and Gmail's
+  client-side trimming is accepted. The received original verifies RFC 8058 header presence and DKIM coverage,
   while Gmail's native UI and client-initiated POST remain unverified. The business address,
   sender-domain unsubscribe template, production Internal Google
   OAuth credentials, and four account-matched OAuth mailboxes are configured. Finding #12 still

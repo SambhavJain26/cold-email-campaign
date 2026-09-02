@@ -4,7 +4,17 @@
 
 **Legend:** `[ ]` not started · `[~]` in progress · `[x]` done · `[!]` blocked (note why in the log)
 
-**Current focus:** → **The 2026-09-02 Gmail follow-up footer remediation is implemented, fully
+**Current focus:** → **The post-canary conversation-choice clarification is implemented and
+locally verified; it is not yet pushed or deployed.** The sequence builder preserves the existing
+`in_thread` contract but replaces the ambiguous **Reply in thread** switch with explicit,
+accessible **Continue existing conversation** and **Start new conversation** choices. Step 1
+states that it always starts a conversation. The descriptions explain the real subject/header and
+Gmail-footer tradeoff without promising placement or visibility. The footer, RFC 8058 headers, and
+sales copy are unchanged. Verified: full typecheck; full lint; full format check; web 62/62; focused
+renderer unit 26/26; sequence-browser E2E 3/3; and production web build. No Docker, database,
+migration, production mutation, campaign action, enrollment, or send was needed.
+
+**Production baseline:** → **The 2026-09-02 Gmail follow-up footer remediation is implemented, fully
 verified, pushed, and deployed at `c31d73b`.** The footer remains 10px but now uses two visible lines in an
 email-safe presentation table, a blue underlined Unsubscribe link, a dark-gray address, 1.5 line
 height, and 20px top separation, with no hidden or invisible variation. Renderer, plain-text,
@@ -14,7 +24,9 @@ real-backend E2E 1, production build, populated `checked 5 enrollments — 0 dif
 all pass. Production containers, internal health, direct-IP public routes, 20 migrations, four
 healthy mailboxes, zero failed jobs/open alerts/sendable work, `checked 10 enrollments — 0
 diff(s)`, self-check, and both backup catalogs pass; the sent watermark remained 23. Gmail
-visibility remains unproven until an owner-address follow-up stays visible on desktop and mobile.
+The live Gmail original later proved correct body/footer delivery, RFC 8058 headers, and DKIM
+coverage. Gmail still collapsed the threaded footer and withheld its native unsubscribe UI; the
+operator accepts that client-controlled presentation and does not want duplicate unsubscribe copy.
 The deployment briefly encountered DNSSEC `SERVFAIL` on both Spaceship-managed outreach domains,
 but the DS/DNSKEY tags and digests matched and Google, Cloudflare, Quad9, system resolution, and the
 full public route matrix recovered without any configuration change. DNSSEC remains enabled.

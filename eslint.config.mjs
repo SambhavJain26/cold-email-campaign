@@ -39,6 +39,7 @@ export default tseslint.config(
       '**/node_modules/**',
       '**/dist/**',
       '**/coverage/**',
+      'test-results/**',
       'apps/web/public/mockServiceWorker.js', // MSW-generated
     ],
   },

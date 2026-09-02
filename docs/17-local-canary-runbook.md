@@ -2,7 +2,7 @@
 
 ## 2026-09-02 owner-address follow-up visibility and reply canary
 
-### Post-remediation live retest — desktop visibility failed; mobile pending
+### Post-remediation live retest — provider behavior accepted; headers verified
 
 After separate action-time approval for exactly one owner-controlled message, Aurora Canary was
 resumed long enough for its untouched control (`jainsambhav2605+canary-sep2-a@gmail.com`) to send
@@ -31,7 +31,9 @@ signature's `h=` list covers both headers. It also proves the expected multipart
 TLS transport, and thread headers. RFC 8058 transport/header conformance is therefore verified on
 the live message, while Gmail's native UI and resulting client-initiated POST remain unverified
 because Gmail withheld the control. A single Promotions placement is not evidence of
-domain-reputation damage. Post-remediation mobile visibility remains untested. F-W17 remains open.
+domain-reputation damage. The operator accepts Gmail's trimming as a client-controlled limitation;
+post-remediation mobile visibility is no longer a launch gate. F-W17 is closed as an accepted
+provider behavior, not as a claim that Gmail can be forced to show the footer.
 
 The walkthrough normalized the application default timezone and all four mailbox fallbacks to
 `Asia/Kolkata`, with a consistent Mon–Fri 10:00–18:00 send window. Aurora and Comet remain paused;
@@ -55,8 +57,10 @@ The separately authorized owner-address Gmail canary produced a negative result 
 footer visibility. The footer was present in each message body, but Gmail collapsed it on both
 clients: desktop displayed the three-dot **Show trimmed content** control and mobile displayed
 **Show quoted text**. In both clients the operator had to expand the collapsed content to reach
-the Unsubscribe link and postal address. Treat F-W17 as open remediation before prospect sends;
-the provider result does not satisfy the intended always-visible footer UX.
+the Unsubscribe link and postal address. The later post-remediation desktop result was unchanged.
+After live header verification, the operator accepted this as Gmail-controlled presentation:
+the application delivered the complete body footer, and no safe HTML structure can guarantee that
+Gmail will expand repeated content in a thread.
 
 Gmail did not display a native unsubscribe control beside the sender or in the message header in
 the tested desktop/mobile views. The later post-remediation **Show original** evidence proves that
@@ -66,12 +70,12 @@ body-link unsubscribe, reply `STOP`, and an
 ordinary interested reply were exercised; the live UI showed the corresponding `UNSUBSCRIBED`,
 auto-unsubscribe/sequence-stop, and `REPLIED`/sequence-stop outcomes. No prospect address was used.
 
-Operator-approved remediation presentation: retain the compact **10px** footer size; render only
+Final operator-approved presentation: retain the compact **10px** footer size; render only
 **Unsubscribe** as a conventional blue, underlined link (`#1155cc`); use `#595959` for the postal
-address; keep a 1.5 line height; and increase the footer's top separation to 20px. Presentation
-changes do not close F-W17 by themselves. The implementation must also keep each follow-up's
-footer in Gmail's immediately visible new-message content without invisible-character variation,
-then pass another owner-address desktop/mobile Gmail canary.
+address; keep a 1.5 line height; and keep 20px of top separation. The footer and RFC 8058 headers
+remain unchanged. Do not duplicate unsubscribe language inside the sales copy and do not use
+invisible-character or filter-evasion tricks. Threaded follow-ups may be trimmed by Gmail; an
+operator who prioritizes footer visibility can instead start that step as a new conversation.
 
 The local remediation candidate is implemented across the renderer, plain-text fallback, Settings
 preview, Sequence preview, and mock API. It renders opt-out and address on separate lines; HTML
@@ -82,8 +86,8 @@ typecheck/lint/format; unit 346/346; web 60/60 (the unrelated OAuth UI test requ
 timing allowance); integration 168/168; API 144/144; GreenMail 29/29; locked golden exactly 47/47;
 mock-browser E2E 62/62; real-backend E2E 1/1; and the production Vite build. The disposable
 event-backed projection fixture reports `checked 5 enrollments — 0 diff(s)` and self-check reports
-no invariant violations. Gmail visibility is not considered fixed until a deployed
-owner-controlled follow-up stays visible on desktop and mobile.
+no invariant violations. The later live result proved that this rendering is correct but cannot
+control Gmail's thread presentation.
 
 After explicit operator authorization, `canary` was pushed and a SHA-256-matched Git bundle
 fast-forwarded the clean Spaceship checkout to `c31d73b`. App, gateway, and backup images rebuilt;
@@ -136,14 +140,25 @@ deliberately absent because unsubscribe is a durable global suppression. The vis
 only Unsubscribe and the plain postal address; inbound `STOP` recognition remains active. HTML
 paragraphs now have explicit email-safe margins and the first paragraph has no top gap.
 
-Finding F-W17 remains open: the requested footer wording/layout is implemented and synthetic
-text/HTML/GreenMail coverage passes, but the post-deployment real-Gmail desktop follow-up still
-hid the repeated footer behind `Show trimmed content`. The attempted invisible-character
-workaround was removed because altering hidden content on every send is an undesirable
-deliverability tradeoff. The body-link GET/confirm/idempotent behavior was observed live, and the
-received original proves correct live RFC 8058 headers plus DKIM coverage. Gmail showed no native
-control, so its provider UI and client-initiated POST remain unverified. Mobile post-remediation
-visibility remains to be checked.
+Finding F-W17 is closed as an accepted provider limitation. The requested footer wording/layout is
+implemented and synthetic text/HTML/GreenMail coverage passes, but the post-deployment real-Gmail
+desktop follow-up still hid the repeated footer behind `Show trimmed content`. The received
+original proves correct live RFC 8058 headers plus DKIM coverage. Gmail showed no native control,
+so its provider UI and client-initiated POST remain unverified. The operator chose not to duplicate
+unsubscribe language inside the sales copy or use filter-evasion tricks. Sequence steps now expose
+the existing delivery choice plainly: **Continue existing conversation** or **Start new
+conversation**; the latter uses its own subject without reply headers and is more likely, but not
+guaranteed, to keep the footer visible.
+
+The corresponding sequence-builder clarification is implemented locally without changing the
+database, API contract, scheduler, renderer, transport, or saved `in_thread` values. Step 1 now
+states that it always starts a conversation. Later steps replace the ambiguous **Reply in thread**
+switch with accessible choice cards for **Continue existing conversation** and **Start new
+conversation**, including the effective subject/header and Gmail-footer tradeoff. The footer and
+RFC 8058 headers remain unchanged, and no duplicate opt-out sentence is inserted into sales copy.
+Verification passes: full typecheck, lint, and format check; web 62/62; focused renderer unit
+26/26; sequence browser E2E 3/3; and the production web build. No Docker, database, migration,
+production mutation, campaign action, enrollment, or send was required.
 
 Final local gate: typecheck/lint/format; unit 345/345; web 58/58; integration 168/168; API 144/144;
 GreenMail 29/29; locked golden exactly 47/47; mock browser 62/62; real-backend browser 1/1;
@@ -740,7 +755,7 @@ as work closes.
 | 16 | **Connecting a mailbox ingests its entire history.** `mailboxes.last_poll_uid` defaults to `0`, so the first poll of a real mailbox fetches every message it has ever received — here **12,581 messages going back to 2022-06-10**, four years of unrelated personal mail, stored in `incoming_messages` with full subjects and sender addresses. 44 historical Amazon/Internshala notifications were classified `auto_reply` and 2 old Gmail DSNs as `bounce`; none produced events because no enrollment matched (that guard held correctly), but the rows are all persisted. Consequences: needless DB bloat, a very slow first poll, and — more seriously — a large volume of unrelated third-party PII pulled into the product's database, which interacts badly with finding 8 (no erasure path). Fix direction: initialise `last_poll_uid` to the mailbox's current `UIDNEXT` at creation/reconnect so polling starts from "now" rather than from the beginning of time. | **data hygiene / privacy** | ✅ completed locally — initialize from UIDNEXT on create and legacy-zero reconnect |
 | 17 | **The Leads state filter returned zero rows for every state — frontend and backend disagreed about what `state=` means, and the api suite froze the wrong answer.** `leadsRepo.leadFilterWhere` did `eq(leads.state, filter.state)` — `leads.state` is the **postal** column from the CSV (`Maharashtra`), while the UI's dropdown sends `ENROLLMENT_STATES` values (`REPLIED`, …). docs/10 specified only a bare `state=` with no enumeration, so each side resolved the ambiguity differently. **The api test locked in the backend's reading** by asserting `GET /leads?state=TX` — so 72 green api tests coexisted with a filter that could never match anything the UI sent. docs/12 §Leads settles it: the table has a `location` column *and* a separate `StateBadge (latest enrollment)`, and the filter row sits beside tier/campaign/suppressed. Fixed: filter on `enrollments.current_state` via EXISTS, scoped to the **same** enrollment when `campaign_id` is also supplied; contract disambiguated; tests rewritten to assert enrollment semantics *and* that a postal value no longer matches. | **correctness (contract ambiguity)** | ✅ fixed |
 | 18 | **Sentiment tagging reported failure on every success, and the retries wrote junk into an append-only log.** `POST /unibox/:id/sentiment` returns the updated **item** (contract docs/10; route declares `response: { 200: uniboxItemSchema }`), but the client parsed it with `okResponseSchema`. Server returned 200 and appended the event; the client's zod parse rejected the body and the global mutation handler toasted "request failed". The operator clicked seven times, producing **seven duplicate `sentiment_tagged` events** that can never be deleted. Note the client-side decision-H tripwire worked exactly as designed — it caught a genuine client/server disagreement; the client was simply the wrong side. Fixed: parse `uniboxItemSchema`. | **correctness (schema mismatch)** | ✅ fixed |
-| 19 | **Every email was originally 100% plain text, so the footer/signature could not be visually de-emphasized.** The corrected send path provides matching plain-text and minimal escaped HTML alternatives with no images or tracking. The original 10px gray one-line paragraph was collapsed by Gmail follow-up threads; the 2026-09-02 deployed remediation changed it to two lines in an email-safe presentation table, with a blue underlined Unsubscribe link and a dark-gray address. The post-deployment sent snapshot verifies the renderer, but the live Gmail desktop message still put the entire redesigned footer behind **Show trimmed content**; presentation alone cannot control Gmail's thread UI. **Legal constraint:** the line must remain clear and conspicuous; it is de-emphasized but not hidden in the MIME content. | product / deliverability | 🟡 desktop provider result negative; remediation design required; mobile pending |
+| 19 | **Every email was originally 100% plain text, so the footer/signature could not be visually de-emphasized.** The corrected send path provides matching plain-text and minimal escaped HTML alternatives with no images or tracking. The original 10px gray one-line paragraph was collapsed by Gmail follow-up threads; the 2026-09-02 deployed remediation changed it to two lines in an email-safe presentation table, with a blue underlined Unsubscribe link and a dark-gray address. The post-deployment sent snapshot and Gmail original verify the renderer, headers, and DKIM coverage, but the live Gmail desktop message still put the entire redesigned footer behind **Show trimmed content**; presentation alone cannot control Gmail's thread UI. The operator accepted this provider limitation, retained the footer unchanged, rejected duplicate in-copy opt-out language, and made the existing new-conversation choice explicit in the sequence builder. **Legal constraint:** the line must remain clear and conspicuous; it is de-emphasized but not hidden in the MIME content. | product / deliverability | 🟢 closed — correct delivery verified; Gmail trimming accepted; explicit conversation choice added |
 | 14 | **The deliverability score's spam lexicon models the wrong era.** `render/spamwords.ts` is the entire vocabulary behind check #9 and decision W's rubric: `['free!!!', 'guarantee', 'act now', 'risk-free', '100% free', 'click here']`. That is a 1990s bulk-mail word list. It contains **zero** burned cold-email phrases — `quick question`, `just following up`, `circling back`, `touching base`, `hope this finds you well`, `reaching out`, `pick your brain`, `15 minutes`, `per my last email`. An operator can therefore write the most template-smelling subject in the industry and the checker will score it clean, which is worse than having no checker: it manufactures false confidence. **Note carefully — this stands on its own as a fact about the code, and is NOT evidence-backed by finding 11**, which turned out to be unmeasurable. The justification is that the lexicon is self-evidently stale, not that any particular phrase was proven to cause filtering. Structurally cheap: decision W says the rubric is DATA and the file header says to tune the lexicon, not `checks.ts`. Worth considering separately whether the subject deserves its own weighting — check #9 currently flattens subject and body into one string (`content = subject + "\n" + body`) and scores a hit identically wherever it appears — but that change should be justified on its own merits, not on this canary's contaminated data. | product gap | ✅ completed locally — transparent cliché rubric in subject/body; warning only |
 | 20 | Acknowledged alert history was inaccessible in the UI. | **observability** | ✅ fixed 2026-08-20 — System now shows all/open alert history with acknowledgement state and action. |
 | 21 | Unibox and incoming-message `mailbox_id` filters existed only in the API. | UI gap | ✅ fixed 2026-08-20 — both screens now provide a mailbox selector. |

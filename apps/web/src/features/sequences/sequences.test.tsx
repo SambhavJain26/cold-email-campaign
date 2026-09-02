@@ -1,7 +1,9 @@
 // F4 — builder unit coverage: the draft ⇔ contract mapping (replace-set,
 // positional step_no, retired variants) and the footer split the preview panel
 // relies on.
-import { describe, expect, it } from 'vitest';
+import { render, screen } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
+import { describe, expect, it, vi } from 'vitest';
 import type { SequenceDto } from '@coldemail/shared';
 import {
   blankDraft,
@@ -12,6 +14,7 @@ import {
   toWriteBody,
 } from './draft';
 import { footerPreviewParts, splitFooter } from './preview-panel';
+import { StepCard } from './step-card';
 
 const sequence: SequenceDto = {
   id: 7,
@@ -158,5 +161,50 @@ describe('footerPreviewParts', () => {
       address: '4517 Congress Ave\nAustin, TX',
       linked: false,
     });
+  });
+});
+
+describe('StepCard conversation choice', () => {
+  const renderStep = (stepNo: number, inThread: boolean) => {
+    const onChange = vi.fn();
+    const draft = draftFromSequence(sequence);
+    const base = {
+      ...draft.steps[Math.min(stepNo - 1, draft.steps.length - 1)]!,
+      content_source: 'personalized' as const,
+      variants: [],
+    };
+    render(
+      <StepCard
+        step={{ ...base, in_thread: inThread }}
+        stepNo={stepNo}
+        canRemove
+        saveErrors={new Map()}
+        onChange={onChange}
+        onRemove={() => {}}
+        onPreview={() => {}}
+      />,
+    );
+    return { onChange, base };
+  };
+
+  it('explains that Step 1 always starts a new conversation', () => {
+    renderStep(1, false);
+
+    expect(
+      screen.getByText(/The first step has no earlier sequence email to continue/),
+    ).toBeInTheDocument();
+    expect(screen.queryByRole('radio')).not.toBeInTheDocument();
+  });
+
+  it('makes both later-step behaviors explicit and updates in_thread', async () => {
+    const user = userEvent.setup();
+    const { onChange, base } = renderStep(2, true);
+
+    expect(screen.getByRole('radio', { name: 'Continue existing conversation' })).toBeChecked();
+    expect(screen.getByText(/Gmail may trim repeated footer content/)).toBeInTheDocument();
+
+    await user.click(screen.getByRole('radio', { name: 'Start new conversation' }));
+
+    expect(onChange).toHaveBeenCalledWith({ ...base, in_thread: false });
   });
 });

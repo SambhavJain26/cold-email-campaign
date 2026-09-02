@@ -2,9 +2,18 @@ import { useState } from 'react';
 import { Eye, Plus, Trash2 } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import {
+  Field,
+  FieldContent,
+  FieldDescription,
+  FieldLabel,
+  FieldLegend,
+  FieldSet,
+  FieldTitle,
+} from '@/components/ui/field';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Switch } from '@/components/ui/switch';
+import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import {
   Select,
   SelectContent,
@@ -22,7 +31,7 @@ import {
 } from './draft';
 import { TemplateField } from './template-field';
 
-/** F4.2/F4.3 — one step card: wait stepper + in-thread toggle + variant tabs + editors. */
+/** F4.2/F4.3 — one step card: wait stepper + conversation choice + variant tabs + editors. */
 export function StepCard({
   step,
   stepNo,
@@ -117,16 +126,6 @@ export function StepCard({
             {stepNo === 1 ? 'days after enrollment' : 'days after the previous step'}
           </span>
         </div>
-        <div className="flex items-center gap-2">
-          <Switch
-            id={`${step.uid}-thread`}
-            checked={step.in_thread}
-            onCheckedChange={(checked) => onChange({ ...step, in_thread: checked })}
-          />
-          <Label htmlFor={`${step.uid}-thread`} className="text-xs text-muted-foreground">
-            Reply in thread
-          </Label>
-        </div>
         <Button
           variant="ghost"
           size="xs"
@@ -138,6 +137,63 @@ export function StepCard({
           <Trash2 className="size-3.5" /> Remove step
         </Button>
       </div>
+
+      <FieldSet className="gap-2">
+        <FieldLegend id={`${step.uid}-conversation-label`} variant="label" className="mb-0">
+          Conversation
+        </FieldLegend>
+        {stepNo === 1 ? (
+          <FieldDescription>
+            Starts a new conversation. The first step has no earlier sequence email to continue.
+          </FieldDescription>
+        ) : (
+          <RadioGroup
+            aria-labelledby={`${step.uid}-conversation-label`}
+            value={step.in_thread ? 'continue' : 'new'}
+            onValueChange={(value) => onChange({ ...step, in_thread: value === 'continue' })}
+            className="grid gap-3 md:grid-cols-2"
+          >
+            <FieldLabel htmlFor={`${step.uid}-conversation-continue`}>
+              <Field orientation="horizontal">
+                <RadioGroupItem
+                  id={`${step.uid}-conversation-continue`}
+                  value="continue"
+                  aria-labelledby={`${step.uid}-conversation-continue-title`}
+                  aria-describedby={`${step.uid}-conversation-continue-description`}
+                />
+                <FieldContent>
+                  <FieldTitle id={`${step.uid}-conversation-continue-title`}>
+                    Continue existing conversation
+                  </FieldTitle>
+                  <FieldDescription id={`${step.uid}-conversation-continue-description`}>
+                    Sends as “Re: &lt;Step 1 subject&gt;” and keeps the context together. Gmail may
+                    trim repeated footer content.
+                  </FieldDescription>
+                </FieldContent>
+              </Field>
+            </FieldLabel>
+            <FieldLabel htmlFor={`${step.uid}-conversation-new`}>
+              <Field orientation="horizontal">
+                <RadioGroupItem
+                  id={`${step.uid}-conversation-new`}
+                  value="new"
+                  aria-labelledby={`${step.uid}-conversation-new-title`}
+                  aria-describedby={`${step.uid}-conversation-new-description`}
+                />
+                <FieldContent>
+                  <FieldTitle id={`${step.uid}-conversation-new-title`}>
+                    Start new conversation
+                  </FieldTitle>
+                  <FieldDescription id={`${step.uid}-conversation-new-description`}>
+                    Uses this step’s own subject without reply headers. The footer is more likely to
+                    remain visible.
+                  </FieldDescription>
+                </FieldContent>
+              </Field>
+            </FieldLabel>
+          </RadioGroup>
+        )}
+      </FieldSet>
 
       {step.content_source === 'personalized' ? (
         <div className="flex flex-col gap-2 rounded-md border border-border p-3 text-sm">
