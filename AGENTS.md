@@ -30,7 +30,7 @@ commissioning** until the operator completes the handoffs below:
   work is limited to testing, verification, diagnosis, and documentation.
 - The operator-approved Personalized Copy/two-tier/campaign-lead-filter release and its 2026-08-31
   import-wizard clarity follow-up are implemented, fully verified, pushed, and deployed on
-  Spaceship; the current application code is at `8ed86a4` through migration `0019`.
+  Spaceship; production is now at footer-remediation release `c31d73b` through migration `0019`.
   It replaces direct Manual Compose sending with sequence-only personalized steps, fixes current
   tiers at A/B, separates Nurture status, adds global-source/campaign-step copy snapshots and
   blockers, and adds exact Pool/Enrolled/Both filtering and bulk tiering. The follow-up replaces
@@ -45,6 +45,12 @@ commissioning** until the operator completes the handoffs below:
   campaign-progress, campaign-context, Personalized Copy, import, timezone, unsubscribe, and
   rendering defects. No migration or live campaign/enrollment mutation was required. Gmail
   follow-up body-footer visibility remains open for a separately approved owner-address canary.
+- The 2026-09-02 Gmail footer remediation is implemented, fully verified, pushed, and deployed at
+  `c31d73b`. No migration, campaign/enrollment mutation, or send occurred. A new owner-controlled
+  Gmail follow-up is still required to prove visibility. Deployment verification also discovered
+  an independent DNSSEC `SERVFAIL` affecting both outreach domains; the app is healthy when pinned
+  to the VPS IP, but ordinary public resolution must be repaired before the UI or unsubscribe
+  hosts can be considered publicly available.
 - The operator-approved 2026-08-25 ten-workstream implementation is complete and deployed through
   Stages 1–4: operational pagination; due-step Manual Compose; in-app reminders; verified
   timezone/folder controls; imported manual drafts; Auto Observation/sequence variables; staged
@@ -194,13 +200,13 @@ and password rotation.
 ## Live deployment state
 
 Spaceship production was deployed on 2026-08-22 and advanced through Stage 4, campaign pools, the
-Personalized Copy/two-tier/campaign-filter release, and import-wizard clarity application release
-`a15f70d` on 2026-08-31, then the owner-walkthrough remediation `8ed86a4` on 2026-09-01. The clean checkout is on
-the one-word `canary` branch. DNS and TLS are live for the two outreach domains and their
-unsubscribe subdomains. The route matrix is
-verified: `/email-campaign/` and direct SPA routes return 200; the bare app path canonicalizes;
-normal outreach-domain traffic redirects 308 to `https://sambhavbuilds.com/`; unsubscribe hosts
-serve only `/u/*` and return 404 elsewhere. The portfolio remains HTTP 200.
+Personalized Copy/two-tier/campaign-filter release, import-wizard clarity, owner-walkthrough
+remediation, and the 2026-09-02 footer remediation at `c31d73b`. The clean checkout is on the
+one-word `canary` branch. Direct-IP HTTPS verification proves the app route returns 200, direct
+SPA routes return 200, the bare app path canonicalizes, normal outreach traffic redirects 308,
+and unsubscribe roots return 404. However, both outreach domains currently fail ordinary public
+resolution with DNSSEC `SERVFAIL`; treat public UI and unsubscribe routing as unavailable until
+DNS is repaired. The portfolio remains HTTP 200.
 
 - db/app/gateway/backup containers are healthy; only `127.0.0.1:18080` is published
 - the 2026-08-31 deployment baseline was four healthy OAuth mailboxes, one global lead, two draft
@@ -224,9 +230,8 @@ serve only `/u/*` and return 404 elsewhere. The portfolio remains HTTP 200.
 - the business postal address and unsubscribe template are configured; body-link confirmation is
   proven on an owner-controlled address. The 2026-09-02 owner-address canary verified the negative
   Gmail result: follow-up footer content is collapsed on desktop and mobile, and no native
-  unsubscribe control appeared. The footer-remediation candidate is fully verified locally;
-  post-deployment Gmail verification remains pending, and RFC 8058 client one-click remains
-  unverified
+  unsubscribe control appeared. The footer remediation is deployed; post-deployment Gmail
+  verification remains pending, and RFC 8058 client one-click remains unverified
 
 The Oracle bounded catch-up/never-burst canary passed on 2026-08-20 UTC and remains paused. The
 accelerated settings were restored before the final deployment. Oracle is deployed on

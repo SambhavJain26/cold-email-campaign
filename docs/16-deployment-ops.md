@@ -3,13 +3,16 @@
 Single always-on VPS (finalized decision). Docker Compose primary; systemd alternative. Implemented
 in B7 and cut over to Spaceship production on 2026-08-22.
 
-**Production status (2026-09-01):** migration `0019` and the owner-walkthrough remediation are
-deployed on the one-word `canary` branch at application commit `8ed86a4`. Reviewed bundle
+**Production status (2026-09-02):** migration `0019`, the owner-walkthrough remediation, and the
+Gmail footer remediation are deployed on the one-word `canary` branch at `c31d73b`. Reviewed bundle
 fast-forward, pre/post backup catalogs, container/internal/public health, route matrix, served
 feature markers, self-check, five-enrollment zero-drift dry-run, failed-job check, and no-send
-preflight pass. The two live test campaigns have five terminal enrollments and zero due/future work;
-auto-enrollment is disabled and the pool has no available leads. Oracle remains paused and
-unchanged. Deployment did not authorize further activation, enrollment, or sending.
+preflight pass. Production has ten enrollments, with zero due/future work in active campaigns;
+auto-enrollment is disabled and the pool has no available leads. The deployment emitted no mail.
+Both outreach domains currently return DNSSEC `SERVFAIL` from validating public resolvers despite
+healthy direct-IP HTTPS; repair DNS before treating the public UI or unsubscribe hosts as
+available. Oracle remains paused and unchanged. Deployment did not authorize further activation,
+enrollment, or sending.
 
 ---
 
@@ -153,11 +156,11 @@ Full stack built and brought up from a clean state (`docker compose -f docker-co
 
 Remaining for a full **M3** close: the real-backend walkthrough replay (§5, `e2e/walkthrough.spec.ts` — Playwright web ⇄ real server + MockTransport + `advance-clock`), which the frontend track deferred here from F8.
 
-## 8. Spaceship shared-VPS production — deployed 2026-08-22, latest rollout 2026-09-01
+## 8. Spaceship shared-VPS production — deployed 2026-08-22, latest rollout 2026-09-02
 
 Production is live at `https://sambhavpmtech.com/email-campaign/` on the existing Spaceship VM.
 The portfolio at `sambhavbuilds.com` remained online throughout. Application code is pinned to
-`8ed86a4` on `canary`; `main` was not merged. Oracle remains paused and unchanged as the temporary
+`c31d73b` on `canary`; `main` was not merged. Oracle remains paused and unchanged as the temporary
 rollback environment.
 
 - **Reverse proxy:** host Caddy is the only public 80/443 listener. The container gateway binds
@@ -167,8 +170,9 @@ rollback environment.
 - **Routing:** `/email-campaign` canonicalizes to `/email-campaign/`; direct SPA routes and the
   subpath API work. Other outreach-domain paths redirect 308 to the portfolio homepage. Each
   unsubscribe host proxies only `/u/*` and returns 404 elsewhere.
-- **DNS/TLS:** authoritative DNS returns `104.207.93.174` for the six approved A records. Existing
-  MX/SPF/DKIM/DMARC/site-verification records were not changed. Public TLS passed on every host.
+- **DNS/TLS:** the records still return `104.207.93.174` with validation disabled and direct-IP TLS
+  passes, but validating resolvers currently return DNSSEC `SERVFAIL` for both outreach domains.
+  Existing MX/SPF/DKIM/DMARC/site-verification records were not changed by the deployment.
 - **Database recovery:** the nightly logical-backup sidecar is active. A fresh custom-format dump
   passed `pg_restore --list`; a scratch restore, projection rebuild/dry-run, and self-check passed,
   and the scratch database was removed.
@@ -236,6 +240,20 @@ campaigns, auto-enrollment, legacy human-written campaigns, or due work. Pre/pos
 `coldemail-20260831-133754.dump` (1,042,810 bytes) and `coldemail-20260831-134549.dump`
 (1,043,586 bytes) passed `pg_restore --list`. No campaign was activated, no lead was enrolled, and
 no email was sent; Oracle, `main`, DNS, Caddy, settings, and mailbox configuration were unchanged.
+
+The 2026-09-02 operator-approved footer rollout pushed `canary` and fast-forwarded the clean VPS
+checkout by a SHA-256-matched bundle to `c31d73b`. The app, gateway, and backup images rebuilt with
+no migration. All containers and internal health pass; direct-IP HTTPS proves the app and direct
+SPA routes return 200, the bare app route redirects 308, outreach traffic redirects 308, and both
+unsubscribe roots remain 404. The served assets contain the new footer marker. Production remains
+at 20 migrations through `0019`, with four healthy mailboxes, zero failed jobs/open alerts,
+personalized blockers, available pool rows, auto-enrollment, or sendable due/future work. Projection
+dry-run reports `checked 10 enrollments — 0 diff(s)` and self-check is clean. The sent-event count
+and watermark remained 23 and 2026-09-02 01:30:35 IST, proving the deployment emitted no email.
+Pre/post dumps `coldemail-20260902-082320.dump` (1,320,418 bytes) and
+`coldemail-20260902-083432.dump` (1,321,580 bytes) passed `pg_restore --list`. Public DNS validation
+currently fails independently with DNSSEC `SERVFAIL` for both outreach domains; direct-IP HTTPS is
+healthy, so do not roll back application code for that DNS incident.
 
 ### Unsubscribe URL and Gmail one-click — body link proven, client one-click pending
 

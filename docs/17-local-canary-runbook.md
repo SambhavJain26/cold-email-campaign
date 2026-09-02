@@ -35,6 +35,23 @@ event-backed projection fixture reports `checked 5 enrollments — 0 diff(s)` an
 no invariant violations. Gmail visibility is not considered fixed until a deployed
 owner-controlled follow-up stays visible on desktop and mobile.
 
+After explicit operator authorization, `canary` was pushed and a SHA-256-matched Git bundle
+fast-forwarded the clean Spaceship checkout to `c31d73b`. App, gateway, and backup images rebuilt;
+no migration was added. All containers and internal health pass. Direct-IP HTTPS verifies the app
+and direct SPA routes at 200, canonical and outreach redirects at 308, and both unsubscribe roots
+at 404; the served assets contain the new footer marker. Production remains at 20 migrations
+through `0019`, with four healthy mailboxes, zero failed jobs/open alerts/personalized blockers,
+zero available pool leads or auto-enrollment, and zero due/future work in active campaigns.
+Projection dry-run reports `checked 10 enrollments — 0 diff(s)` and self-check is clean. The
+sent-event count and watermark remained 23 and 2026-09-02 01:30:35 IST, proving deployment emitted
+no mail. Pre/post dumps `coldemail-20260902-082320.dump` (1,320,418 bytes) and
+`coldemail-20260902-083432.dump` (1,321,580 bytes) passed catalog validation.
+
+The same verification discovered an independent DNS outage: Google and Cloudflare validating
+resolvers return DNSSEC `SERVFAIL` for both outreach domains, while queries with validation disabled
+still return `104.207.93.174` and direct-IP HTTPS is healthy. This was not caused by the application
+release, but ordinary public UI and unsubscribe resolution are unavailable until DNS is repaired.
+
 Read-only production reconciliation after the recipient actions found both canary campaigns
 paused. Aurora Canary has two `UNSUBSCRIBED` enrollments and one untouched control waiting at Step
 3; Comet Canary has one `REPLIED` enrollment and one untouched control waiting at Step 3. Further

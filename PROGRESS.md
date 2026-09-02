@@ -4,16 +4,19 @@
 
 **Legend:** `[ ]` not started · `[~]` in progress · `[x]` done · `[!]` blocked (note why in the log)
 
-**Current focus:** → **The 2026-09-02 Gmail follow-up footer remediation is implemented and fully
-verified locally.** The footer remains 10px but now uses two visible lines in an
+**Current focus:** → **The 2026-09-02 Gmail follow-up footer remediation is implemented, fully
+verified, pushed, and deployed at `c31d73b`.** The footer remains 10px but now uses two visible lines in an
 email-safe presentation table, a blue underlined Unsubscribe link, a dark-gray address, 1.5 line
 height, and 20px top separation, with no hidden or invisible variation. Renderer, plain-text,
 Settings/Sequence previews, mocks, tests, specifications, and manual agree. Typecheck/lint/format,
 unit 346, web 60, integration 168, API 144, GreenMail 29, locked golden exactly 47, mock E2E 62,
 real-backend E2E 1, production build, populated `checked 5 enrollments — 0 diff(s)`, and self-check
-all pass. Gmail visibility remains unproven until a deployed owner-address follow-up stays visible
-on desktop and mobile. The
-2026-09-01 broader walkthrough remediation remains deployed at application commit `8ed86a4`.
+all pass. Production containers, internal health, direct-IP public routes, 20 migrations, four
+healthy mailboxes, zero failed jobs/open alerts/sendable work, `checked 10 enrollments — 0
+diff(s)`, self-check, and both backup catalogs pass; the sent watermark remained 23. Gmail
+visibility remains unproven until an owner-address follow-up stays visible on desktop and mobile.
+The deployment also exposed an independent DNSSEC `SERVFAIL` on both outreach domains: direct-IP
+HTTPS is healthy, but ordinary public UI and unsubscribe resolution require DNS repair.
 
 **2026-09-01 owner-address walkthrough and local remediation:** the bounded production walkthrough
 used five operator-controlled recipients and accepted 13 messages: Atlas 3 × one step and Beacon

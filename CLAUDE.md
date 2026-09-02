@@ -26,7 +26,7 @@ commissioning**:
   enrollment, or sending.
 - **Personalized Copy production release:** the operator-approved Personalized Copy/two-tier/
   campaign-lead filter release and 2026-08-31 import-wizard clarity follow-up are implemented,
-  fully verified, pushed, and deployed; current application code is at `8ed86a4` through migration
+  fully verified, pushed, and deployed; production is at `c31d73b` through migration
   `0019`.
   Personalized copy is now sequence content only; current tiers
   are A/B with separate Nurture status; imported global sources bind to independent campaign-step
@@ -43,6 +43,12 @@ commissioning**:
   validation, unsubscribe state, and email rendering. It adds no migration and made no live
   campaign/enrollment mutation. Gmail follow-up body-footer visibility still requires a separately
   approved real-provider test.
+- **2026-09-02 footer remediation:** the two-line 10px presentation-table footer is fully verified,
+  pushed, and deployed at `c31d73b`; deployment added no migration and emitted no mail. A new
+  owner-controlled Gmail follow-up remains required to prove visibility. The deployment check also
+  found an independent DNSSEC `SERVFAIL` on both outreach domains. Direct-IP HTTPS and the
+  application are healthy, but normal public UI and unsubscribe resolution are unavailable until
+  DNS is repaired.
 - The operator-approved Spaceship deployment, subpath support, sender-domain unsubscribe routing,
   and individual Google Workspace OAuth implementation are complete. Do not extend production
   scope or change DNS/Caddy/mailboxes outside the approved commissioning steps without fresh
@@ -50,10 +56,10 @@ commissioning**:
 - The public unsubscribe hosts, business postal address, and sender-domain unsubscribe template are
   configured. The Gmail body-link GET and confirm flow are verified on an owner-controlled address.
   The 2026-09-02 owner-address follow-up canary verified that Gmail collapses the footer behind
-  **Show trimmed content** on desktop and **Show quoted text** on mobile. A local remediation
-  candidate now uses a two-line presentation-table footer with the operator-approved
-  10px/blue-link/dark-gray treatment and no hidden variation; its non-Docker gate passes, but
-  DB/GreenMail verification and a post-deployment Gmail canary remain pending. Gmail exposed no
+  **Show trimmed content** on desktop and **Show quoted text** on mobile. The deployed remediation
+  uses a two-line presentation-table footer with the operator-approved 10px/blue-link/dark-gray
+  treatment and no hidden variation; its complete local gate passes, but a post-deployment Gmail
+  canary remains pending. Gmail exposed no
   native unsubscribe control in the tested views, so RFC 8058 mailbox-client one-click remains
   unverified (the missing UI does not prove that the headers were absent).
 - Do not start a real cohort or send new external campaign mail without explicit approval for that specific send. This covers sending mail, activating or resuming a campaign, enrolling leads, altering live campaign state, and contacting prospects — each needs its own approval.
@@ -181,14 +187,16 @@ After an authorized deploy, verify container health, `https://localhost/health`,
   paused. Health, self-check, backup, and `checked 24 enrollments — 0 diff(s)` are clean.
 - **Spaceship production:** deployed 2026-08-22 and advanced through the verified Personalized
   Copy/two-tier/campaign-filter and import-wizard clarity release `a15f70d` on 2026-08-31, then the
-  owner-walkthrough remediation `8ed86a4` on 2026-09-01. It has
+  owner-walkthrough remediation `8ed86a4` and footer remediation `c31d73b`. It has
   four `google_oauth` mailboxes. The 2026-08-31 deployment baseline had one global lead, two draft
   campaigns, and zero enrollments; the separately authorized walkthrough later added five
   operator-controlled leads across Atlas and Beacon and accepted 13 messages. Body-link
   unsubscribe, reply `STOP`, global suppression, and reply ingestion were observed; no prospect
-  was contacted. Inspect current live state before operational work. DNS, TLS,
-  the `/email-campaign/` SPA/API subpath, outreach
-  redirects, and the two isolated unsubscribe hosts are live. Containers and health are green;
+  was contacted. Inspect current live state before operational work. Containers, TLS when pinned
+  to the VPS IP, the `/email-campaign/` SPA/API subpath, outreach redirects, and the isolated
+  unsubscribe routes are healthy. Ordinary public DNS currently fails DNSSEC validation for both
+  outreach domains and must be repaired before those routes are publicly available. Containers
+  and health are green;
   migration 0019, self-check, and zero drift pass; both deployment dumps passed catalog validation
   and the local scratch restore drill passed; Spaceship AutoBackup has a five-backup limit. The
   portfolio remained online.
