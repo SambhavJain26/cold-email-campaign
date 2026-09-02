@@ -4,19 +4,18 @@
 
 **Legend:** `[ ]` not started · `[~]` in progress · `[x]` done · `[!]` blocked (note why in the log)
 
-**Current focus:** → **The post-canary conversation-choice clarification is implemented, verified,
-pushed, and deployed at `6c2c390`.** The sequence builder preserves the existing
-`in_thread` contract but replaces the ambiguous **Reply in thread** switch with explicit,
-accessible **Continue existing conversation** and **Start new conversation** choices. Step 1
-states that it always starts a conversation. The descriptions explain the real subject/header and
-Gmail-footer tradeoff without promising placement or visibility. The footer, RFC 8058 headers, and
-sales copy are unchanged. Verified: full typecheck; full lint; full format check; web 62/62; focused
-renderer unit 26/26; sequence-browser E2E 3/3; and production web build. No Docker, database,
-migration, production mutation, campaign action, enrollment, or send was needed. Production
-verification passed all containers, internal/public health and route isolation, the served UI
-marker, all 20 migrations, `checked 10 enrollments — 0 diff(s)`, clean self-check, four healthy
-mailboxes, zero failed jobs/sendable active work, an unchanged 24-event sent watermark, and a
-validated 1,354,270-byte post-deploy dump.
+**Current focus:** → **The Sequence preview and dirty-state follow-up is implemented and verified
+locally; it is not pushed or deployed.** When Compliance uses the sender-domain Unsubscribe URL,
+Sequence preview now renders the real link-style footer with a permanently non-resolving `.invalid`
+placeholder and proves that no live unsubscribe capability token is minted. The builder compares
+the effective write payload to its saved baseline, so reverting **Start new conversation** back to
+the saved choice clears **Unsaved changes**, and a successful save establishes the next baseline.
+No migration, scheduler, transport, footer/header, production-state, campaign, enrollment, or send
+behavior changed. Verified: type/lint/format; unit 346; web 63; API 144; GreenMail 29; locked golden
+exactly 47; mock E2E 62; focused Sequence browser E2E 3; production build; zero projection diffs;
+and clean self-check. A single-process integration run hit varying pre-existing 30-second scenario
+timeouts on unusually slow local Docker; fresh poller 20/20, scheduler 18/18, and event-store 7/7
+runs all pass under the normal limits.
 
 **Production baseline:** → **The 2026-09-02 Gmail follow-up footer remediation is implemented, fully
 verified, pushed, and deployed at `c31d73b`.** The footer remains 10px but now uses two visible lines in an

@@ -9,6 +9,7 @@ import {
   blankDraft,
   draftBlockers,
   draftFromSequence,
+  draftsEqual,
   nextVariantLabel,
   parseSaveErrors,
   toWriteBody,
@@ -89,6 +90,35 @@ describe('draftFromSequence / toWriteBody', () => {
     const body = toWriteBody(blankDraft());
     expect(body.steps[0]).not.toHaveProperty('id');
     expect(body.steps[0]!.variants[0]).not.toHaveProperty('id');
+  });
+
+  it('compares the effective save payload and clears a reverted edit', () => {
+    const saved = draftFromSequence(sequence);
+    const changed = {
+      ...saved,
+      steps: saved.steps.map((step, index) => (index === 1 ? { ...step, in_thread: false } : step)),
+    };
+    const reverted = {
+      ...changed,
+      steps: changed.steps.map((step, index) =>
+        index === 1 ? { ...step, in_thread: true } : step,
+      ),
+    };
+
+    expect(draftsEqual(saved, changed)).toBe(false);
+    expect(draftsEqual(saved, reverted)).toBe(true);
+    expect(
+      draftsEqual(saved, {
+        ...saved,
+        variable_defaults: { zed: 'last', alpha: 'first' },
+      }),
+    ).toBe(false);
+    expect(
+      draftsEqual(
+        { ...saved, variable_defaults: { alpha: 'first', zed: 'last' } },
+        { ...saved, variable_defaults: { zed: 'last', alpha: 'first' } },
+      ),
+    ).toBe(true);
   });
 });
 

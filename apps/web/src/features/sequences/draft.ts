@@ -122,6 +122,21 @@ export function toWriteBody(draft: SequenceDraft): SequenceWriteBody {
   };
 }
 
+/** Compare the effective save payload, not transient React uids or edit history.
+ * Variable keys are sorted so changing their insertion order alone is not dirty. */
+export function draftsEqual(left: SequenceDraft, right: SequenceDraft): boolean {
+  const canonical = (draft: SequenceDraft) => {
+    const body = toWriteBody(draft);
+    return {
+      ...body,
+      variable_defaults: Object.fromEntries(
+        Object.entries(body.variable_defaults).sort(([a], [b]) => a.localeCompare(b)),
+      ),
+    };
+  };
+  return JSON.stringify(canonical(left)) === JSON.stringify(canonical(right));
+}
+
 /** Local pre-save guard — the write schema's min(1)s, stated in operator words. */
 export function draftBlockers(draft: SequenceDraft): string[] {
   const blockers: string[] = [];

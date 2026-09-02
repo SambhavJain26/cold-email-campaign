@@ -228,29 +228,48 @@ describe('B6.5 sequences', () => {
   });
 
   it('preview renders subject/body with footer + checks for a real lead', async () => {
-    const seq = (await h.inject({ method: 'GET', url: '/api/v1/sequences' })).json().items[0];
-    const variantA = seq.steps[0].variants.find((v: { label: string }) => v.label === 'A');
-    const res = await h.inject({
-      method: 'POST',
-      url: `/api/v1/sequences/${seqId}/preview`,
-      payload: { lead_id: 1, step_no: 1, variant_id: variantA.id },
-    });
-    expect(res.statusCode).toBe(200);
-    const p = res.json();
-    expect(p.subject).toBe('Quick question about Acme Realty');
-    expect(p.body).toContain('Hi Amy');
-    expect(p.body).toContain('your Dallas listings move fast'); // researched-mode observation
-    expect(p.body).toContain('100 Test Street, Austin TX 78701'); // footer, unconditional
-    expect(p.checks.score).toBeGreaterThan(0);
-    expect(p.checks.fatal).toEqual([]);
-    expect(p.checks.variations).toBeGreaterThanOrEqual(1);
+    await h.pool.query(
+      `UPDATE compliance_settings
+          SET unsubscribe_base_url = 'https://unsubscribe.{sender_domain}'
+        WHERE id = 1`,
+    );
+    const tokensBefore = await h.pool.query(
+      `SELECT count(*)::int AS count FROM unsubscribe_tokens`,
+    );
+    try {
+      const seq = (await h.inject({ method: 'GET', url: '/api/v1/sequences' })).json().items[0];
+      const variantA = seq.steps[0].variants.find((v: { label: string }) => v.label === 'A');
+      const res = await h.inject({
+        method: 'POST',
+        url: `/api/v1/sequences/${seqId}/preview`,
+        payload: { lead_id: 1, step_no: 1, variant_id: variantA.id },
+      });
+      expect(res.statusCode).toBe(200);
+      const p = res.json();
+      expect(p.subject).toBe('Quick question about Acme Realty');
+      expect(p.body).toContain('Hi Amy');
+      expect(p.body).toContain('your Dallas listings move fast'); // researched-mode observation
+      expect(p.body).toContain('100 Test Street, Austin TX 78701'); // footer, unconditional
+      expect(p.body).toContain(
+        'Unsubscribe: https://unsubscribe-preview.invalid/u/not-a-live-token',
+      );
+      expect(p.checks.score).toBeGreaterThan(0);
+      expect(p.checks.fatal).toEqual([]);
+      expect(p.checks.variations).toBeGreaterThanOrEqual(1);
 
-    const missingVariant = await h.inject({
-      method: 'POST',
-      url: `/api/v1/sequences/${seqId}/preview`,
-      payload: { lead_id: 1, step_no: 2, variant_id: variantA.id },
-    });
-    expect(missingVariant.statusCode).toBe(404); // variant belongs to step 1
+      const missingVariant = await h.inject({
+        method: 'POST',
+        url: `/api/v1/sequences/${seqId}/preview`,
+        payload: { lead_id: 1, step_no: 2, variant_id: variantA.id },
+      });
+      expect(missingVariant.statusCode).toBe(404); // variant belongs to step 1
+      const tokensAfter = await h.pool.query(
+        `SELECT count(*)::int AS count FROM unsubscribe_tokens`,
+      );
+      expect(tokensAfter.rows[0].count).toBe(tokensBefore.rows[0].count); // preview never mints capability tokens
+    } finally {
+      await h.pool.query(`UPDATE compliance_settings SET unsubscribe_base_url = '' WHERE id = 1`);
+    }
   });
 
   it('previews exact campaign copy and derives Tier B Auto Observation in campaign context', async () => {

@@ -1055,7 +1055,9 @@ export const handlers: RequestHandler[] = [
       // render/footer.ts appendFooter, including the dormant-URL fallback.
       const base = db.compliance.unsubscribe_base_url.trim();
       const optoutLine =
-        base === '' ? db.compliance.optout_text : `Unsubscribe: ${base}/u/preview-token`;
+        base === ''
+          ? db.compliance.optout_text
+          : 'Unsubscribe: https://unsubscribe-preview.invalid/u/not-a-live-token';
       const footer = `\n\n${optoutLine}\n${db.compliance.physical_address}`;
       return HttpResponse.json({
         subject,

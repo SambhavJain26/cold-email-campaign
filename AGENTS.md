@@ -56,6 +56,12 @@ commissioning** until the operator completes the handoffs below:
   the served DNSKEY tags/digests, and Google, Cloudflare, Quad9, system resolution, and the complete
   public route matrix recovered without a configuration change. Keep DNSSEC enabled; treat this as
   a transient provider incident unless it recurs.
+- The F-W25/F-W32 Sequence-preview follow-up is implemented and verified locally but is not pushed
+  or deployed. Configured unsubscribe-link previews use a permanently non-resolving `.invalid`
+  placeholder without creating a capability token, and Sequence dirty state now compares the
+  effective write payload with its saved baseline so reverted edits become clean. It changes no
+  migration, scheduler, transport, footer/header behavior, production data, campaign, enrollment,
+  or send state.
 - The operator-approved 2026-08-25 ten-workstream implementation is complete and deployed through
   Stages 1–4: operational pagination; due-step Manual Compose; in-app reminders; verified
   timezone/folder controls; imported manual drafts; Auto Observation/sequence variables; staged

@@ -70,6 +70,18 @@ function toSequenceDto(n: NestedSequence): SequenceDto {
   };
 }
 
+// Preview must show the configured link-style footer without issuing a real
+// capability token. `.invalid` is permanently non-resolving by specification.
+const PREVIEW_UNSUBSCRIBE_URL = 'https://unsubscribe-preview.invalid/u/not-a-live-token';
+
+function complianceForPreview(compliance: Awaited<ReturnType<typeof getComplianceSettings>>) {
+  return {
+    ...compliance,
+    unsubscribeUrl:
+      compliance.unsubscribeBaseUrl.trim() === '' ? undefined : PREVIEW_UNSUBSCRIBE_URL,
+  };
+}
+
 /** Fatal template errors block the save: 422 sequence_invalid, mapped per step/variant (docs/12 §5). */
 function assertTemplatesParse(body: SequenceWriteBody): void {
   const errors: Array<{ step_no: number; label: string; field: string; message: string }> = [];
@@ -227,13 +239,14 @@ export async function sequencesRoutes(app: FastifyInstance, services: AppService
           ? resolvedVariablesOf(campaign)
           : { ...nested.sequence.variableDefaults, ...variableOverridesOf(campaign) }
         : nested.sequence.variableDefaults;
+      const compliance = await getComplianceSettings(db);
       const renderContext: RenderContext = {
         mode,
         customFields,
         autoObservations: Object.keys(autoConfig.rules).length > 0 ? autoConfig.rules : null,
         autoObservationField: autoConfig.field,
         sequenceVariables,
-        compliance: await getComplianceSettings(db),
+        compliance: complianceForPreview(compliance),
       };
 
       if (stepEntry.step.contentSource === 'personalized') {

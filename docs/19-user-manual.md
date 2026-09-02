@@ -895,6 +895,10 @@ saved-template render, locked compliance footer, score, warnings, and fatal erro
 sources, fallbacks, and deterministic spintax choices. Unsaved edits are not included; save and
 render again. Test multiple leads, including missing-name and missing-custom-field cases.
 
+When Compliance has an Unsubscribe URL configured, preview shows the link-style footer with a safe,
+non-working `.invalid` example URL. Rendering a preview never creates a real unsubscribe token;
+real recipient-specific URLs are created only by the sending pipeline.
+
 ![Rendered sequence preview showing personalized subject/body, locked footer, score, variations, and warnings](images/user-manual/06-sequence-preview.png)
 
 ### 10.7 Editing a sequence with history

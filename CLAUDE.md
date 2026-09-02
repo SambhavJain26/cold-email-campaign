@@ -54,6 +54,13 @@ commissioning**:
   exactly matched the served DNSKEY tags/digests, and validating public resolvers plus the full
   route matrix recovered without a configuration change. Keep DNSSEC enabled and treat it as a
   transient provider incident unless it recurs.
+- **Sequence preview/dirty-state follow-up:** F-W25 and F-W32 are implemented and verified locally
+  but are not pushed or deployed. A configured unsubscribe URL makes preview use the real
+  link-style footer with a permanently non-resolving `.invalid` placeholder and no minted
+  capability token. Dirty state compares the effective write payload with the saved baseline, so
+  reverting a conversation choice clears the warning and a successful save establishes a new
+  baseline. No migration, scheduler, transport, footer/header behavior, production data, campaign,
+  enrollment, or send state changed.
 - The operator-approved Spaceship deployment, subpath support, sender-domain unsubscribe routing,
   and individual Google Workspace OAuth implementation are complete. Do not extend production
   scope or change DNS/Caddy/mailboxes outside the approved commissioning steps without fresh

@@ -70,6 +70,24 @@ test('build a sequence: 24 variations, fatal link in step 1, fix, save', async (
   await expect(page.getByText('Sequence created')).toBeVisible();
   await expect(page).toHaveURL(/\/sequences\/\d+$/);
 
+  // Dirty state follows the effective draft, not whether an edit ever happened.
+  const savedStep2 = page.getByTestId('step-card-2');
+  await savedStep2.getByRole('radio', { name: 'Start new conversation' }).click();
+  await expect(page.getByText('Unsaved changes', { exact: true })).toBeVisible();
+  await savedStep2.getByRole('radio', { name: 'Continue existing conversation' }).click();
+  await expect(page.getByText('Unsaved changes', { exact: true })).not.toBeVisible();
+
+  // A real save resets the canonical baseline and survives subsequent SPA navigation.
+  await savedStep2.getByRole('radio', { name: 'Start new conversation' }).click();
+  await page.getByRole('button', { name: 'Save sequence' }).click();
+  await expect(page.getByText('Sequence saved').last()).toBeVisible();
+  await page.getByRole('button', { name: 'Back to list' }).click();
+  await page.getByRole('link', { name: 'Walkthrough Sequence', exact: true }).click();
+  await expect(
+    page.getByTestId('step-card-2').getByRole('radio', { name: 'Start new conversation' }),
+  ).toBeChecked();
+  await expect(page.getByText('Unsaved changes', { exact: true })).not.toBeVisible();
+
   // Preview the saved step-1 variant against a real lead.
   await page.getByRole('button', { name: 'Preview step 1 variant A' }).click();
   const panel = page.getByTestId('preview-panel');
@@ -88,7 +106,7 @@ test('build a sequence: 24 variations, fatal link in step 1, fix, save', async (
   // Fix the URL, save, re-render: clean checklist, variations unchanged.
   await buildStepOne(page, BODY_CLEAN);
   await page.getByRole('button', { name: 'Save sequence' }).click();
-  await expect(page.getByText('Sequence saved')).toBeVisible();
+  await expect(page.getByText('Sequence saved').last()).toBeVisible();
 
   await panel.getByRole('button', { name: 'Render preview' }).click();
   await expect(panel.getByTestId('preview-checks')).not.toContainText(

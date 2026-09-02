@@ -14,6 +14,7 @@ import {
   blankStep,
   draftBlockers,
   draftFromSequence,
+  draftsEqual,
   parseSaveErrors,
   saveErrorKey,
   toWriteBody,
@@ -27,10 +28,11 @@ import { StepCard } from './step-card';
  *  so a different sequence remounts with fresh state initializers (no setState-in-effect). */
 export function SequenceBuilder({ sequence }: { sequence?: SequenceDto }) {
   const navigate = useNavigate();
-  const [draft, setDraft] = useState<SequenceDraft>(() =>
+  const [initialDraft] = useState<SequenceDraft>(() =>
     sequence ? draftFromSequence(sequence) : blankDraft(),
   );
-  const [dirty, setDirty] = useState(false);
+  const [draft, setDraft] = useState<SequenceDraft>(initialDraft);
+  const [savedDraft, setSavedDraft] = useState<SequenceDraft>(initialDraft);
   const [saveErrors, setSaveErrors] = useState<Map<string, string>>(new Map());
   const [conflicts, setConflicts] = useState<string[]>([]);
   const [target, setTarget] = useState<PreviewTarget | null>(null);
@@ -39,11 +41,9 @@ export function SequenceBuilder({ sequence }: { sequence?: SequenceDto }) {
   const update = useUpdateSequence();
   const saving = create.isPending || update.isPending;
   const blockers = draftBlockers(draft);
+  const dirty = !draftsEqual(draft, savedDraft);
 
-  const edit = (next: SequenceDraft) => {
-    setDraft(next);
-    setDirty(true);
-  };
+  const edit = (next: SequenceDraft) => setDraft(next);
   const patchStep = (uid: string, next: DraftStep) =>
     edit({ ...draft, steps: draft.steps.map((step) => (step.uid === uid ? next : step)) });
 
@@ -92,8 +92,10 @@ export function SequenceBuilder({ sequence }: { sequence?: SequenceDto }) {
       update.mutate(
         { id: sequence.id, body },
         {
-          onSuccess: () => {
-            setDirty(false);
+          onSuccess: (saved) => {
+            const next = draftFromSequence(saved);
+            setDraft(next);
+            setSavedDraft(next);
             toast.success('Sequence saved');
           },
           onError: onSaveError,
@@ -102,7 +104,9 @@ export function SequenceBuilder({ sequence }: { sequence?: SequenceDto }) {
     } else {
       create.mutate(body, {
         onSuccess: (created) => {
-          setDirty(false);
+          const next = draftFromSequence(created);
+          setDraft(next);
+          setSavedDraft(next);
           toast.success('Sequence created');
           navigate(`/sequences/${created.id}`, { replace: true });
         },

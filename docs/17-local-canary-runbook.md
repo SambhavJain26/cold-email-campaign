@@ -41,18 +41,28 @@ Atlas and Beacon are active but have only terminal current enrollments. The sche
 raised a durable `send_blocked_send_window_closed` warning while the earlier midnight-only mailbox
 window was closed; it remains open for operator acknowledgement as historical evidence.
 
-### Post-remediation UI findings — open
+### Post-remediation UI findings — status
 
 | ID | Verified behavior | Required improvement |
 |---|---|---|
-| F-W25 | Sequence preview rendered the fallback “Reply STOP” footer although Compliance was configured with the sender-domain Unsubscribe URL; the actual scheduled message used the correct link-only footer. | Make preview use an explicit safe preview URL/token representation so it mirrors the real renderer without minting a live capability token. |
+| F-W25 | Sequence preview rendered the fallback “Reply STOP” footer although Compliance was configured with the sender-domain Unsubscribe URL; the actual scheduled message used the correct link-only footer. | **Fixed locally:** configured link mode now renders through the real footer with a permanently non-resolving `.invalid` preview URL. Preview creates no unsubscribe capability token. |
 | F-W26 | Analytics showed the new Step 3 message as pending immediately, but Overview still said “3 delivery confirmed · 0 awaiting confirmation” because it classifies contacted leads by whether they have any earlier confirmed message. | Label the Overview values as lead-level status or add a distinct pending-message count; do not imply that no current message awaits confirmation. |
 | F-W27 | Leads → Aurora → Enrolled/Both returned the correct three leads, but the Pool column labeled every enrolled pool lead “Global” because the list DTO exposes only currently-available pool assignments. | Show the selected campaign/enrolled pool provenance, or rename the column so terminal/enrolled pool rows are not mislabeled. |
 | F-W28 | Cold Storage silently defaulted to Atlas after the global header selector was removed. Beacon's finished lead appeared only by manually adding `?campaign=2`; no visible source-campaign control exists. | Add a Cold Storage source-campaign selector and keep it synchronized with the URL. |
 | F-W29 | The sent Aurora Step 3 record was correctly immutable, but its Personalized Copy editor preview displayed the saved audit subject (`A second Northstar angle`) rather than the actual in-thread subject (`Re: Aanya, a quick Northstar idea`). | Show both saved audit subject and effective send subject, clearly labeled. |
 | F-W30 | A bare Overview route rendered the default campaign's metrics while the selector still displayed “Select campaign…”; selecting a campaign corrected the value. | Resolve and display the default campaign in the selector whenever default campaign data is shown. |
 | F-W31 | During Sequence preview, selecting a campaign before selecting a lead briefly showed “This variant is new — save the sequence before previewing it” for an existing Personalized Copy step. | Replace it with a lead-selection prompt and reserve the unsaved-variant message for genuinely new template variants. |
-| F-W32 | In the deployed Sequence builder, changing a later step from **Continue existing conversation** to **Start new conversation** and then restoring the original choice still left the **Unsaved changes** banner visible. | Derive dirty state from the current draft versus its saved baseline so reverting a change clears the warning. |
+| F-W32 | In the deployed Sequence builder, changing a later step from **Continue existing conversation** to **Start new conversation** and then restoring the original choice still left the **Unsaved changes** banner visible. | **Fixed locally:** dirty state is derived from the effective write payload versus its saved baseline, so a full revert clears the warning and each successful save establishes the new baseline. |
+
+The F-W25/F-W32 remediation is local-only and has not been pushed or deployed. It changes no
+database schema, scheduler, mail transport, footer styling, RFC 8058 header behavior, campaign,
+enrollment, or sent state. Verification passes: typecheck/lint/format; unit 346/346; web 63/63;
+API 144/144; focused Sequence API 8/8; GreenMail 29/29; locked golden exactly 47/47; mock-browser
+E2E 62/62; focused Sequence browser E2E 3/3; production Vite build; `checked 0 enrollments — 0
+diff(s)`; and clean self-check. The full integration project encountered varying existing
+30-second scenario timeouts under unusually slow local Docker execution; fresh isolated reruns of
+the affected poller 20/20, scheduler 18/18, and event-store 7/7 files all pass under their normal
+limits, so no deterministic integration regression was reproduced.
 
 The separately authorized owner-address Gmail canary produced a negative result for follow-up
 footer visibility. The footer was present in each message body, but Gmail collapsed it on both
