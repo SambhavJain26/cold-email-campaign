@@ -45,17 +45,17 @@ window was closed; it remains open for operator acknowledgement as historical ev
 
 | ID | Verified behavior | Required improvement |
 |---|---|---|
-| F-W25 | Sequence preview rendered the fallback “Reply STOP” footer although Compliance was configured with the sender-domain Unsubscribe URL; the actual scheduled message used the correct link-only footer. | **Fixed locally:** configured link mode now renders through the real footer with a permanently non-resolving `.invalid` preview URL. Preview creates no unsubscribe capability token. |
+| F-W25 | Sequence preview rendered the fallback “Reply STOP” footer although Compliance was configured with the sender-domain Unsubscribe URL; the actual scheduled message used the correct link-only footer. | **Fixed and deployed:** configured link mode now renders through the real footer with a permanently non-resolving `.invalid` preview URL. Preview creates no unsubscribe capability token. |
 | F-W26 | Analytics showed the new Step 3 message as pending immediately, but Overview still said “3 delivery confirmed · 0 awaiting confirmation” because it classifies contacted leads by whether they have any earlier confirmed message. | Label the Overview values as lead-level status or add a distinct pending-message count; do not imply that no current message awaits confirmation. |
 | F-W27 | Leads → Aurora → Enrolled/Both returned the correct three leads, but the Pool column labeled every enrolled pool lead “Global” because the list DTO exposes only currently-available pool assignments. | Show the selected campaign/enrolled pool provenance, or rename the column so terminal/enrolled pool rows are not mislabeled. |
 | F-W28 | Cold Storage silently defaulted to Atlas after the global header selector was removed. Beacon's finished lead appeared only by manually adding `?campaign=2`; no visible source-campaign control exists. | Add a Cold Storage source-campaign selector and keep it synchronized with the URL. |
 | F-W29 | The sent Aurora Step 3 record was correctly immutable, but its Personalized Copy editor preview displayed the saved audit subject (`A second Northstar angle`) rather than the actual in-thread subject (`Re: Aanya, a quick Northstar idea`). | Show both saved audit subject and effective send subject, clearly labeled. |
 | F-W30 | A bare Overview route rendered the default campaign's metrics while the selector still displayed “Select campaign…”; selecting a campaign corrected the value. | Resolve and display the default campaign in the selector whenever default campaign data is shown. |
 | F-W31 | During Sequence preview, selecting a campaign before selecting a lead briefly showed “This variant is new — save the sequence before previewing it” for an existing Personalized Copy step. | Replace it with a lead-selection prompt and reserve the unsaved-variant message for genuinely new template variants. |
-| F-W32 | In the deployed Sequence builder, changing a later step from **Continue existing conversation** to **Start new conversation** and then restoring the original choice still left the **Unsaved changes** banner visible. | **Fixed locally:** dirty state is derived from the effective write payload versus its saved baseline, so a full revert clears the warning and each successful save establishes the new baseline. |
+| F-W32 | In the deployed Sequence builder, changing a later step from **Continue existing conversation** to **Start new conversation** and then restoring the original choice still left the **Unsaved changes** banner visible. | **Fixed and deployed:** dirty state is derived from the effective write payload versus its saved baseline, so a full revert clears the warning and each successful save establishes the new baseline. |
 
-The F-W25/F-W32 remediation is local-only and has not been pushed or deployed. It changes no
-database schema, scheduler, mail transport, footer styling, RFC 8058 header behavior, campaign,
+The F-W25/F-W32 remediation is deployed at application commit `a8c2e65`. It changes no database
+schema, scheduler, mail transport, footer styling, RFC 8058 header behavior, campaign,
 enrollment, or sent state. Verification passes: typecheck/lint/format; unit 346/346; web 63/63;
 API 144/144; focused Sequence API 8/8; GreenMail 29/29; locked golden exactly 47/47; mock-browser
 E2E 62/62; focused Sequence browser E2E 3/3; production Vite build; `checked 0 enrollments — 0
@@ -63,6 +63,25 @@ diff(s)`; and clean self-check. The full integration project encountered varying
 30-second scenario timeouts under unusually slow local Docker execution; fresh isolated reruns of
 the affected poller 20/20, scheduler 18/18, and event-store 7/7 files all pass under their normal
 limits, so no deterministic integration regression was reproduced.
+
+After explicit operator authorization, `canary` was pushed and a reviewed 4,456,075-byte Git
+bundle with matching local/remote SHA-256 fast-forwarded the clean Spaceship checkout from
+`c1b9a94` to exact application commit `a8c2e65`. The app, gateway, and backup images rebuilt and
+the stack recreated without a migration. All containers, app-direct and subpath health, the SPA,
+direct Sequences route, canonical/outreach redirects, unsubscribe-host isolation, and portfolio
+route pass. All 20 migrations through `0019` remain applied; production reports `checked 10
+enrollments — 0 diff(s)` and clean self-check. Auto-enrollment, available pool, active due/future
+work, failed jobs, open error alerts, and Personalized Copy blockers are zero. The sent ledger
+remained 24 with the same 2026-09-02 15:10:35 IST watermark, proving deployment emitted no mail.
+Pre/post dumps `coldemail-20260902-173809.dump` (1,344,276 bytes) and
+`coldemail-20260902-174523.dump` (1,344,955 bytes) passed `pg_restore --list`. The deployed
+container source contains the inert preview URL marker. An authenticated production browser replay
+then changed Beacon Step 2 to **Start new conversation**, observed **Unsaved changes**, reverted to
+the saved **Continue existing conversation** choice, and observed the warning clear. The same
+read-only pass rendered Beacon Step 2 variant A and showed the blue underlined **Unsubscribe**
+treatment plus address, with no fallback “reply STOP” text. The temporary choice was reverted and
+was never saved. Oracle, `main`, DNS/Caddy, campaign, enrollment, mailbox, and sending state were
+unchanged.
 
 The separately authorized owner-address Gmail canary produced a negative result for follow-up
 footer visibility. The footer was present in each message body, but Gmail collapsed it on both

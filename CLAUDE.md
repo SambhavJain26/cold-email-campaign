@@ -26,7 +26,7 @@ commissioning**:
   enrollment, or sending.
 - **Personalized Copy production release:** the operator-approved Personalized Copy/two-tier/
   campaign-lead filter release and 2026-08-31 import-wizard clarity follow-up are implemented,
-  fully verified, pushed, and deployed; production is at `6c2c390` through migration
+  fully verified, pushed, and deployed; production is at `a8c2e65` through migration
   `0019`.
   Personalized copy is now sequence content only; current tiers
   are A/B with separate Nurture status; imported global sources bind to independent campaign-step
@@ -54,13 +54,15 @@ commissioning**:
   exactly matched the served DNSKEY tags/digests, and validating public resolvers plus the full
   route matrix recovered without a configuration change. Keep DNSSEC enabled and treat it as a
   transient provider incident unless it recurs.
-- **Sequence preview/dirty-state follow-up:** F-W25 and F-W32 are implemented and verified locally
-  but are not pushed or deployed. A configured unsubscribe URL makes preview use the real
+- **Sequence preview/dirty-state follow-up:** F-W25 and F-W32 are implemented, verified, pushed,
+  and deployed at `a8c2e65`. A configured unsubscribe URL makes preview use the real
   link-style footer with a permanently non-resolving `.invalid` placeholder and no minted
   capability token. Dirty state compares the effective write payload with the saved baseline, so
   reverting a conversation choice clears the warning and a successful save establishes a new
   baseline. No migration, scheduler, transport, footer/header behavior, production data, campaign,
-  enrollment, or send state changed.
+  enrollment, or send state changed. Deployment health/routes, 20 migrations, zero drift,
+  self-check, backup catalogs, the unchanged 24-message sent watermark, and an authenticated
+  read-only UI replay pass.
 - The operator-approved Spaceship deployment, subpath support, sender-domain unsubscribe routing,
   and individual Google Workspace OAuth implementation are complete. Do not extend production
   scope or change DNS/Caddy/mailboxes outside the approved commissioning steps without fresh
@@ -151,7 +153,7 @@ rollback/canary environment.
 - Stack: `docker-compose.spaceship.yml` with `.env.prod`
 - UI: `https://sambhavpmtech.com/email-campaign/`
 - Internal gateway: `127.0.0.1:18080`; host Caddy alone owns public 80/443
-- Deployed application release: `canary` at `6c2c390`
+- Deployed application release: `canary` at `a8c2e65`
 
 The private repository currently has no GitHub deploy credential on the VPS. Until a read-only
 deploy key is deliberately installed, transfer a reviewed `git bundle`, fetch the pinned branch

@@ -4,8 +4,8 @@
 
 **Legend:** `[ ]` not started · `[~]` in progress · `[x]` done · `[!]` blocked (note why in the log)
 
-**Current focus:** → **The Sequence preview and dirty-state follow-up is implemented and verified
-locally; it is not pushed or deployed.** When Compliance uses the sender-domain Unsubscribe URL,
+**Current focus:** → **The Sequence preview and dirty-state follow-up is implemented, verified,
+pushed, and deployed at `a8c2e65`.** When Compliance uses the sender-domain Unsubscribe URL,
 Sequence preview now renders the real link-style footer with a permanently non-resolving `.invalid`
 placeholder and proves that no live unsubscribe capability token is minted. The builder compares
 the effective write payload to its saved baseline, so reverting **Start new conversation** back to
@@ -15,7 +15,15 @@ behavior changed. Verified: type/lint/format; unit 346; web 63; API 144; GreenMa
 exactly 47; mock E2E 62; focused Sequence browser E2E 3; production build; zero projection diffs;
 and clean self-check. A single-process integration run hit varying pre-existing 30-second scenario
 timeouts on unusually slow local Docker; fresh poller 20/20, scheduler 18/18, and event-store 7/7
-runs all pass under the normal limits.
+runs all pass under the normal limits. A SHA-256-matched reviewed bundle fast-forwarded the clean
+Spaceship checkout; all containers, internal/public health, route isolation, 20 migrations,
+`checked 10 enrollments — 0 diff(s)`, and self-check pass. Auto-enrollment, available pool, active
+due/future work, failed jobs, open error alerts, and Personalized Copy blockers remain zero. The
+sent ledger stayed at 24 with its existing watermark. Valid pre/post custom-format dumps are
+`coldemail-20260902-173809.dump` (1,344,276 bytes) and
+`coldemail-20260902-174523.dump` (1,344,955 bytes). An authenticated production replay proved both
+the edit/revert dirty-state behavior and the link-style preview footer without saving. Oracle and
+`main` were unchanged.
 
 **Production baseline:** → **The 2026-09-02 Gmail follow-up footer remediation is implemented, fully
 verified, pushed, and deployed at `c31d73b`.** The footer remains 10px but now uses two visible lines in an

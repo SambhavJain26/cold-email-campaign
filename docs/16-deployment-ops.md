@@ -4,12 +4,14 @@ Single always-on VPS (finalized decision). Docker Compose primary; systemd alter
 in B7 and cut over to Spaceship production on 2026-08-22.
 
 **Production status (2026-09-02):** migration `0019`, the owner-walkthrough remediation, Gmail
-footer remediation, and conversation-choice clarification are deployed on the one-word `canary`
-branch at `6c2c390`. Reviewed bundle
+footer remediation, conversation-choice clarification, and the Sequence preview/dirty-state
+follow-up are deployed on the one-word `canary` branch at `a8c2e65`. Reviewed bundle
 fast-forward, pre/post backup catalogs, container/internal/public health, route matrix, served
 feature markers, self-check, five-enrollment zero-drift dry-run, failed-job check, and no-send
 preflight pass. Production has ten enrollments, with zero due/future work in active campaigns;
 auto-enrollment is disabled and the pool has no available leads. The deployment emitted no mail.
+An authenticated read-only Sequence replay verified the corrected preview footer and edit/revert
+dirty state without saving.
 Both Spaceship-managed outreach domains briefly returned DNSSEC `SERVFAIL`, but their DS and
 DNSKEY tags/digests matched and validating public resolvers plus the full route matrix recovered
 without a configuration change. DNSSEC remains enabled. Oracle remains paused and unchanged.
@@ -170,7 +172,7 @@ Remaining for a full **M3** close: the real-backend walkthrough replay (§5, `e2
 
 Production is live at `https://sambhavpmtech.com/email-campaign/` on the existing Spaceship VM.
 The portfolio at `sambhavbuilds.com` remained online throughout. Application code is pinned to
-`6c2c390` on `canary`; `main` was not merged. Oracle remains paused and unchanged as the temporary
+`a8c2e65` on `canary`; `main` was not merged. Oracle remains paused and unchanged as the temporary
 rollback environment.
 
 - **Reverse proxy:** host Caddy is the only public 80/443 listener. The container gateway binds

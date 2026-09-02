@@ -30,7 +30,7 @@ commissioning** until the operator completes the handoffs below:
   work is limited to testing, verification, diagnosis, and documentation.
 - The operator-approved Personalized Copy/two-tier/campaign-lead-filter release and its 2026-08-31
   import-wizard clarity follow-up are implemented, fully verified, pushed, and deployed on
-  Spaceship; production is now at conversation-choice release `6c2c390` through migration `0019`.
+  Spaceship; production is now at Sequence-preview follow-up `a8c2e65` through migration `0019`.
   It replaces direct Manual Compose sending with sequence-only personalized steps, fixes current
   tiers at A/B, separates Nurture status, adds global-source/campaign-step copy snapshots and
   blockers, and adds exact Pool/Enrolled/Both filtering and bulk tiering. The follow-up replaces
@@ -56,12 +56,13 @@ commissioning** until the operator completes the handoffs below:
   the served DNSKEY tags/digests, and Google, Cloudflare, Quad9, system resolution, and the complete
   public route matrix recovered without a configuration change. Keep DNSSEC enabled; treat this as
   a transient provider incident unless it recurs.
-- The F-W25/F-W32 Sequence-preview follow-up is implemented and verified locally but is not pushed
-  or deployed. Configured unsubscribe-link previews use a permanently non-resolving `.invalid`
+- The F-W25/F-W32 Sequence-preview follow-up is implemented, verified, pushed, and deployed at
+  `a8c2e65`. Configured unsubscribe-link previews use a permanently non-resolving `.invalid`
   placeholder without creating a capability token, and Sequence dirty state now compares the
   effective write payload with its saved baseline so reverted edits become clean. It changes no
   migration, scheduler, transport, footer/header behavior, production data, campaign, enrollment,
-  or send state.
+  or send state. Deployment health/routes, 20 migrations, zero drift, self-check, backup catalogs,
+  the unchanged 24-message sent watermark, and an authenticated read-only UI replay pass.
 - The operator-approved 2026-08-25 ten-workstream implementation is complete and deployed through
   Stages 1–4: operational pagination; due-step Manual Compose; in-app reminders; verified
   timezone/folder controls; imported manual drafts; Auto Observation/sequence variables; staged
@@ -176,7 +177,7 @@ temporary rollback/canary environment.
 - App: `/opt/email-campaign`; stack: `docker-compose.spaceship.yml` with `.env.prod`
 - Public UI: `https://sambhavpmtech.com/email-campaign/`
 - Internal gateway: `127.0.0.1:18080`; host Caddy is the only public 80/443 listener
-- Deployed application release: `canary` at `6c2c390`
+- Deployed application release: `canary` at `a8c2e65`
 
 The repository is private and the VPS currently has no GitHub deploy credential. Until a read-only
 deploy key is deliberately installed, transfer a reviewed `git bundle`, fetch the pinned branch
