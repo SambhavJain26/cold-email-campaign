@@ -1,6 +1,6 @@
 # Local canary runbook (B8.3-local) — two-week validation on throwaway Gmail
 
-## 2026-09-03 runtime dependency remediation — verified locally, not deployed
+## 2026-09-03 runtime dependency remediation — deployed at `552fab8`
 
 The operator approved fixing the runtime audit findings before the final owner-address canary.
 Fastify is updated from **5.10.0 to 5.12.1**; all locked `fast-uri` copies are updated from
@@ -53,11 +53,31 @@ Verification caveats and findings:
   are part of the passing API suite.
 - The production frontend build retains its existing large-chunk warning; it is not a build failure.
 
-A read-only authenticated live visit loaded Overview and Leads successfully, including the
-default Atlas selector and lead-level delivery wording. It confirmed existing suppression on prior
-owner test recipients; no suppression or lead history was cleared. This is not a full live replay
-or a post-deployment test of this dependency candidate. Production remains at `c75a385`.
-Push/deployment and each precisely bounded live send batch still require separate authorization.
+A pre-candidate read-only authenticated live visit loaded Overview and Leads successfully,
+including the default Atlas selector and lead-level delivery wording. It confirmed existing
+suppression on prior owner test recipients; no suppression or lead history was cleared.
+
+After explicit push/deploy authorization, `origin/canary` advanced to `552fab8`. A 4,495,921-byte
+reviewed bundle had matching local/remote SHA-256
+`9da472b2cbd8f82041dab5c5597f5a32c4824b035bd8b321e7870e012acfd204`, verified as complete, and
+fast-forwarded the clean Spaceship checkout from `17cf93d` to that exact commit. App, gateway, and
+backup images rebuilt and the stack recreated. The production prune reported zero vulnerabilities.
+No migration was added.
+
+Preflight sent watermark was 24, with zero due/future active work and auto-enrollment disabled.
+Post-deployment: four healthy containers; internal health `{ok:true,db:true}`; deployed Fastify
+5.12.1 and fast-uri 3.1.7/4.1.4; all 20 migrations through `0019`; `checked 10 enrollments — 0
+diff(s)`; clean self-check; four `ok` mailboxes; zero open error alerts/copy blockers; and the same
+24-message watermark with zero due/future active work. SPA/Sequence routes return 200; the bare
+app path and both outreach roots retain their expected 308 redirects; both unsubscribe roots
+return 404; and the portfolio returns 200. Pre/post dumps
+`coldemail-20260903-182915.dump` (1,472,596 bytes) and
+`coldemail-20260903-183420.dump` (1,473,229 bytes) each passed a 331-entry restore-catalog check.
+The temporary VPS bundle was removed. No lead, campaign, enrollment, mailbox, DNS/Caddy, Oracle,
+or sent state changed. A fresh authenticated post-deployment UI replay remains pending because the
+previous in-app tab was no longer available after the environment transition.
+
+Each precisely bounded live send batch still requires separate authorization.
 The proposed canary ceiling is **20 total messages**, not a guarantee of five per mailbox: normal
 rotation assigns openers, started threads remain pinned, and reply/STOP/unsubscribe/missing-copy
 tests deliberately prevent subsequent sends. New aliases must not bypass recorded opt-outs.

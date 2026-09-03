@@ -4,16 +4,19 @@
 
 **Legend:** `[ ]` not started · `[~]` in progress · `[x]` done · `[!]` blocked (note why in the log)
 
-**Current focus:** → **Runtime dependency remediation is verified locally; not pushed/deployed.**
+**Current focus:** → **Runtime dependency remediation is verified and deployed at `552fab8`.**
 Fastify 5.12.1 and fast-uri 3.1.7/4.1.4 clear the runtime audit. Three new integration checks
 protect Zod root-primitive parsing and the server's untrusted forwarding-header defaults.
 Gate: type/lint/format; unit 346; web 67; API 144; integration 171; GreenMail 29; golden exactly
 47; mock E2E 63; real-backend E2E 1; real-API subpath build; clean Linux npm-ci/pruned app image
 and server import; populated five-enrollment zero drift/self-check and scratch restore.
 Two ambiguous test selectors were corrected. Eight development/build audit findings and the
-F-T01 missing MSW copy-coverage fixture remain separately recorded in docs/17. No production
-mutation or real send occurred. Deployment and the bounded owner-address canary await separate
-authorization; 20 total messages would not guarantee five per mailbox.
+F-T01 missing MSW copy-coverage fixture remain separately recorded in docs/17. Reviewed bundle
+fast-forward, production prune audit, containers/routes, 20 migrations, ten-enrollment zero drift,
+self-check, four healthy mailboxes, zero sendable work/error alerts, unchanged 24-send watermark,
+and pre/post backup catalogs pass. No production data mutation or real send occurred. The bounded
+owner-address canary awaits separate send authorization; 20 total messages would not guarantee
+five per mailbox.
 
 **Latest production release:** → **F-W26–F-W31 are verified, pushed, and deployed at `c75a385`.**
 The six fixes clarify Overview's lead-level delivery status/default campaign, preserve campaign

@@ -32,11 +32,13 @@ commissioning** until the operator completes the handoffs below:
   24-send watermark pass. Authenticated UI replay is pending due to browser-tool
   `ERR_BLOCKED_BY_CLIENT`. Runtime `fast-uri` (high) and `fastify` (moderate) audit advisories
   are resolved in the separately authorized, locally verified Fastify 5.12.1 / fast-uri 3.1.7 and
-  4.1.4 candidate, not yet pushed/deployed. Its full test gate, clean Linux app image, zero-runtime
+  4.1.4 release deployed at `552fab8`. Its full test gate, clean Linux app image, zero-runtime
   audit, and populated restore drill pass. Eight development/build audit findings and F-T01's
   missing MSW copy-coverage fixture remain separate. Read-only authenticated Overview/Leads now
-  loads; a full live replay remains pending. See docs/17. No new send batch is authorized by this
-  dependency update; deployment and precisely bounded owner-address sends remain separately gated.
+  loads; a post-deployment authenticated replay remains pending. Production routes/containers, 20
+  migrations, zero drift, self-check, four mailboxes, zero sendable work/error alerts, unchanged
+  24-send history, and pre/post backup catalogs pass. See docs/17. No new send batch is authorized
+  by this dependency deployment; precisely bounded owner-address sends remain separately gated.
 
 - **The authorized feature scope** includes the completed operator-approved 2026-08-15 list plus
   the 2026-08-20 pre-domain safety backlog: mandatory reply stopping; reply dispositions and
@@ -193,7 +195,7 @@ temporary rollback/canary environment.
 - App: `/opt/email-campaign`; stack: `docker-compose.spaceship.yml` with `.env.prod`
 - Public UI: `https://sambhavpmtech.com/email-campaign/`
 - Internal gateway: `127.0.0.1:18080`; host Caddy is the only public 80/443 listener
-- Deployed application release: `canary` at `c75a385`
+- Deployed application release: `canary` at `552fab8`
 
 The repository is private and the VPS currently has no GitHub deploy credential. Until a read-only
 deploy key is deliberately installed, transfer a reviewed `git bundle`, fetch the pinned branch
