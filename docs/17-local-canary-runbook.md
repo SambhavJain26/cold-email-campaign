@@ -1,5 +1,26 @@
 # Local canary runbook (B8.3-local) — two-week validation on throwaway Gmail
 
+## 2026-09-04 final canary cohort staging — five leads imported, no send state
+
+After the runtime dependency deployment was verified, the operator authorized preparation of five
+fresh owner-controlled aliases for the final canary. The browser's file chooser was not available
+to automation, so the same five CSV rows were submitted individually through **Add lead**. That UI
+uses the normal one-row ingest preview/commit path; it does not bypass hygiene, deduplication, or
+suppression checks.
+
+Read-only production reconciliation verified that the five exact aliases are lead IDs 12–16 with
+`source=csv_import`, `tier=NULL`, `outreach_status=standard`, and `is_suppressed=false`. They have
+zero `campaign_lead_pool` rows and zero enrollments. The database now contains 16 leads in total,
+including the 11 pre-existing records. The sent-event watermark remains 24, auto-enrollment remains
+disabled, and there are zero due enrollments belonging to an active campaign. One older calendar-due
+row belongs to the paused Aurora canary and is therefore not sendable. No campaign was assigned,
+tiered, enrolled, activated, resumed, or sent as part of this staging step.
+
+The Gmail aliases are suitable for the next bounded setup. The university-domain plus alias must be
+treated as unproven until an owner-controlled delivery is accepted; do not infer provider support
+from successful lead ingestion. Campaign assignment, tiering, enrollment, activation, and the exact
+outbound batch remain separately gated.
+
 ## 2026-09-03 runtime dependency remediation — deployed at `552fab8`
 
 The operator approved fixing the runtime audit findings before the final owner-address canary.
