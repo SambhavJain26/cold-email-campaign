@@ -87,7 +87,7 @@ test('13d health: sparklines with thresholds and the watch-rule status', async (
 
 test('cold storage previews multi-source exclusions before confirmation', async ({ page }) => {
   await login(page);
-  await page.getByRole('link', { name: 'Cold Storage' }).click();
+  await page.getByRole('link', { name: 'Cold Storage', exact: true }).click();
   await expect(page.getByLabel('Cold Storage source campaign')).toContainText('Golden Pass 1');
   await page.getByLabel('Cold Storage source campaign').click();
   await page.getByRole('option', { name: 'Manual Send Fixture' }).click();
@@ -103,7 +103,7 @@ test('cold storage previews multi-source exclusions before confirmation', async 
   await page.getByRole('button', { name: 'Create campaign' }).click();
   await expect(page).toHaveURL(/\/campaigns\/\d+$/);
 
-  await page.getByRole('link', { name: 'Cold Storage' }).click();
+  await page.getByRole('link', { name: 'Cold Storage', exact: true }).click();
   await page.getByRole('button', { name: 'Recycle into campaign…' }).click();
   await page.getByText('Manual Send Fixture', { exact: true }).click();
   await page.getByLabel('Target campaign (draft only)').click();
@@ -139,7 +139,7 @@ test('recycling into a campaign with a new sequence succeeds', async ({ page }) 
   await page.getByRole('option', { name: /Listing automation angle/ }).click();
   await page.getByRole('button', { name: 'Create campaign' }).click();
 
-  await page.getByRole('link', { name: 'Cold Storage' }).click();
+  await page.getByRole('link', { name: 'Cold Storage', exact: true }).click();
   await page.getByRole('button', { name: 'Recycle into campaign…' }).click();
   await page.getByText('Manual Send Fixture', { exact: true }).click();
   await page.getByLabel('Target campaign (draft only)').click();

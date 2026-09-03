@@ -7,8 +7,12 @@ in B7 and cut over to Spaceship production on 2026-08-22.
 Health/routes, all 20 migrations, ten-enrollment zero drift, self-check, pre/post backup catalogs,
 and unchanged 24-send history pass. No campaign/enrollment/mailbox/DNS changes or mail occurred.
 Authenticated UI replay is pending due to `ERR_BLOCKED_BY_CLIENT` in the browser tool. Runtime
-dependency advisories (`fast-uri` high, `fastify` moderate) remain a separate pre-launch follow-up;
-the pinned release does not change its dependency lockfile. See docs/17 for exact evidence.
+dependency advisories (`fast-uri` high, `fastify` moderate) are fixed in a locally verified candidate
+using Fastify 5.12.1 and fast-uri 3.1.7/4.1.4, but that candidate is not pushed/deployed. Its clean
+Linux app image, zero-runtime audit, full test gate, and populated restore drill pass; eight
+development/build-tool findings remain separate. A read-only authenticated Overview/Leads visit
+now works, but is not a full live replay. See docs/17 for exact evidence. Deployment still requires
+explicit authorization and must preserve the portfolio, live state, and sent watermark.
 
 **Previous production status (2026-09-02):** migration `0019`, the owner-walkthrough remediation, Gmail
 footer remediation, conversation-choice clarification, and the Sequence preview/dirty-state

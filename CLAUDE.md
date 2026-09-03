@@ -20,7 +20,12 @@ commissioning**:
   Production health/routes, ten-enrollment zero drift, self-check, backup catalogs, and unchanged
   24-send watermark pass. Authenticated UI replay is pending due to browser-tool
   `ERR_BLOCKED_BY_CLIENT`. Runtime `fast-uri` (high) and `fastify` (moderate) audit advisories
-  require separate assessment and tested dependency updates before prospect launch; see docs/17.
+  are resolved in the separately authorized, locally verified Fastify 5.12.1 / fast-uri 3.1.7 and
+  4.1.4 candidate, not yet pushed/deployed. Its full test gate, clean Linux app image, zero-runtime
+  audit, and populated restore drill pass. Eight development/build audit findings and F-T01's
+  missing MSW copy-coverage fixture remain separate. Read-only authenticated Overview/Leads now
+  loads; a full live replay remains pending. See docs/17. No new send batch is authorized by this
+  dependency update; deployment and precisely bounded owner-address sends remain separately gated.
 
 - **Approved build scope — the only feature work authorized:** the completed 2026-08-15 list (public unsubscribe/one-click, launch guardrails, domain-readiness preflight, per-folder polling, and single-lead creation) plus the operator-approved 2026-08-20 pre-domain safety backlog: mandatory reply stopping; reply dispositions and conservative suppression; guarded cross-campaign recontact; broader opt-out phrases; findings #20–25; alert history and mailbox filters; arbitrary custom-field editing; copy-risk rubric improvements; local verification; and runbook/documentation reconciliation. Outside that list, the rule is unchanged: testing, verification, diagnosis, and documentation only.
 - **2026-08-25 implementation status:** the operator-approved ten-workstream run is complete and

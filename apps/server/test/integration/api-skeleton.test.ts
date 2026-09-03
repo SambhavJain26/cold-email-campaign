@@ -2,7 +2,9 @@
 import { Writable } from 'node:stream';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import type { FastifyInstance } from 'fastify';
+import { z } from 'zod';
 import { buildServer } from '../../src/api/server';
+import { registerZodCompilers } from '../../src/api/plugins/zodCompilers';
 import { AppError } from '../../src/api/errors';
 import { createLogger } from '../../src/config/logger';
 import { compose, type AppServices } from '../../src/composition';
@@ -27,6 +29,22 @@ describe('api skeleton', () => {
     });
     app.get('/boom-unknown', () => {
       throw new Error('secret internal detail');
+    });
+    app.get('/request-origin', (req) => ({
+      host: req.host,
+      hostname: req.hostname,
+      protocol: req.protocol,
+      ip: req.ip,
+    }));
+    // Exercise the application's actual compiler with the root-primitive shape
+    // described in GHSA-w2qp-rph6-63g4. The handler must receive parsed data.
+    void app.register(async (probe) => {
+      registerZodCompilers(probe);
+      probe.post(
+        '/validated-primitive',
+        { schema: { body: z.coerce.number().int().min(1).max(10) } },
+        (req) => ({ value: req.body, type: typeof req.body }),
+      );
     });
     await app.ready();
   });
@@ -60,5 +78,48 @@ describe('api skeleton', () => {
     const res = await app.inject({ method: 'GET', url: '/nope' });
     expect(res.statusCode).toBe(404);
     expect(res.json().error.code).toBe('not_found');
+  });
+
+  it('passes a coerced root primitive to the handler as its validated type', async () => {
+    const res = await app.inject({
+      method: 'POST',
+      url: '/validated-primitive',
+      headers: { 'content-type': 'application/json' },
+      payload: JSON.stringify('10'),
+    });
+    expect(res.statusCode).toBe(200);
+    expect(res.json()).toEqual({ value: 10, type: 'number' });
+  });
+
+  it('rejects a root primitive outside the validated bound', async () => {
+    const res = await app.inject({
+      method: 'POST',
+      url: '/validated-primitive',
+      headers: { 'content-type': 'application/json' },
+      payload: JSON.stringify('11'),
+    });
+    expect(res.statusCode).toBe(400);
+    expect(res.json().error.code).toBe('validation');
+  });
+
+  it('does not trust spoofed forwarding headers on the application origin', async () => {
+    const res = await app.inject({
+      method: 'GET',
+      url: '/request-origin',
+      remoteAddress: '127.0.0.1',
+      headers: {
+        host: 'app.internal',
+        'x-forwarded-host': 'attacker.invalid',
+        'x-forwarded-proto': 'https',
+        'x-forwarded-for': '203.0.113.20',
+      },
+    });
+    expect(res.statusCode).toBe(200);
+    expect(res.json()).toEqual({
+      host: 'app.internal',
+      hostname: 'app.internal',
+      protocol: 'http',
+      ip: '127.0.0.1',
+    });
   });
 });

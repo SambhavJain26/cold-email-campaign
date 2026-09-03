@@ -4,7 +4,18 @@
 
 **Legend:** `[ ]` not started · `[~]` in progress · `[x]` done · `[!]` blocked (note why in the log)
 
-**Current focus:** → **F-W26–F-W31 are verified, pushed, and deployed at `c75a385`.**
+**Current focus:** → **Runtime dependency remediation is verified locally; not pushed/deployed.**
+Fastify 5.12.1 and fast-uri 3.1.7/4.1.4 clear the runtime audit. Three new integration checks
+protect Zod root-primitive parsing and the server's untrusted forwarding-header defaults.
+Gate: type/lint/format; unit 346; web 67; API 144; integration 171; GreenMail 29; golden exactly
+47; mock E2E 63; real-backend E2E 1; real-API subpath build; clean Linux npm-ci/pruned app image
+and server import; populated five-enrollment zero drift/self-check and scratch restore.
+Two ambiguous test selectors were corrected. Eight development/build audit findings and the
+F-T01 missing MSW copy-coverage fixture remain separately recorded in docs/17. No production
+mutation or real send occurred. Deployment and the bounded owner-address canary await separate
+authorization; 20 total messages would not guarantee five per mailbox.
+
+**Latest production release:** → **F-W26–F-W31 are verified, pushed, and deployed at `c75a385`.**
 The six fixes clarify Overview's lead-level delivery status/default campaign, preserve campaign
 pool provenance in Leads, add the Cold Storage source selector, distinguish audit/send subjects,
 and correct the Personalized Copy preview prerequisite. Verification: type/lint/format; unit 346;
@@ -14,7 +25,8 @@ No migration, production mutation, or outbound mail. See docs/17 for complete ev
 Production health/routes, 20 migrations, ten-enrollment zero drift, self-check, pre/post backup
 catalogs, and the unchanged 24-send watermark pass. Authenticated browser replay is pending because
 the browser tool returned `ERR_BLOCKED_BY_CLIENT`. Runtime dependency advisories for `fast-uri`
-(high) and `fastify` (moderate) need a separate assessed/tested update before prospect launch.
+(high) and `fastify` (moderate) are fixed in the locally verified candidate above, not yet in
+production. The authenticated Overview/Leads read-only visit now works; full live replay remains.
 
 **Latest deployed follow-up:** → **The Sequence preview and dirty-state follow-up is implemented, verified,
 pushed, and deployed at `a8c2e65`.** When Compliance uses the sender-domain Unsubscribe URL,

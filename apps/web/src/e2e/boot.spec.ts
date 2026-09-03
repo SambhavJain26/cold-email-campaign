@@ -52,7 +52,9 @@ test('session survives reload and navigation works', async ({ page }) => {
   await page.getByLabel('Password').fill('golden-cohort');
   await page.getByRole('button', { name: 'Sign in' }).click();
   await expect(page).toHaveURL(/\/overview$/);
-  await expect(page.getByLabel('Campaign')).toContainText('Golden Pass 1');
+  await expect(page.getByRole('combobox', { name: 'Campaign', exact: true })).toContainText(
+    'Golden Pass 1',
+  );
   await expect(page.getByText(/Lead-level delivery status/)).toBeVisible();
 
   await page.reload();

@@ -1,5 +1,67 @@
 # Local canary runbook (B8.3-local) — two-week validation on throwaway Gmail
 
+## 2026-09-03 runtime dependency remediation — verified locally, not deployed
+
+The operator approved fixing the runtime audit findings before the final owner-address canary.
+Fastify is updated from **5.10.0 to 5.12.1**; all locked `fast-uri` copies are updated from
+3.1.5/4.1.2 to **3.1.7/4.1.4**. The related Fastify `process-warning` dependency advances to 5.1.0.
+No automatic `npm audit fix --force`, schema migration, send-logic change, production mutation,
+push, deployment, activation, enrollment, or real send was performed.
+
+Assessment: the application uses a custom Zod compiler rather than the default Ajv pipeline and
+does not configure numeric `trustProxy`. New integration checks prove parsed root-primitive
+coercion, rejection outside the validated bound, and rejection of spoofed forwarded origin headers
+under the actual server defaults. `fast-uri` is transitive through Fastify's schema tooling; the
+application source has no direct import. These observations narrow the known exposure but are not
+a blanket claim of non-exploitability. Primary advisories:
+[root primitive validation](https://github.com/advisories/GHSA-w2qp-rph6-63g4),
+[proxy trust](https://github.com/advisories/GHSA-3m5p-2c4r-xxw2), and
+[URI normalization](https://github.com/advisories/GHSA-f65p-4m7j-42xc).
+
+Verified gate: typecheck/lint/format; unit **346/346**; web **67/67**; API **144/144**;
+integration **171/171** (including three new probes); GreenMail **29/29**; locked golden exactly
+**47/47**; mock-browser E2E **63/63**; real-backend E2E **1/1**; real-API production Vite build
+for `/email-campaign/`; populated **checked 5 enrollments — 0 diff(s)**; and clean self-check.
+DB-backed suites ran serially. The custom-format local dump
+`/tmp/dependency-security-20260903.dump` in `coldemail-postgres` passed its 321-entry catalog check
+and restored into a newly created `coldemail_dependency_restore_20260903` database. The restored
+five-enrollment cohort also passed zero drift and self-check. Only that disposable restore database
+was dropped afterward; the dump and original test database remain.
+
+A clean Linux `Dockerfile` app-target build (`coldemail-security-candidate:20260903`) passed
+`npm ci`, production pruning, and a network-disabled import of the production server through tsx.
+Both the local `npm audit --omit=dev --json` and the production-image prune audit report **zero
+runtime findings**. The full development/build dependency graph still reports **eight affected
+packages (five moderate, three high)**: `@esbuild-kit/core-utils`, `@esbuild-kit/esm-loader`,
+`drizzle-kit`, `esbuild`, `brace-expansion`, `nanoid`, `postcss`, and `undici`. They remain a separate
+assessed/tooling-update task; some suggested fixes are breaking changes or downgrades. This release
+does not claim that the full repository audit is clean or that future advisories cannot appear.
+
+Verification caveats and findings:
+
+- Local parallel browser/web runs encountered worker/test timeouts under memory pressure. The
+  complete isolated web run and one-worker browser rerun pass. The real-backend server also exceeded
+  its 90-second startup budget while the image build was completing; the isolated rerun passed at
+  the unchanged timeout. These are not claimed as successful initial runs.
+- Two existing browser selectors were ambiguous: `Cold Storage` also matched `Recycle cold
+  storage`, and `Campaign` also matched the sent-today progress label. Exact accessible-role/name
+  selectors now resolve those tests without changing product behavior; the full 63-test rerun passes.
+- **F-T01 — open, mock harness:** the MSW handler set lacks
+  `GET /campaigns/:id/personalized-copy-coverage`. Mock campaign-detail visits therefore log proxy
+  connection refusals despite the covered flows passing. Add a contract-faithful fixture and
+  assertion separately; do not claim mock E2E verifies this coverage card. Real API coverage tests
+  are part of the passing API suite.
+- The production frontend build retains its existing large-chunk warning; it is not a build failure.
+
+A read-only authenticated live visit loaded Overview and Leads successfully, including the
+default Atlas selector and lead-level delivery wording. It confirmed existing suppression on prior
+owner test recipients; no suppression or lead history was cleared. This is not a full live replay
+or a post-deployment test of this dependency candidate. Production remains at `c75a385`.
+Push/deployment and each precisely bounded live send batch still require separate authorization.
+The proposed canary ceiling is **20 total messages**, not a guarantee of five per mailbox: normal
+rotation assigns openers, started threads remain pinned, and reply/STOP/unsubscribe/missing-copy
+tests deliberately prevent subsequent sends. New aliases must not bypass recorded opt-outs.
+
 ## 2026-09-03 shared-VPS cache cleanup — verified
 
 After the operator explicitly approved cache-only cleanup while protecting the portfolio,
@@ -41,12 +103,14 @@ Authenticated post-deploy UI replay remains pending: the in-app browser had no e
 opening the application returned `net::ERR_BLOCKED_BY_CLIENT`. This is a browser-tool limitation;
 the public route and served-asset checks passed, but are not claimed as an authenticated UI replay.
 
-**Dependency follow-up — open:** npm's build audit reported ten total dependency findings. The
+**Dependency follow-up — resolved locally, deployment pending:** npm's build audit reported ten total dependency findings. The
 separate runtime audit (`npm audit --omit=dev --json`) reports two affected packages: high-severity
 `fast-uri` URI-normalization/host-confusion advisories and moderate-severity `fastify` validation/
 proxy advisories. The lockfile is unchanged from the prior deployed release. No exploitability
 claim or blanket safety claim is made; assess exposure and update the dependencies with a fresh
 test gate before prospect launch. No automatic audit fix was applied during this pinned rollout.
+The verified runtime update and remaining development-tool findings are recorded above; this
+historical deployed-release audit must not be mistaken for the candidate's zero-runtime audit.
 
 ## 2026-09-03 remaining six UI findings — verified locally, not deployed
 
