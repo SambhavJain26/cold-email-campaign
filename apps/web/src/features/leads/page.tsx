@@ -144,8 +144,13 @@ export default function LeadsPage() {
     { key: 'tier', header: 'Tier', cell: (l) => <TierBadge tier={l.tier} /> },
     {
       key: 'pool',
-      header: 'Pool',
-      cell: (lead) => lead.pool_assignment?.campaign_name ?? 'Global',
+      header: 'Campaign source',
+      cell: (lead) =>
+        lead.pool_assignment
+          ? `${lead.pool_assignment.campaign_name} · ${lead.pool_assignment.status}`
+          : campaignFilter !== ANY && lead.latest_enrollment?.campaign_id === Number(campaignFilter)
+            ? 'Direct enrollment'
+            : 'Global lead',
     },
     {
       key: 'state',
@@ -457,7 +462,12 @@ export default function LeadsPage() {
                   <StateBadge state={lead.latest_enrollment.current_state} />
                 ))}
               <span className="text-xs text-muted-foreground">
-                {lead.pool_assignment ? `Pool: ${lead.pool_assignment.campaign_name}` : 'Global'}
+                {lead.pool_assignment
+                  ? `Campaign source: ${lead.pool_assignment.campaign_name} · ${lead.pool_assignment.status}`
+                  : campaignFilter !== ANY &&
+                      lead.latest_enrollment?.campaign_id === Number(campaignFilter)
+                    ? 'Campaign source: direct enrollment'
+                    : 'Campaign source: global lead'}
               </span>
               {[lead.city, lead.state].filter(Boolean).length > 0 && (
                 <span className="text-xs text-muted-foreground">

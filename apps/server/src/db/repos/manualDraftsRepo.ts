@@ -5,6 +5,7 @@ import {
   campaigns,
   personalizedCopyBlockers,
   personalizedCopySources,
+  sentMessages,
   sequenceSteps,
 } from '../schema';
 import { contentHashOf } from '../../render/hash';
@@ -34,10 +35,16 @@ export async function listPersonalizedCopiesForLead(db: DbLike, leadId: number) 
     .where(eq(personalizedCopySources.leadId, leadId))
     .orderBy(asc(personalizedCopySources.slotNo));
   const copies = await db
-    .select({ copy: campaignPersonalizedCopies, step: sequenceSteps, campaign: campaigns })
+    .select({
+      copy: campaignPersonalizedCopies,
+      step: sequenceSteps,
+      campaign: campaigns,
+      sentRenderedSubject: sentMessages.renderedSubject,
+    })
     .from(campaignPersonalizedCopies)
     .leftJoin(sequenceSteps, eq(campaignPersonalizedCopies.sequenceStepId, sequenceSteps.id))
     .innerJoin(campaigns, eq(campaignPersonalizedCopies.campaignId, campaigns.id))
+    .leftJoin(sentMessages, eq(campaignPersonalizedCopies.sentMessageId, sentMessages.messageId))
     .where(eq(campaignPersonalizedCopies.leadId, leadId))
     .orderBy(asc(campaignPersonalizedCopies.campaignId), asc(campaignPersonalizedCopies.stepNo));
   return { sources, copies };

@@ -11,6 +11,13 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 Spaceship production infrastructure is live, but the project remains in **pre-prospect-send
 commissioning**:
 
+- **2026-09-03 remaining UI findings:** operator-approved F-W26–F-W31 are implemented and
+  verified locally on `canary`, not pushed or deployed. They clarify lead-level confirmation,
+  campaign provenance/default selection, Cold Storage source selection, sent-copy audit subjects,
+  and personalized-preview prerequisites. The complete serial test gate and populated five-lead
+  zero-drift/self-check/scratch restore pass; docs/17 records the evidence. No migration,
+  scheduler, transport, footer/header, event-ledger, or production-state change was made.
+
 - **Approved build scope — the only feature work authorized:** the completed 2026-08-15 list (public unsubscribe/one-click, launch guardrails, domain-readiness preflight, per-folder polling, and single-lead creation) plus the operator-approved 2026-08-20 pre-domain safety backlog: mandatory reply stopping; reply dispositions and conservative suppression; guarded cross-campaign recontact; broader opt-out phrases; findings #20–25; alert history and mailbox filters; arbitrary custom-field editing; copy-risk rubric improvements; local verification; and runbook/documentation reconciliation. Outside that list, the rule is unchanged: testing, verification, diagnosis, and documentation only.
 - **2026-08-25 implementation status:** the operator-approved ten-workstream run is complete and
   deployed through Stages 1–4: operational pagination; due-step Manual Compose; in-app reminders;

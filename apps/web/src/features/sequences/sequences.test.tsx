@@ -14,7 +14,7 @@ import {
   parseSaveErrors,
   toWriteBody,
 } from './draft';
-import { footerPreviewParts, splitFooter } from './preview-panel';
+import { footerPreviewParts, previewRequirement, splitFooter } from './preview-panel';
 import { StepCard } from './step-card';
 
 const sequence: SequenceDto = {
@@ -119,6 +119,33 @@ describe('draftFromSequence / toWriteBody', () => {
         { ...saved, variable_defaults: { zed: 'last', alpha: 'first' } },
       ),
     ).toBe(true);
+  });
+});
+
+describe('preview guidance', () => {
+  it('asks for a lead after a personalized campaign context is selected', () => {
+    expect(previewRequirement({ stepNo: 3, variant: null }, 7, null)).toBe(
+      'Pick a lead to render against.',
+    );
+  });
+
+  it('reserves the unsaved message for a genuinely new template variant', () => {
+    expect(
+      previewRequirement(
+        {
+          stepNo: 1,
+          variant: {
+            uid: 'new',
+            label: 'B',
+            subject_template: 'Subject',
+            body_template: 'Body',
+            active: true,
+          },
+        },
+        null,
+        null,
+      ),
+    ).toBe('This variant is new — save the sequence before previewing it.');
   });
 });
 

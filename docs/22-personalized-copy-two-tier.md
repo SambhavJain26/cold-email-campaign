@@ -120,7 +120,11 @@ The lead Edit card keeps arbitrary custom fields, Custom Observation, Notes, sup
 erasure, and the event timeline. Its Personalized Copy editor selects **Reusable lead copy · not
 assigned to a campaign** or a Campaign + Personalized Step and exposes subject/body, provenance,
 readiness, preview/risk checks, target-named Save Draft/Mark Ready/Copy actions. Sent copy is
-read-only. Authoritative lead edits remount the form if tier/status/custom fields/notes changed, so
+read-only. Its preview labels **Saved copy subject (audit)** separately from **Subject actually
+sent**, loaded from the immutable sent-message snapshot (`sent_subject` in the campaign-copy list
+DTO). Historical null snapshots are explicitly unavailable rather than reconstructed. Campaign-
+filtered Leads displays that campaign's pool provenance, including enrolled/released rows, or
+**Direct enrollment** when no matching pool record exists. Authoritative lead edits remount the form if tier/status/custom fields/notes changed, so
 an unrelated save cannot submit a stale tier after bulk editing.
 
 ## 5. Campaign and sequence behavior

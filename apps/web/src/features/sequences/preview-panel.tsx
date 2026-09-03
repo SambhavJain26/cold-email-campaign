@@ -23,6 +23,22 @@ export interface PreviewTarget {
   variant: DraftVariant | null;
 }
 
+export function previewRequirement(
+  target: PreviewTarget | null,
+  campaignId: number | null,
+  leadId: number | null,
+): string | null {
+  if (target === null) return 'Choose Preview on a step card.';
+  if (target.variant === null && campaignId === null) {
+    return 'Choose a campaign context for this personalized step.';
+  }
+  if (target.variant !== null && target.variant.id === undefined) {
+    return 'This variant is new — save the sequence before previewing it.';
+  }
+  if (leadId === null) return 'Pick a lead to render against.';
+  return null;
+}
+
 const FOOTER_SEPARATOR = '\n\n';
 
 /** The engine appends the CAN-SPAM footer after all expansion (docs/08 §4) — split
@@ -69,11 +85,8 @@ export function PreviewPanel({
   const preview = usePreviewSequence(sequenceId ?? 0);
 
   const selectedLead = leads.data?.items.find((lead) => lead.id === leadId);
-  const canPreview =
-    sequenceId !== null &&
-    target !== null &&
-    (target.variant === null ? campaignId !== null : target.variant.id !== undefined) &&
-    leadId !== null;
+  const requirement = previewRequirement(target, campaignId, leadId);
+  const canPreview = sequenceId !== null && requirement === null;
 
   const rendered = preview.data ? splitFooter(preview.data.body) : null;
   const renderedFooter = rendered?.footer ? footerPreviewParts(rendered.footer) : null;
@@ -180,17 +193,7 @@ export function PreviewPanel({
           >
             {preview.isPending ? 'Rendering…' : 'Render preview'}
           </Button>
-          {!canPreview && (
-            <p className="text-[11px] text-muted-foreground">
-              {target === null
-                ? 'Choose Preview on a step card.'
-                : target.variant === null && campaignId === null
-                  ? 'Choose a campaign context for this personalized step.'
-                  : target.variant?.id === undefined
-                    ? 'This variant is new — save the sequence before previewing it.'
-                    : 'Pick a lead to render against.'}
-            </p>
-          )}
+          {!canPreview && <p className="text-[11px] text-muted-foreground">{requirement}</p>}
 
           {preview.data && (
             <div className="space-y-3" data-testid="preview-result">

@@ -44,6 +44,7 @@ test('Campaign filter exposes Pool, Enrolled, and Both membership scopes', async
   await expect(page.getByLabel('Campaign membership scope')).toHaveText('Both');
   await expect(page.getByRole('table').getByRole('row')).toHaveCount(26);
   await expect(page.getByRole('navigation', { name: 'Leads pagination' })).toContainText('36');
+  await expect(page.getByRole('table')).toContainText('Direct enrollment');
 
   await page.getByLabel('Campaign membership scope').click();
   await page.getByRole('option', { name: 'Pool' }).click();

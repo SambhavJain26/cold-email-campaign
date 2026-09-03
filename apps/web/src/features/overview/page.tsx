@@ -136,8 +136,10 @@ export default function OverviewPage() {
           className="max-w-xl"
         />
         <p className="mt-2 text-xs text-muted-foreground">
-          {data.delivery_confirmation.confirmed} delivery confirmed ·{' '}
-          {data.delivery_confirmation.pending} awaiting confirmation
+          Lead-level delivery status: {data.delivery_confirmation.confirmed} contacted lead
+          {data.delivery_confirmation.confirmed === 1 ? '' : 's'} with a confirmed delivery or
+          recipient action · {data.delivery_confirmation.pending} with only pending sent mail.
+          Message-level confirmation appears in Analytics.
         </p>
         {estimate && (
           <p

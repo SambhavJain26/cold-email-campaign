@@ -275,13 +275,21 @@ export async function listLeads(
       .from(campaignLeadPool)
       .innerJoin(campaigns, eq(campaigns.id, campaignLeadPool.campaignId))
       .where(
-        and(
-          inArray(
-            campaignLeadPool.leadId,
-            rows.map((row) => row.id),
-          ),
-          eq(campaignLeadPool.status, 'available'),
-        ),
+        filter.campaignId === undefined
+          ? and(
+              inArray(
+                campaignLeadPool.leadId,
+                rows.map((row) => row.id),
+              ),
+              eq(campaignLeadPool.status, 'available'),
+            )
+          : and(
+              inArray(
+                campaignLeadPool.leadId,
+                rows.map((row) => row.id),
+              ),
+              eq(campaignLeadPool.campaignId, filter.campaignId),
+            ),
       )
       .orderBy(campaignLeadPool.id);
     for (const pool of poolRows) poolByLead.set(pool.leadId, pool);

@@ -22,6 +22,13 @@ call planned work implemented.
 The Spaceship production infrastructure is live, but the project remains in **pre-prospect-send
 commissioning** until the operator completes the handoffs below:
 
+- **2026-09-03 remaining UI findings:** operator-approved F-W26–F-W31 are implemented and
+  verified locally on `canary`, not pushed or deployed. They clarify lead-level confirmation,
+  campaign provenance/default selection, Cold Storage source selection, sent-copy audit subjects,
+  and personalized-preview prerequisites. The complete serial test gate and populated five-lead
+  zero-drift/self-check/scratch restore pass; docs/17 records the evidence. No migration,
+  scheduler, transport, footer/header, event-ledger, or production-state change was made.
+
 - **The authorized feature scope** includes the completed operator-approved 2026-08-15 list plus
   the 2026-08-20 pre-domain safety backlog: mandatory reply stopping; reply dispositions and
   conservative suppression; guarded cross-campaign recontact; broader opt-out phrases; findings

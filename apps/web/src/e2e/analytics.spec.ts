@@ -88,6 +88,11 @@ test('13d health: sparklines with thresholds and the watch-rule status', async (
 test('cold storage previews multi-source exclusions before confirmation', async ({ page }) => {
   await login(page);
   await page.getByRole('link', { name: 'Cold Storage' }).click();
+  await expect(page.getByLabel('Cold Storage source campaign')).toContainText('Golden Pass 1');
+  await page.getByLabel('Cold Storage source campaign').click();
+  await page.getByRole('option', { name: 'Manual Send Fixture' }).click();
+  await expect(page).toHaveURL(/\/cold-storage\?campaign=2$/);
+  await expect(page.getByText('· from Manual Send Fixture')).toBeVisible();
   await expect(page.getByText(/of \d+ finished leads are ready/)).toBeVisible();
   await expect(page.getByTestId('next-eligible')).toBeVisible();
 

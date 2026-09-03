@@ -150,11 +150,39 @@ describe('personalized copy API', () => {
   });
 
   it('keeps sent campaign copy immutable', async () => {
+    await h.pool.query(`
+      INSERT INTO mailboxes (display_name, from_address, smtp_host, imap_host)
+      VALUES ('Sent copy mailbox', 'sent-copy@test.dev', 'smtp.test.dev', 'imap.test.dev')`);
+    await h.pool.query(`
+      INSERT INTO enrollments
+        (campaign_id, lead_id, current_state, current_step_no, personalization_mode, enrolled_at)
+      VALUES (1, 1, 'COMPLETED', 4, 'template_researched', now())`);
+    const copy = await h.pool.query(`
+      SELECT id FROM campaign_personalized_copies
+       WHERE lead_id = 1 AND campaign_id = 1 AND step_no = 1`);
+    await h.pool.query(
+      `INSERT INTO sent_messages
+        (message_id, enrollment_id, lead_id, mailbox_id, step_no, content_hash,
+         rendered_subject, rendered_body_text, rendered_body_html, content_source,
+         personalized_copy_id, sent_at)
+       VALUES ('<immutable@copy.dev>', 1, 1, 1, 1, 'sent-copy-hash',
+               'Re: Actual threaded subject', 'Sent text', '<p>Sent text</p>',
+               'personalized', $1, now())`,
+      [copy.rows[0].id],
+    );
     await h.pool.query(
       `UPDATE campaign_personalized_copies
           SET status = 'sent', sent_at = now(), sent_message_id = '<immutable@copy.dev>'
         WHERE lead_id = 1 AND campaign_id = 1 AND step_no = 1`,
     );
+    const listed = (
+      await h.inject({ method: 'GET', url: '/api/v1/leads/1/personalized-copies' })
+    ).json();
+    expect(listed.campaign_copies[0]).toMatchObject({
+      subject: 'Source subject',
+      sent_subject: 'Re: Actual threaded subject',
+      status: 'sent',
+    });
     const edit = await h.inject({
       method: 'PUT',
       url: '/api/v1/leads/1/campaigns/1/steps/1/personalized-copy',

@@ -1,6 +1,16 @@
 import { useState } from 'react';
 import { Recycle } from 'lucide-react';
+import { useSearchParams } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
+import { Field, FieldLabel } from '@/components/ui/field';
+import {
+  Select,
+  SelectContent,
+  SelectGroup,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 import { Skeleton } from '@/components/ui/skeleton';
 import { EmptyState } from '@/components/shared/empty-state';
 import { DataTable } from '@/components/shared/data-table';
@@ -17,6 +27,7 @@ function daysUntil(iso: string, now = new Date()): number {
 /** F7.5 — Cold Storage (docs/12 §9): who has rested long enough for a second pass. */
 export default function ColdStoragePage() {
   const campaigns = useCampaigns();
+  const [searchParams, setSearchParams] = useSearchParams();
   const selected = useCampaignParam();
   const sourceCampaignId = selected ?? campaigns.data?.items[0]?.id;
   const source = campaigns.data?.items.find((c) => c.id === sourceCampaignId);
@@ -68,9 +79,36 @@ export default function ColdStoragePage() {
   return (
     <div className="space-y-4 p-4 sm:p-6">
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <div className="flex items-baseline gap-2">
-          <h1 className="text-lg font-semibold">Cold Storage</h1>
-          {source && <span className="text-sm text-muted-foreground">· from {source.name}</span>}
+        <div className="flex min-w-0 flex-col gap-2">
+          <div className="flex items-baseline gap-2">
+            <h1 className="text-lg font-semibold">Cold Storage</h1>
+            {source && <span className="text-sm text-muted-foreground">· from {source.name}</span>}
+          </div>
+          <Field className="max-w-xs gap-1.5">
+            <FieldLabel htmlFor="cold-storage-source">Source campaign</FieldLabel>
+            <Select
+              value={String(sourceCampaignId)}
+              onValueChange={(value) => {
+                const next = new URLSearchParams(searchParams);
+                next.set('campaign', value);
+                setSearchParams(next, { replace: true });
+                setPagination({ sourceCampaignId: Number(value), page: 1 });
+              }}
+            >
+              <SelectTrigger id="cold-storage-source" aria-label="Cold Storage source campaign">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectGroup>
+                  {(campaigns.data?.items ?? []).map((campaign) => (
+                    <SelectItem key={campaign.id} value={String(campaign.id)}>
+                      {campaign.name}
+                    </SelectItem>
+                  ))}
+                </SelectGroup>
+              </SelectContent>
+            </Select>
+          </Field>
         </div>
         <Button size="sm" onClick={() => setDialogOpen(true)}>
           <Recycle className="size-4" /> Recycle into campaign…

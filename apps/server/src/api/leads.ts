@@ -155,6 +155,7 @@ function campaignCopyDto(row: ListedCampaignCopy) {
     content_hash: row.copy.contentHash ?? contentHashOf(row.copy.subject, row.copy.body),
     sent_event_id: row.copy.sentEventId,
     sent_message_id: row.copy.sentMessageId,
+    sent_subject: row.sentRenderedSubject,
     created_at: row.copy.createdAt.toISOString(),
     updated_at: row.copy.updatedAt.toISOString(),
     sent_at: row.copy.sentAt?.toISOString() ?? null,

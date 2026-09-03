@@ -206,9 +206,10 @@ so a later imported batch can be allocated and enrolled.
   provider inbox-placement receipt.
 - `contacted` means the lead has at least one SMTP-accepted `sent` event in that campaign. It is a
   distinct-lead count, so follow-ups do not multiply it.
-- `delivery confirmed` means the lead has a delivered, human-reply, or unsubscribe fact. The UI
-  separately shows accepted recipients still awaiting delivery confirmation. A hard bounce
-  resolves the pending state without becoming a confirmed delivery.
+- Overview's **Lead-level delivery status** counts contacted leads with any confirmed delivery
+  or recipient action, and those with only pending sent mail. A lead can have an earlier confirmed
+  message and a later pending follow-up; see Analytics for **message-level** confirmation.
+  A hard bounce resolves the pending state without becoming a confirmed delivery.
 
 ### 4.6 Suppression
 
@@ -1227,6 +1228,10 @@ unsubscribe trend. Pause and investigate trends; do not “solve” them by incr
 ## 14. Cold Storage
 
 Cold Storage lists unsuppressed leads whose enrollment completed without reply.
+
+Use **Source campaign** to choose which campaign's completed leads to inspect. The selection is
+stored in the page URL and changing it resets pagination to the first page. This viewing choice
+does not recycle or enroll anyone; recycling has its own preview and confirmation.
 
 ![Cold Storage showing rest-period eligibility and the second-pass recycle action](images/user-manual/13-cold-storage.png)
 

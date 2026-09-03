@@ -76,6 +76,7 @@ export function PersonalizedCopyEditor({
   const currentBody = editedScope === scope ? body : (selected?.body ?? '');
 
   const sent = selected && 'sent_event_id' in selected && selected.status === 'sent';
+  const sentSubject = sent && 'sent_subject' in selected ? selected.sent_subject : null;
   const warnings = [
     ...(currentSubject.length > 78 ? ['Subject is longer than 78 characters.'] : []),
     ...(currentBody.trim().length < 20 ? ['Body is unusually short.'] : []),
@@ -211,7 +212,18 @@ export function PersonalizedCopyEditor({
           </Field>
           <div className="rounded-md border border-border p-3 text-sm">
             <p className="font-medium">Preview</p>
-            <p className="mt-2 whitespace-pre-wrap">{currentSubject || 'No subject'}</p>
+            <p className="mt-2 text-xs text-muted-foreground">
+              {sent ? 'Saved copy subject (audit)' : 'Subject'}
+            </p>
+            <p className="mt-1 whitespace-pre-wrap">{currentSubject || 'No subject'}</p>
+            {sent && (
+              <>
+                <p className="mt-3 text-xs text-muted-foreground">Subject actually sent</p>
+                <p className="mt-1 whitespace-pre-wrap">
+                  {sentSubject ?? 'Not recorded for this historical send'}
+                </p>
+              </>
+            )}
             <p className="mt-3 whitespace-pre-wrap text-muted-foreground">
               {currentBody || 'No body'}
             </p>

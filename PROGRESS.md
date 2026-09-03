@@ -4,7 +4,15 @@
 
 **Legend:** `[ ]` not started · `[~]` in progress · `[x]` done · `[!]` blocked (note why in the log)
 
-**Current focus:** → **The Sequence preview and dirty-state follow-up is implemented, verified,
+**Current focus:** → **F-W26–F-W31 are fixed and verified locally; not pushed or deployed.**
+The six fixes clarify Overview's lead-level delivery status/default campaign, preserve campaign
+pool provenance in Leads, add the Cold Storage source selector, distinguish audit/send subjects,
+and correct the Personalized Copy preview prerequisite. Verification: type/lint/format; unit 346;
+web 67; API 144; integration 168; GreenMail 29; golden exactly 47; mock E2E 63; real-backend E2E 1;
+production build; populated five-enrollment zero drift; self-check; and validated scratch restore.
+No migration, production mutation, or outbound mail. See docs/17 for complete evidence and caveats.
+
+**Latest deployed follow-up:** → **The Sequence preview and dirty-state follow-up is implemented, verified,
 pushed, and deployed at `a8c2e65`.** When Compliance uses the sender-domain Unsubscribe URL,
 Sequence preview now renders the real link-style footer with a permanently non-resolving `.invalid`
 placeholder and proves that no live unsubscribe capability token is minted. The builder compares

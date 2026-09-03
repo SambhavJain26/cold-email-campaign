@@ -33,7 +33,8 @@ describe('campaign-scoped lead filtering and bulk actions', () => {
         (1, 1, 1, 'available', NULL, NULL, NULL),
         (1, 3, 2, 'available', NULL, NULL, NULL),
         (1, 4, 3, 'released',  NULL, NULL, now()),
-        (1, 5, 4, 'released',  3, now() - interval '5 days', now())`);
+        (1, 5, 4, 'released',  3, now() - interval '5 days', now()),
+        (1, 2, 5, 'enrolled',  1, now() - interval '10 days', NULL)`);
   });
 
   afterAll(async () => {
@@ -58,6 +59,14 @@ describe('campaign-scoped lead filtering and bulk actions', () => {
       'enrolled-only@scope.dev',
       'released-enrolled@scope.dev',
     ]);
+    expect(
+      enrolled.items.find((lead: { email: string }) => lead.email === 'enrolled-only@scope.dev')
+        .pool_assignment,
+    ).toMatchObject({ campaign_name: 'Scoped Campaign', status: 'enrolled' });
+    expect(
+      enrolled.items.find((lead: { email: string }) => lead.email === 'released-enrolled@scope.dev')
+        .pool_assignment,
+    ).toMatchObject({ campaign_name: 'Scoped Campaign', status: 'released' });
 
     const both = (
       await h.inject({ method: 'GET', url: '/api/v1/leads?campaign_id=1&campaign_scope=both' })

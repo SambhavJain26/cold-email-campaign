@@ -1,5 +1,33 @@
 # Local canary runbook (B8.3-local) — two-week validation on throwaway Gmail
 
+## 2026-09-03 remaining six UI findings — verified locally, not deployed
+
+The operator-approved F-W26–F-W31 fixes are complete and locally verified on `canary`.
+Overview explicitly labels delivery status as lead-level and names its default campaign. Leads
+shows selected-campaign pool provenance (including enrolled/released history) or Direct enrollment,
+instead of mislabeling enrolled campaign leads Global. Cold Storage has a visible URL-backed source
+campaign selector. Sent Personalized Copy shows both the saved audit subject and the exact stored
+send subject, with an explicit unavailable label for historical null snapshots. Personalized
+Sequence preview asks for a lead rather than calling the step an unsaved variant.
+
+Verified serial gate: typecheck/lint/format; unit **346/346**; web **67/67**; API **144/144**;
+integration **168/168**; GreenMail **29/29**; locked golden exactly **47/47**; mock-browser E2E
+**63/63**; real-backend E2E **1/1**; production Vite build; populated `checked 5 enrollments — 0
+diff(s)`; clean self-check; and a custom-format backup catalog/scratch restore with the same
+five-enrollment zero-drift and self-check results. The first complete browser run caught a default
+selector interaction regression; it was corrected and the full suite rerun successfully. Web tests
+also pass with a 20-second CLI test budget after a load-related default-timeout failure.
+
+The standalone golden seeder is not a valid input to the generic shape-loading CLI without its
+fixture-specific campaign shape: it stores no sequence, while its completion helper uses an
+explicit golden shape. A supplemental run therefore reported shape-dependent differences. No
+production projection was changed; the normal real-backend five-lead cohort supplied the final
+populated check. The locked golden fixtures and their 47-test gate were not modified.
+
+No migration, event-ledger, scheduler, transport, footer/header, or sending behavior changed.
+Production remains at `a8c2e65`; no push, deployment, production mutation, or outbound mail was
+performed. Deployment and authenticated production replay remain separately authorized steps.
+
 ## 2026-09-02 owner-address follow-up visibility and reply canary
 
 ### Post-remediation live retest — provider behavior accepted; headers verified
@@ -46,12 +74,12 @@ window was closed; it remains open for operator acknowledgement as historical ev
 | ID | Verified behavior | Required improvement |
 |---|---|---|
 | F-W25 | Sequence preview rendered the fallback “Reply STOP” footer although Compliance was configured with the sender-domain Unsubscribe URL; the actual scheduled message used the correct link-only footer. | **Fixed and deployed:** configured link mode now renders through the real footer with a permanently non-resolving `.invalid` preview URL. Preview creates no unsubscribe capability token. |
-| F-W26 | Analytics showed the new Step 3 message as pending immediately, but Overview still said “3 delivery confirmed · 0 awaiting confirmation” because it classifies contacted leads by whether they have any earlier confirmed message. | Label the Overview values as lead-level status or add a distinct pending-message count; do not imply that no current message awaits confirmation. |
-| F-W27 | Leads → Aurora → Enrolled/Both returned the correct three leads, but the Pool column labeled every enrolled pool lead “Global” because the list DTO exposes only currently-available pool assignments. | Show the selected campaign/enrolled pool provenance, or rename the column so terminal/enrolled pool rows are not mislabeled. |
-| F-W28 | Cold Storage silently defaulted to Atlas after the global header selector was removed. Beacon's finished lead appeared only by manually adding `?campaign=2`; no visible source-campaign control exists. | Add a Cold Storage source-campaign selector and keep it synchronized with the URL. |
-| F-W29 | The sent Aurora Step 3 record was correctly immutable, but its Personalized Copy editor preview displayed the saved audit subject (`A second Northstar angle`) rather than the actual in-thread subject (`Re: Aanya, a quick Northstar idea`). | Show both saved audit subject and effective send subject, clearly labeled. |
-| F-W30 | A bare Overview route rendered the default campaign's metrics while the selector still displayed “Select campaign…”; selecting a campaign corrected the value. | Resolve and display the default campaign in the selector whenever default campaign data is shown. |
-| F-W31 | During Sequence preview, selecting a campaign before selecting a lead briefly showed “This variant is new — save the sequence before previewing it” for an existing Personalized Copy step. | Replace it with a lead-selection prompt and reserve the unsaved-variant message for genuinely new template variants. |
+| F-W26 | Analytics showed the new Step 3 message as pending immediately, but Overview still said “3 delivery confirmed · 0 awaiting confirmation” because it classifies contacted leads by whether they have any earlier confirmed message. | **Fixed and verified locally:** explicit lead-level wording distinguishes these values from Analytics message-level confirmation. Not deployed. |
+| F-W27 | Leads → Aurora → Enrolled/Both returned the correct three leads, but the Pool column labeled every enrolled pool lead “Global” because the list DTO exposes only currently-available pool assignments. | **Fixed and verified locally:** Campaign source shows selected-campaign pool status or Direct enrollment; API covers enrolled/released provenance. Not deployed. |
+| F-W28 | Cold Storage silently defaulted to Atlas after the global header selector was removed. Beacon's finished lead appeared only by manually adding `?campaign=2`; no visible source-campaign control exists. | **Fixed and verified locally:** visible Source campaign selector updates the URL and resets pagination. Not deployed. |
+| F-W29 | The sent Aurora Step 3 record was correctly immutable, but its Personalized Copy editor preview displayed the saved audit subject (`A second Northstar angle`) rather than the actual in-thread subject (`Re: Aanya, a quick Northstar idea`). | **Fixed and verified locally:** separately labeled audit and actually-sent subjects, using the immutable snapshot; historical missing snapshots are explicit. Not deployed. |
+| F-W30 | A bare Overview route rendered the default campaign's metrics while the selector still displayed “Select campaign…”; selecting a campaign corrected the value. | **Fixed and verified locally:** the selector names the default campaign; explicit selection still writes the URL and deep links remain intact. Not deployed. |
+| F-W31 | During Sequence preview, selecting a campaign before selecting a lead briefly showed “This variant is new — save the sequence before previewing it” for an existing Personalized Copy step. | **Fixed and verified locally:** personalized preview asks for a lead; only genuinely new template variants receive the unsaved-variant prompt. Not deployed. |
 | F-W32 | In the deployed Sequence builder, changing a later step from **Continue existing conversation** to **Start new conversation** and then restoring the original choice still left the **Unsaved changes** banner visible. | **Fixed and deployed:** dirty state is derived from the effective write payload versus its saved baseline, so a full revert clears the warning and each successful save establishes the new baseline. |
 
 The F-W25/F-W32 remediation is deployed at application commit `a8c2e65`. It changes no database

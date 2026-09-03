@@ -36,6 +36,7 @@ export const campaignPersonalizedCopySchema = z
     content_hash: z.string(),
     sent_event_id: z.number().int().positive().nullable(),
     sent_message_id: z.string().nullable(),
+    sent_subject: z.string().nullable(),
     created_at: isoDateTime,
     updated_at: isoDateTime,
     sent_at: isoDateTime.nullable(),

@@ -608,6 +608,7 @@ export const handlers: RequestHandler[] = [
         content_hash: `mock-${leadId}-${campaignId}-${stepNo}-${subject.length}-${copyBody.length}`,
         sent_event_id: null,
         sent_message_id: null,
+        sent_subject: null,
         created_at: existing?.created_at ?? NOW,
         updated_at: NOW,
         sent_at: null,

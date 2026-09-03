@@ -141,3 +141,16 @@ test('a template parse error is refused by the server and mapped to its variant 
   await page.getByRole('button', { name: 'Save sequence' }).click();
   await expect(page.getByText('Sequence saved')).toBeVisible();
 });
+
+test('personalized preview asks for a lead after campaign selection', async ({ page }) => {
+  await login(page);
+  await page.goto('/sequences/2');
+
+  await page.getByRole('button', { name: 'Preview personalized step 1' }).click();
+  const panel = page.getByTestId('preview-panel');
+  await panel.getByLabel('Preview campaign context').click();
+  await page.getByRole('option', { name: /Beacon import mapping/ }).click();
+
+  await expect(panel.getByText('Pick a lead to render against.')).toBeVisible();
+  await expect(panel.getByText(/This variant is new/)).toHaveCount(0);
+});

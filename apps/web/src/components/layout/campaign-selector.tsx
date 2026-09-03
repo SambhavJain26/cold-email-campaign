@@ -18,12 +18,21 @@ export function useCampaignParam(): number | undefined {
   return Number.isInteger(id) && id > 0 ? id : undefined;
 }
 
+export function resolveCampaignSelection(
+  campaigns: ReadonlyArray<{ id: number }>,
+  selected: number | undefined,
+): number | undefined {
+  return campaigns.some((campaign) => campaign.id === selected) ? selected : campaigns[0]?.id;
+}
+
 export function CampaignSelector() {
   const { data } = useCampaigns();
   const [searchParams, setSearchParams] = useSearchParams();
   const selected = useCampaignParam();
 
   const items = useMemo(() => data?.items ?? [], [data]);
+  const effectiveSelected = resolveCampaignSelection(items, selected);
+  const effectiveCampaign = items.find((campaign) => campaign.id === effectiveSelected);
 
   useEffect(() => {
     // An empty array before the campaigns query resolves is not evidence that
@@ -50,7 +59,7 @@ export function CampaignSelector() {
         className="min-h-11 min-w-0 flex-1 sm:w-56 sm:flex-none md:min-h-8"
         aria-label="Campaign"
       >
-        <SelectValue placeholder={items.length === 0 ? 'No campaigns' : 'Select campaign…'} />
+        <SelectValue placeholder={effectiveCampaign?.name ?? 'No campaigns'} />
       </SelectTrigger>
       <SelectContent>
         {items.map((campaign) => (
