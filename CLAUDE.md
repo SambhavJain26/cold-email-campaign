@@ -12,11 +12,15 @@ Spaceship production infrastructure is live, but the project remains in **pre-pr
 commissioning**:
 
 - **2026-09-03 remaining UI findings:** operator-approved F-W26–F-W31 are implemented and
-  verified locally on `canary`, not pushed or deployed. They clarify lead-level confirmation,
+  verified, pushed, and deployed at `c75a385` on `canary`. They clarify lead-level confirmation,
   campaign provenance/default selection, Cold Storage source selection, sent-copy audit subjects,
   and personalized-preview prerequisites. The complete serial test gate and populated five-lead
   zero-drift/self-check/scratch restore pass; docs/17 records the evidence. No migration,
   scheduler, transport, footer/header, event-ledger, or production-state change was made.
+  Production health/routes, ten-enrollment zero drift, self-check, backup catalogs, and unchanged
+  24-send watermark pass. Authenticated UI replay is pending due to browser-tool
+  `ERR_BLOCKED_BY_CLIENT`. Runtime `fast-uri` (high) and `fastify` (moderate) audit advisories
+  require separate assessment and tested dependency updates before prospect launch; see docs/17.
 
 - **Approved build scope — the only feature work authorized:** the completed 2026-08-15 list (public unsubscribe/one-click, launch guardrails, domain-readiness preflight, per-folder polling, and single-lead creation) plus the operator-approved 2026-08-20 pre-domain safety backlog: mandatory reply stopping; reply dispositions and conservative suppression; guarded cross-campaign recontact; broader opt-out phrases; findings #20–25; alert history and mailbox filters; arbitrary custom-field editing; copy-risk rubric improvements; local verification; and runbook/documentation reconciliation. Outside that list, the rule is unchanged: testing, verification, diagnosis, and documentation only.
 - **2026-08-25 implementation status:** the operator-approved ten-workstream run is complete and
@@ -160,7 +164,7 @@ rollback/canary environment.
 - Stack: `docker-compose.spaceship.yml` with `.env.prod`
 - UI: `https://sambhavpmtech.com/email-campaign/`
 - Internal gateway: `127.0.0.1:18080`; host Caddy alone owns public 80/443
-- Deployed application release: `canary` at `a8c2e65`
+- Deployed application release: `canary` at `c75a385`
 
 The private repository currently has no GitHub deploy credential on the VPS. Until a read-only
 deploy key is deliberately installed, transfer a reviewed `git bundle`, fetch the pinned branch

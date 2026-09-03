@@ -3,7 +3,14 @@
 Single always-on VPS (finalized decision). Docker Compose primary; systemd alternative. Implemented
 in B7 and cut over to Spaceship production on 2026-08-22.
 
-**Production status (2026-09-02):** migration `0019`, the owner-walkthrough remediation, Gmail
+**Production status (2026-09-03):** F-W26–F-W31 are deployed at `c75a385` on `canary`.
+Health/routes, all 20 migrations, ten-enrollment zero drift, self-check, pre/post backup catalogs,
+and unchanged 24-send history pass. No campaign/enrollment/mailbox/DNS changes or mail occurred.
+Authenticated UI replay is pending due to `ERR_BLOCKED_BY_CLIENT` in the browser tool. Runtime
+dependency advisories (`fast-uri` high, `fastify` moderate) remain a separate pre-launch follow-up;
+the pinned release does not change its dependency lockfile. See docs/17 for exact evidence.
+
+**Previous production status (2026-09-02):** migration `0019`, the owner-walkthrough remediation, Gmail
 footer remediation, conversation-choice clarification, and the Sequence preview/dirty-state
 follow-up are deployed on the one-word `canary` branch at `a8c2e65`. Reviewed bundle
 fast-forward, pre/post backup catalogs, container/internal/public health, route matrix, served
@@ -172,7 +179,7 @@ Remaining for a full **M3** close: the real-backend walkthrough replay (§5, `e2
 
 Production is live at `https://sambhavpmtech.com/email-campaign/` on the existing Spaceship VM.
 The portfolio at `sambhavbuilds.com` remained online throughout. Application code is pinned to
-`a8c2e65` on `canary`; `main` was not merged. Oracle remains paused and unchanged as the temporary
+`c75a385` on `canary`; `main` was not merged. Oracle remains paused and unchanged as the temporary
 rollback environment.
 
 - **Reverse proxy:** host Caddy is the only public 80/443 listener. The container gateway binds

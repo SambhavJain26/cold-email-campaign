@@ -1,5 +1,36 @@
 # Local canary runbook (B8.3-local) — two-week validation on throwaway Gmail
 
+## 2026-09-03 six-finding release — deployed at `c75a385`
+
+After explicit push/deploy authorization, `origin/canary` advanced to `c75a385` and a reviewed
+bundle fast-forwarded the clean Spaceship checkout from `321f283` to that exact release. The local
+and remote SHA-256 both matched
+`b514ce6ffc73bb26fb719cecd91028230703c246251a02e352225f264e9d75a1`.
+App, gateway, and backup images rebuilt and the stack recreated; no migration was added.
+
+Verified: running containers with healthy app/database; public health `{ok:true,db:true}`; SPA and
+Overview/Leads/Cold Storage/Sequences routes 200; bare subpath 308 canonicalization; both outreach
+roots 308 to the portfolio; both unsubscribe roots 404; portfolio 200. Public assets contain the
+new lead-level status, campaign-source, Cold Storage selector, sent-subject, and preview-prompt
+markers. All 20 migrations through `0019` remain applied; production reports `checked 10
+enrollments — 0 diff(s)` and clean self-check. Four mailboxes remain `ok`; failed jobs, active
+NEW/ACTIVE work, available pool rows, and auto-enrollment-enabled campaigns are zero. The sent
+ledger remains **24**, with unchanged last-send time **2026-09-02 15:10:35.874 IST**.
+
+Pre/post dumps `coldemail-20260903-111201.dump` (1,464,831 bytes) and
+`coldemail-20260903-111439.dump` (1,465,495 bytes) passed `pg_restore --list`. No campaign,
+enrollment, mailbox, DNS/Caddy, Oracle, or `main` changes were made and no email was sent.
+Authenticated post-deploy UI replay remains pending: the in-app browser had no existing tab and
+opening the application returned `net::ERR_BLOCKED_BY_CLIENT`. This is a browser-tool limitation;
+the public route and served-asset checks passed, but are not claimed as an authenticated UI replay.
+
+**Dependency follow-up — open:** npm's build audit reported ten total dependency findings. The
+separate runtime audit (`npm audit --omit=dev --json`) reports two affected packages: high-severity
+`fast-uri` URI-normalization/host-confusion advisories and moderate-severity `fastify` validation/
+proxy advisories. The lockfile is unchanged from the prior deployed release. No exploitability
+claim or blanket safety claim is made; assess exposure and update the dependencies with a fresh
+test gate before prospect launch. No automatic audit fix was applied during this pinned rollout.
+
 ## 2026-09-03 remaining six UI findings — verified locally, not deployed
 
 The operator-approved F-W26–F-W31 fixes are complete and locally verified on `canary`.
@@ -25,8 +56,8 @@ production projection was changed; the normal real-backend five-lead cohort supp
 populated check. The locked golden fixtures and their 47-test gate were not modified.
 
 No migration, event-ledger, scheduler, transport, footer/header, or sending behavior changed.
-Production remains at `a8c2e65`; no push, deployment, production mutation, or outbound mail was
-performed. Deployment and authenticated production replay remain separately authorized steps.
+At that local checkpoint production remained at `a8c2e65`, and no push, deployment, production
+mutation, or outbound mail had occurred. The subsequent authorized deployment is recorded above.
 
 ## 2026-09-02 owner-address follow-up visibility and reply canary
 
@@ -74,12 +105,12 @@ window was closed; it remains open for operator acknowledgement as historical ev
 | ID | Verified behavior | Required improvement |
 |---|---|---|
 | F-W25 | Sequence preview rendered the fallback “Reply STOP” footer although Compliance was configured with the sender-domain Unsubscribe URL; the actual scheduled message used the correct link-only footer. | **Fixed and deployed:** configured link mode now renders through the real footer with a permanently non-resolving `.invalid` preview URL. Preview creates no unsubscribe capability token. |
-| F-W26 | Analytics showed the new Step 3 message as pending immediately, but Overview still said “3 delivery confirmed · 0 awaiting confirmation” because it classifies contacted leads by whether they have any earlier confirmed message. | **Fixed and verified locally:** explicit lead-level wording distinguishes these values from Analytics message-level confirmation. Not deployed. |
-| F-W27 | Leads → Aurora → Enrolled/Both returned the correct three leads, but the Pool column labeled every enrolled pool lead “Global” because the list DTO exposes only currently-available pool assignments. | **Fixed and verified locally:** Campaign source shows selected-campaign pool status or Direct enrollment; API covers enrolled/released provenance. Not deployed. |
-| F-W28 | Cold Storage silently defaulted to Atlas after the global header selector was removed. Beacon's finished lead appeared only by manually adding `?campaign=2`; no visible source-campaign control exists. | **Fixed and verified locally:** visible Source campaign selector updates the URL and resets pagination. Not deployed. |
-| F-W29 | The sent Aurora Step 3 record was correctly immutable, but its Personalized Copy editor preview displayed the saved audit subject (`A second Northstar angle`) rather than the actual in-thread subject (`Re: Aanya, a quick Northstar idea`). | **Fixed and verified locally:** separately labeled audit and actually-sent subjects, using the immutable snapshot; historical missing snapshots are explicit. Not deployed. |
-| F-W30 | A bare Overview route rendered the default campaign's metrics while the selector still displayed “Select campaign…”; selecting a campaign corrected the value. | **Fixed and verified locally:** the selector names the default campaign; explicit selection still writes the URL and deep links remain intact. Not deployed. |
-| F-W31 | During Sequence preview, selecting a campaign before selecting a lead briefly showed “This variant is new — save the sequence before previewing it” for an existing Personalized Copy step. | **Fixed and verified locally:** personalized preview asks for a lead; only genuinely new template variants receive the unsaved-variant prompt. Not deployed. |
+| F-W26 | Analytics showed the new Step 3 message as pending immediately, but Overview still said “3 delivery confirmed · 0 awaiting confirmation” because it classifies contacted leads by whether they have any earlier confirmed message. | **Fixed, verified, and deployed:** explicit lead-level wording distinguishes these values from Analytics message-level confirmation. Release `c75a385`. |
+| F-W27 | Leads → Aurora → Enrolled/Both returned the correct three leads, but the Pool column labeled every enrolled pool lead “Global” because the list DTO exposes only currently-available pool assignments. | **Fixed, verified, and deployed:** Campaign source shows selected-campaign pool status or Direct enrollment; API covers enrolled/released provenance. Release `c75a385`. |
+| F-W28 | Cold Storage silently defaulted to Atlas after the global header selector was removed. Beacon's finished lead appeared only by manually adding `?campaign=2`; no visible source-campaign control exists. | **Fixed, verified, and deployed:** visible Source campaign selector updates the URL and resets pagination. Release `c75a385`. |
+| F-W29 | The sent Aurora Step 3 record was correctly immutable, but its Personalized Copy editor preview displayed the saved audit subject (`A second Northstar angle`) rather than the actual in-thread subject (`Re: Aanya, a quick Northstar idea`). | **Fixed, verified, and deployed:** separately labeled audit and actually-sent subjects, using the immutable snapshot; historical missing snapshots are explicit. Release `c75a385`. |
+| F-W30 | A bare Overview route rendered the default campaign's metrics while the selector still displayed “Select campaign…”; selecting a campaign corrected the value. | **Fixed, verified, and deployed:** the selector names the default campaign; explicit selection still writes the URL and deep links remain intact. Release `c75a385`. |
+| F-W31 | During Sequence preview, selecting a campaign before selecting a lead briefly showed “This variant is new — save the sequence before previewing it” for an existing Personalized Copy step. | **Fixed, verified, and deployed:** personalized preview asks for a lead; only genuinely new template variants receive the unsaved-variant prompt. Release `c75a385`. |
 | F-W32 | In the deployed Sequence builder, changing a later step from **Continue existing conversation** to **Start new conversation** and then restoring the original choice still left the **Unsaved changes** banner visible. | **Fixed and deployed:** dirty state is derived from the effective write payload versus its saved baseline, so a full revert clears the warning and each successful save establishes the new baseline. |
 
 The F-W25/F-W32 remediation is deployed at application commit `a8c2e65`. It changes no database

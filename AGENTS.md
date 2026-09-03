@@ -23,11 +23,15 @@ The Spaceship production infrastructure is live, but the project remains in **pr
 commissioning** until the operator completes the handoffs below:
 
 - **2026-09-03 remaining UI findings:** operator-approved F-W26–F-W31 are implemented and
-  verified locally on `canary`, not pushed or deployed. They clarify lead-level confirmation,
+  verified, pushed, and deployed at `c75a385` on `canary`. They clarify lead-level confirmation,
   campaign provenance/default selection, Cold Storage source selection, sent-copy audit subjects,
   and personalized-preview prerequisites. The complete serial test gate and populated five-lead
   zero-drift/self-check/scratch restore pass; docs/17 records the evidence. No migration,
   scheduler, transport, footer/header, event-ledger, or production-state change was made.
+  Production health/routes, ten-enrollment zero drift, self-check, backup catalogs, and unchanged
+  24-send watermark pass. Authenticated UI replay is pending due to browser-tool
+  `ERR_BLOCKED_BY_CLIENT`. Runtime `fast-uri` (high) and `fastify` (moderate) audit advisories
+  require separate assessment and tested dependency updates before prospect launch; see docs/17.
 
 - **The authorized feature scope** includes the completed operator-approved 2026-08-15 list plus
   the 2026-08-20 pre-domain safety backlog: mandatory reply stopping; reply dispositions and
@@ -184,7 +188,7 @@ temporary rollback/canary environment.
 - App: `/opt/email-campaign`; stack: `docker-compose.spaceship.yml` with `.env.prod`
 - Public UI: `https://sambhavpmtech.com/email-campaign/`
 - Internal gateway: `127.0.0.1:18080`; host Caddy is the only public 80/443 listener
-- Deployed application release: `canary` at `a8c2e65`
+- Deployed application release: `canary` at `c75a385`
 
 The repository is private and the VPS currently has no GitHub deploy credential. Until a read-only
 deploy key is deliberately installed, transfer a reviewed `git bundle`, fetch the pinned branch
