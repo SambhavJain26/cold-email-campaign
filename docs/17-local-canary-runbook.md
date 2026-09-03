@@ -21,6 +21,37 @@ treated as unproven until an owner-controlled delivery is accepted; do not infer
 from successful lead ingestion. Campaign assignment, tiering, enrollment, activation, and the exact
 outbound batch remain separately gated.
 
+The operator then authorized the remaining setup, still stopping before enrollment, activation,
+or delivery. Production now has draft campaign and sequence **Final Canary Sep3** (`campaign_id=5`,
+`sequence_id=5`). The five-step path is Personalized Copy → two-variant researched/Auto template →
+Personalized Copy → two-variant new-conversation template → two-variant threaded template with
+two-way `{{RANDOM|...|...}}` spintax. All waits are zero days; delivery pacing comes from the
+mailbox schedule rather than the wait fields. Campaign Auto Observation uses the `company` field
+with a readable default. Auto-enrollment remains off.
+
+The five exact fresh leads are the only **available** pool rows: IDs 12–14 are Tier A and IDs 15–16
+are Tier B. Tier A rows have researched `custom_observation` values. Each lead has ready campaign
+copy for Personalized Steps 1 and 3, producing coverage of 5 ready / 0 review / 0 missing / 0
+blocked at both steps. A count-only pool allocation initially selected two older eligible leads;
+those rows were released before any enrollment and remain as intentional audit history. This is a
+usability finding: exact-ID pool addition is safer than count-only "next safe" selection for a
+named canary cohort.
+
+Campaign-context previews caught and corrected two authoring errors before activation: the
+supported researched/Auto slot is `{{custom_observation}}`, not `{{observation}}`, and supported
+spintax is `{{RANDOM|a|b}}`, not `{a|b}`. Final previews verified ready Personalized Steps 1 and 3,
+Tier A researched resolution, Tier B Auto Observation resolution, both variants at Steps 2, 4,
+and 5, two actual Step 5 expansions per variant, threaded `Re:` subjects, the Step 4 independent
+subject, and the compliance footer. No fatal render check remains; the only copy note is that these
+deliberately short canary bodies are below the advisory 40-word target.
+
+Final read-only reconciliation: campaign 5 is `draft`, pool-only, steady cap 15, with five
+available and two released audit rows; it has zero enrollments and zero sent messages. The global
+sent-message watermark remains 24 and there are zero due enrollments attached to an active
+campaign. Scheduler tick is five minutes, send jitter is 0%, and all four healthy mailboxes use
+Asia/Kolkata, daily cap 50, and the temporary Mon–Fri 00:00–04:10 canary window. Those temporary
+settings are staged for the separately approved live canary and must be restored after it.
+
 ## 2026-09-03 runtime dependency remediation — deployed at `552fab8`
 
 The operator approved fixing the runtime audit findings before the final owner-address canary.
