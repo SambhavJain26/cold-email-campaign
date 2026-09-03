@@ -1,5 +1,22 @@
 # Local canary runbook (B8.3-local) — two-week validation on throwaway Gmail
 
+## 2026-09-03 shared-VPS cache cleanup — verified
+
+After the operator explicitly approved cache-only cleanup while protecting the portfolio,
+`docker builder prune --all --force` removed unused build cache (Docker reported 10.29 GB),
+and `apt-get clean` reduced downloaded package archives from 388 MiB to 24 KiB. Root filesystem
+usage fell from 74% (17 GB used, 6.3 GB available) to 33% (7.5 GB used, 16 GB available).
+Cache accounting includes shared layers, so Docker's reclaimed total is not an independent
+filesystem-space measurement. Build cache is now zero; all four running images/containers and
+both data volumes remain. No image/container/volume pruning, file deletion, log trimming, service
+restart, deployment, or application-state change was performed beyond these two cache operations.
+
+Before/after checks: portfolio `https://sambhavbuilds.com/` returned 200; email UI returned 200
+after cleanup; email health returned `{ok:true,db:true}` before and after. Host Caddy remained
+active and all four container IDs stayed unchanged. Database, backups, portfolio/application
+files, configuration, certificates, swap, and logs were untouched. Removed caches can be
+regenerated/downloaded; future image builds may take longer.
+
 ## 2026-09-03 six-finding release — deployed at `c75a385`
 
 After explicit push/deploy authorization, `origin/canary` advanced to `c75a385` and a reviewed
