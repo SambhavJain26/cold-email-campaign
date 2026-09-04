@@ -1355,8 +1355,8 @@ The live preview mirrors the canonical styling. The delivered message is `multip
 - the HTML alternative starts the first body paragraph at zero top margin, preserves deliberate
   16px paragraph gaps, and places the footer in a one-cell presentation table after a 20px top gap
   at `10px` and `line-height: 1.5`;
-- the unsubscribe destination is linked behind a blue (`#1155cc`), underlined **Unsubscribe**;
-  the address appears below it in dark gray (`#595959`), and normal HTML-capable email clients do
+- the unsubscribe destination is linked behind a bold, non-underlined **Unsubscribe** in the same
+  dark gray (`#595959`) as the address below it, and normal HTML-capable email clients do
   not display the full token URL;
 - the plain-text alternative shows the complete URL because plain text cannot hide a destination
   behind linked words;

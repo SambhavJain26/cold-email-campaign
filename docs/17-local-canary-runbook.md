@@ -1,5 +1,21 @@
 # Local canary runbook (B8.3-local) — two-week validation on throwaway Gmail
 
+## 2026-09-04 unsubscribe presentation follow-up — locally verified, not deployed
+
+The operator approved a presentation-only refinement based on a supplied footer reference. The
+canonical HTML footer and both operator previews now keep the existing two-line 10px structure,
+20px top separation, 1.5 line height, and `#595959` text color, but render **Unsubscribe** bold and
+without an underline in the same gray as the postal address. The clickable anchor, destination,
+plain-text full URL, address, capability-token flow, RFC 8058 headers, and public unsubscribe
+behavior are unchanged. This does not attempt to influence Gmail's accepted trimming behavior.
+
+Verification passes: focused renderer 26/26; focused Compliance preview 6/6; full unit 346/346;
+full web 67/67; typecheck, lint, and format; and the production Vite build. The existing large-chunk
+build warning remains non-fatal. No migration, database, campaign, lead, mailbox, enrollment,
+event, send, DNS/Caddy, or production-state change occurred. This candidate is local only; pushing
+and deployment require separate authorization, so production continues to show the earlier blue,
+underlined treatment until then.
+
 ## 2026-09-04 operator-requested production workspace reset
 
 After the final five-lead owner-address canary and recipient-action reconciliation, the operator
@@ -379,12 +395,14 @@ body-link unsubscribe, reply `STOP`, and an
 ordinary interested reply were exercised; the live UI showed the corresponding `UNSUBSCRIBED`,
 auto-unsubscribe/sequence-stop, and `REPLIED`/sequence-stop outcomes. No prospect address was used.
 
-Final operator-approved presentation: retain the compact **10px** footer size; render only
+Final operator-approved presentation at that 2026-09-02 checkpoint: retain the compact **10px** footer size; render only
 **Unsubscribe** as a conventional blue, underlined link (`#1155cc`); use `#595959` for the postal
 address; keep a 1.5 line height; and keep 20px of top separation. The footer and RFC 8058 headers
 remain unchanged. Do not duplicate unsubscribe language inside the sales copy and do not use
 invisible-character or filter-evasion tricks. Threaded follow-ups may be trimmed by Gmail; an
-operator who prioritizes footer visibility can instead start that step as a new conversation.
+operator who prioritizes footer visibility can instead start that step as a new conversation. The
+2026-09-04 local presentation follow-up above supersedes only the link's color, weight, and
+underline once deployed.
 
 The local remediation candidate is implemented across the renderer, plain-text fallback, Settings
 preview, Sequence preview, and mock API. It renders opt-out and address on separate lines; HTML

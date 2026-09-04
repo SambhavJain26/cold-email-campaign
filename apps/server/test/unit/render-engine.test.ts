@@ -161,7 +161,7 @@ describe('unsubscribe link in the footer (0010, docs/16 §8)', () => {
   it('live: the HTML part says the SAME thing with the word linked', () => {
     const html = withLink().bodyHtml;
     expect(html).toContain(
-      `<a href="${URL}" style="color:#1155cc;text-decoration:underline">Unsubscribe</a>`,
+      `<a href="${URL}" style="color:#595959;text-decoration:none;font-weight:700">Unsubscribe</a>`,
     );
     expect(html).toContain(`</a><br>${compliance.physicalAddress}`);
     expect(html).not.toContain('or reply STOP');
@@ -169,6 +169,8 @@ describe('unsubscribe link in the footer (0010, docs/16 §8)', () => {
     expect(html).toContain(compliance.physicalAddress);
     // De-emphasised but legible — CAN-SPAM "clear and conspicuous".
     expect(html).toContain('font-size:10px');
+    expect(html).not.toContain('#1155cc');
+    expect(html).not.toContain('text-decoration:underline');
   });
 
   it('the two parts stay semantically identical (finding 19)', () => {

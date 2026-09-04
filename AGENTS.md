@@ -22,6 +22,15 @@ call planned work implemented.
 The Spaceship production infrastructure is live, but the project remains in **pre-prospect-send
 commissioning** until the operator completes the handoffs below:
 
+- **2026-09-04 unsubscribe presentation follow-up:** the operator-approved compact footer change
+  is implemented and locally verified on `canary`: the 10px two-line structure, 20px separation,
+  `#595959` color, and 1.5 line height remain, while **Unsubscribe** is now bold, gray, and not
+  underlined. The destination, plain-text URL, token flow, RFC 8058 headers, address, and Gmail
+  trimming behavior are unchanged. Typecheck/lint/format, unit 346/346, web 67/67, focused
+  renderer/UI tests, and the production web build pass. It is committed locally but is not pushed
+  or deployed; production still serves the prior blue-underlined treatment until separately
+  authorized.
+
 - **2026-09-04 operator-requested fresh workspace:** after the final five-lead owner-address
   canary completed, production's populated `coldemail` database was preserved intact as
   `coldemail_canary_archive_20260904` and a new empty `coldemail` database was initialized through

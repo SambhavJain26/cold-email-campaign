@@ -237,7 +237,7 @@ export function PreviewPanel({
                     </p>
                     {renderedFooter && (
                       <div className="mt-5 font-mono text-[10px] leading-[15px] whitespace-pre-wrap text-[#595959]">
-                        <span className={renderedFooter.linked ? 'text-[#1155cc] underline' : ''}>
+                        <span className={renderedFooter.linked ? 'font-bold no-underline' : ''}>
                           {renderedFooter.optout}
                         </span>
                         <br />

@@ -36,7 +36,8 @@ describe('unsubscribe base URL field', () => {
   it('live: preview switches to the link-and-address form', () => {
     renderTab({ unsubscribe_base_url: 'https://unsubscribe.example.com' });
     expect(preview()).toContain('Unsubscribe106-460 Doyle Ave');
-    expect(screen.getByText('Unsubscribe')).toHaveClass('text-[#1155cc]', 'underline');
+    expect(screen.getByText('Unsubscribe')).toHaveClass('font-bold', 'no-underline');
+    expect(screen.getByText('Unsubscribe')).not.toHaveClass('text-[#1155cc]', 'underline');
     expect(preview()).not.toContain('reply STOP');
     expect(preview()).not.toContain('⟨token⟩');
   });
@@ -71,6 +72,6 @@ describe('unsubscribe base URL field', () => {
 
   it('accepts the sender-domain host template used by multiple outreach domains', () => {
     renderTab({ unsubscribe_base_url: 'https://unsubscribe.{sender_domain}' });
-    expect(screen.getByText('Unsubscribe')).toHaveClass('text-[#1155cc]', 'underline');
+    expect(screen.getByText('Unsubscribe')).toHaveClass('font-bold', 'no-underline');
   });
 });

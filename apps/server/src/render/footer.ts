@@ -46,7 +46,7 @@ export function appendFooter(body: string, compliance: ComplianceInfo): string {
 export function footerHtml(compliance: ComplianceInfo): string {
   const url = liveUrl(compliance);
   const optout = url
-    ? `<a href="${escapeHtml(url)}" style="color:#1155cc;text-decoration:underline">Unsubscribe</a>`
+    ? `<a href="${escapeHtml(url)}" style="color:#595959;text-decoration:none;font-weight:700">Unsubscribe</a>`
     : escapeHtml(compliance.optoutText);
   const address = escapeHtml(compliance.physicalAddress).replaceAll('\n', '<br>');
   return `${optout}<br>${address}`;
