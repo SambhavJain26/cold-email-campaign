@@ -52,6 +52,38 @@ campaign. Scheduler tick is five minutes, send jitter is 0%, and all four health
 Asia/Kolkata, daily cap 50, and the temporary Mon–Fri 00:00–04:10 canary window. Those temporary
 settings are staged for the separately approved live canary and must be restored after it.
 
+### Live outcome — 25-message owner-controlled journey completed
+
+The operator explicitly authorized activation, exact enrollment of the five staged aliases, and
+the bounded owner-address send. Campaign 5 activated at 00:59 IST and enrolled exactly lead IDs
+12–16: three `template_researched` and two `template_auto`. The first scheduler wave at 01:00:38
+assigned four leads across the four healthy mailboxes. The fifth lead shared mailbox 2 and began at
+01:10:08. All five leads completed all five steps by 02:10:08, producing exactly 25 accepted sends:
+5/10/5/5 by mailbox and 5 per lead. No mailbox sent twice in one tick; the minimum observed
+same-mailbox gap was exactly 300 seconds for every mailbox. The shared mailbox serialized its two
+threads, so some per-lead gaps were ten minutes rather than five.
+
+Immutable snapshots reconcile as 10 Personalized Copy and 15 template messages, five at every
+step. No subject, text body, or HTML body is missing, and every snapshot contains the unsubscribe
+footer and postal address. Each automated step distributed variants A/B as 3/2. All 25 messages
+have durable `sent` and `delivered` events. Overview shows 5/5 contacted and Campaign complete;
+Analytics shows 5/5 confirmed at every step, Tier A contacted 3 and Tier B contacted 2, and the
+expected 25-message health total. The operator reported that the recipient accounts received the
+messages. Recipient-side unsubscribe/reply classification checks remain pending.
+
+After completion, campaign 5 was paused and auto-enrollment remained off. The temporary settings
+were restored through the UI: all four mailboxes are healthy at 5/day, Mon–Fri 10:00–18:00
+Asia/Kolkata, and send jitter is back to 20%. Projection reconciliation returned `checked 15
+enrollments — 0 diff(s)`; self-check reported no invariant violations; all four containers are up,
+app/db health is green, and public `/health` returned 200. There is no remaining sendable work in
+this campaign.
+
+**New presentation finding:** the Analytics Tier insight says Tier A is "doing the work" when the
+campaign has zero meetings, and recommends reconsidering Legacy Tier C even though the current
+campaign has no Tier C and current enrollment supports only A/B. The underlying counts reconcile;
+the generated advice should be suppressed or made conditional when its denominator is zero or the
+legacy tier is absent.
+
 ## 2026-09-03 runtime dependency remediation — deployed at `552fab8`
 
 The operator approved fixing the runtime audit findings before the final owner-address canary.
