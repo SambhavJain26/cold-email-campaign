@@ -34,6 +34,16 @@ and self-check is clean. Pre-deploy dump `coldemail-20260904-174221.dump` (162,6
 post-deploy dump `coldemail-20260904-174656.dump` (162,878 bytes) both pass `pg_restore --list`.
 Temporary local and VPS bundles were removed. No email was sent and the portfolio was unaffected.
 
+A subsequent operator-requested recheck reran typecheck, lint, format, all unit **346/346**, all
+web **67/67**, and a fresh production frontend build successfully. Local Docker remained closed,
+so DB-backed API/integration/GreenMail suites were not redundantly restarted for this
+presentation-only diff. Read-only production reconciliation independently confirmed exact local/
+VPS footer-source SHA-256 parity, the deployed gray/bold/non-underlined renderer marker, the served
+preview marker, healthy app/database containers with running gateway/backup services, 20
+migrations, zero operational records/open error alerts/sendable work, preserved New York
+safeguards, `checked 0 enrollments — 0 diff(s)`, clean self-check, the expected public route
+matrix, and a valid post-deploy backup catalog. No regression or unexpected state change was found.
+
 ## 2026-09-04 operator-requested production workspace reset
 
 After the final five-lead owner-address canary and recipient-action reconciliation, the operator
