@@ -12,13 +12,13 @@ Spaceship production infrastructure is live, but the project remains in **pre-pr
 commissioning**:
 
 - **2026-09-04 unsubscribe presentation follow-up:** the operator-approved compact footer change
-  is implemented and locally verified on `canary`: the 10px two-line structure, 20px separation,
+  is implemented, verified, pushed, and deployed at `0a2f3c0` on `canary`: the 10px two-line structure, 20px separation,
   `#595959` color, and 1.5 line height remain, while **Unsubscribe** is now bold, gray, and not
   underlined. The destination, plain-text URL, token flow, RFC 8058 headers, address, and Gmail
   trimming behavior are unchanged. Typecheck/lint/format, unit 346/346, web 67/67, focused
-  renderer/UI tests, and the production web build pass. It is committed locally but is not pushed
-  or deployed; production still serves the prior blue-underlined treatment until separately
-  authorized.
+  renderer/UI tests, and the production web build pass. Deployment health/routes, served asset and
+  renderer markers, 20 migrations, empty live state, zero drift, self-check, and pre/post backup
+  catalogs pass. No mailbox, lead, campaign, enrollment, event, or send was created.
 
 - **2026-09-04 operator-requested fresh workspace:** after the final five-lead owner-address
   canary completed, production's populated `coldemail` database was preserved intact as
@@ -193,7 +193,7 @@ rollback/canary environment.
 - Stack: `docker-compose.spaceship.yml` with `.env.prod`
 - UI: `https://sambhavpmtech.com/email-campaign/`
 - Internal gateway: `127.0.0.1:18080`; host Caddy alone owns public 80/443
-- Deployed application release: `canary` at `552fab8`
+- Deployed application release: `canary` at `0a2f3c0`
 
 The private repository currently has no GitHub deploy credential on the VPS. Until a read-only
 deploy key is deliberately installed, transfer a reviewed `git bundle`, fetch the pinned branch

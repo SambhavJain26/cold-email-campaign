@@ -186,8 +186,15 @@ Remaining for a full **M3** close: the real-backend walkthrough replay (§5, `e2
 
 Production is live at `https://sambhavpmtech.com/email-campaign/` on the existing Spaceship VM.
 The portfolio at `sambhavbuilds.com` remained online throughout. Application code is pinned to
-`c75a385` on `canary`; `main` was not merged. Oracle remains paused and unchanged as the temporary
+`0a2f3c0` on `canary`; `main` was not merged. Oracle remains paused and unchanged as the temporary
 rollback environment.
+
+The 2026-09-04 footer-presentation rollout changed only the canonical HTML anchor and the two
+operator previews: **Unsubscribe** is now bold, non-underlined, and `#595959`, matching the address.
+The link destination, plain-text URL, token flow, RFC 8058 headers, and Gmail trimming behavior are
+unchanged. The pushed and deployed commit is `0a2f3c0`; health/routes, served markers, 20
+migrations, zero live records/sendable work, zero projection drift, self-check, and pre/post
+backup catalogs pass. No production mail or operational record was created.
 
 On 2026-09-04, after the owner-address commissioning canary, the operator requested a fresh live
 workspace. The populated database was preserved intact as

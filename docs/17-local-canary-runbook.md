@@ -1,6 +1,6 @@
 # Local canary runbook (B8.3-local) — two-week validation on throwaway Gmail
 
-## 2026-09-04 unsubscribe presentation follow-up — locally verified, not deployed
+## 2026-09-04 unsubscribe presentation follow-up — deployed at `0a2f3c0`
 
 The operator approved a presentation-only refinement based on a supplied footer reference. The
 canonical HTML footer and both operator previews now keep the existing two-line 10px structure,
@@ -12,9 +12,27 @@ behavior are unchanged. This does not attempt to influence Gmail's accepted trim
 Verification passes: focused renderer 26/26; focused Compliance preview 6/6; full unit 346/346;
 full web 67/67; typecheck, lint, and format; and the production Vite build. The existing large-chunk
 build warning remains non-fatal. No migration, database, campaign, lead, mailbox, enrollment,
-event, send, DNS/Caddy, or production-state change occurred. This candidate is local only; pushing
-and deployment require separate authorization, so production continues to show the earlier blue,
-underlined treatment until then.
+event, send, DNS/Caddy, or production-state change occurred during local verification.
+
+After explicit push/deploy authorization, `origin/canary` advanced to `0a2f3c0`. A reviewed bundle
+had matching local/remote SHA-256
+`e24505f264116691c1fa174d139195b87c9bab9e6484c0ea4c89505d7951452b` and fast-forwarded the clean
+VPS checkout from `552fab8` to the exact candidate. The app image built and its production prune
+reported zero vulnerabilities. The first gateway build stopped before recreation on a transient
+Docker Hub TLS handshake timeout; an unchanged retry succeeded, after which the stack was
+recreated normally.
+
+Post-deploy verification: app/database health passes and gateway/backup services are running;
+internal and public `/email-campaign/health` return `{ok:true,db:true}`; the SPA and direct
+Sequences route return 200; both outreach roots retain their portfolio redirects; both
+unsubscribe roots return 404; and the portfolio returns 200. The checkout and renderer carry the
+exact new gray/bold/non-underlined marker, and the served frontend asset contains the matching
+preview wording. All 20 migrations through `0019` remain applied. The live workspace remains at
+zero leads, campaigns, sequences, enrollments, events, mailboxes, sent messages, and sendable work;
+New York safeguards are unchanged. Projection dry-run reports `checked 0 enrollments — 0 diff(s)`
+and self-check is clean. Pre-deploy dump `coldemail-20260904-174221.dump` (162,674 bytes) and
+post-deploy dump `coldemail-20260904-174656.dump` (162,878 bytes) both pass `pg_restore --list`.
+Temporary local and VPS bundles were removed. No email was sent and the portfolio was unaffected.
 
 ## 2026-09-04 operator-requested production workspace reset
 
