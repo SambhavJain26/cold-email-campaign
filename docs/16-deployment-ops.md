@@ -189,6 +189,15 @@ The portfolio at `sambhavbuilds.com` remained online throughout. Application cod
 `c75a385` on `canary`; `main` was not merged. Oracle remains paused and unchanged as the temporary
 rollback environment.
 
+On 2026-09-04, after the owner-address commissioning canary, the operator requested a fresh live
+workspace. The populated database was preserved intact as
+`coldemail_canary_archive_20260904`; the active `coldemail` database is newly migrated and empty
+except for the existing operator and compliance configuration. It has zero leads, campaigns,
+sequences, enrollments, events, mailboxes, imports, suppressions, alerts, or messages. Operational
+timezone is `America/New_York`; enforced windows, automatic/global opt-out handling, five-minute
+scheduler/polling, 20% jitter, 30/day mailbox ceiling, 15/day campaign-enrollment ceiling, and a
+seven-day minimum ramp are configured. See docs/17 for backup and verification evidence.
+
 - **Reverse proxy:** host Caddy is the only public 80/443 listener. The container gateway binds
   only `127.0.0.1:18080`; Postgres and the app port are not published.
 - **Memory:** a persistent 2 GiB swap file was added before building. Swap reduces OOM risk but is

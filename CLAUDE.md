@@ -11,6 +11,19 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 Spaceship production infrastructure is live, but the project remains in **pre-prospect-send
 commissioning**:
 
+- **2026-09-04 operator-requested fresh workspace:** after the final five-lead owner-address
+  canary completed, production's populated `coldemail` database was preserved intact as
+  `coldemail_canary_archive_20260904` and a new empty `coldemail` database was initialized through
+  all 20 migrations. The live workspace has zero leads, campaigns, sequences, enrollments, events,
+  mailboxes, imports, suppressions, alerts, or message rows. The existing operator login and
+  compliance address/unsubscribe configuration were carried forward. Defaults are now
+  `America/New_York`, enforced send windows, automatic/global opt-out suppression, five-minute
+  scheduler and poll intervals, 20% jitter, a 30/day mailbox configuration ceiling, a 15/day
+  campaign-enrollment ceiling, and a mandatory seven-day ramp. The pre-reset and post-reset dumps
+  both pass catalog validation; app/database health, running gateway/backup services, public
+  app/portfolio routes, zero-drift, self-check, and authenticated empty-state Leads/Mailboxes UI
+  pass. This reset is not authorization to add mailboxes, import leads, activate, enroll, or send.
+
 - **2026-09-03 remaining UI findings:** operator-approved F-W26–F-W31 are implemented and
   verified, pushed, and deployed at `c75a385` on `canary`. They clarify lead-level confirmation,
   campaign provenance/default selection, Cold Storage source selection, sent-copy audit subjects,

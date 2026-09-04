@@ -1,5 +1,40 @@
 # Local canary runbook (B8.3-local) — two-week validation on throwaway Gmail
 
+## 2026-09-04 operator-requested production workspace reset
+
+After the final five-lead owner-address canary and recipient-action reconciliation, the operator
+explicitly requested a one-time completely fresh live workspace before importing real leads. All
+five campaigns and four mailboxes were first paused, auto-enrollment was disabled, and sendable
+work was verified as zero. A pre-reset custom-format backup
+`coldemail-20260904-110328.dump` (1,599,917 bytes) passed `pg_restore --list`.
+
+The populated production database was not truncated and its append-only event history was not
+rewritten. Instead, it was renamed intact to `coldemail_canary_archive_20260904`, and a new empty
+`coldemail` database was created and migrated through all 20 migrations ending at
+`0019_personalized_copy_two_tiers`. The current operator row and the configured compliance address,
+footer text, and sender-domain unsubscribe template were carried forward without exposing their
+contents. The temporary transfer file containing the operator password hash was removed after
+verification.
+
+The live database now contains zero leads, campaigns, sequences, enrollments, events, mailboxes,
+imports, suppressions, alerts, sent messages, incoming messages, or Personalized Copy sources. The
+authenticated Leads UI shows `0 total`; Mailboxes shows `Nothing here yet` and total daily capacity
+zero. The prior test analytics remain recoverable only from the archived database and validated
+pre-reset dump; they are deliberately absent from the live application.
+
+Real-outreach defaults are now: `America/New_York`; send-window enforcement on; automatic opt-out
+detection and global unsubscribe suppression on; scheduler and IMAP poll every five minutes; 20%
+send jitter; maximum configurable mailbox cap 30/day; maximum campaign enrollment cap 15/day; and
+a mandatory seven-day ramp. These are safety ceilings, not recommended day-one volume; each newly
+connected mailbox should still begin at the operator's deliberately chosen low cap.
+
+Post-reset verification: app/database health passes and gateway/backup services are running;
+public app health, the SPA, and the unrelated `sambhavbuilds.com` portfolio return 200; projection
+dry-run reports `checked 0 enrollments — 0 diff(s)`; self-check is clean; and post-reset dump
+`coldemail-20260904-110609.dump` (146,619 bytes) passes `pg_restore --list`. No code, image, DNS,
+Caddy, portfolio, or Oracle change occurred. Creating mailboxes, importing real leads, activating,
+enrolling, and sending remain separately operator-controlled actions.
+
 ## 2026-09-04 final canary cohort staging — five leads imported, no send state
 
 After the runtime dependency deployment was verified, the operator authorized preparation of five
