@@ -1,5 +1,21 @@
 # Local canary runbook (B8.3-local) — two-week validation on throwaway Gmail
 
+## 2026-09-06 single-message unsubscribe check cleanup
+
+After the operator-controlled single-message unsubscribe check completed, the operator explicitly
+approved the supported cleanup path for its live records. Campaign **Unsubscribe Check**
+(`campaign_id=1`) was already paused and was archived through the authenticated Campaign UI. Its
+test lead was then erased through the authenticated Lead privacy flow. The Leads UI now reports
+zero current leads, while the Campaigns UI shows the campaign as `archived` with no available
+action.
+
+Read-only production reconciliation confirms zero non-erased leads and one erased lineage row. The
+single historical `sent` event and its `sent_messages` row remain, as required by the append-only
+audit model, while all three rendered subject/text/HTML snapshot fields are null after erasure.
+The referenced sequence remains present because it is part of that immutable history. The one
+OAuth mailbox was not removed and its fallback timezone remains `America/New_York`. No campaign
+was activated or resumed, no lead was enrolled, and no email was sent during cleanup.
+
 ## 2026-09-04 unsubscribe presentation follow-up — deployed at `0a2f3c0`
 
 The operator approved a presentation-only refinement based on a supplied footer reference. The
