@@ -19,6 +19,17 @@ call planned work implemented.
 
 ## Current operating boundary
 
+- **2026-09-14 IST bounded prospect authorization:** the operator explicitly lifted the
+  owner-address-only send restriction for **Campaign 2 / Import 2 lead IDs 2–13 only**, authorizing
+  activation, enrollment, and their existing five-email pilot sequence. UI activation/enrollment
+  succeeded; Campaign 2 is active, automatic enrollment remains off, and exactly 12 leads are
+  ACTIVE with complete Ready copy. Mailboxes remain 3 total messages/day each, New York weekdays
+  09:00–17:00. Zero-drift replay checks 13 enrollments; self-check and pre/post backup catalogs pass.
+  No pilot mail had been sent at Sunday verification; sending awaits Monday's window. This narrow
+  authorization supersedes the older keep-draft/owner-only statements for this cohort only.
+  All other prospects, campaigns, new cohorts, auto-enrollment, and cap increases remain separately
+  gated. Do not infer runtime receipt or mailbox balance from enrollment. See docs/17.
+
 The Spaceship production infrastructure is live, but the project remains in **pre-prospect-send
 commissioning** until the operator completes the handoffs below:
 

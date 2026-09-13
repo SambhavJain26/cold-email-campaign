@@ -4,6 +4,14 @@
 
 **Legend:** `[ ]` not started · `[~]` in progress · `[x]` done · `[!]` blocked (note why in the log)
 
+**Latest operational handoff (2026-09-14 IST):** the operator explicitly authorized Campaign 2's
+12-prospect pilot, lifting the owner-only restriction for Import 2 leads 2–13 only. Authenticated
+UI activation/enrollment succeeded: active campaign, 12 ACTIVE enrollments, all 60 emails Ready,
+automatic enrollment off, four healthy 3/day mailboxes, New York weekdays 09:00–17:00. Zero drift
+checks 13 enrollments; self-check and pre/post backup catalogs pass. No pilot mail had sent at
+Sunday verification; sending awaits Monday's window. Wider outreach remains separately gated.
+See docs/17 for the precise authorization and verified launch record.
+
 **Current focus:** → **F-W35 CSV auto-ready remediation.**
 The operator rejected per-email readiness approval after the 12-lead import exposed 60 complete
 copies requiring manual action. The fix makes every complete, non-conflicting CSV pair Ready,

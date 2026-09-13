@@ -1,5 +1,33 @@
 # Local canary runbook (B8.3-local) — two-week validation on throwaway Gmail
 
+## 2026-09-14 IST — explicitly authorized 12-prospect pilot launched
+
+The operator explicitly approved lifting the owner-address-only restriction **for Campaign 2's
+12 imported prospects only**, activating US Property Management, and enrolling those leads into
+the existing five-email sequence. This is not authorization for additional prospects, imports,
+campaigns, automatic enrollment, cap increases, or a wider cohort.
+
+Read-only launch checks confirmed the exact Import 2 available-pool lead IDs **2–13**, no
+suppressed/erased/untiered/Nurture candidates, and all 60 campaign copies Ready. The five steps
+retain personalized content with waits **0/3/4/4/5 days** and conversation flags
+**new/continue/new/continue/continue**. All four mailboxes are healthy, capped at **3 total
+messages/day each**, with America/New_York Monday–Friday **09:00–17:00**, 20% jitter, five-minute
+scheduler/poll intervals, enforced windows, reply stopping, and global unsubscribe suppression.
+
+Activation and enrollment were performed through the authenticated UI and its normal API guards.
+The success notifications reported active and **Enrolled 12**. Database reconciliation confirms
+exactly leads 2–13 enrolled in Campaign 2; the UI shows **ACTIVE 12**, pool **enrolled 12 /
+available 0**, 12 reserved openers, automatic enrollment Off, and full Ready copy coverage.
+Production reports `checked 13 enrollments — 0 diff(s)` and self-check has no invariant violations.
+No pilot sent event exists at verification: production UTC was Sunday 2026-09-13 18:45, New York
+Sunday 14:45, so mail must wait for Monday's sending window. Started-thread mailbox assignments
+will be created by the scheduler; enrollment does not prove exactly three opener assignments per
+mailbox. Runtime send pacing/receipt/reply outcomes remain unobserved for this prospect pilot.
+
+Pre-launch `coldemail-20260913-184514.dump` (**872,744 bytes**) and post-launch
+`coldemail-20260913-184602.dump` (**873,193 bytes**) both pass **342-line** restore catalogs.
+No settings, copy content, historical events, DNS, portfolio, or deployment changed.
+
 ## 2026-09-13 F-W35 — valid CSV copy must be Ready automatically
 
 The 12-lead pilot exposed an unusable workflow: 60 complete imported emails were left Needs review,
