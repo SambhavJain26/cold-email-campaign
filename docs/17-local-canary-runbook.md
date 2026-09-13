@@ -35,8 +35,18 @@ including exact Step 3 snapshot subject reuse and Step 4/5 reference boundaries.
 The local release gate passes: typecheck, lint, format check, unit 346/346, web 67/67, integration
 171/171, API 144/144, GreenMail 29/29, locked golden exactly 47, mock E2E 63/63,
 real-backend E2E 1/1, production web build, zero projection drift, and clean self-check. Production
-deployment and the 12-lead pilot settings transition are recorded only after their independent
-verification below.
+was pushed and deployed at `33bad55` after an independently validated 789,419-byte pre-deploy
+custom-format backup. The app, database, backup, and gateway containers are up; application health,
+the public app/direct-route/redirect/portfolio/unsubscribe-host matrix, `checked 1 enrollments — 0
+diff(s)`, and self-check pass. A 789,616-byte post-deploy dump passes catalog validation. The
+historical sent/enrollment watermarks remain one and no current lead exists, proving the deployment
+sent no mail or created operational records.
+
+The clean production image audit also surfaced newly published runtime advisories that are outside
+this threading change: direct `csv-parse` (<7.0.2) and `nodemailer` (<=9.1.0), with the latter also
+reported through `imapflow`/`mailparser`. They must be assessed and updated under a separate tested
+dependency change before prospect activation; no forced audit rewrite was performed during this
+release.
 
 Rendered personalized previews await imported lead/campaign/step copy. Database reconciliation
 confirms zero non-erased leads, only the prior single historical enrollment, and an unchanged

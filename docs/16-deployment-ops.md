@@ -182,11 +182,11 @@ Full stack built and brought up from a clean state (`docker compose -f docker-co
 
 Remaining for a full **M3** close: the real-backend walkthrough replay (§5, `e2e/walkthrough.spec.ts` — Playwright web ⇄ real server + MockTransport + `advance-clock`), which the frontend track deferred here from F8.
 
-## 8. Spaceship shared-VPS production — deployed 2026-08-22, latest rollout 2026-09-02
+## 8. Spaceship shared-VPS production — deployed 2026-08-22, latest rollout 2026-09-13
 
 Production is live at `https://sambhavpmtech.com/email-campaign/` on the existing Spaceship VM.
 The portfolio at `sambhavbuilds.com` remained online throughout. Application code is pinned to
-`0a2f3c0` on `canary`; `main` was not merged. Oracle remains paused and unchanged as the temporary
+`33bad55` on `canary`; `main` was not merged. Oracle remains paused and unchanged as the temporary
 rollback environment.
 
 The 2026-09-04 footer-presentation rollout changed only the canonical HTML anchor and the two

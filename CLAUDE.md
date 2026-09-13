@@ -11,6 +11,15 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 Spaceship production infrastructure is live, but the project remains in **pre-prospect-send
 commissioning**:
 
+- **2026-09-13 conversation-scoped threading:** the operator-approved F-W33 fix is implemented,
+  fully verified, pushed, and deployed at `33bad55` on `canary`. Continued steps now use the exact
+  subject and message-ID chain of the nearest preceding new-conversation step, so
+  new/continue/new/continue/continue produces two independent conversations. The complete local
+  gate, production health/routes, zero drift, self-check, and validated pre/post backups pass; no
+  lead or send was created. A fresh runtime audit now reports direct `csv-parse` and `nodemailer`
+  advisories (plus `imapflow`/`mailparser` effects); these require a separate tested dependency
+  update before prospect activation. Do not run a forced audit rewrite.
+
 - **2026-09-04 unsubscribe presentation follow-up:** the operator-approved compact footer change
   is implemented, verified, pushed, and deployed at `0a2f3c0` on `canary`: the 10px two-line structure, 20px separation,
   `#595959` color, and 1.5 line height remain, while **Unsubscribe** is now bold, gray, and not
@@ -193,7 +202,7 @@ rollback/canary environment.
 - Stack: `docker-compose.spaceship.yml` with `.env.prod`
 - UI: `https://sambhavpmtech.com/email-campaign/`
 - Internal gateway: `127.0.0.1:18080`; host Caddy alone owns public 80/443
-- Deployed application release: `canary` at `0a2f3c0`
+- Deployed application release: `canary` at `33bad55`
 
 The private repository currently has no GitHub deploy credential on the VPS. Until a read-only
 deploy key is deliberately installed, transfer a reviewed `git bundle`, fetch the pinned branch
