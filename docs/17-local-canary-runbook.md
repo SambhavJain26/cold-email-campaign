@@ -1,5 +1,42 @@
 # Local canary runbook (B8.3-local) — two-week validation on throwaway Gmail
 
+## 2026-09-13 US personalized outreach preparation — draft, threading blocker
+
+The operator authorized application preparation before importing real lead batches. Through the
+authenticated UI, all four connected OAuth mailboxes were saved at 25/day, Monday–Friday,
+09:00–17:00, with `America/New_York` fallback timezone. Read-only production reconciliation
+confirms identical windows/caps and `ok` status for mailbox IDs 1–4. Global capacity is 100
+messages/day including follow-ups, not 100 new leads/day or a guaranteed send quota.
+
+Sequence **US Personalized — Five Emails** (`sequence_id=2`) was created with five Personalized
+Copy steps, no template variants, waits 0/3/4/4/5 calendar days, and conversation flags
+new/continue/new/continue/continue. Campaign **US Property Management** (`campaign_id=2`) was
+created against it and remains `draft`, with automatic enrollment off. At the operator's explicit
+request to start at 25/mailbox on day one, every stage and the permanent enrollment cap were saved
+at 100/day: this is a flat allowance, not a gradual ramp. Its selection mode remains
+`global` until a real import allocation creates its pool; normal pool allocation switches it to
+`pool`. No synthetic lead or pool reservation was created to force that transition.
+
+The Settings UI confirms New York default timezone, enforced windows, automatic/global opt-out
+suppression, five-minute scheduler and IMAP polling, 20% jitter, existing bounce guards, 30/day
+mailbox ceiling and the configured business address/sender-domain unsubscribe footer. The global
+enrollment configuration ceiling was raised to 100/day and minimum ramp set to zero, as explicitly
+requested. Read-only production reconciliation verifies these saved values, the flat campaign
+stage/permanent caps, and unchanged draft/automatic-enrollment-off state. Other settings were retained.
+
+**Open launch blocker F-W33 — second conversation threading:** inspection of
+`scheduler.threadSubjectFor` proves every threaded step loads the enrollment's first sent subject.
+`buildThreadHeaders` includes all previous sequence-message IDs, without resetting references
+after a new-conversation step. Therefore the current sender does not correctly implement an
+independent Step 3/4/5 conversation. Prior chat guidance promising that behavior was incorrect.
+The requested flags are saved only as a draft; this campaign must not activate until the subject,
+reference boundaries, previews, and relevant regression coverage are corrected and deployed.
+This setup authorization does not itself authorize that code change or deployment.
+
+Rendered personalized previews await imported lead/campaign/step copy. Database reconciliation
+confirms zero non-erased leads, only the prior single historical enrollment, and an unchanged
+single sent event. No CSV was imported and no activation, enrollment, or send occurred.
+
 ## 2026-09-06 single-message unsubscribe check cleanup
 
 After the operator-controlled single-message unsubscribe check completed, the operator explicitly
