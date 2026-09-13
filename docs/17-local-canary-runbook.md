@@ -1,6 +1,6 @@
 # Local canary runbook (B8.3-local) — two-week validation on throwaway Gmail
 
-## 2026-09-13 CSV and mail dependency security remediation — locally verified
+## 2026-09-13 CSV and mail dependency security remediation — deployed at `baac951`
 
 The operator authorized resolving the newly reported runtime advisories, testing, and deployment
 before importing the 12-lead pilot. Server dependencies are pinned to `csv-parse` **7.0.2**,
@@ -28,7 +28,25 @@ The populated disposable test database reports `checked 5 enrollments — 0 diff
 self-check. Its 110,754-byte custom-format dump passes a 274-line catalog check and restores
 into the new disposable `coldemail_security_restore_20260913` database. Rebuild, a second
 five-enrollment zero-diff dry-run, and self-check all pass; only that verified scratch database
-was removed afterward. Production deployment is still pending at this local verification point.
+was removed afterward.
+
+The verified change was committed/pushed and deployed at `baac951` through a SHA-256-matched
+reviewed Git bundle and clean fast-forward. Pre-deploy `coldemail-20260913-135104.dump`
+(799,518 bytes) and post-deploy `coldemail-20260913-135407.dump` (799,922 bytes) both pass
+342-line catalog validation. The running pruned app reports zero runtime advisories and the exact
+four pinned versions. App/database health, all four stack containers, all 20 migrations,
+`checked 1 enrollments — 0 diff(s)`, self-check, zero failed jobs, and zero open error alerts pass.
+Public app/direct SPA routes return 200, the bare app path and outreach roots redirect 308,
+the portfolio returns 200, and both unsubscribe-host roots retain 404. DNS, host Caddy, and the
+portfolio stack were not changed.
+
+Post-deployment authenticated campaign and mailbox UI loads and agrees with the database. All
+four mailbox polls are fresh and healthy. The pilot caps, draft state, automatic-enrollment-off
+setting, global/bounce settings, zero current leads, and single historical enrollment/sent-event
+watermarks are unchanged. The operator may now import the 12-lead CSV and allocate it to
+**US Property Management**, keeping the campaign draft until all 60 personalized copies,
+tiering, and rendered previews have been checked. This release did not authorize or create a
+prospect send.
 
 Read-only authenticated UI and database checks confirm the existing pilot setup: all four
 mailboxes are `ok`, 3 messages/day each, New York Monday–Friday 09:00–17:00, with INBOX and

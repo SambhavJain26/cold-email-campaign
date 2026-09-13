@@ -22,14 +22,25 @@ call planned work implemented.
 The Spaceship production infrastructure is live, but the project remains in **pre-prospect-send
 commissioning** until the operator completes the handoffs below:
 
+- **2026-09-13 CSV/mail runtime security update:** the separately approved dependency update is
+  fully verified, pushed, and deployed at `baac951` on `canary`: csv-parse 7.0.2, Nodemailer
+  9.1.1, Mailparser 3.9.20, and ImapFlow 1.6.0. The full serial gate, clean Linux image,
+  zero-runtime audit, populated five-enrollment restore drill, production routes/health,
+  one-enrollment zero drift, self-check, and validated pre/post backups pass. The authenticated
+  campaign/mailbox UI loads; four healthy mailboxes remain 3/day, New York weekdays 09:00–17:00,
+  Campaign 2 remains draft/auto-enrollment off with 12/day caps, and current leads remain zero.
+  The saved bounce guards are 25 minimum sends, 4% over 50, 2 in 10, and 50% resume cap.
+  Ten development/build audit findings and F-T01 remain separate; runtime findings are zero.
+  No import, allocation, activation, enrollment, or send occurred. CSV import is the next
+  operator handoff; activation and every outbound batch remain separately gated.
+
 - **2026-09-13 conversation-scoped threading:** the operator-approved F-W33 fix is implemented,
   fully verified, pushed, and deployed at `33bad55` on `canary`. Continued steps now use the exact
   subject and message-ID chain of the nearest preceding new-conversation step, so
   new/continue/new/continue/continue produces two independent conversations. The complete local
   gate, production health/routes, zero drift, self-check, and validated pre/post backups pass; no
-  lead or send was created. A fresh runtime audit now reports direct `csv-parse` and `nodemailer`
-  advisories (plus `imapflow`/`mailparser` effects); these require a separate tested dependency
-  update before prospect activation. Do not run a forced audit rewrite.
+  lead or send was created. The runtime advisories found during that rollout are resolved by
+  the separately verified and deployed CSV/mail update above. Do not run a forced audit rewrite.
 
 - **2026-09-13 12-lead pilot staging:** production mailboxes 1–4 are `ok` and temporarily capped
   at 3 messages/day each with `America/New_York`, Monday–Friday 09:00–17:00 windows. Campaign
@@ -234,7 +245,7 @@ temporary rollback/canary environment.
 - App: `/opt/email-campaign`; stack: `docker-compose.spaceship.yml` with `.env.prod`
 - Public UI: `https://sambhavpmtech.com/email-campaign/`
 - Internal gateway: `127.0.0.1:18080`; host Caddy is the only public 80/443 listener
-- Deployed application release: `canary` at `33bad55`
+- Deployed application release: `canary` at `baac951`
 
 The repository is private and the VPS currently has no GitHub deploy credential. Until a read-only
 deploy key is deliberately installed, transfer a reviewed `git bundle`, fetch the pinned branch

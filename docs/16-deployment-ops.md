@@ -3,7 +3,18 @@
 Single always-on VPS (finalized decision). Docker Compose primary; systemd alternative. Implemented
 in B7 and cut over to Spaceship production on 2026-08-22.
 
-**Production status (2026-09-03):** F-W26–F-W31 are deployed at `c75a385` on `canary`.
+**Production status (2026-09-13):** CSV/mail security remediation is verified and deployed at
+`baac951` on `canary`: csv-parse 7.0.2, Nodemailer 9.1.1, Mailparser 3.9.20, and ImapFlow
+1.6.0. The full serial regression gate, clean Linux/pruned running-app runtime audit (zero),
+populated restore drill, production health/routes, 20 migrations, zero drift, self-check, and
+pre/post backup catalogs pass. Four healthy OAuth mailboxes retain New York weekdays 09:00–17:00
+at 3/day each. Campaign 2 remains draft with auto-enrollment off and flat 12/day caps; current
+leads are zero and the historical enrollment/sent-event watermarks remain one. Authenticated
+campaign/mailbox UI reconciliation passes. Ten development/build audit findings and F-T01 remain
+separate. No import, activation, enrollment, send, DNS change, or portfolio mutation occurred.
+See docs/17 for the verified evidence and next CSV-import handoff.
+
+**Previous production status (2026-09-03):** F-W26–F-W31 are deployed at `c75a385` on `canary`.
 Health/routes, all 20 migrations, ten-enrollment zero drift, self-check, pre/post backup catalogs,
 and unchanged 24-send history pass. No campaign/enrollment/mailbox/DNS changes or mail occurred.
 Authenticated UI replay is pending due to `ERR_BLOCKED_BY_CLIENT` in the browser tool. Runtime
@@ -186,7 +197,7 @@ Remaining for a full **M3** close: the real-backend walkthrough replay (§5, `e2
 
 Production is live at `https://sambhavpmtech.com/email-campaign/` on the existing Spaceship VM.
 The portfolio at `sambhavbuilds.com` remained online throughout. Application code is pinned to
-`33bad55` on `canary`; `main` was not merged. Oracle remains paused and unchanged as the temporary
+`baac951` on `canary`; `main` was not merged. Oracle remains paused and unchanged as the temporary
 rollback environment.
 
 The 2026-09-04 footer-presentation rollout changed only the canonical HTML anchor and the two

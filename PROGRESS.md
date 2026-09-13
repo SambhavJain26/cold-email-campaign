@@ -4,7 +4,22 @@
 
 **Legend:** `[ ]` not started · `[~]` in progress · `[x]` done · `[!]` blocked (note why in the log)
 
-**Current focus:** → **Runtime dependency remediation is verified and deployed at `552fab8`.**
+**Current focus:** → **The 12-lead pilot is ready for CSV import; campaign activation remains gated.**
+The separately authorized CSV/mail dependency security update is verified, pushed, and deployed
+at `baac951`: csv-parse 7.0.2, Nodemailer 9.1.1, Mailparser 3.9.20, ImapFlow 1.6.0.
+Gate: type/lint/format; unit 348/348; web 67/67; integration 171/171; API 144/144; GreenMail
+29/29; golden exactly 47/47; mock E2E 63/63; real-backend E2E 1/1; production build; clean
+Linux npm-ci/pruned image and transport/parser imports; populated five-enrollment zero drift,
+self-check, and scratch restore. Runtime audits are zero locally and in the running production
+app; 10 development/build findings and F-T01 remain separate. Production routes/health,
+20 migrations, one-enrollment zero drift/self-check, zero failed jobs/open error alerts,
+authenticated campaign/mailbox UI, and pre/post backup catalogs pass. Four healthy mailboxes
+retain 3/day each, New York weekdays 09:00–17:00; US Property Management remains draft,
+auto-enrollment off, with every stage/permanent cap 12/day. Current leads remain zero and the
+historical enrollment/sent-event watermarks remain one. No import, allocation, activation,
+enrollment, prospect send, DNS change, or portfolio mutation occurred. See docs/17.
+
+**Previous runtime remediation (2026-09-03):** → **Verified and deployed at `552fab8`.**
 Fastify 5.12.1 and fast-uri 3.1.7/4.1.4 clear the runtime audit. Three new integration checks
 protect Zod root-primitive parsing and the server's untrusted forwarding-header defaults.
 Gate: type/lint/format; unit 346; web 67; API 144; integration 171; GreenMail 29; golden exactly
@@ -18,7 +33,7 @@ and pre/post backup catalogs pass. No production data mutation or real send occu
 owner-address canary awaits separate send authorization; 20 total messages would not guarantee
 five per mailbox.
 
-**Latest production release:** → **F-W26–F-W31 are verified, pushed, and deployed at `c75a385`.**
+**Previous UI release (2026-09-03):** → **F-W26–F-W31 are verified, pushed, and deployed at `c75a385`.**
 The six fixes clarify Overview's lead-level delivery status/default campaign, preserve campaign
 pool provenance in Leads, add the Cold Storage source selector, distinguish audit/send subjects,
 and correct the Personalized Copy preview prerequisite. Verification: type/lint/format; unit 346;
