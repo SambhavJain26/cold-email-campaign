@@ -1,5 +1,45 @@
 # Local canary runbook (B8.3-local) — two-week validation on throwaway Gmail
 
+## 2026-09-13 CSV and mail dependency security remediation — locally verified
+
+The operator authorized resolving the newly reported runtime advisories, testing, and deployment
+before importing the 12-lead pilot. Server dependencies are pinned to `csv-parse` **7.0.2**,
+`nodemailer` **9.1.1**, `mailparser` **3.9.20**, and `imapflow` **1.6.0**. The lockfile removes
+the older transitive Nodemailer copies; no forced audit rewrite, application behavior change,
+schema migration, or production-data mutation is part of this release.
+
+Two added unit regressions verify the upstream duplicate-`__proto__` CSV-column protection and
+round-trip all five personalized subject/body pairs with quoted commas and multiline cells.
+The complete serial gate passes: typecheck, lint, format check, unit **348/348**, web **67/67**,
+integration **171/171**, API **144/144**, GreenMail **29/29**, locked golden **47/47**,
+mock E2E **63/63**, real-backend E2E **1/1**, and the real-API subpath production build. The
+GreenMail and scheduler suites retain coverage of reply ingestion, STOP/bounces, threading,
+RFC 8058 headers, pacing, immutable copies, and missing-copy holds. Mock E2E still emits the
+previously recorded F-T01 missing-copy-coverage-fixture proxy warnings; the suite itself passes.
+
+A clean Linux `npm ci` / pruned app image builds and imports the real SMTP/IMAP transport and
+CSV parser. Both local and pruned-image runtime audits report **zero vulnerabilities**. The full
+repository audit separately reports **10 development/build findings** (7 moderate, 3 high):
+`@esbuild-kit/core-utils`, `@esbuild-kit/esm-loader`, `@vitest/mocker`, `brace-expansion`,
+`drizzle-kit`, `esbuild`, `nanoid`, `postcss`, `undici`, and `vitest`. This is not a claim that
+the complete development dependency graph is clean or that future advisories cannot appear.
+
+The populated disposable test database reports `checked 5 enrollments — 0 diff(s)` and a clean
+self-check. Its 110,754-byte custom-format dump passes a 274-line catalog check and restores
+into the new disposable `coldemail_security_restore_20260913` database. Rebuild, a second
+five-enrollment zero-diff dry-run, and self-check all pass; only that verified scratch database
+was removed afterward. Production deployment is still pending at this local verification point.
+
+Read-only authenticated UI and database checks confirm the existing pilot setup: all four
+mailboxes are `ok`, 3 messages/day each, New York Monday–Friday 09:00–17:00, with INBOX and
+Gmail Spam polling. Campaign **US Property Management** remains draft, automatic enrollment off,
+and every stage/permanent cap is 12/day. Sequence **US Personalized — Five Emails** retains five
+Personalized Copy steps, waits 0/3/4/4/5 calendar days, and new/continue/new/continue/continue
+conversation choices. Rendered lead-copy previews necessarily await import. The operator's saved
+bounce guards are 25 minimum sends, 4% over 50 sends, 2 bounces in 10 sends, and 50% resume cap.
+There are zero current leads and the historical enrollment/sent-event watermarks remain one.
+No import, allocation, activation, enrollment, or send occurred.
+
 ## 2026-09-13 12-lead pilot limits
 
 After deploying the conversation-threading remediation, the operator authorized preparation for a

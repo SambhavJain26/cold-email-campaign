@@ -1,6 +1,7 @@
 // B5.2: CSV contract (docs/09 §1) — aliases, BOM, delimiter sniffing,
 // custom-field preservation, limits.
 import { describe, expect, it } from 'vitest';
+import { parse as parseRecords } from 'csv-parse/sync';
 import {
   CsvContractError,
   ImportTooLargeError,
@@ -44,6 +45,35 @@ describe('header aliasing', () => {
 });
 
 describe('format tolerance', () => {
+  it('preserves all five personalized emails with quoted commas and multiline cells', async () => {
+    const subjects = [
+      'First conversation',
+      'First conversation',
+      'Another idea',
+      'Another idea',
+      'Another idea',
+    ];
+    const bodies = subjects.map(
+      (_, index) => `Hi Jo,\n\nMessage ${index + 1}, with a comma.\nSambhav`,
+    );
+    const headers = [
+      'email',
+      ...subjects.flatMap((_, index) => [`step_${index + 1}_subject`, `step_${index + 1}_body`]),
+    ];
+    const cells = ['jo@x.dev', ...subjects.flatMap((subject, index) => [subject, bodies[index]!])];
+    const quote = (value: string) => `"${value.replaceAll('"', '""')}"`;
+    const [row] = await parseCsv(buf(`${headers.join(',')}\n${cells.map(quote).join(',')}\n`));
+    expect(row!.fields.email).toBe('jo@x.dev');
+    for (let index = 0; index < 5; index += 1) {
+      expect(row!.copySlots?.[index + 1]).toEqual({
+        subject: subjects[index],
+        body: bodies[index],
+        targetStepNo: index + 1,
+      });
+    }
+    expect(row!.copyConflicts).toEqual([]);
+  });
+
   it('maps generic and step-specific personalized copy without treating it as custom fields', async () => {
     const rows = await parseCsv(
       buf(
@@ -93,6 +123,19 @@ describe('format tolerance', () => {
   it('values are trimmed; row numbers are 1-based in file order', async () => {
     const rows = await parseCsv(buf('email , first_name \n  jo@x.dev ,  Jo \n'));
     expect(rows[0]).toMatchObject({ rowNo: 1, fields: { email: 'jo@x.dev', first_name: 'Jo' } });
+  });
+});
+
+describe('CSV dependency security regression', () => {
+  it('duplicate __proto__ columns cannot replace the parsed record prototype', () => {
+    const [record] = parseRecords('email,__proto__,__proto__\njo@x.dev,one,two\n', {
+      columns: true,
+      group_columns_by_name: true,
+    }) as Array<Record<string, unknown>>;
+    expect(Object.getPrototypeOf(record!)).toBe(Object.prototype);
+    expect(Object.hasOwn(record!, '__proto__')).toBe(true);
+    expect(record!['__proto__']).toEqual(['one', 'two']);
+    expect(record!['email']).toBe('jo@x.dev');
   });
 });
 
