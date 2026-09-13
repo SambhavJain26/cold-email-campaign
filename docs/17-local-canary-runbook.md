@@ -40,8 +40,11 @@ Public app/direct SPA routes return 200, the bare app path and outreach roots re
 the portfolio returns 200, and both unsubscribe-host roots retain 404. DNS, host Caddy, and the
 portfolio stack were not changed.
 
-Post-deployment authenticated campaign and mailbox UI loads and agrees with the database. All
-four mailbox polls are fresh and healthy. The pilot caps, draft state, automatic-enrollment-off
+Post-deployment authenticated campaign and mailbox UI loads and agrees with the database. System
+shows a fresh scheduler tick and four healthy pollers. Domain readiness reports no blocking
+failures: compliance, mailbox health/caps, SPF, DKIM, DMARC, and MX pass for both outreach domains.
+The sole warning is the explicitly operator-selected zero-day minimum ramp, not a changed setting.
+All four mailbox polls are fresh and healthy. The pilot caps, draft state, automatic-enrollment-off
 setting, global/bounce settings, zero current leads, and single historical enrollment/sent-event
 watermarks are unchanged. The operator may now import the 12-lead CSV and allocate it to
 **US Property Management**, keeping the campaign draft until all 60 personalized copies,
