@@ -195,6 +195,32 @@ export async function firstSentEvent(
   return rows[0] ? toSentEventLite(rows[0]) : null;
 }
 
+/** Latest accepted attempt for an exact enrollment step. */
+export async function sentEventForStep(
+  db: DbLike,
+  enrollmentId: number,
+  stepNo: number,
+): Promise<SentEventLite | null> {
+  const rows = await db
+    .select({
+      stepNo: events.stepNo,
+      occurredAt: events.occurredAt,
+      messageId: events.messageId,
+      attributes: events.attributes,
+    })
+    .from(events)
+    .where(
+      and(
+        eq(events.enrollmentId, enrollmentId),
+        eq(events.stepNo, stepNo),
+        eq(events.type, 'sent'),
+      ),
+    )
+    .orderBy(desc(events.id))
+    .limit(1);
+  return rows[0] ? toSentEventLite(rows[0]) : null;
+}
+
 /** Recycle guard probe (decision Q): has this lead ever received this template hash? */
 export async function leadReceivedContentHash(
   db: DbLike,

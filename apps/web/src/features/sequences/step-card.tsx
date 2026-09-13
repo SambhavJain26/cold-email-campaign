@@ -166,8 +166,8 @@ export function StepCard({
                     Continue existing conversation
                   </FieldTitle>
                   <FieldDescription id={`${step.uid}-conversation-continue-description`}>
-                    Sends as “Re: &lt;Step 1 subject&gt;” and keeps the context together. Gmail may
-                    trim repeated footer content.
+                    Replies to the nearest earlier “Start new conversation” step and uses that
+                    conversation’s subject. Gmail may trim repeated footer content.
                   </FieldDescription>
                 </FieldContent>
               </Field>

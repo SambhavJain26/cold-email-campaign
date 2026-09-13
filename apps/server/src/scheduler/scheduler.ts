@@ -20,9 +20,9 @@ import { listMailboxesByStatus, patchMailbox } from '../db/repos/mailboxesRepo';
 import {
   countSentForStep,
   countSentSince,
-  firstSentEvent,
   hasSoftBounceAfter,
   lastSentEvent,
+  sentEventForStep,
   type SentEventLite,
 } from '../db/repos/eventsRepo';
 import {
@@ -32,7 +32,6 @@ import {
   type DueEnrollment,
 } from '../db/repos/enrollmentsRepo';
 import {
-  firstSentMessage,
   insertSentMessage,
   leadReceivedContentHash,
   sentMessageForStep,
@@ -48,6 +47,7 @@ import {
 import { getVariantById } from '../db/repos/sequencesRepo';
 import { buildEvent } from '../domain/events';
 import {
+  conversationRootStepNo,
   shapeOf,
   stepOf,
   type SequenceDef,
@@ -570,7 +570,13 @@ export class Scheduler {
 
     // Threading (docs/07 §4) via buildMime (docs/08 §6).
     const messageId = buildMessageId(e.id, stepNo, now, mb.fromAddress);
-    const { inReplyTo, references } = await buildThreadHeaders(db, e.id, stepNo, step.inThread);
+    const { inReplyTo, references } = await buildThreadHeaders(
+      db,
+      e.id,
+      stepNo,
+      step.inThread,
+      conversationRootStepNo(seq, stepNo),
+    );
 
     const msg: OutboundMessage = {
       mailboxId: mb.id,
@@ -801,7 +807,7 @@ export class Scheduler {
       literal: opts.literal,
     };
     if (step.inThread && step.stepNo > 1) {
-      base.threadSubject = await this.threadSubjectFor(e, seq, base);
+      base.threadSubject = await this.threadSubjectFor(e, seq, step, base);
     }
     return base;
   }
@@ -840,25 +846,29 @@ export class Scheduler {
   }
 
   /**
-   * The rendered step-1 subject for `Re:` threading (docs/08 §6): re-rendered
-   * deterministically (same seed → same spintax picks). Bespoke step-1 renders
-   * literal. Undefined on any lookup failure — the engine then Re:-prefixes
-   * the step's own subject instead of crashing the send.
+   * The rendered subject of the current conversation's starting step for
+   * `Re:` threading (docs/08 §6). Historical rows without snapshots are
+   * re-rendered deterministically (same seed → same spintax picks). Bespoke
+   * renders stay literal. Undefined on any lookup failure — the engine then
+   * Re:-prefixes the step's own subject instead of crashing the send.
    */
   private async threadSubjectFor(
     e: DueEnrollment,
     seq: SequenceDef,
+    step: SequenceStepDef,
     base: RenderContext,
   ): Promise<string | undefined> {
     const { db, renderer } = this.deps;
-    const snapshot = await firstSentMessage(db, e.id);
+    const rootStepNo = conversationRootStepNo(seq, step.stepNo);
+    if (rootStepNo === undefined) return undefined;
+    const snapshot = await sentMessageForStep(db, e.id, rootStepNo);
     if (snapshot?.renderedSubject) return snapshot.renderedSubject.replace(/^Re:\s*/i, '');
-    const first = await firstSentEvent(db, e.id);
-    if (!first) return undefined;
-    let variant = this.variantOf(seq, first);
+    const root = await sentEventForStep(db, e.id, rootStepNo);
+    if (!root) return undefined;
+    let variant = this.variantOf(seq, root);
     let literal = false;
-    if (!variant && first.variantId !== null) {
-      const row = await getVariantById(db, first.variantId);
+    if (!variant && root.variantId !== null) {
+      const row = await getVariantById(db, root.variantId);
       if (row) {
         variant = {
           id: row.id,
@@ -873,7 +883,7 @@ export class Scheduler {
     if (!variant) return undefined;
     return renderer.render({
       variant,
-      step: { stepNo: first.stepNo, inThread: false },
+      step: { stepNo: root.stepNo, inThread: false },
       lead: this.leadLiteOf(e),
       enrollmentId: e.id,
       ctx: { ...base, threadSubject: undefined, literal },

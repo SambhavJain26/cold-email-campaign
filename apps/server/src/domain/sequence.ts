@@ -33,6 +33,13 @@ export function stepOf(seq: SequenceDef, stepNo: number): SequenceStepDef | unde
   return seq.steps.find((s) => s.stepNo === stepNo);
 }
 
+/** Nearest preceding step that started the conversation containing `stepNo`. */
+export function conversationRootStepNo(seq: SequenceDef, stepNo: number): number | undefined {
+  return seq.steps
+    .filter((step) => step.stepNo < stepNo && !step.inThread)
+    .sort((a, b) => b.stepNo - a.stepNo)[0]?.stepNo;
+}
+
 export function lastStepNo(seq: SequenceDef): number {
   return seq.steps.at(-1)?.stepNo ?? 0;
 }

@@ -144,7 +144,7 @@ describe('scheduler (B3.7/B3.8)', () => {
     expect(toPT()[0]!.at.getTime()).toBeGreaterThanOrEqual(Date.parse('2026-01-05T16:00:00Z'));
   });
 
-  it('runs personalized 1 → researched template 2 → personalized 3 → template 4 and holds only missing copy', async () => {
+  it('runs two personalized-root conversations and holds only missing copy', async () => {
     s = await scenario({ mailboxes: 1, sequence: fourStep, tickMinutes: 30, jitterPct: 0 });
     const sequenceId = await createSequence(s.db, {
       name: 'mixed personalized path',
@@ -164,7 +164,7 @@ describe('scheduler (B3.7/B3.8)', () => {
             },
           ],
         },
-        { stepNo: 3, waitDays: 1, inThread: true, contentSource: 'personalized', variants: [] },
+        { stepNo: 3, waitDays: 1, inThread: false, contentSource: 'personalized', variants: [] },
         {
           stepNo: 4,
           waitDays: 1,
@@ -176,6 +176,20 @@ describe('scheduler (B3.7/B3.8)', () => {
               subjectTemplate: 'Last note',
               bodyTemplate: 'Hi {{first_name|there}},\n\nClosing the loop.\n\nBest,\nSam',
               contentHash: contentHashOf('Last note', 'Closing the loop.'),
+            },
+          ],
+        },
+        {
+          stepNo: 5,
+          waitDays: 1,
+          inThread: true,
+          contentSource: 'template',
+          variants: [
+            {
+              label: 'A',
+              subjectTemplate: 'Unused follow-up subject',
+              bodyTemplate: 'Hi {{first_name|there}},\n\nOne final thought.\n\nBest,\nSam',
+              contentHash: contentHashOf('Unused follow-up subject', 'One final thought.'),
             },
           ],
         },
@@ -255,16 +269,16 @@ describe('scheduler (B3.7/B3.8)', () => {
       status: 'ready',
       replace: false,
     });
-    await s.advanceDays(3);
+    await s.advanceDays(7); // crosses the weekend and allows both continued steps to send
 
-    expect(s.mock.sentTo(leadEmail('L0001'))).toHaveLength(4);
-    expect(s.mock.sentTo(leadEmail('L0002'))).toHaveLength(4);
+    expect(s.mock.sentTo(leadEmail('L0001'))).toHaveLength(5);
+    expect(s.mock.sentTo(leadEmail('L0002'))).toHaveLength(5);
     const sent = await s.pool.query(
       `SELECT lead_id, step_no, rendered_subject, rendered_body_text, content_source,
               personalized_copy_id
          FROM sent_messages ORDER BY lead_id, step_no`,
     );
-    expect(sent.rows).toHaveLength(8);
+    expect(sent.rows).toHaveLength(10);
     expect(
       sent.rows.find(
         (row: { lead_id: number; step_no: number }) => row.lead_id === 1 && row.step_no === 1,
@@ -278,7 +292,7 @@ describe('scheduler (B3.7/B3.8)', () => {
         (row: { lead_id: number; step_no: number }) => row.lead_id === 1 && row.step_no === 3,
       ),
     ).toMatchObject({
-      rendered_subject: 'Re: Personal opener 1',
+      rendered_subject: 'A second personal thought for Ada',
       content_source: 'personalized',
     });
     expect(
@@ -286,6 +300,23 @@ describe('scheduler (B3.7/B3.8)', () => {
         (row: { lead_id: number; step_no: number }) => row.lead_id === 1 && row.step_no === 3,
       ).personalized_copy_id,
     ).not.toBeNull();
+    const lead1Sends = s.mock.sentTo(leadEmail('L0001'));
+    const [one, two, three, four, five] = lead1Sends;
+    expect(two!.msg.subject).toBe('Re: Personal opener 1');
+    expect(two!.msg.headers.inReplyTo).toBe(one!.msg.headers.messageId);
+    expect(two!.msg.headers.references).toEqual([one!.msg.headers.messageId]);
+    expect(three!.msg.subject).toBe(lead1Step3Subject);
+    expect(three!.msg.headers.inReplyTo).toBeUndefined();
+    expect(three!.msg.headers.references).toBeUndefined();
+    expect(four!.msg.subject).toBe(`Re: ${lead1Step3Subject}`);
+    expect(four!.msg.headers.inReplyTo).toBe(three!.msg.headers.messageId);
+    expect(four!.msg.headers.references).toEqual([three!.msg.headers.messageId]);
+    expect(five!.msg.subject).toBe(`Re: ${lead1Step3Subject}`);
+    expect(five!.msg.headers.inReplyTo).toBe(four!.msg.headers.messageId);
+    expect(five!.msg.headers.references).toEqual([
+      three!.msg.headers.messageId,
+      four!.msg.headers.messageId,
+    ]);
     expect(
       (await s.pool.query(`SELECT count(*)::int n FROM personalized_copy_blockers`)).rows[0].n,
     ).toBe(0);

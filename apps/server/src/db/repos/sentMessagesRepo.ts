@@ -63,21 +63,6 @@ export async function sentMessageForStep(
   )[0];
 }
 
-/** Exact Step-1 subject is the audit/threading anchor for every later step. */
-export async function firstSentMessage(
-  db: DbLike,
-  enrollmentId: number,
-): Promise<SentMessageRow | undefined> {
-  return (
-    await db
-      .select()
-      .from(sentMessages)
-      .where(eq(sentMessages.enrollmentId, enrollmentId))
-      .orderBy(sentMessages.sentAt)
-      .limit(1)
-  )[0];
-}
-
 export async function leadReceivedContentHash(
   db: DbLike,
   leadId: number,

@@ -1,6 +1,6 @@
 # Local canary runbook (B8.3-local) — two-week validation on throwaway Gmail
 
-## 2026-09-13 US personalized outreach preparation — draft, threading blocker
+## 2026-09-13 US personalized outreach preparation and threading remediation
 
 The operator authorized application preparation before importing real lead batches. Through the
 authenticated UI, all four connected OAuth mailboxes were saved at 25/day, Monday–Friday,
@@ -24,14 +24,19 @@ enrollment configuration ceiling was raised to 100/day and minimum ramp set to z
 requested. Read-only production reconciliation verifies these saved values, the flat campaign
 stage/permanent caps, and unchanged draft/automatic-enrollment-off state. Other settings were retained.
 
-**Open launch blocker F-W33 — second conversation threading:** inspection of
-`scheduler.threadSubjectFor` proves every threaded step loads the enrollment's first sent subject.
-`buildThreadHeaders` includes all previous sequence-message IDs, without resetting references
-after a new-conversation step. Therefore the current sender does not correctly implement an
-independent Step 3/4/5 conversation. Prior chat guidance promising that behavior was incorrect.
-The requested flags are saved only as a draft; this campaign must not activate until the subject,
-reference boundaries, previews, and relevant regression coverage are corrected and deployed.
-This setup authorization does not itself authorize that code change or deployment.
+**F-W33 — second conversation threading:** the defect was reproduced: every continued step used
+the enrollment's first sent subject and included all previous sequence-message IDs. The scheduler
+now anchors each continued step to the nearest preceding new-conversation step. Its exact sent
+subject supplies `Re:`, `In-Reply-To` targets the latest message within that conversation, and
+`References` contains only that conversation's prior message IDs. A new five-step personalized-root
+integration case proves new/continue/new/continue/continue produces two independent conversations,
+including exact Step 3 snapshot subject reuse and Step 4/5 reference boundaries.
+
+The local release gate passes: typecheck, lint, format check, unit 346/346, web 67/67, integration
+171/171, API 144/144, GreenMail 29/29, locked golden exactly 47, mock E2E 63/63,
+real-backend E2E 1/1, production web build, zero projection drift, and clean self-check. Production
+deployment and the 12-lead pilot settings transition are recorded only after their independent
+verification below.
 
 Rendered personalized previews await imported lead/campaign/step copy. Database reconciliation
 confirms zero non-erased leads, only the prior single historical enrollment, and an unchanged

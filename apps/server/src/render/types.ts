@@ -39,9 +39,9 @@ export interface RenderContext {
   /** Footer ingredients; `unsubscribeUrl` is per-send and absent when dormant. */
   compliance: ComplianceInfo;
   /**
-   * The rendered step-1 subject: in-thread steps 2+ send `Re: {threadSubject}`
-   * (docs/08 §6). Absent → the step renders its own subject (still Re:-prefixed
-   * when in-thread past step 1).
+   * The rendered subject of the current conversation's starting step. A
+   * continued step sends `Re: {threadSubject}` (docs/08 §6). Absent → the step
+   * renders its own subject (still Re:-prefixed when continued).
    */
   threadSubject?: string;
   /**

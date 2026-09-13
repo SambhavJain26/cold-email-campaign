@@ -21,18 +21,23 @@ export interface ThreadHeaders {
 }
 
 /**
- * In-Reply-To = previous step's Message-ID; References = all prior ids in
- * order. Same-step soft-retries re-anchor to the PREVIOUS step, not the
- * bounced attempt (the stepNo < current filter).
+ * In-Reply-To = previous message in the current conversation; References =
+ * this conversation's prior ids in order. A new-conversation step resets the
+ * lower boundary. Same-step soft-retries re-anchor to the previous step, not
+ * the bounced attempt (the stepNo < current filter).
  */
 export async function buildThreadHeaders(
   db: DbLike,
   enrollmentId: number,
   stepNo: number,
   inThread: boolean,
+  conversationRootStepNo?: number,
 ): Promise<ThreadHeaders> {
   if (!inThread) return {};
-  const thread = (await listThreadMessageIds(db, enrollmentId)).filter((m) => m.stepNo < stepNo);
+  if (conversationRootStepNo === undefined) return {};
+  const thread = (await listThreadMessageIds(db, enrollmentId)).filter(
+    (message) => message.stepNo >= conversationRootStepNo && message.stepNo < stepNo,
+  );
   if (thread.length === 0) return {};
   return {
     inReplyTo: thread.at(-1)!.messageId,

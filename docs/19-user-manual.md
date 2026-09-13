@@ -777,7 +777,8 @@ For each step:
 - **Wait:** step 1 waits after enrollment; later steps wait after the previous send. Range is 0–90
   days.
 - **Conversation:** Step 1 always starts a new conversation. For later steps, choose **Continue
-  existing conversation** to use `In-Reply-To`/`References` and `Re: <Step 1 subject>`, or **Start
+  existing conversation** to use conversation-scoped `In-Reply-To`/`References` and
+  `Re: <nearest conversation-start subject>`, or **Start
   new conversation** to use that step's own subject without reply headers. Continuing the thread
   preserves context, but Gmail may collapse the repeated compliance footer behind **Show trimmed
   content**. Starting a new conversation makes the footer more likely—not guaranteed—to remain

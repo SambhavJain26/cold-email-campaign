@@ -56,7 +56,9 @@ template fallback can replace missing personalized copy.
 
 `sent_messages` stores the exact rendered subject, text body, HTML body, content source, and
 personalized-copy ID for new sends. Soft-bounce retries reuse this immutable snapshot. In-thread
-steps retain their saved subject for audit but send `Re: <exact Step 1 subject>`.
+steps retain their saved subject for audit but send `Re: <exact conversation-start subject>`.
+A later step configured to start a new conversation resets both this subject anchor and the MIME
+References boundary for the continued steps that follow it.
 
 ## 3. CSV import
 
