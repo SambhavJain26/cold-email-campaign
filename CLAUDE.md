@@ -20,6 +20,14 @@ commissioning**:
   advisories (plus `imapflow`/`mailparser` effects); these require a separate tested dependency
   update before prospect activation. Do not run a forced audit rewrite.
 
+- **2026-09-13 12-lead pilot staging:** production mailboxes 1–4 are `ok` and temporarily capped
+  at 3 messages/day each with `America/New_York`, Monday–Friday 09:00–17:00 windows. Campaign
+  **US Property Management** (`campaign_id=2`) remains `draft`, automatic enrollment is off, and
+  every stage plus both permanent caps are 12/day. There are zero current leads; the single
+  historical enrollment and sent event are unchanged. UI/database reconciliation, zero drift,
+  self-check, and the 790,702-byte backup catalog pass. No import, pool allocation, activation,
+  enrollment, or send is authorized by this staging change.
+
 - **2026-09-04 unsubscribe presentation follow-up:** the operator-approved compact footer change
   is implemented, verified, pushed, and deployed at `0a2f3c0` on `canary`: the 10px two-line structure, 20px separation,
   `#595959` color, and 1.5 line height remain, while **Unsubscribe** is now bold, gray, and not

@@ -1,5 +1,28 @@
 # Local canary runbook (B8.3-local) — two-week validation on throwaway Gmail
 
+## 2026-09-13 12-lead pilot limits
+
+After deploying the conversation-threading remediation, the operator authorized preparation for a
+12-lead pilot but did not authorize import, activation, enrollment, or sending. Through the
+authenticated production UI, all four connected OAuth mailboxes were reduced from 25/day to
+**3/day each** while retaining `America/New_York`, Monday–Friday, 09:00–17:00, and `ok` status.
+Production therefore has a configured aggregate mailbox capacity of 12 messages/day, including
+follow-ups.
+
+Campaign **US Property Management** (`campaign_id=2`) remains `draft` with automatic enrollment
+off. All five draft ramp-stage caps, the draft permanent cap, and the pool permanent cap are now
+**12/day**, creating a flat pilot allowance rather than a staged ramp. The Settings UI was checked
+without further mutation: send-window enforcement, automatic/global opt-out suppression,
+five-minute scheduler and IMAP polling, 20% jitter, New York default timezone, the physical address,
+and the sender-domain unsubscribe URL remain configured. The broader 30/day mailbox and 100/day
+campaign configuration ceilings remain unchanged; the lower saved mailbox and campaign values are
+the effective pilot limits.
+
+Read-only production reconciliation confirms zero non-erased leads, the unchanged single historical
+enrollment and sent event, `checked 1 enrollments — 0 diff(s)`, and a clean self-check. No lead,
+pool reservation, enrollment, or send was created. Post-change backup
+`coldemail-20260913-123947.dump` is 790,702 bytes and its `pg_restore --list` catalog validates.
+
 ## 2026-09-13 US personalized outreach preparation and threading remediation
 
 The operator authorized application preparation before importing real lead batches. Through the
