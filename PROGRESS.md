@@ -4,13 +4,17 @@
 
 **Legend:** `[ ]` not started · `[~]` in progress · `[x]` done · `[!]` blocked (note why in the log)
 
-**Current focus:** → **Pilot import/tiering complete; F-W34 preview parity and copy review remain.**
+**Current focus:** → **F-W34 preview fix implemented locally; deployment and copy review remain.**
 The operator-authorized browser import created 12 Tier B leads and all 60 source/campaign-step
 copies as Needs review. Campaign 2 remains draft, auto-enrollment off, pool-only; no enrollment
 or send occurred. Coverage has 12 review/zero missing per step. Zero drift, self-check, and backup
-catalog pass. Sampled bodies render, but Step 4/5 preview subjects still anchor to Step 1 rather
-than Step 3; F-W34 is diagnosed and recorded, not implemented. Full 60-preview review and marking
-copy ready remain pending. See docs/17; do not activate the pilot yet.
+catalog pass. F-W34 now uses the scheduler's nearest new-conversation selector for personalized
+preview subjects. The added API regression failed on the old Step 4 subject and passes after the
+fix. The complete serial gate passes: type/lint/format; unit 348; web 67; integration 171; API 145;
+GreenMail 29; golden exactly 47; mock E2E 63; real-backend E2E 1; production build; populated
+five-enrollment zero drift; and clean self-check. Production remains at `baac951`; deployment,
+full 60-preview review, and marking copy ready remain pending. See docs/17; do not activate the
+pilot yet.
 
 **Previous import-preparation gate (2026-09-13):**
 The separately authorized CSV/mail dependency security update is verified, pushed, and deployed

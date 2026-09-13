@@ -8,11 +8,13 @@ in B7 and cut over to Spaceship production on 2026-08-22.
 1.6.0. The full serial regression gate, clean Linux/pruned running-app runtime audit (zero),
 populated restore drill, production health/routes, 20 migrations, zero drift, self-check, and
 pre/post backup catalogs pass. Four healthy OAuth mailboxes retain New York weekdays 09:00–17:00
-at 3/day each. Campaign 2 remains draft with auto-enrollment off and flat 12/day caps; current
-leads are zero and the historical enrollment/sent-event watermarks remain one. Authenticated
-campaign/mailbox UI reconciliation passes. Ten development/build audit findings and F-T01 remain
-separate. No import, activation, enrollment, send, DNS change, or portfolio mutation occurred.
-See docs/17 for the verified evidence and next CSV-import handoff.
+at 3/day each. The subsequent operator-authorized UI import added 12 Tier B pool leads and 60
+Needs-review campaign-step copies to Campaign 2; the campaign remains draft with auto-enrollment
+off and flat 12/day caps, while historical enrollment/sent-event watermarks remain one. F-W34's
+personalized preview subject fix is fully verified locally but not yet pushed or deployed. Ten
+development/build audit findings and F-T01 remain separate. No activation, enrollment, send, DNS
+change, or portfolio mutation occurred. See docs/17 for evidence and the remaining deployment,
+60-copy review, readiness, and activation handoffs.
 
 **Previous production status (2026-09-03):** F-W26–F-W31 are deployed at `c75a385` on `canary`.
 Health/routes, all 20 migrations, ten-enrollment zero drift, self-check, pre/post backup catalogs,

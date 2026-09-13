@@ -42,6 +42,7 @@ import { resolveObservation } from '../render/slots';
 import { seededPick } from '../render/spintax';
 import { spintaxRng } from '../render/seed';
 import type { RenderContext } from '../render/types';
+import { conversationRootStepNo } from '../domain/sequence';
 import { AppError } from './errors';
 import type { ZodTypeProvider } from './plugins/zodCompilers';
 
@@ -266,13 +267,20 @@ export async function sequencesRoutes(app: FastifyInstance, services: AppService
           );
         }
         if (stepEntry.step.inThread && stepEntry.step.stepNo > 1) {
-          const firstStep = nested.steps.find((entry) => entry.step.stepNo === 1);
-          if (firstStep?.step.contentSource === 'personalized') {
+          const rootStepNo = conversationRootStepNo(
+            {
+              id: nested.sequence.id,
+              steps: nested.steps.map(({ step }) => ({ ...step, variants: [] })),
+            },
+            stepEntry.step.stepNo,
+          );
+          const rootStep = nested.steps.find((entry) => entry.step.stepNo === rootStepNo);
+          if (rootStep?.step.contentSource === 'personalized') {
             const opener = await getCampaignPersonalizedCopy(
               db,
               lead.id,
               campaign.id,
-              firstStep.step.id,
+              rootStep.step.id,
             );
             if (opener) renderContext.threadSubject = opener.subject;
           }

@@ -360,6 +360,88 @@ describe('B6.5 sequences', () => {
     expect(template.json().resolution_trace.render_mode).toBe('template_auto');
   });
 
+  it('personalized previews follow the nearest new-conversation subject without mutating copy', async () => {
+    const created = await h.inject({
+      method: 'POST',
+      url: '/api/v1/sequences',
+      payload: {
+        name: 'Two personalized conversations',
+        stop_on_reply: true,
+        stop_on_hard_bounce: true,
+        stop_on_unsubscribe: true,
+        steps: [false, true, false, true, true].map((inThread, index) => ({
+          step_no: index + 1,
+          wait_days: index === 0 ? 0 : 3,
+          in_thread: inThread,
+          content_source: 'personalized',
+          variants: [],
+        })),
+      },
+    });
+    expect(created.statusCode).toBe(200);
+    const sequence = created.json();
+    const campaignId = (
+      await h.pool.query(
+        `INSERT INTO campaigns (name, status, sequence_id)
+         VALUES ('Two-conversation preview', 'draft', $1) RETURNING id`,
+        [sequence.id],
+      )
+    ).rows[0].id as number;
+    const subjects = ['First idea', 'Saved second subject', 'Another idea', 'Fourth', 'Fifth'];
+    for (const [index, subject] of subjects.entries()) {
+      const saved = await h.inject({
+        method: 'PUT',
+        url: `/api/v1/leads/1/campaigns/${campaignId}/steps/${index + 1}/personalized-copy`,
+        payload: { subject, body: `Amy,\n\nExact step ${index + 1} body.`, action: 'save_draft' },
+      });
+      expect(saved.statusCode).toBe(200);
+    }
+    const before = await h.pool.query(
+      'SELECT * FROM campaign_personalized_copies WHERE campaign_id=$1 ORDER BY id',
+      [campaignId],
+    );
+    const wm = await eventWatermark(h.pool);
+    const expected = [
+      'First idea',
+      'Re: First idea',
+      'Another idea',
+      'Re: Another idea',
+      'Re: Another idea',
+    ];
+    for (const [index, subject] of expected.entries()) {
+      const preview = await h.inject({
+        method: 'POST',
+        url: `/api/v1/sequences/${sequence.id}/preview`,
+        payload: { lead_id: 1, step_no: index + 1, campaign_id: campaignId },
+      });
+      expect(preview.statusCode).toBe(200);
+      expect(preview.json()).toMatchObject({ subject, personalized_copy_status: 'needs_review' });
+      expect(preview.json().body).toContain(`Amy,\n\nExact step ${index + 1} body.`);
+    }
+    expect(
+      (
+        await h.pool.query(
+          'SELECT * FROM campaign_personalized_copies WHERE campaign_id=$1 ORDER BY id',
+          [campaignId],
+        )
+      ).rows,
+    ).toEqual(before.rows);
+    await expectNoNewEvents(h.pool, wm);
+
+    // An absent second opener must never borrow the first conversation's copy.
+    await h.pool.query(
+      'DELETE FROM campaign_personalized_copies WHERE campaign_id=$1 AND sequence_step_id=$2',
+      [campaignId, sequence.steps[2].id],
+    );
+    const missingRoot = await h.inject({
+      method: 'POST',
+      url: `/api/v1/sequences/${sequence.id}/preview`,
+      payload: { lead_id: 1, step_no: 4, campaign_id: campaignId },
+    });
+    expect(missingRoot.statusCode).toBe(200);
+    expect(missingRoot.json().subject).toBe('Re: Fourth');
+  });
+
   it('validate-template returns tokens, errors, and the variation count', async () => {
     const ok = (
       await h.inject({

@@ -19,15 +19,33 @@ enrollment/sent-event watermarks of one. Projection dry-run checks one enrollmen
 and self-check passes. Backup `coldemail-20260913-170109.dump` (859,826 bytes) passes catalog
 validation. No activation, enrollment, or send occurred, and no copy was marked ready.
 
-**F-W34 — open, sequence-preview conversation subject:** authenticated sequence previews render
+**F-W34 — implemented locally, deployment pending, sequence-preview conversation subject:** authenticated sequence previews render
 all five imported bodies for one lead and a distinct first-step subject/body for a second lead.
 Step 3's new-conversation subject is correct, but Step 4/5 previews incorrectly use `Re:` plus
 Step 1's subject, rather than Step 3's. Code inspection confirms `api/sequences.ts` still looks up
 Step 1 when selecting the personalized preview's opener. The scheduler already uses the nearest
 preceding new-conversation step (F-W33); this is a verified preview-path mismatch, not evidence of
 an actual misthreaded send. All sampled previews report passing pre-send checks and retain Needs
-review. The full 60-preview review is not complete. Fix and verify preview parity before pilot
-activation; no implementation or deployment of F-W34 is claimed.
+review. The full 60-preview review is not complete.
+
+The separately operator-approved fix replaces the preview's Step-1-only lookup with the same
+pure `conversationRootStepNo` selector already used by the scheduler. For personalized roots,
+Steps 2/4/5 now preview `Re:` plus the subject of Steps 1/3/3 respectively. No scheduler,
+transport, footer, header, schema, copy-readiness, or production-state behavior is changed.
+An added API regression first failed on Step 4 (`Re: First idea` instead of `Re: Another idea`),
+then all nine sequence API tests passed after the fix. It verifies all five subjects and literal
+bodies, unchanged complete saved-copy rows and event watermark, and no borrowing of the first
+conversation's subject when the second opener's copy is absent. Deployment and live full-copy
+review remain separate handoffs; the pilot is still draft and nothing was sent.
+
+The complete local verification gate passes: typecheck, lint, format check, unit **348/348**,
+web **67/67**, API **145/145**, integration **171/171**, GreenMail **29/29**, locked golden
+exactly **47/47**, mock E2E **63/63**, real-backend E2E **1/1**, and the real-API subpath
+production build. Mock E2E retains the already-recorded F-T01 missing-copy-coverage-fixture proxy
+warnings while all assertions pass. A populated disposable database reports `checked 5
+enrollments — 0 diff(s)` and self-check reports no invariant violations. No migration or live
+production operation was required. The local candidate is ready for a separately authorized
+push/deployment; production remains on `baac951` until then.
 
 ## 2026-09-13 CSV and mail dependency security remediation — deployed at `baac951`
 
