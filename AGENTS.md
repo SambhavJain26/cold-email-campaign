@@ -23,9 +23,9 @@ The Spaceship production infrastructure is live, but the project remains in **pr
 commissioning** until the operator completes the handoffs below:
 
 - **2026-09-13 pilot CSV import:** the operator-authorized UI import created 12 Tier B leads,
-  60 reusable sources and 60 campaign-step copies. All sources remain Needs review; an interrupted
-  manual readiness attempt changed only Lead 2 Steps 1–2 to Ready, leaving 58 campaign copies Needs
-  review. Campaign 2 remains draft,
+  60 reusable sources and 60 campaign-step copies. After explicit authorization, F-W35 was
+  pushed and deployed at `9f1ada0`, and a guarded Import 2 transaction made all 60 sources and
+  all 60 campaign copies Ready without changing content/history. Campaign 2 remains draft,
   auto-enrollment off, now pool-only, with 12 available leads and unchanged one historical
   enrollment/sent event. Zero drift, self-check, and the 859,826-byte backup catalog pass.
   F-W34 is implemented, fully verified, pushed, and deployed at `61a5b15`: personalized previews
@@ -34,9 +34,11 @@ commissioning** until the operator completes the handoffs below:
   mismatch and passes after the fix without changing saved copy or events. The complete local
   gate passes, including API 145/145, locked golden 47/47, and real-backend E2E 1/1. Production
   Step 4/5 previews both use the imported Step 3 subject. F-W35 changes future valid CSV copy to
-  Ready automatically and removes the import readiness choice; it is fully verified locally
-  (including 500/500 Ready sources and campaign copies) and awaits separate push/deployment
-  authorization and exact pilot normalization. Keep the pilot draft.
+  Ready automatically and removes the import readiness choice; the complete local gate passes
+  (including 500/500 Ready sources and campaign copies). Production health/routes, 20 migrations,
+  one-enrollment zero drift, self-check, runtime audit zero, and pre/post backup catalogs pass.
+  Authenticated coverage shows 12 Ready and zero review/missing/blocked for every step.
+  Keep the pilot draft; activation and every outbound batch remain separately gated.
   No activation, enrollment, or send was authorized or performed.
 
 - **2026-09-13 CSV/mail runtime security update:** the separately approved dependency update is
@@ -262,7 +264,7 @@ temporary rollback/canary environment.
 - App: `/opt/email-campaign`; stack: `docker-compose.spaceship.yml` with `.env.prod`
 - Public UI: `https://sambhavpmtech.com/email-campaign/`
 - Internal gateway: `127.0.0.1:18080`; host Caddy is the only public 80/443 listener
-- Deployed application release: `canary` at `61a5b15`
+- Deployed application release: `canary` at `9f1ada0`
 
 The repository is private and the VPS currently has no GitHub deploy credential. Until a read-only
 deploy key is deliberately installed, transfer a reviewed `git bundle`, fetch the pinned branch

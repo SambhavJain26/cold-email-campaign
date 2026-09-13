@@ -13,10 +13,13 @@ The complete gate passes: typecheck/lint/format; unit 348/348; web 67/67; API 14
 integration 171/171; GreenMail 29/29; locked golden exactly 47/47; mock E2E 63/63;
 real-backend E2E 1/1; real-API subpath production build; populated five-enrollment zero drift;
 and clean self-check. The added 100-lead/five-step regression proves 500/500 sources and campaign
-copies Ready after one import, with no new events. Production remains at `61a5b15`, Campaign 2 is draft with no new
-enrollment/send, all 60 sources remain Needs review, and an interrupted manual attempt left only
-Lead 2 Steps 1–2 Ready plus 58 campaign copies Needs review. Deployment and exact pilot
-normalization require separate authorization. See docs/17; do not activate the pilot yet.
+copies Ready after one import, with no new events. After explicit authorization, production and
+origin/canary advanced to `9f1ada0`. Exact guarded normalization changed 60 sources and 58 remaining
+unsent campaign copies to Ready, preserving the two already-Ready copies and all content/history.
+Authenticated coverage confirms 12 Ready per step, zero review/missing/blocked. Campaign 2 stays
+draft/auto-enrollment off with no pilot enrollments or sends. Production health/routes, 20 migrations,
+one-enrollment zero drift, self-check, runtime audit zero, no failed jobs/open errors/blockers,
+and validated pre/post backups pass. See docs/17; do not activate the pilot yet.
 
 **Previous import-preparation gate (2026-09-13):**
 The separately authorized CSV/mail dependency security update is verified, pushed, and deployed

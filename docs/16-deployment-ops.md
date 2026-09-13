@@ -3,7 +3,16 @@
 Single always-on VPS (finalized decision). Docker Compose primary; systemd alternative. Implemented
 in B7 and cut over to Spaceship production on 2026-08-22.
 
-**Production status (2026-09-13):** F-W34 is verified and deployed at `61a5b15` on `canary`.
+**Production status (2026-09-14 IST):** F-W35 is verified and deployed at `9f1ada0` on `canary`.
+Valid complete CSV personalized pairs now become Ready automatically; manual drafts and later
+content edits retain review. The separately authorized Import 2 normalization made all 60 sources
+and all 60 campaign copies Ready without changing content or history. Browser coverage confirms
+12 ready and zero review/missing/blocked for each of five steps. Campaign 2 remains draft with
+automatic enrollment off and no pilot enrollments. Health/routes, 20 migrations, one-enrollment
+zero drift, self-check, zero runtime audit, zero failed jobs/open errors/blockers, and validated
+pre/post backups pass. No email was sent and the portfolio remains healthy and untouched.
+
+**Previous production status (2026-09-13):** F-W34 is verified and deployed at `61a5b15` on `canary`.
 Personalized Step 4/5 previews now use the nearest preceding new-conversation subject, matching
 the already-correct scheduler. The underlying CSV/mail security release retains csv-parse 7.0.2,
 Nodemailer 9.1.1, Mailparser 3.9.20, and ImapFlow
@@ -17,8 +26,8 @@ remains draft with auto-enrollment off and flat 12/day caps, while historical en
 watermarks remain one. Production
 Step 4/5 previews both render `Re:` plus the imported Step 3 subject. Ten development/build audit
 findings and F-T01 remain separate. No activation, enrollment, send, DNS change,
-or portfolio mutation occurred. F-W35's CSV auto-ready change is fully verified locally and awaits
-separate push/deployment authorization and exact pilot normalization; see docs/17.
+or portfolio mutation occurred in that rollout. The subsequent authorized F-W35 deployment and
+exact pilot normalization supersede that readiness snapshot; see the current status above and docs/17.
 
 **Previous production status (2026-09-03):** F-W26–F-W31 are deployed at `c75a385` on `canary`.
 Health/routes, all 20 migrations, ten-enrollment zero drift, self-check, pre/post backup catalogs,

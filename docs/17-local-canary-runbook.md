@@ -27,11 +27,29 @@ remain covered. The populated disposable database reports `checked 5 enrollments
 and self-check reports no invariant violations. No schema migration is required. Existing F-T01
 mock copy-coverage proxy warnings and the large frontend bundle warning remain separate.
 
-A fresh read-only production reconciliation confirms all 60 sources Needs review, 58 campaign
-copies Needs review and two Ready, Campaign 2 draft/automatic enrollment off, and one historical
-sent event. No production mutation occurred in this remediation. Push/deployment and an exact
-transactional normalization of Import 2's sources/campaign copies remain separately gated; keep
-Campaign 2 draft and do not enroll or send.
+After explicit operator authorization, `origin/canary` and Spaceship fast-forwarded to
+`9f1ada0` through a reviewed bundle with matching local/remote SHA-256. Deployment completed
+on 2026-09-14 IST (2026-09-13 UTC). A scoped, guarded transaction changed Import 2's **60**
+reusable sources and **58** remaining unsent Campaign 2 copies to Ready; its two already-Ready
+copies were preserved. It checked campaign draft/automatic-enrollment-off state, exact row counts,
+complete matching source/campaign content, unsuppressed/unerased leads, absent sent linkage,
+and unchanged event/enrollment watermarks before committing. Source-content digest
+`41a4e30a8c9a24fcd01d292537581ce6` and campaign-content digest
+`ed5505ecd52d614081bd61c4e3d0d07d` remained unchanged.
+
+Authenticated browser verification confirms all 12 available pool leads Ready and every one of
+Steps 1–5 showing **12 ready / 0 review / 0 missing / 0 blocked**. Campaign 2 remains draft,
+automatic enrollment off, and zero pilot enrollments. Four mailboxes remain healthy at 3/day.
+All four stack services are running; app/database health, all 20 migrations, the public app/direct
+routes, canonical and outreach redirects, expected unsubscribe-root 404s, and portfolio 200 pass.
+The internal health endpoint is `/email-campaign/health`; bare gateway `/health` correctly returns
+404 under the subpath configuration. Production reports `checked 1 enrollments — 0 diff(s)` and
+clean self-check, zero failed jobs/open error alerts/copy blockers, and zero runtime audit findings.
+Events remain **4**, maximum ID **4**, with **1** historical sent event and **1** historical
+enrollment. No activation, enrollment, or send occurred; DNS and the portfolio were untouched.
+Pre-deploy `coldemail-20260913-183626.dump` (**871,752 bytes**) and post-deploy/normalization
+`coldemail-20260913-184058.dump` (**872,365 bytes**) both pass **342-line** restore catalogs.
+Keep the pilot draft; activation and every outbound batch remain separately gated.
 
 ## 2026-09-13 12-lead import, tiering, and preview verification
 
