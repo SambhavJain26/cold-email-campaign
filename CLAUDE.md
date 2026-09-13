@@ -11,6 +11,15 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 Spaceship production infrastructure is live, but the project remains in **pre-prospect-send
 commissioning**:
 
+- **2026-09-13 pilot CSV import:** the operator-authorized UI import created 12 Tier B leads,
+  60 reusable sources, and 60 campaign-step copies, all Needs review. Campaign 2 remains draft,
+  auto-enrollment off, now pool-only, with 12 available leads and unchanged one historical
+  enrollment/sent event. Zero drift, self-check, and the 859,826-byte backup catalog pass.
+  F-W34 is open: sequence preview incorrectly anchors personalized Step 4/5 subjects to Step 1,
+  although the scheduler uses the correct conversation root. Sampled bodies render correctly;
+  full 60-preview review and readiness remain pending. Fix preview parity before activation.
+  No activation, enrollment, copy-ready mutation, or send was authorized or performed.
+
 - **2026-09-13 CSV/mail runtime security update:** the separately approved dependency update is
   fully verified, pushed, and deployed at `baac951` on `canary`: csv-parse 7.0.2, Nodemailer
   9.1.1, Mailparser 3.9.20, and ImapFlow 1.6.0. The full serial gate, clean Linux image,

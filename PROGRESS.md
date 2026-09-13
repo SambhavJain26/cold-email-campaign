@@ -4,7 +4,15 @@
 
 **Legend:** `[ ]` not started · `[~]` in progress · `[x]` done · `[!]` blocked (note why in the log)
 
-**Current focus:** → **The 12-lead pilot is ready for CSV import; campaign activation remains gated.**
+**Current focus:** → **Pilot import/tiering complete; F-W34 preview parity and copy review remain.**
+The operator-authorized browser import created 12 Tier B leads and all 60 source/campaign-step
+copies as Needs review. Campaign 2 remains draft, auto-enrollment off, pool-only; no enrollment
+or send occurred. Coverage has 12 review/zero missing per step. Zero drift, self-check, and backup
+catalog pass. Sampled bodies render, but Step 4/5 preview subjects still anchor to Step 1 rather
+than Step 3; F-W34 is diagnosed and recorded, not implemented. Full 60-preview review and marking
+copy ready remain pending. See docs/17; do not activate the pilot yet.
+
+**Previous import-preparation gate (2026-09-13):**
 The separately authorized CSV/mail dependency security update is verified, pushed, and deployed
 at `baac951`: csv-parse 7.0.2, Nodemailer 9.1.1, Mailparser 3.9.20, ImapFlow 1.6.0.
 Gate: type/lint/format; unit 348/348; web 67/67; integration 171/171; API 144/144; GreenMail

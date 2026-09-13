@@ -1,5 +1,34 @@
 # Local canary runbook (B8.3-local) — two-week validation on throwaway Gmail
 
+## 2026-09-13 12-lead import, tiering, and preview verification
+
+The operator selected `test_leads.csv` in the authenticated UI and authorized completing the
+remaining import process. Preview reported 12 clean addresses, 60 complete step-specific copies,
+and zero invalid, duplicate, suppressed, incomplete, or conflicting rows/copies. Safe-address mode,
+Needs review, and Keep existing were retained. One allocation reserved all 12 accepted leads in
+**US Property Management**; direct `step_N_subject/body` mapping bound all 60 campaign-step copies.
+The result reported 12 imported/allocated, 60 drafts created, zero remaining global leads, and
+zero replaced/skipped/invalid drafts. Campaign-scoped selection then bulk-tiered the 12 leads B;
+the UI confirms 12 Tier B, zero untiered. All five steps are personalized, so tiering does not
+replace their saved copy with a template or Auto Observation.
+
+Campaign coverage reports 12 Needs review, zero ready/missing/blocked for each of Steps 1–5.
+Read-only database reconciliation confirms 60 reusable sources, 60 bound copies, Campaign 2
+draft with automatic enrollment off and pool-only selection, and unchanged historical
+enrollment/sent-event watermarks of one. Projection dry-run checks one enrollment with zero diffs
+and self-check passes. Backup `coldemail-20260913-170109.dump` (859,826 bytes) passes catalog
+validation. No activation, enrollment, or send occurred, and no copy was marked ready.
+
+**F-W34 — open, sequence-preview conversation subject:** authenticated sequence previews render
+all five imported bodies for one lead and a distinct first-step subject/body for a second lead.
+Step 3's new-conversation subject is correct, but Step 4/5 previews incorrectly use `Re:` plus
+Step 1's subject, rather than Step 3's. Code inspection confirms `api/sequences.ts` still looks up
+Step 1 when selecting the personalized preview's opener. The scheduler already uses the nearest
+preceding new-conversation step (F-W33); this is a verified preview-path mismatch, not evidence of
+an actual misthreaded send. All sampled previews report passing pre-send checks and retain Needs
+review. The full 60-preview review is not complete. Fix and verify preview parity before pilot
+activation; no implementation or deployment of F-W34 is claimed.
+
 ## 2026-09-13 CSV and mail dependency security remediation — deployed at `baac951`
 
 The operator authorized resolving the newly reported runtime advisories, testing, and deployment
