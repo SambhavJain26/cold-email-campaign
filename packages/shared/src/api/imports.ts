@@ -64,7 +64,8 @@ export const commitImportBodySchema = z
     mode: z.enum(['drop_flagged', 'import_all']),
     draft_campaign_id: z.number().int().positive().optional(),
     replace_existing_drafts: z.boolean().default(false),
-    mark_valid_copy_ready: z.boolean().default(false),
+    // Backward compatibility for older clients. Complete imported copy is always ready.
+    mark_valid_copy_ready: z.boolean().optional(),
     allocations: z
       .array(
         z

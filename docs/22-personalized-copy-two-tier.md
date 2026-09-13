@@ -43,10 +43,11 @@ legacy human-written due work stays held.
 ID. Copy-on-assignment occurs when import allocation or campaign-pool membership can identify the
 target personalized step. A later source edit never rewrites a bound campaign snapshot.
 
-Complete subject/body pairs begin as `needs_review`. Operators can save a draft, mark valid copy
-ready, or explicitly copy/re-copy from a source. Editing content resets it to `needs_review`.
-Incomplete pairs are invalid. A sent campaign copy is immutable. PII erasure scrubs source copy,
-campaign copy, and rendered sent snapshots while preserving event lineage.
+Complete, non-conflicting subject/body pairs imported from CSV begin as `ready`; a batch import
+never requires per-email approval. Operator-written copy can be saved as a draft and marked ready,
+and editing any unsent copy resets it to `needs_review`. Incomplete pairs are invalid. A sent
+campaign copy is immutable. PII erasure scrubs source copy, campaign copy, and rendered sent
+snapshots while preserving event lineage.
 
 Personalized Step 1 must be ready before enrollment. A later personalized step may be completed
 after enrollment; if it becomes due without ready copy, only that enrollment is held. Durable
@@ -93,10 +94,10 @@ Existing source and bound copy wins unless replacement is explicitly requested. 
 1,000-row flow is atomic: all 1,000 global leads and sources can be created, 100 allocated/bound to
 Campaign 1, 100 allocated/bound to Campaign 2, and 800 left globally unassigned.
 
-The preview presents three decisions in order: safe-address admission, imported-copy review and
-replacement status, then campaign/count/copy destination per allocation. Its final summary uses
-campaign names and states exact row order, copy readiness, step bindings, global remainder, and
-that import does not activate, enroll, or send.
+The preview presents three decisions in order: safe-address admission, whether existing unsent
+copy should be kept or replaced, then campaign/count/copy destination per allocation. Valid
+imported copy is always Ready. Its final summary uses campaign names and states exact row order,
+Ready status, step bindings, global remainder, and that import does not activate, enroll, or send.
 
 ## 4. Leads page and exact bulk actions
 

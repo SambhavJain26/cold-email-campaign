@@ -1,11 +1,45 @@
 # Local canary runbook (B8.3-local) — two-week validation on throwaway Gmail
 
+## 2026-09-13 F-W35 — valid CSV copy must be Ready automatically
+
+The 12-lead pilot exposed an unusable workflow: 60 complete imported emails were left Needs review,
+which would require 500 manual approvals for a 100-lead, five-step batch. The operator stopped the
+manual process and changed the product rule: every complete, non-conflicting CSV subject/body pair
+must be Ready automatically. Needs review remains meaningful only for operator-written drafts and
+content edited after import; incomplete or conflicting pairs remain invalid and unsendable.
+
+The interrupted UI action is precisely reconciled: all 60 reusable sources remain Needs review;
+only Campaign 2 / Lead 2 / Steps 1–2 became Ready, and the other 58 campaign copies remain Needs
+review. No activation, enrollment, or send occurred. The local F-W35 implementation hard-codes
+valid import sources to Ready, lets campaign bindings inherit that status, removes the import
+readiness selector, and states the automatic behavior in the preview and confirmation. The retired
+`mark_valid_copy_ready` request field remains accepted for older clients but is ignored, so an old
+client sending `false` cannot recreate the problem.
+
+The complete local gate finished on 2026-09-14: typecheck, lint, format check, unit **348/348**,
+web **67/67**, API **146/146**, integration **171/171**, GreenMail **29/29**, locked golden
+exactly **47/47**, mock E2E **63/63**, real-backend E2E **1/1**, and the real-API subpath
+production build. The new scale regression imports 100 leads with five personalized pairs each
+and proves all **500/500** reusable sources and **500/500** campaign copies are Ready in one
+transaction, even with the old request field explicitly set to false; no events are appended.
+Generic and step-specific bindings, invalid pairs, keep/replace policy, and manual edit readiness
+remain covered. The populated disposable database reports `checked 5 enrollments — 0 diff(s)`
+and self-check reports no invariant violations. No schema migration is required. Existing F-T01
+mock copy-coverage proxy warnings and the large frontend bundle warning remain separate.
+
+A fresh read-only production reconciliation confirms all 60 sources Needs review, 58 campaign
+copies Needs review and two Ready, Campaign 2 draft/automatic enrollment off, and one historical
+sent event. No production mutation occurred in this remediation. Push/deployment and an exact
+transactional normalization of Import 2's sources/campaign copies remain separately gated; keep
+Campaign 2 draft and do not enroll or send.
+
 ## 2026-09-13 12-lead import, tiering, and preview verification
 
 The operator selected `test_leads.csv` in the authenticated UI and authorized completing the
 remaining import process. Preview reported 12 clean addresses, 60 complete step-specific copies,
 and zero invalid, duplicate, suppressed, incomplete, or conflicting rows/copies. Safe-address mode,
-Needs review, and Keep existing were retained. One allocation reserved all 12 accepted leads in
+Needs review, and Keep existing were retained under the behavior then deployed. One allocation
+reserved all 12 accepted leads in
 **US Property Management**; direct `step_N_subject/body` mapping bound all 60 campaign-step copies.
 The result reported 12 imported/allocated, 60 drafts created, zero remaining global leads, and
 zero replaced/skipped/invalid drafts. Campaign-scoped selection then bulk-tiered the 12 leads B;
@@ -19,7 +53,7 @@ enrollment/sent-event watermarks of one. Projection dry-run checks one enrollmen
 and self-check passes. Backup `coldemail-20260913-170109.dump` (859,826 bytes) passes catalog
 validation. No activation, enrollment, or send occurred, and no copy was marked ready.
 
-**F-W34 — implemented locally, deployment pending, sequence-preview conversation subject:** authenticated sequence previews render
+**F-W34 — deployed at `61a5b15`, sequence-preview conversation subject:** authenticated sequence previews render
 all five imported bodies for one lead and a distinct first-step subject/body for a second lead.
 Step 3's new-conversation subject is correct, but Step 4/5 previews incorrectly use `Re:` plus
 Step 1's subject, rather than Step 3's. Code inspection confirms `api/sequences.ts` still looks up
@@ -44,8 +78,24 @@ exactly **47/47**, mock E2E **63/63**, real-backend E2E **1/1**, and the real-AP
 production build. Mock E2E retains the already-recorded F-T01 missing-copy-coverage-fixture proxy
 warnings while all assertions pass. A populated disposable database reports `checked 5
 enrollments — 0 diff(s)` and self-check reports no invariant violations. No migration or live
-production operation was required. The local candidate is ready for a separately authorized
-push/deployment; production remains on `baac951` until then.
+production operation was required.
+
+After explicit authorization, `origin/canary` and Spaceship fast-forwarded to `61a5b15` through a
+reviewed bundle whose SHA-256 matched locally and remotely. Pre-deploy
+`coldemail-20260913-172408.dump` (862,875 bytes) and post-deploy
+`coldemail-20260913-173113.dump` (863,814 bytes) both pass 342-line restore-catalog validation.
+All four stack services are running and the app/database health check passes; all 20 migrations
+remain applied. Production projection replay reports `checked 1 enrollments — 0 diff(s)`,
+self-check is clean, and failed jobs, open error alerts, and personalized-copy blockers are zero.
+The public app, Leads, Sequence 2, health, canonical redirect, both outreach redirects, and
+portfolio routes pass; both unsubscribe-host roots retain the expected 404.
+
+An authenticated read-only production replay for the imported Mike lead verifies Step 4 and Step
+5 both render `Re: adding a portfolio`, the exact Step 3 new-conversation subject. Both retained
+Needs review and passed all pre-send checks at 10/10. Production remained 12 current Tier B leads,
+60 campaign copies, 12 available pool rows, Campaign 2 draft, automatic enrollment off, and zero
+active campaigns. The one historical enrollment and sent event remained unchanged, and no email
+was sent. The later interrupted readiness attempt and F-W35 decision are recorded above.
 
 ## 2026-09-13 CSV and mail dependency security remediation — deployed at `baac951`
 

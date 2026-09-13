@@ -174,7 +174,6 @@ export function ImportWizard({
   const [uploadError, setUploadError] = useState<string | null>(null);
   const [expanded, setExpanded] = useState<ImportRowFlag | null>(null);
   const [replaceDrafts, setReplaceDrafts] = useState(false);
-  const [markCopyReady, setMarkCopyReady] = useState(false);
   const [commitMode, setCommitMode] = useState<'drop_flagged' | 'import_all'>('drop_flagged');
   const [allocations, setAllocations] = useState<AllocationRow[]>([]);
   const campaigns = useCampaigns();
@@ -206,7 +205,6 @@ export function ImportWizard({
       setUploadError(null);
       setExpanded(null);
       setReplaceDrafts(false);
-      setMarkCopyReady(false);
       setCommitMode('drop_flagged');
       setAllocations([]);
     }
@@ -251,7 +249,6 @@ export function ImportWizard({
             }),
           })),
           replace_existing_drafts: replaceDrafts,
-          mark_valid_copy_ready: markCopyReady,
         },
       },
       {
@@ -421,45 +418,15 @@ export function ImportWizard({
                   <p className="text-sm text-muted-foreground">
                     {preview.draftCounts.valid_drafts} complete ·{' '}
                     {preview.draftCounts.invalid_drafts} incomplete or conflicting. Every complete
-                    subject/body pair is saved as reusable lead copy. Campaign and step assignment
-                    happens below.
+                    subject/body pair is saved as reusable lead copy and is Ready for sequence use
+                    automatically. Campaign and step assignment happens below.
                   </p>
                   <p className="mt-2 text-xs text-muted-foreground">
                     Exact step_N_subject/body pairs map directly to compatible Personalized Copy
                     steps and do not need a generic destination choice.
                   </p>
                 </div>
-                <FieldGroup className="gap-4">
-                  <FieldSet className="gap-3">
-                    <FieldLegend variant="label">Review status</FieldLegend>
-                    <RadioGroup
-                      value={markCopyReady ? 'ready' : 'needs_review'}
-                      onValueChange={(value) => setMarkCopyReady(value === 'ready')}
-                    >
-                      <FieldLabel htmlFor="copy-needs-review">
-                        <Field orientation="horizontal">
-                          <RadioGroupItem id="copy-needs-review" value="needs_review" />
-                          <FieldContent>
-                            <FieldTitle>Needs review — Recommended</FieldTitle>
-                            <FieldDescription>
-                              Save the copy, but require a review before a sequence can use it.
-                            </FieldDescription>
-                          </FieldContent>
-                        </Field>
-                      </FieldLabel>
-                      <FieldLabel htmlFor="copy-ready">
-                        <Field orientation="horizontal">
-                          <RadioGroupItem id="copy-ready" value="ready" />
-                          <FieldContent>
-                            <FieldTitle>Ready for sequence use</FieldTitle>
-                            <FieldDescription>
-                              Mark every complete imported subject/body pair ready immediately.
-                            </FieldDescription>
-                          </FieldContent>
-                        </Field>
-                      </FieldLabel>
-                    </RadioGroup>
-                  </FieldSet>
+                <FieldGroup>
                   <FieldSet className="gap-3">
                     <FieldLegend variant="label">If copy already exists</FieldLegend>
                     <RadioGroup
@@ -699,7 +666,7 @@ export function ImportWizard({
                       {preview.draftCounts.valid_drafts > 0 && (
                         <li>
                           {preview.draftCounts.valid_drafts} reusable personalized emails will be
-                          saved as {markCopyReady ? 'Ready' : 'Needs review'}.
+                          saved as Ready.
                         </li>
                       )}
                       {allocationPreview.data.campaigns.map((item, index) => (
@@ -733,7 +700,7 @@ export function ImportWizard({
                   <AlertDescription>
                     {acceptedCount} leads will be imported and remain outside campaign pools.
                     {preview.draftCounts.valid_drafts > 0
-                      ? ` ${preview.draftCounts.valid_drafts} reusable personalized emails will be saved as ${markCopyReady ? 'Ready' : 'Needs review'}.`
+                      ? ` ${preview.draftCounts.valid_drafts} reusable personalized emails will be saved as Ready.`
                       : ''}{' '}
                     This will not activate campaigns, enroll leads, or send email.
                   </AlertDescription>

@@ -152,7 +152,6 @@ export async function importsRoutes(app: FastifyInstance, services: AppServices)
             mode: req.body.mode,
             draftCampaignId: req.body.draft_campaign_id,
             replaceExistingDrafts: req.body.replace_existing_drafts,
-            markValidCopyReady: req.body.mark_valid_copy_ready,
             allocations: req.body.allocations.map((allocation) => ({
               campaignId: allocation.campaign_id,
               count: allocation.count,

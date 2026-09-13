@@ -59,7 +59,8 @@ test('generic personalized copy requires a destination for a multi-step campaign
 
   await expect(page.getByText('Personalized emails found in CSV')).toBeVisible();
   await expect(page.getByLabel('Draft target campaign')).toHaveCount(0);
-  await page.getByRole('radio', { name: /Ready for sequence use/ }).click();
+  await expect(page.getByText(/Ready for sequence use automatically/)).toBeVisible();
+  await expect(page.getByRole('radio', { name: /Needs review/ })).toHaveCount(0);
   await page.getByRole('button', { name: 'Add campaign allocation' }).click();
   await page.getByLabel('Allocation campaign 1').click();
   await page.getByRole('option', { name: campaignName }).click();

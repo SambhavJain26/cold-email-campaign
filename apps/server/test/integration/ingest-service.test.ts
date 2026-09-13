@@ -303,7 +303,7 @@ describe('ingest service (B5.3–B5.5)', () => {
     expect(replaced.rows[0]).toEqual({
       subject: 'Replacement',
       body: 'Replacement body',
-      status: 'needs_review',
+      status: 'ready',
     });
   });
 });

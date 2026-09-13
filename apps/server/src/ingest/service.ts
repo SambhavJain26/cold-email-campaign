@@ -196,7 +196,6 @@ export async function commitImport(
     mode: CommitMode;
     draftCampaignId?: number;
     replaceExistingDrafts?: boolean;
-    markValidCopyReady?: boolean;
     allocations?: readonly ImportAllocationRequest[];
   },
 ): Promise<CommitResult> {
@@ -316,7 +315,7 @@ export async function commitImport(
           sourceImportId: input.importId,
           subject: candidate.copy.subject!,
           body: candidate.copy.body!,
-          status: input.markValidCopyReady ? 'ready' : 'needs_review',
+          status: 'ready',
           replace: input.replaceExistingDrafts ?? false,
           at: deps.clock?.now(),
         });

@@ -531,10 +531,10 @@ campaign's total, available, enrolled, and released allocation counts.
 #### Imported Personalized Copy workflow
 
 The preview separates new/existing leads, complete/incomplete sources, campaign-step bindings, and
-content conflicts. It asks three plain-language questions: which addresses to import, whether copy
-needs review or is ready, and which campaign/step receives each allocation. Complete copy defaults
-to **Needs review — Recommended**; select **Ready for sequence use** only after reviewing the
-batch. Existing lead profile fields are preserved, and **Keep existing copy — Recommended** avoids
+content conflicts. It asks which addresses to import, whether existing unsent copy should be kept
+or replaced, and which campaign/step receives each allocation. Every complete, non-conflicting
+CSV subject/body pair is automatically **Ready for sequence use**—there is no per-email approval
+step. Existing lead profile fields are preserved, and **Keep existing copy — Recommended** avoids
 replacement unless the operator deliberately selects **Replace existing unsent copy**.
 
 Before commit, **What will happen** names every campaign and shows its ordered lead count, resolved
@@ -548,7 +548,8 @@ reports created, replaced, skipped, invalid, assigned, conflicting, and unassign
 Imported copy:
 
 - creates one global source per lead/slot and independent campaign-step snapshots when assigned;
-- start as **needs review**;
+- starts as **ready** when the subject/body pair is complete and non-conflicting;
+- leaves incomplete or conflicting pairs invalid and unsendable;
 - never enroll a lead, activate a campaign, or send automatically; and
 - appears in the lead's **Personalized Copy** editor with source-import provenance.
 

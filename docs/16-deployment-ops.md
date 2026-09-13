@@ -3,18 +3,22 @@
 Single always-on VPS (finalized decision). Docker Compose primary; systemd alternative. Implemented
 in B7 and cut over to Spaceship production on 2026-08-22.
 
-**Production status (2026-09-13):** CSV/mail security remediation is verified and deployed at
-`baac951` on `canary`: csv-parse 7.0.2, Nodemailer 9.1.1, Mailparser 3.9.20, and ImapFlow
+**Production status (2026-09-13):** F-W34 is verified and deployed at `61a5b15` on `canary`.
+Personalized Step 4/5 previews now use the nearest preceding new-conversation subject, matching
+the already-correct scheduler. The underlying CSV/mail security release retains csv-parse 7.0.2,
+Nodemailer 9.1.1, Mailparser 3.9.20, and ImapFlow
 1.6.0. The full serial regression gate, clean Linux/pruned running-app runtime audit (zero),
 populated restore drill, production health/routes, 20 migrations, zero drift, self-check, and
 pre/post backup catalogs pass. Four healthy OAuth mailboxes retain New York weekdays 09:00–17:00
 at 3/day each. The subsequent operator-authorized UI import added 12 Tier B pool leads and 60
-Needs-review campaign-step copies to Campaign 2; the campaign remains draft with auto-enrollment
-off and flat 12/day caps, while historical enrollment/sent-event watermarks remain one. F-W34's
-personalized preview subject fix is fully verified locally but not yet pushed or deployed. Ten
-development/build audit findings and F-T01 remain separate. No activation, enrollment, send, DNS
-change, or portfolio mutation occurred. See docs/17 for evidence and the remaining deployment,
-60-copy review, readiness, and activation handoffs.
+campaign-step copies to Campaign 2; an interrupted manual attempt left Lead 2 Steps 1–2 Ready and
+58 campaign copies Needs review, while all 60 reusable sources remain Needs review. The campaign
+remains draft with auto-enrollment off and flat 12/day caps, while historical enrollment/sent-event
+watermarks remain one. Production
+Step 4/5 previews both render `Re:` plus the imported Step 3 subject. Ten development/build audit
+findings and F-T01 remain separate. No activation, enrollment, send, DNS change,
+or portfolio mutation occurred. F-W35's CSV auto-ready change is fully verified locally and awaits
+separate push/deployment authorization and exact pilot normalization; see docs/17.
 
 **Previous production status (2026-09-03):** F-W26–F-W31 are deployed at `c75a385` on `canary`.
 Health/routes, all 20 migrations, ten-enrollment zero drift, self-check, pre/post backup catalogs,

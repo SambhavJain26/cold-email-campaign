@@ -216,6 +216,8 @@ describe('B6.4 imports', () => {
       payload: {
         mode: 'drop_flagged',
         draft_campaign_id: campaign.id,
+        // Older clients may still send false; valid CSV copy is ready regardless.
+        mark_valid_copy_ready: false,
         allocations: [{ campaign_id: campaign.id, count: 1 }],
       },
     });
@@ -252,7 +254,7 @@ describe('B6.4 imports', () => {
       {
         subject: 'A researched idea',
         body: 'Line one\n\nLine two',
-        status: 'needs_review',
+        status: 'ready',
       },
     ]);
   });
@@ -463,6 +465,93 @@ describe('B6.4 imports', () => {
     ]);
   });
 
+  it('marks all 500 valid copies ready in one 100-lead, five-step CSV import', async () => {
+    const wm = await eventWatermark(h.pool);
+    const sequence = (
+      await h.inject({
+        method: 'POST',
+        url: '/api/v1/sequences',
+        payload: {
+          name: 'Five-step bulk personalized import',
+          stop_on_reply: true,
+          steps: Array.from({ length: 5 }, (_, index) => ({
+            step_no: index + 1,
+            wait_days: index === 0 ? 0 : 1,
+            in_thread: index !== 0 && index !== 2,
+            content_source: 'personalized',
+            variants: [],
+          })),
+        },
+      })
+    ).json();
+    const campaign = (
+      await h.inject({
+        method: 'POST',
+        url: '/api/v1/campaigns',
+        payload: { name: 'Hundred-lead personalized import', sequence_id: sequence.id },
+      })
+    ).json();
+    const copyColumns = Array.from({ length: 5 }, (_, index) => [
+      'step_' + (index + 1) + '_subject',
+      'step_' + (index + 1) + '_body',
+    ]).flat();
+    const rows = Array.from({ length: 100 }, (_, leadIndex) =>
+      [
+        'bulk-ready-' + (leadIndex + 1) + '@example.dev',
+        ...Array.from({ length: 5 }, (_, stepIndex) => [
+          'Subject ' + (stepIndex + 1) + ' for lead ' + (leadIndex + 1),
+          'Body ' + (stepIndex + 1) + ' for lead ' + (leadIndex + 1),
+        ]).flat(),
+      ].join(','),
+    );
+    const csv = Buffer.from([['email', ...copyColumns].join(','), ...rows].join('\n'));
+    const multipart = multipartOf('hundred-leads-five-steps.csv', csv);
+    const preview = await h.inject({
+      method: 'POST',
+      url: '/api/v1/imports',
+      headers: { 'content-type': multipart.contentType },
+      payload: multipart.payload,
+    });
+    expect(preview.statusCode, preview.body).toBe(200);
+    expect(preview.json().draft_counts).toMatchObject({ valid_drafts: 500, invalid_drafts: 0 });
+
+    const commit = await h.inject({
+      method: 'POST',
+      url: '/api/v1/imports/' + preview.json().import_id + '/commit',
+      payload: {
+        mode: 'drop_flagged',
+        mark_valid_copy_ready: false,
+        allocations: [{ campaign_id: campaign.id, count: 100 }],
+      },
+    });
+    expect(commit.statusCode, commit.body).toBe(200);
+    expect(commit.json()).toMatchObject({
+      leads_created: 100,
+      sources_created: 500,
+      copies_bound: 500,
+      invalid_drafts: 0,
+    });
+    const sourceCoverage = (
+      await h.pool.query(
+        'SELECT count(*)::int AS total, ' +
+          "(count(*) FILTER (WHERE status = 'ready'))::int AS ready " +
+          'FROM personalized_copy_sources WHERE source_import_id = $1',
+        [preview.json().import_id],
+      )
+    ).rows[0];
+    const campaignCoverage = (
+      await h.pool.query(
+        'SELECT count(*)::int AS total, ' +
+          "(count(*) FILTER (WHERE status = 'ready'))::int AS ready " +
+          'FROM campaign_personalized_copies WHERE campaign_id = $1',
+        [campaign.id],
+      )
+    ).rows[0];
+    expect(sourceCoverage).toEqual({ total: 500, ready: 500 });
+    expect(campaignCoverage).toEqual({ total: 500, ready: 500 });
+    await expectNoNewEvents(h.pool, wm);
+  });
+
   it('binds multiple step-specific subject/body pairs without a generic step choice', async () => {
     const sequence = (
       await h.inject({
@@ -538,14 +627,14 @@ describe('B6.4 imports', () => {
     expect(
       (
         await h.pool.query(
-          `SELECT step_no, subject, body FROM campaign_personalized_copies
+          `SELECT step_no, subject, body, status FROM campaign_personalized_copies
             WHERE campaign_id = $1 ORDER BY step_no`,
           [campaign.id],
         )
       ).rows,
     ).toEqual([
-      { step_no: 1, subject: 'First subject', body: 'First body' },
-      { step_no: 3, subject: 'Third subject', body: 'Third body' },
+      { step_no: 1, subject: 'First subject', body: 'First body', status: 'ready' },
+      { step_no: 3, subject: 'Third subject', body: 'Third body', status: 'ready' },
     ]);
   });
 

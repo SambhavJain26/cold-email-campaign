@@ -12,16 +12,21 @@ Spaceship production infrastructure is live, but the project remains in **pre-pr
 commissioning**:
 
 - **2026-09-13 pilot CSV import:** the operator-authorized UI import created 12 Tier B leads,
-  60 reusable sources, and 60 campaign-step copies, all Needs review. Campaign 2 remains draft,
+  60 reusable sources and 60 campaign-step copies. All sources remain Needs review; an interrupted
+  manual readiness attempt changed only Lead 2 Steps 1–2 to Ready, leaving 58 campaign copies Needs
+  review. Campaign 2 remains draft,
   auto-enrollment off, now pool-only, with 12 available leads and unchanged one historical
   enrollment/sent event. Zero drift, self-check, and the 859,826-byte backup catalog pass.
-  F-W34 is implemented locally: personalized previews now use the scheduler's nearest preceding
+  F-W34 is implemented, fully verified, pushed, and deployed at `61a5b15`: personalized previews
+  now use the scheduler's nearest preceding
   new-conversation selector, so Step 4/5 subjects follow Step 3. The regression reproduces the old
   mismatch and passes after the fix without changing saved copy or events. The complete local
-  gate passes, including API 145/145, locked golden 47/47, and real-backend E2E 1/1. Deployment
-  and the full 60-preview review/readiness remain pending. Keep the pilot draft until those
-  handoffs pass.
-  No activation, enrollment, copy-ready mutation, or send was authorized or performed.
+  gate passes, including API 145/145, locked golden 47/47, and real-backend E2E 1/1. Production
+  Step 4/5 previews both use the imported Step 3 subject. F-W35 changes future valid CSV copy to
+  Ready automatically and removes the import readiness choice; it is fully verified locally
+  (including 500/500 Ready sources and campaign copies) and awaits separate push/deployment
+  authorization and exact pilot normalization. Keep the pilot draft.
+  No activation, enrollment, or send was authorized or performed.
 
 - **2026-09-13 CSV/mail runtime security update:** the separately approved dependency update is
   fully verified, pushed, and deployed at `baac951` on `canary`: csv-parse 7.0.2, Nodemailer
@@ -233,7 +238,7 @@ rollback/canary environment.
 - Stack: `docker-compose.spaceship.yml` with `.env.prod`
 - UI: `https://sambhavpmtech.com/email-campaign/`
 - Internal gateway: `127.0.0.1:18080`; host Caddy alone owns public 80/443
-- Deployed application release: `canary` at `baac951`
+- Deployed application release: `canary` at `61a5b15`
 
 The private repository currently has no GitHub deploy credential on the VPS. Until a read-only
 deploy key is deliberately installed, transfer a reviewed `git bundle`, fetch the pinned branch

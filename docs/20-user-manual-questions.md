@@ -209,10 +209,11 @@ alex@example.com,First subject,First body,Later subject,Later body
 ```
 
 Those pairs map directly to the matching Personalized Copy steps and need no generic-step choice.
-The preview defaults to **Needs review — Recommended** and **Keep existing copy — Recommended**;
-the alternative choices mark valid copy ready or replace existing unsent copy. Import never
-activates a campaign, enrolls a lead, or sends an email. Review and edit the result through the
-lead's **Personalized Copy** editor; every actual send occurs through the sequence scheduler.
+Every complete, non-conflicting imported pair is automatically **Ready for sequence use**. The
+preview still defaults to **Keep existing copy — Recommended**; choose replacement only when the
+CSV should replace existing unsent copy. Import never activates a campaign, enrolls a lead, or
+sends an email. You can inspect or edit the result through the lead's **Personalized Copy** editor;
+every actual send occurs through the sequence scheduler.
 
 ## 2. Mailboxes: controls, table columns, timezones, and polled folders
 
