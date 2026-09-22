@@ -8,6 +8,13 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Current operating boundary
 
+- **2026-09-23 footer plain-text and muted presentation update:** the operator-approved
+  footer change softens text color from `#595959` to `#767676`, retaining 10px, 20px top
+  separation, and 1.5 line height, and sets default opt-out copy to "Prefer I don't reach out?
+  Just let me know or reply stop.". Previews and renderer reflect the muted gray. Typecheck, lint,
+  format, unit 348/348, web 67/67, and production web build pass. No migration or send occurred.
+  Live campaigns stay active; remaining steps pick up the new footer at send time.
+
 - **2026-09-14 IST bounded prospect authorization:** the operator explicitly lifted the
   owner-address-only send restriction for **Campaign 2 / Import 2 lead IDs 2–13 only**, authorizing
   activation, enrollment, and their existing five-email pilot sequence. UI activation/enrollment

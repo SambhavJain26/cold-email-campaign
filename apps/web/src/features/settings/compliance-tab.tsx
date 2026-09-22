@@ -115,7 +115,7 @@ export function ComplianceTab({
             className="rounded-md border border-dashed border-border bg-muted/30 p-3"
             data-testid="footer-preview"
           >
-            <div className="font-mono text-[10px] leading-[15px] text-[#595959]">
+            <div className="font-mono text-[10px] leading-[15px] text-[#767676]">
               {hasLiveLink ? (
                 <span className="font-bold no-underline">Unsubscribe</span>
               ) : (
@@ -126,8 +126,7 @@ export function ComplianceTab({
             </div>
           </div>
           <p className="mt-2 text-xs text-muted-foreground">
-            Delivered 20px below the message in 10px dark-gray text. Unsubscribe is bold and has no
-            underline. No visible divider is added.
+            Delivered 20px below the message in 10px muted gray text. No visible divider is added.
           </p>
         </CardContent>
       </Card>

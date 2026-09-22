@@ -236,7 +236,7 @@ export function PreviewPanel({
                       </Link>
                     </p>
                     {renderedFooter && (
-                      <div className="mt-5 font-mono text-[10px] leading-[15px] whitespace-pre-wrap text-[#595959]">
+                      <div className="mt-5 font-mono text-[10px] leading-[15px] whitespace-pre-wrap text-[#767676]">
                         <span className={renderedFooter.linked ? 'font-bold no-underline' : ''}>
                           {renderedFooter.optout}
                         </span>

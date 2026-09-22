@@ -37,5 +37,5 @@ export function htmlOfText(bodyText: string, footerHtml?: string): string {
   // two required lines in the new message's HTML, and adds no hidden or
   // recipient-specific variation. Gmail visibility still requires a live
   // provider canary; no offline renderer can promise a client's trim policy.
-  return `${bodyHtml}<table role="presentation" cellpadding="0" cellspacing="0" border="0" style="margin-top:20px;border-collapse:collapse"><tbody><tr><td style="padding:0;font-size:10px;color:#595959;line-height:1.5">${inner}</td></tr></tbody></table>`;
+  return `${bodyHtml}<table role="presentation" cellpadding="0" cellspacing="0" border="0" style="margin-top:20px;border-collapse:collapse"><tbody><tr><td style="padding:0;font-size:10px;color:#767676;line-height:1.5">${inner}</td></tr></tbody></table>`;
 }

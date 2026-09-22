@@ -91,7 +91,7 @@ describe('SmtpImapTransport over a real server (B8.1)', () => {
       subject: 'A safe subject',
       bodyText: 'Hi Sarah\n\n123 Main St\nReply STOP',
       bodyHtml:
-        '<p>Hi Sarah</p><table role="presentation" style="margin-top:20px"><tr><td style="font-size:10px;color:#595959;line-height:1.5">Reply STOP<br>123 Main St</td></tr></table>',
+        '<p>Hi Sarah</p><table role="presentation" style="margin-top:20px"><tr><td style="font-size:10px;color:#767676;line-height:1.5">Reply STOP<br>123 Main St</td></tr></table>',
       headers: { messageId: '<ce-html-1@coldemail.test>' },
     });
     const [stored] = await readInbox(LEAD);

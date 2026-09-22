@@ -131,7 +131,7 @@ describe('footer is unconditional (docs/08 §4)', () => {
     expect(r.bodyHtml.startsWith('<p style="margin:0')).toBe(true);
     expect(r.bodyHtml).toContain('<table role="presentation"');
     expect(r.bodyHtml).toContain('font-size:10px');
-    expect(r.bodyHtml).toContain('color:#595959');
+    expect(r.bodyHtml).toContain('color:#767676');
     expect(r.bodyHtml).toContain('margin-top:20px');
     expect(r.bodyHtml).toContain('123 Main St');
     expect(r.bodyHtml).not.toContain('<unsafe>');
@@ -161,7 +161,7 @@ describe('unsubscribe link in the footer (0010, docs/16 §8)', () => {
   it('live: the HTML part says the SAME thing with the word linked', () => {
     const html = withLink().bodyHtml;
     expect(html).toContain(
-      `<a href="${URL}" style="color:#595959;text-decoration:none;font-weight:700">Unsubscribe</a>`,
+      `<a href="${URL}" style="color:#767676;text-decoration:none;font-weight:700">Unsubscribe</a>`,
     );
     expect(html).toContain(`</a><br>${compliance.physicalAddress}`);
     expect(html).not.toContain('or reply STOP');
