@@ -4,11 +4,13 @@
 
 **Legend:** `[ ]` not started · `[~]` in progress · `[x]` done · `[!]` blocked (note why in the log)
 
-**2026-09-27 signature feature:** local implementation and verification complete; not deployed.
+**2026-09-27 signature feature:** implemented, verified, and explicitly authorized deployment
+completed at `767b964` with migration `0020`.
 Editable name/title and actual sender-domain signature now precede the existing compliance footer.
-See docs/17 for tests and release handoffs. Live opt-out is already text-only; all 60 pilot copies
-contain a trailing `Sambhav`, so authorized unsent-copy cleanup is needed before release to avoid
-duplicate sign-offs. Production data and history are unchanged.
+See docs/17 for tests and deployment evidence. Full integration rerun passes **172/172**.
+Live opt-out is text-only; 17 unsent pilot copies retain a trailing `Sambhav` and need separately
+authorized cleanup to avoid duplicate sign-offs. Saved copy/history are unchanged (44 sends).
+Production health/routes, 13-enrollment zero drift, self-check, and pre/post backup catalogs pass.
 
 **Latest operational handoff (2026-09-14 IST):** the operator explicitly authorized Campaign 2's
 12-prospect pilot, lifting the owner-only restriction for Import 2 leads 2–13 only. Authenticated

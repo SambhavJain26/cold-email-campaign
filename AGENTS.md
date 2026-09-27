@@ -22,9 +22,11 @@ call planned work implemented.
 - **2026-09-27 automatic sender signature:** implemented locally with migration `0020`, editable
   global signature name/title, sending-mailbox plain-text domain, matching previews, and unchanged
   blank-URL/text versus configured-URL/link behavior. Verification and release handoffs are in
-  docs/17. No deployment or production mutation occurred. Read-only production review confirms
-  text-only opt-out and all 60 Campaign 2 pilot bodies already ending in `Sambhav`; resolve duplicate
-  sign-offs under separate copy-change authorization before deployment. Preserve sent history.
+  docs/17. Explicitly authorized deployment completed at `767b964`; migration 0020, health/routes,
+  13-enrollment zero drift, self-check, and pre/post backup catalogs pass. Live opt-out is text-only.
+  Saved copy remains unchanged: 43 pilot copies are sent and 17 unsent copies retain `Sambhav`,
+  which duplicates the new signature. Cleanup awaits separate operator authorization. Sent history
+  remains intact (44 total sends); deployment emitted no mail.
 
 - **2026-09-23 footer plain-text and muted presentation update:** the operator-approved
   footer change softens text color from `#595959` to `#767676`, retaining 10px, 20px top
@@ -289,7 +291,7 @@ temporary rollback/canary environment.
 - App: `/opt/email-campaign`; stack: `docker-compose.spaceship.yml` with `.env.prod`
 - Public UI: `https://sambhavpmtech.com/email-campaign/`
 - Internal gateway: `127.0.0.1:18080`; host Caddy is the only public 80/443 listener
-- Deployed application release: `canary` at `9f1ada0`
+- Deployed application release: `canary` at `767b964`
 
 The repository is private and the VPS currently has no GitHub deploy credential. Until a read-only
 deploy key is deliberately installed, transfer a reviewed `git bundle`, fetch the pinned branch

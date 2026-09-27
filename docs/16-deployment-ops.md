@@ -3,7 +3,14 @@
 Single always-on VPS (finalized decision). Docker Compose primary; systemd alternative. Implemented
 in B7 and cut over to Spaceship production on 2026-08-22.
 
-**Production status (2026-09-14 IST):** F-W35 is verified and deployed at `9f1ada0` on `canary`.
+**Production status (2026-09-27 IST):** sender signatures are deployed at `767b964` on `canary`,
+through migration `0020` (21 applied migrations). Health/routes, 13-enrollment zero drift,
+self-check, live renderer probes, served UI markers, and validated pre/post backups pass.
+Live opt-out remains text-only. Saved copy/history are unchanged; Campaign 2 retains 43 sent and
+17 Ready unsent copies. Cleanup of their trailing `Sambhav` remains separately gated. Deployment
+emitted no mail (44 total sent events). See docs/17 for exact evidence and pending copy cleanup.
+
+**Previous production status (2026-09-14 IST):** F-W35 is verified and deployed at `9f1ada0` on `canary`.
 Valid complete CSV personalized pairs now become Ready automatically; manual drafts and later
 content edits retain review. The separately authorized Import 2 normalization made all 60 sources
 and all 60 campaign copies Ready without changing content or history. Browser coverage confirms

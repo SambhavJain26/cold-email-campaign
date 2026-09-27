@@ -1,6 +1,6 @@
 # Local canary runbook (B8.3-local) — two-week validation on throwaway Gmail
 
-## 2026-09-27 automatic sender signature — local implementation, not deployed
+## 2026-09-27 automatic sender signature — deployed at `767b964`
 
 Operator-approved signature support adds migration `0020_sender_signature`, initializing the
 global name to **Sambhav Jain** and title/company line to **Automation Specialist | Sambhav Builds**.
@@ -27,14 +27,33 @@ scheduler coverage then passed **19/19**, including mailbox-domain output and si
 changes across a personalized retry. No golden fixtures were regenerated. A parallel unit/web
 rerun hit worker-start timeouts; the complete single-worker rerun passed **417/417**. Docker was
 started locally after initial unavailable/starting-up checks. The existing large web bundle
-warning remains.
+warning remains. The final full serial integration rerun passed **172/172** across 28 files.
 
 Read-only production review confirmed blank `unsubscribe_base_url` and the exact saved sentence
 **Prefer I don't reach out? Just let me know or reply stop.** It also verified all **60/60**
 Campaign 2 / lead IDs 2–13 bodies end with a standalone **Sambhav**. Appending the new signature
 would duplicate that sign-off. Saved bodies and sent history remain untouched as requested;
-cleanup of eligible unsent copy needs separate authorization before release. No production
-migration, setting change, deployment, enrollment, activation, or send was performed.
+cleanup of eligible unsent copy needs separate authorization. The operator subsequently authorized
+deployment. A separate cleanup question remains pending, so deployment preserved all saved bodies.
+
+The reviewed bundle advanced `origin/canary` and the clean Spaceship checkout to `767b964`.
+Local and remote SHA-256 matched
+`a36a9f81c06856df1261c0cfcda2f44e5d6e620255db58a61134ce1770721bdc`.
+Production images built successfully; the pruned runtime audit reports zero vulnerabilities
+(10 existing development/build advisories remain). Migration `0020` applied, giving **21** applied
+migrations. The new signature defaults and blank unsubscribe URL are verified in the live database.
+App/database health, the full public route/redirect matrix, served signature/preview UI markers,
+and a pure renderer probe in the live container for both outreach domains pass. The probe verifies
+bold identity, no anchors in text-only mode, and exactly one compliance clause without sending.
+The browser reaches login; authenticated visual replay was not performed in this session.
+
+Pre-deploy `coldemail-20260927-074000.dump` (**1,742,678 bytes**) and post-deploy
+`coldemail-20260927-074510.dump` (**1,743,591 bytes**) both pass **342-line** restore catalogs.
+Production reports `checked 13 enrollments — 0 diff(s)` and clean self-check before and after.
+Event count/max ID remain **104/104**, with **44** sent events/messages. Campaign 2 remains active,
+automatic enrollment off; its copies remain **43 sent / 17 Ready unsent**. Deployment emitted no
+mail and changed no campaign, mailbox, saved copy, or historical message. The 17 unsent bodies still
+end in `Sambhav` and will duplicate the new automatic identity until separately authorized cleanup.
 
 ## 2026-09-14 IST — explicitly authorized 12-prospect pilot launched
 
