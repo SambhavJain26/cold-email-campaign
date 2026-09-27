@@ -11,14 +11,16 @@ optional. `Best,` joins the signature directly; previews show the complete text,
 snapshots preserve the original content and format. See docs/17 for the full gate and deployment.
 Production has 22 migrations, plain-text Compliance format, blank unsubscribe URL, healthy routes,
 13-enrollment zero drift, clean self-check, and validated pre/post backups. Event and sent
-watermarks remain 104/44; no mail was emitted. The 17 Ready copies with manual `Sambhav` remain.
+watermarks remain 104/44; no mail was emitted. The subsequent authorized cleanup replaced only
+the terminal `Sambhav` with `Best,` in the 17 Ready copies and their linked reusable sources;
+the 43 sent copies and all sent-message bodies remain unchanged. See docs/17.
 
 **2026-09-27 signature feature:** implemented, verified, and explicitly authorized deployment
 completed at `767b964` with migration `0020`.
 Editable name/title and actual sender-domain signature now precede the existing compliance footer.
 See docs/17 for tests and deployment evidence. Full integration rerun passes **172/172**.
-Live opt-out is text-only; 17 unsent pilot copies retain a trailing `Sambhav` and need separately
-authorized cleanup to avoid duplicate sign-offs. Saved copy/history are unchanged (44 sends).
+Live opt-out is text-only; 17 unsent pilot copies retained a trailing `Sambhav` until the later
+authorized cleanup above. Sent copy/history remain unchanged (44 sends).
 Production health/routes, 13-enrollment zero drift, self-check, and pre/post backup catalogs pass.
 
 **Latest operational handoff (2026-09-14 IST):** the operator explicitly authorized Campaign 2's

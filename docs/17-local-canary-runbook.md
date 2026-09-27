@@ -1,5 +1,33 @@
 # Local canary runbook (B8.3-local) — two-week validation on throwaway Gmail
 
+## 2026-09-27 authorized cleanup of 17 unsent pilot sign-offs
+
+The operator separately authorized correction of Campaign 2's 17 Ready personalized copies.
+Read-only inspection found one exact terminal `\n\nSambhav` in each body and no terminal `Best,`.
+The 17 linked reusable sources were distinct, Ready, identical to their campaign copies, and not
+linked to any sent copy. Their existing campaign content hashes matched the application formula.
+The campaign was active with automatic enrollment off; New York time was Sunday 06:51, outside
+the configured send window. No campaign pause or send was introduced.
+
+After a validated pre-change custom-format dump, one guarded transaction locked the two copy
+tables, required the exact 17 Ready matches plus unchanged 104-event/44-message watermarks, and
+replaced only terminal `Sambhav` with `Best,` in those 17 campaign bodies and their 17 linked
+source bodies. It recomputed the campaign content hashes and preserved subjects, other body text,
+Ready statuses, import/source links, all sent copies, and sent-message snapshots. The transaction
+verified all 17 paired rows before commit. Post-commit checks show **17/17** `Best,` endings,
+**0** old endings, **17/17** source matches and valid content hashes, and **43 sent / 17 Ready**
+campaign-copy statuses. A read-only production renderer probe checked every Ready body against
+both sender domains: **34/34** contain one `Sambhav Jain` identity immediately below `Best,`,
+followed by the configured opt-out text and full address. No email was sent.
+
+The sent-message body digest remained `a1d5688c82ccfef79b38aee824c17bac` and the sent-copy
+body digest remained `c543a2ed2478933a53c95b8f558ebc47`; the event count/max ID stayed
+**104/104** and sent messages stayed **44**. Production reports `checked 13 enrollments — 0
+diff(s)` and clean self-check. Pre-change `coldemail-20260927-104958.dump` (**1,715,746 bytes**)
+and post-change `coldemail-20260927-105359.dump` (**1,716,533 bytes**) both pass **342-line**
+restore catalogs. No code release, migration, activation, enrollment, mailbox change, or outbound
+mail was part of this cleanup.
+
 ## 2026-09-27 plain-text email mode — deployed at `d6f3e1b`
 
 The operator-approved release adds migration `0021_plain_text_mode`. Compliance gains a global
@@ -45,7 +73,8 @@ Production reports `checked 13 enrollments — 0 diff(s)` and clean self-check b
 Event count/max ID remain **104/104**, with **44** sent messages. Campaign 2 remains active with
 automatic enrollment off and **43 sent / 17 Ready** campaign copies. No mail was emitted and no
 campaign, mailbox, saved copy, or historical message was altered. The 17 Ready bodies still have
-manual `Sambhav` sign-offs; cleanup remains separately gated. Oracle and `main` are unchanged.
+manual `Sambhav` sign-offs at deployment; their later authorized cleanup is recorded above.
+Oracle and `main` are unchanged.
 
 ## 2026-09-27 automatic sender signature — deployed at `767b964`
 
@@ -80,8 +109,8 @@ Read-only production review confirmed blank `unsubscribe_base_url` and the exact
 **Prefer I don't reach out? Just let me know or reply stop.** It also verified all **60/60**
 Campaign 2 / lead IDs 2–13 bodies end with a standalone **Sambhav**. Appending the new signature
 would duplicate that sign-off. Saved bodies and sent history remain untouched as requested;
-cleanup of eligible unsent copy needs separate authorization. The operator subsequently authorized
-deployment. A separate cleanup question remains pending, so deployment preserved all saved bodies.
+cleanup of eligible unsent copy needed separate authorization. The operator subsequently authorized
+deployment. That release preserved all saved bodies; the later authorized cleanup is recorded above.
 
 The reviewed bundle advanced `origin/canary` and the clean Spaceship checkout to `767b964`.
 Local and remote SHA-256 matched
@@ -99,8 +128,8 @@ Pre-deploy `coldemail-20260927-074000.dump` (**1,742,678 bytes**) and post-deplo
 Production reports `checked 13 enrollments — 0 diff(s)` and clean self-check before and after.
 Event count/max ID remain **104/104**, with **44** sent events/messages. Campaign 2 remains active,
 automatic enrollment off; its copies remain **43 sent / 17 Ready unsent**. Deployment emitted no
-mail and changed no campaign, mailbox, saved copy, or historical message. The 17 unsent bodies still
-end in `Sambhav` and will duplicate the new automatic identity until separately authorized cleanup.
+mail and changed no campaign, mailbox, saved copy, or historical message. At that point the 17
+unsent bodies still ended in `Sambhav`; the later authorized cleanup is recorded above.
 
 ## 2026-09-14 IST — explicitly authorized 12-prospect pilot launched
 

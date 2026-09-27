@@ -8,8 +8,9 @@ through migration `0021` (22 applied migrations). The global format is `plain_te
 `Automation Specialist`, and the unsubscribe URL remains blank. Health/routes, 13-enrollment zero
 drift, self-check, served UI markers, and validated pre/post backups pass. All 44 historical sent
 rows retain `minimal_html`; event/sent watermarks remain 104/44. Campaign 2 retains 43 sent and
-17 Ready unsent copies. Cleanup of their trailing `Sambhav` remains separately gated. Deployment
-emitted no mail. See docs/17 for exact evidence and pending copy cleanup.
+17 Ready unsent copies. A subsequent separately authorized cleanup changed only their terminal
+`Sambhav` to `Best,` and updated their 17 matching reusable sources; sent history remained intact.
+Deployment and cleanup emitted no mail. See docs/17 for exact evidence.
 
 **Previous production status (2026-09-14 IST):** F-W35 is verified and deployed at `9f1ada0` on `canary`.
 Valid complete CSV personalized pairs now become Ready automatically; manual drafts and later

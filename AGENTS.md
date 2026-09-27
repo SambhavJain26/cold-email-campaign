@@ -27,17 +27,17 @@ call planned work implemented.
   stay HTML. The full local gate and deployment evidence are in docs/17. Production migration,
   health/routes, 13-enrollment zero drift, self-check, and pre/post backup catalogs pass. The
   unsubscribe URL remains blank, the event/sent watermarks remain 104/44, and deployment emitted
-  no mail. The 17 unsent pilot copies with manual `Sambhav` sign-offs still need separately
-  authorized cleanup.
+  no mail. The operator subsequently authorized cleanup of the 17 unsent pilot sign-offs; the
+  verified live-copy outcome is recorded in docs/17.
 
 - **2026-09-27 automatic sender signature:** implemented locally with migration `0020`, editable
   global signature name/title, sending-mailbox plain-text domain, matching previews, and unchanged
   blank-URL/text versus configured-URL/link behavior. Verification and release handoffs are in
   docs/17. Explicitly authorized deployment completed at `767b964`; migration 0020, health/routes,
   13-enrollment zero drift, self-check, and pre/post backup catalogs pass. Live opt-out is text-only.
-  Saved copy remains unchanged: 43 pilot copies are sent and 17 unsent copies retain `Sambhav`,
-  which duplicates the new signature. Cleanup awaits separate operator authorization. Sent history
-  remains intact (44 total sends); deployment emitted no mail.
+  At that deployment, 43 pilot copies were sent and 17 unsent copies retained `Sambhav`,
+  which duplicated the new signature until the separately authorized cleanup recorded above and
+  in docs/17. Sent history remains intact (44 total sends); deployment emitted no mail.
 
 - **2026-09-23 footer plain-text and muted presentation update:** the operator-approved
   footer change softens text color from `#595959` to `#767676`, retaining 10px, 20px top
