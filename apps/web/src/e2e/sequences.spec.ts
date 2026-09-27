@@ -9,7 +9,9 @@ const BODY_CLEAN = `Hi {{first_name|there}},
 
 {{RANDOM|Noticed|Saw|Spotted}} your recent listings around {{city}} and wanted to reach out. We help independent brokerages in {{market}} keep more of their pipeline moving without adding headcount, mostly by tightening the follow-up that already happens after every showing appointment.
 
-{{RANDOM|Worth a quick chat|Open to fifteen minutes}} {{RANDOM|this week|next week}}?`;
+{{RANDOM|Worth a quick chat|Open to fifteen minutes}} {{RANDOM|this week|next week}}?
+
+Best,`;
 const BODY_WITH_LINK = BODY_CLEAN.replace(
   'wanted to reach out.',
   'wanted to reach out. Details live at https://example.com/pricing.',
@@ -94,17 +96,20 @@ test('build a sequence: 24 variations, fatal link in step 1, fix, save', async (
   await panel.getByRole('button', { name: /mike\.rodriguez1@example\.com/ }).click();
   await panel.getByRole('button', { name: 'Render preview' }).click();
 
-  // The footer is a separate, locked block — never part of the editable body.
-  await expect(panel.getByTestId('preview-footer')).toContainText('4517 Congress Ave');
-  await expect(panel.getByTestId('preview-body')).not.toContainText('4517 Congress Ave');
-  await expect(panel.getByTestId('preview-signature')).toContainText('Sambhav Jain');
-  await expect(panel.getByTestId('preview-signature')).toContainText('[sender domain');
+  // The complete outgoing text includes the signature and compliance footer.
+  await expect(panel.getByTestId('preview-body')).toContainText('4517 Congress Ave');
+  await expect(panel.getByTestId('preview-body')).toContainText('Sambhav Jain');
+  await expect(panel.getByTestId('preview-body')).toContainText('[sender domain');
+  expect(await panel.getByTestId('preview-body').textContent()).toContain(
+    'Best,\nSambhav Jain\nAutomation Specialist\n',
+  );
+  await expect(panel.getByText('Plain text — complete email')).toBeVisible();
   await panel.getByRole('combobox', { name: 'Preview mailbox' }).click();
   await page.getByRole('option', { name: 'sales1@coldmail-domain1.com', exact: true }).click();
   await expect(panel.getByTestId('preview-result')).not.toBeVisible();
   await panel.getByRole('button', { name: 'Render preview' }).click();
-  await expect(panel.getByTestId('preview-signature')).toContainText('coldmail-domain1.com');
-  await expect(panel.getByTestId('preview-signature').locator('a')).toHaveCount(0);
+  await expect(panel.getByTestId('preview-body')).toContainText('coldmail-domain1.com');
+  await expect(panel.getByTestId('preview-body').locator('a')).toHaveCount(0);
 
   // 24 variations, and the URL is FATAL in step 1 (docs/08 §5 check #3).
   await expect(panel.getByTestId('preview-checks')).toContainText('24 variations');

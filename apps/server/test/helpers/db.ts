@@ -49,7 +49,8 @@ export async function resetCoreTables(pool: Pool): Promise<void> {
     `UPDATE compliance_settings
         SET physical_address = '100 Test Street, Austin TX 78701',
             signature_name = 'Sambhav Jain',
-            signature_role_line = 'Automation Specialist | Sambhav Builds',
+            signature_role_line = 'Automation Specialist',
+            email_format = 'plain_text',
             unsubscribe_base_url = ''
       WHERE id = 1`,
   );

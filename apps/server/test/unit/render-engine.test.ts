@@ -16,6 +16,7 @@ const fullLead: LeadLite = {
 };
 
 const compliance = {
+  emailFormat: 'minimal_html' as const,
   physicalAddress: '123 Main St, Austin TX 78701',
   optoutText: "Don't want future emails? Reply STOP and I'll remove you immediately.",
   signatureName: 'Sambhav Jain',
@@ -131,7 +132,7 @@ describe('footer is unconditional (docs/08 §4)', () => {
     );
     expect(r.bodyHtml).toContain('<p style="margin:0 0 16px">Hi Jane, &lt;unsafe&gt;</p>');
     expect(r.bodyHtml).toContain('<p style="margin:0 0 0">Second paragraph.</p>');
-    expect(r.bodyHtml.startsWith('<p style="margin:0')).toBe(true);
+    expect(r.bodyHtml!.startsWith('<p style="margin:0')).toBe(true);
     expect(r.bodyHtml).toContain('<table role="presentation"');
     expect(r.bodyHtml).toContain('font-size:10px');
     expect(r.bodyHtml).toContain('color:#767676');
@@ -168,7 +169,7 @@ describe('sender domain signature', () => {
     expect(r.bodyText).toContain(
       '\nsambhavpmtech.com\n\nUnsubscribe: https://unsubscribe.example/u/token',
     );
-    expect(r.bodyHtml.match(/<a href=/g)).toHaveLength(1);
+    expect(r.bodyHtml!.match(/<a href=/g)).toHaveLength(1);
     expect(r.bodyHtml).toContain('<br>sambhavpmtech.com</p>');
   });
 });
@@ -211,7 +212,7 @@ describe('unsubscribe link in the footer (0010, docs/16 §8)', () => {
   it('the two parts stay semantically identical (finding 19)', () => {
     const r = withLink();
     const textFooter = r.bodyText.slice(r.bodyText.lastIndexOf('\n\n') + 2);
-    const htmlFooter = r.bodyHtml.slice(r.bodyHtml.lastIndexOf('<table role='));
+    const htmlFooter = r.bodyHtml!.slice(r.bodyHtml!.lastIndexOf('<table role='));
     for (const fragment of ['Unsubscribe', compliance.physicalAddress, URL]) {
       expect(textFooter).toContain(fragment);
       expect(htmlFooter).toContain(fragment);

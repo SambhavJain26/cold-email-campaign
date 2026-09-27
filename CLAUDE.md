@@ -8,6 +8,15 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Current operating boundary
 
+- **2026-09-27 plain-text email mode:** the operator-approved release is implemented and verified
+  locally on `canary`, with migration `0021`. New messages default to text/plain only; Minimal HTML
+  remains optional. Drafts ending in `Best,` join the automatic signature on the next line, and
+  the default role is `Automation Specialist`. Sequence previews show the complete text message.
+  Both template and personalized retries retain their saved bodies and format; legacy HTML rows
+  stay HTML. The full local gate and rollout handoff are in docs/17. This release has **not** been
+  deployed; production remains at `767b964` until separately authorized. The 17 unsent pilot
+  copies with manual `Sambhav` sign-offs still need separately authorized cleanup.
+
 - **2026-09-27 automatic sender signature:** implemented locally with migration `0020`, editable
   global signature name/title, sending-mailbox plain-text domain, matching previews, and unchanged
   blank-URL/text versus configured-URL/link behavior. Verification and release handoffs are in

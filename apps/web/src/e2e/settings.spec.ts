@@ -62,7 +62,10 @@ test('compliance: empty address blocks saving with the explanation', async ({ pa
 
   await expect(page.getByTestId('footer-preview')).toContainText('4517 Congress Ave');
   await expect(page.getByLabel('Signature name')).toHaveValue('Sambhav Jain');
-  await page.getByLabel('Title and company line').fill('Automation Consultant | Sambhav Builds');
+  await expect(page.getByRole('combobox', { name: 'Email format' })).toContainText('Plain text');
+  await page.getByRole('combobox', { name: 'Email format' }).click();
+  await page.getByRole('option', { name: 'Minimal HTML', exact: true }).click();
+  await page.getByLabel('Role line').fill('Automation Consultant | Sambhav Builds');
   await expect(page.getByTestId('footer-preview')).toContainText('Automation Consultant');
 
   await page.getByLabel('Physical address').fill('');
@@ -76,9 +79,8 @@ test('compliance: empty address blocks saving with the explanation', async ({ pa
   await expect(page.getByText('Compliance footer saved')).toBeVisible();
   await page.getByRole('tab', { name: 'Rules' }).click();
   await page.getByRole('tab', { name: 'Compliance' }).click();
-  await expect(page.getByLabel('Title and company line')).toHaveValue(
-    'Automation Consultant | Sambhav Builds',
-  );
+  await expect(page.getByLabel('Role line')).toHaveValue('Automation Consultant | Sambhav Builds');
+  await expect(page.getByRole('combobox', { name: 'Email format' })).toContainText('Minimal HTML');
 });
 
 test('account tab changes the password', async ({ page }) => {

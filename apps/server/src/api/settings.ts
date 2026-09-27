@@ -26,6 +26,7 @@ import type { ZodTypeProvider } from './plugins/zodCompilers';
 
 function toComplianceDto(row: ComplianceRow): ComplianceDto {
   return {
+    email_format: row.emailFormat,
     physical_address: row.physicalAddress,
     optout_text: row.optoutText,
     signature_name: row.signatureName,
@@ -146,6 +147,7 @@ export async function settingsRoutes(app: FastifyInstance, services: AppServices
         db,
         {
           physicalAddress: req.body.physical_address,
+          emailFormat: req.body.email_format,
           optoutText: req.body.optout_text,
           signatureName: req.body.signature_name,
           signatureRoleLine: req.body.signature_role_line,

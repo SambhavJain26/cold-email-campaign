@@ -82,6 +82,8 @@ describe('SmtpImapTransport over a real server (B8.1)', () => {
     expect(stored!.source).toContain('From: Arjun Mehta <canary@coldemail.test>');
     expect(stored!.source).toContain('Subject: quick question about Acme');
     expect(stored!.source).toContain('Noticed you handle listings in Austin.');
+    expect(stored!.source).toMatch(/Content-Type: text\/plain/i);
+    expect(stored!.source).not.toMatch(/Content-Type: (text\/html|multipart\/alternative)/i);
   });
 
   it('send: text plus HTML becomes a minimal multipart alternative', async () => {

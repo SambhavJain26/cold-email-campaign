@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { AlertTriangle, CheckCircle2, Lock, XCircle } from 'lucide-react';
+import { AlertTriangle, CheckCircle2, XCircle } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -7,6 +7,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useLeads } from '@/api/queries/leads';
 import { useCampaigns } from '@/api/queries/campaigns';
+import { useCompliance } from '@/api/queries/settings';
 import { useMailboxes } from '@/api/queries/mailboxes';
 import { usePreviewSequence } from '@/api/mutations/sequences';
 import { useDebounced } from '@/lib/use-debounced';
@@ -41,43 +42,6 @@ export function previewRequirement(
   return null;
 }
 
-const FOOTER_SEPARATOR = '\n\n';
-
-/** The engine appends identity and compliance as the final two blocks. */
-export function splitFooter(body: string): {
-  body: string;
-  signature: string | null;
-  footer: string | null;
-} {
-  const index = body.lastIndexOf(FOOTER_SEPARATOR);
-  if (index === -1) return { body, signature: null, footer: null };
-  const preceding = body.slice(0, index);
-  const signatureAt = preceding.lastIndexOf(FOOTER_SEPARATOR);
-  if (signatureAt === -1)
-    return { body: preceding, signature: null, footer: body.slice(index + 2) };
-  return {
-    body: preceding.slice(0, signatureAt),
-    signature: preceding.slice(signatureAt + FOOTER_SEPARATOR.length),
-    footer: body.slice(index + FOOTER_SEPARATOR.length),
-  };
-}
-
-/** Convert the plain-text preview footer into the appearance used by the HTML
- *  alternative. The raw capability URL intentionally stays out of the UI. */
-export function footerPreviewParts(footer: string): {
-  optout: string;
-  address: string;
-  linked: boolean;
-} {
-  const [firstLine = '', ...addressLines] = footer.split('\n');
-  const linked = firstLine.startsWith('Unsubscribe: ');
-  return {
-    optout: linked ? 'Unsubscribe' : firstLine,
-    address: addressLines.join('\n'),
-    linked,
-  };
-}
-
 /** F4.4 — Preview & pre-send panel (docs/12 §5): lead picker → POST preview →
  *  rendered output with the locked footer block + the checklist verbatim. */
 export function PreviewPanel({
@@ -98,13 +62,21 @@ export function PreviewPanel({
   const campaigns = useCampaigns();
   const mailboxes = useMailboxes();
   const preview = usePreviewSequence(sequenceId ?? 0);
+  const compliance = useCompliance();
+  const previewKey = JSON.stringify([
+    sequenceId,
+    target,
+    campaignId,
+    leadId,
+    mailboxId,
+    compliance.data,
+  ]);
+  const [renderedKey, setRenderedKey] = useState<string | null>(null);
 
   const selectedLead = leads.data?.items.find((lead) => lead.id === leadId);
   const requirement = previewRequirement(target, campaignId, leadId);
   const canPreview = sequenceId !== null && requirement === null;
 
-  const rendered = preview.data ? splitFooter(preview.data.body) : null;
-  const renderedFooter = rendered?.footer ? footerPreviewParts(rendered.footer) : null;
   const checks = preview.data?.checks;
 
   return (
@@ -228,6 +200,8 @@ export function PreviewPanel({
             disabled={!canPreview || preview.isPending}
             onClick={() => {
               if (!canPreview || target === null || leadId === null) return;
+              preview.reset();
+              setRenderedKey(previewKey);
               preview.mutate({
                 lead_id: leadId,
                 step_no: target.stepNo,
@@ -241,7 +215,7 @@ export function PreviewPanel({
           </Button>
           {!canPreview && <p className="text-[11px] text-muted-foreground">{requirement}</p>}
 
-          {preview.data && (
+          {preview.data && renderedKey === previewKey && (
             <div className="space-y-3" data-testid="preview-result">
               {selectedLead && (
                 <p className="text-[11px] text-muted-foreground">
@@ -263,49 +237,23 @@ export function PreviewPanel({
                 </p>
               </div>
               <div className="space-y-1">
-                <p className="text-[11px] text-muted-foreground">Body</p>
+                <p className="text-[11px] text-muted-foreground">
+                  {preview.data.email_format === 'plain_text'
+                    ? 'Plain text — complete email'
+                    : 'Minimal HTML — complete text alternative'}
+                </p>
                 <pre
                   className="rounded-md border border-border px-2 py-1 font-mono text-xs whitespace-pre-wrap"
                   data-testid="preview-body"
                 >
-                  {rendered?.body}
+                  {preview.data.body}
                 </pre>
-                {rendered?.signature && (
-                  <div className="px-2 py-1 font-mono text-xs" data-testid="preview-signature">
-                    <strong>{rendered.signature.split('\n')[0]}</strong>
-                    {rendered.signature
-                      .split('\n')
-                      .slice(1)
-                      .map((line, index) => (
-                        <span key={index}>
-                          <br />
-                          {line}
-                        </span>
-                      ))}
-                  </div>
-                )}
-                {rendered?.footer !== null && rendered !== null && (
-                  <div
-                    className="rounded-md border border-dashed border-border bg-muted/40 px-2 py-1"
-                    data-testid="preview-footer"
-                  >
-                    <p className="flex items-center gap-1 text-[11px] text-muted-foreground">
-                      <Lock className="size-3" aria-hidden /> Appended to every send —{' '}
-                      <Link to="/settings" className="underline">
-                        edit in Compliance settings
-                      </Link>
-                    </p>
-                    {renderedFooter && (
-                      <div className="mt-5 font-mono text-[10px] leading-[15px] whitespace-pre-wrap text-[#767676]">
-                        <span className={renderedFooter.linked ? 'font-bold no-underline' : ''}>
-                          {renderedFooter.optout}
-                        </span>
-                        <br />
-                        <span>{renderedFooter.address}</span>
-                      </div>
-                    )}
-                  </div>
-                )}
+                <p className="text-xs text-muted-foreground">
+                  Signature and footer included ·{' '}
+                  <Link to="/settings" className="underline">
+                    Edit in Compliance settings
+                  </Link>
+                </p>
               </div>
 
               {preview.data.resolution_trace && (

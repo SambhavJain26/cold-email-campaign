@@ -318,6 +318,7 @@ export async function sequencesRoutes(app: FastifyInstance, services: AppService
         return {
           subject: rendered.subject,
           body: rendered.bodyText,
+          email_format: compliance.emailFormat,
           checks: rendered.checks,
           personalized_copy_status: copy.status,
           resolution_trace: {
@@ -427,6 +428,7 @@ export async function sequencesRoutes(app: FastifyInstance, services: AppService
       return {
         subject: rendered.subject,
         body: rendered.bodyText,
+        email_format: compliance.emailFormat,
         checks: rendered.checks,
         resolution_trace: {
           render_mode: mode,

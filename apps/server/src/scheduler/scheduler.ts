@@ -463,18 +463,22 @@ export class Scheduler {
     const personalized = step.contentSource === 'personalized';
     let personalizedCopy: ManualDraftRow | null = null;
     let retrySnapshot: Awaited<ReturnType<typeof sentMessageForStep>> | null = null;
+    if (retryOf) {
+      const saved = await sentMessageForStep(db, e.id, stepNo);
+      if (
+        saved?.renderedSubject &&
+        saved.renderedBodyText &&
+        (saved.emailFormat === 'plain_text' || saved.renderedBodyHtml)
+      )
+        retrySnapshot = saved;
+    }
     if (personalized) {
       if (step.id === undefined) {
         await this.blockPersonalizedCopy(e, stepNo, -stepNo, 'missing', now);
         return 'render_failed';
       }
       if (retryOf) {
-        retrySnapshot = (await sentMessageForStep(db, e.id, stepNo)) ?? null;
-        if (
-          !retrySnapshot?.renderedSubject ||
-          !retrySnapshot.renderedBodyText ||
-          !retrySnapshot.renderedBodyHtml
-        ) {
+        if (!retrySnapshot) {
           await this.blockPersonalizedCopy(e, stepNo, step.id, 'missing', now);
           return 'render_failed';
         }
@@ -538,14 +542,20 @@ export class Scheduler {
     // A send that then fails leaves an unused token row, which is harmless.
     const compliance = this.tickCtx?.compliance ?? (await getComplianceSettings(db));
     const unsubscribeUrl = retrySnapshot
-      ? undefined
+      ? [
+          ...retrySnapshot.renderedBodyText!.matchAll(/\n\nUnsubscribe: (https:\/\/[^\s]+)\r?\n/g),
+        ].at(-1)?.[1]
       : await this.unsubscribeUrlFor(e, stepNo, compliance.unsubscribeBaseUrl, mb.fromAddress);
 
     const rendered: RenderedMessage = retrySnapshot
       ? {
           subject: retrySnapshot.renderedSubject!,
           bodyText: retrySnapshot.renderedBodyText!,
-          bodyHtml: retrySnapshot.renderedBodyHtml!,
+          bodyHtml:
+            retrySnapshot.emailFormat === 'plain_text'
+              ? undefined
+              : retrySnapshot.renderedBodyHtml!,
+          emailFormat: retrySnapshot.emailFormat,
           contentHash: retrySnapshot.contentHash,
           checks: { fatal: [], warnings: [], score: 10, variations: 1 },
         }
@@ -558,6 +568,7 @@ export class Scheduler {
             literal,
             unsubscribeUrl,
             senderDomain: senderDomainOf(mb.fromAddress),
+            emailFormat: retryOf ? 'minimal_html' : compliance.emailFormat,
           }),
         });
 
@@ -643,6 +654,8 @@ export class Scheduler {
               renderedSubject: rendered.subject,
               renderedBodyText: rendered.bodyText,
               renderedBodyHtml: rendered.bodyHtml,
+              emailFormat:
+                rendered.emailFormat ?? (rendered.bodyHtml ? 'minimal_html' : 'plain_text'),
               contentSource: personalized ? 'personalized' : 'template',
               personalizedCopyId: personalizedCopy?.id ?? retrySnapshot?.personalizedCopyId ?? null,
               sentAt: now,
@@ -797,7 +810,12 @@ export class Scheduler {
     e: DueEnrollment,
     seq: SequenceDef,
     step: SequenceStepDef,
-    opts: { literal: boolean; unsubscribeUrl?: string; senderDomain: string },
+    opts: {
+      literal: boolean;
+      unsubscribeUrl?: string;
+      senderDomain: string;
+      emailFormat?: 'plain_text' | 'minimal_html';
+    },
   ): Promise<RenderContext> {
     const compliance = this.tickCtx?.compliance ?? (await getComplianceSettings(this.deps.db));
     const campaign = await getCampaign(this.deps.db, e.campaignId);
@@ -811,6 +829,7 @@ export class Scheduler {
       compliance: {
         ...compliance,
         unsubscribeUrl: opts.unsubscribeUrl,
+        emailFormat: opts.emailFormat ?? compliance.emailFormat,
         senderDomain: opts.senderDomain,
       },
       literal: opts.literal,

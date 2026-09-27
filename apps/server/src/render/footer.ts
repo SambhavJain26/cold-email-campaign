@@ -16,12 +16,12 @@
 // opt-out clause with the link; blank uses the saved opt-out text verbatim.
 import { escapeHtml } from './html';
 
-// A blank paragraph is the least distracting visual boundary in both the
-// plain-text and HTML alternatives. Keep this exact value aligned with
-// html.ts and the web preview splitter.
+// One blank line separates signature and compliance text. Best, joins directly
+// to the name; other body endings also use this separator before the signature.
 export const FOOTER_SEPARATOR = '\n\n';
 
 export interface ComplianceInfo {
+  emailFormat?: 'plain_text' | 'minimal_html';
   physicalAddress: string;
   optoutText: string;
   signatureName?: string;
@@ -52,7 +52,7 @@ export function senderDomainOf(fromAddress: string): string {
 function signatureLines(compliance: ComplianceInfo): [string, string, string] {
   return [
     compliance.signatureName ?? 'Sambhav Jain',
-    compliance.signatureRoleLine ?? 'Automation Specialist | Sambhav Builds',
+    compliance.signatureRoleLine ?? 'Automation Specialist',
     compliance.senderDomain ?? PREVIEW_SENDER_DOMAIN,
   ];
 }
@@ -70,7 +70,15 @@ const liveUrl = (c: ComplianceInfo): string | undefined => {
 export function appendFooter(body: string, compliance: ComplianceInfo): string {
   const url = liveUrl(compliance);
   const optout = url ? `Unsubscribe: ${url}` : compliance.optoutText;
-  return `${body.trimEnd()}${FOOTER_SEPARATOR}${signatureLines(compliance).join('\n')}${FOOTER_SEPARATOR}${optout}\n${compliance.physicalAddress}`;
+  const content = body.trimEnd();
+  const separator = content.split(/\r?\n/).at(-1)?.trim() === 'Best,' ? '\n' : FOOTER_SEPARATOR;
+  return `${content}${separator}${signatureLines(compliance).join('\n')}${FOOTER_SEPARATOR}${optout}\n${compliance.physicalAddress}`;
+}
+
+/** Strip the known automatic suffix, never infer its boundary from body paragraphs. */
+export function stripAutomaticFooter(body: string, compliance: ComplianceInfo): string {
+  const suffix = appendFooter('', compliance).trimStart();
+  return body.endsWith(suffix) ? body.slice(0, -suffix.length).trimEnd() : body;
 }
 
 /** The HTML twin of appendFooter's trailing line — same words, linked. */

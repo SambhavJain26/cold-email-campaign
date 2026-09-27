@@ -1062,11 +1062,14 @@ export const handlers: RequestHandler[] = [
       const mailbox = db.mailboxes.find((item) => item.id === body.mailbox_id);
       const domain =
         mailbox?.from_address.split('@')[1] ?? '[sender domain — select a preview mailbox]';
-      const signature = `\n\n${db.compliance.signature_name}\n${db.compliance.signature_role_line}\n${domain}`;
+      const content = bodyPreFooter.trimEnd();
+      const separator = content.split(/\r?\n/).at(-1)?.trim() === 'Best,' ? '\n' : '\n\n';
+      const signature = `${separator}${db.compliance.signature_name}\n${db.compliance.signature_role_line}\n${domain}`;
       const footer = `\n\n${optoutLine}\n${db.compliance.physical_address}`;
       return HttpResponse.json({
         subject,
-        body: bodyPreFooter + signature + footer,
+        body: content + signature + footer,
+        email_format: db.compliance.email_format,
         checks: {
           ...mockRenderChecks(body.step_no, subject, bodyPreFooter, db.compliance),
           variations:

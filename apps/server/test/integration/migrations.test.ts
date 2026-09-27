@@ -40,6 +40,29 @@ describe('migration runner', () => {
     expect(afterUp.every((s) => s.applied)).toBe(true);
   });
 
+  it('plain text migration changes only the old default role and preserves custom wording', async () => {
+    await migrateDown(pool, MIGRATIONS_DIR, 1);
+    await pool.query(
+      "UPDATE compliance_settings SET signature_role_line='Automation Specialist | Sambhav Builds'",
+    );
+    await migrateUp(pool, MIGRATIONS_DIR);
+    expect(
+      (await pool.query('SELECT email_format, signature_role_line FROM compliance_settings'))
+        .rows[0],
+    ).toEqual({ email_format: 'plain_text', signature_role_line: 'Automation Specialist' });
+    await migrateDown(pool, MIGRATIONS_DIR, 1);
+    await pool.query("UPDATE compliance_settings SET signature_role_line='Custom role'");
+    await migrateUp(pool, MIGRATIONS_DIR);
+    expect(
+      (await pool.query('SELECT signature_role_line FROM compliance_settings')).rows[0]
+        .signature_role_line,
+    ).toBe('Custom role');
+    await expect(
+      pool.query("UPDATE compliance_settings SET email_format='invalid'"),
+    ).rejects.toThrow();
+    await resetCoreTables(pool);
+  });
+
   it('backfills legacy single-source campaign and enrollment provenance', async () => {
     const targetMigration = '0017_multi_source_recycling';
     const targetIndex = names.indexOf(targetMigration);

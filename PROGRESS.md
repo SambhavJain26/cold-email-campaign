@@ -4,6 +4,13 @@
 
 **Legend:** `[ ]` not started · `[~]` in progress · `[x]` done · `[!]` blocked (note why in the log)
 
+**2026-09-27 plain-text email mode:** implemented and locally verified on `canary`, awaiting
+separate release deployment authorization. Migration `0021` defaults new sends to text/plain only
+and changes only the exact former default role to `Automation Specialist`. Minimal HTML stays
+optional. `Best,` joins the signature directly; previews show the complete text, and retry
+snapshots preserve the original content and format. See docs/17 for the gate and rollout boundary.
+Production remains at `767b964`; no live setting, campaign, copy, or send was changed.
+
 **2026-09-27 signature feature:** implemented, verified, and explicitly authorized deployment
 completed at `767b964` with migration `0020`.
 Editable name/title and actual sender-domain signature now precede the existing compliance footer.

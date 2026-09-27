@@ -10,6 +10,7 @@ import type { ComplianceDto } from '@coldemail/shared';
 import { ComplianceTab } from './compliance-tab';
 
 const BASE: ComplianceDto = {
+  email_format: 'minimal_html',
   physical_address: '106-460 Doyle Ave, Kelowna, BC V1Y 0C2',
   optout_text: 'Reply STOP to unsubscribe.',
   signature_name: 'Sambhav Jain',
@@ -29,6 +30,29 @@ function renderTab(compliance: Partial<ComplianceDto> = {}) {
 const preview = () => screen.getByTestId('footer-preview').textContent ?? '';
 
 describe('unsubscribe base URL field', () => {
+  it('plain text previews exact line breaks and an unstyled signature and address', () => {
+    renderTab({
+      email_format: 'plain_text',
+      signature_role_line: 'Automation Specialist',
+      physical_address: 'Street\n\nCity',
+    });
+    expect(preview()).toBe(
+      'Sambhav Jain\nAutomation Specialist\n[sending mailbox domain]\n\nReply STOP to unsubscribe.\nStreet\n\nCity',
+    );
+    expect(screen.getByTestId('footer-preview').querySelector('strong')).toBeNull();
+    expect(screen.getByRole('combobox', { name: 'Email format' })).toHaveTextContent('Plain text');
+  });
+
+  it('plain text link-mode shows the complete nonfunctional URL', () => {
+    renderTab({
+      email_format: 'plain_text',
+      unsubscribe_base_url: 'https://unsubscribe.example.com',
+    });
+    expect(preview()).toContain(
+      'Unsubscribe: https://unsubscribe-preview.invalid/u/not-a-live-token\n',
+    );
+    expect(screen.getByTestId('footer-preview').querySelector('a')).toBeNull();
+  });
   it('dormant: preview shows the operator opt-out text and no link', () => {
     renderTab();
     expect(preview()).toContain('Reply STOP to unsubscribe.106-460 Doyle Ave');

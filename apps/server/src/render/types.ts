@@ -78,7 +78,8 @@ export interface RenderChecks {
 export interface RenderedMessage {
   subject: string;
   bodyText: string;
-  bodyHtml: string;
+  bodyHtml?: string;
+  emailFormat?: 'plain_text' | 'minimal_html';
   /** Echoes variant.contentHash — stored on the sent event (decision Q). */
   contentHash: string;
   checks: RenderChecks;

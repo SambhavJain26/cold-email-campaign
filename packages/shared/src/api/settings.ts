@@ -88,6 +88,7 @@ export const unsubscribeBaseUrlSchema = z.string().refine(
 
 export const complianceSchema = z
   .object({
+    email_format: z.enum(['plain_text', 'minimal_html']),
     physical_address: z.string(),
     optout_text: z.string().min(1),
     signature_name: z

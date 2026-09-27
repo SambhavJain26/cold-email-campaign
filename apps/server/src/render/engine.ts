@@ -25,6 +25,11 @@ const EMPTY_PARSE: ParsedTemplate = { tokens: [], errors: [] };
 export class RenderEngine implements Renderer {
   render(input: RenderInput): RenderedMessage {
     const { variant, step, lead, enrollmentId, ctx } = input;
+    const emailFormat = ctx.compliance.emailFormat ?? 'plain_text';
+    const html = (body: string) =>
+      emailFormat === 'minimal_html'
+        ? htmlOfText(body, footerHtml(ctx.compliance), signatureHtml(ctx.compliance))
+        : undefined;
 
     // Mode-1 manual compose (docs/08 §3): text is already literal — stages
     // 1–3 are skipped; footer + checks still apply.
@@ -34,7 +39,8 @@ export class RenderEngine implements Renderer {
       return {
         subject,
         bodyText,
-        bodyHtml: htmlOfText(bodyText, footerHtml(ctx.compliance), signatureHtml(ctx.compliance)),
+        bodyHtml: html(variant.bodyTemplate),
+        emailFormat,
         contentHash: variant.contentHash,
         checks: runChecks({
           stepNo: step.stepNo,
@@ -76,7 +82,8 @@ export class RenderEngine implements Renderer {
     return {
       subject: this.threadedSubject(input, ownSubject),
       bodyText,
-      bodyHtml: htmlOfText(bodyText, footerHtml(ctx.compliance), signatureHtml(ctx.compliance)),
+      bodyHtml: html(bodyPreFooter),
+      emailFormat,
       contentHash: variant.contentHash,
       checks: runChecks({
         stepNo: step.stepNo,

@@ -92,12 +92,14 @@ describe('B6.10 settings + compliance', () => {
   it('GET/PUT /compliance roundtrip; empty address → 422', async () => {
     const before = (await h.inject({ method: 'GET', url: '/api/v1/compliance' })).json();
     expect(before.physical_address).toBe('100 Test Street, Austin TX 78701');
+    expect(before.email_format).toBe('plain_text');
 
     const updated = await h.inject({
       method: 'PUT',
       url: '/api/v1/compliance',
       payload: {
         physical_address: '1 Main St, Denver CO 80202',
+        email_format: 'minimal_html',
         optout_text: before.optout_text,
         signature_name: 'Sambhav Jain',
         signature_role_line: 'Automation Specialist | Sambhav Builds',
@@ -106,6 +108,7 @@ describe('B6.10 settings + compliance', () => {
     });
     expect(updated.statusCode).toBe(200);
     expect(updated.json()).toMatchObject({
+      email_format: 'minimal_html',
       signature_name: 'Sambhav Jain',
       signature_role_line: 'Automation Specialist | Sambhav Builds',
     });
@@ -117,6 +120,12 @@ describe('B6.10 settings + compliance', () => {
       });
       expect(rejected.statusCode).toBe(400);
     }
+    const invalidFormat = await h.inject({
+      method: 'PUT',
+      url: '/api/v1/compliance',
+      payload: { ...updated.json<Record<string, unknown>>(), email_format: 'invalid' },
+    });
+    expect(invalidFormat.statusCode).toBe(400);
     expect((await getComplianceSettings(h.services.db)).physicalAddress).toBe(
       '1 Main St, Denver CO 80202',
     );
@@ -126,6 +135,7 @@ describe('B6.10 settings + compliance', () => {
       url: '/api/v1/compliance',
       payload: {
         physical_address: '   ',
+        email_format: 'minimal_html',
         optout_text: before.optout_text,
         signature_name: before.signature_name,
         signature_role_line: before.signature_role_line,

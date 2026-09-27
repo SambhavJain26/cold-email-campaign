@@ -1,5 +1,38 @@
 # Local canary runbook (B8.3-local) — two-week validation on throwaway Gmail
 
+## 2026-09-27 plain-text email mode — local candidate, not deployed
+
+The operator-approved release adds migration `0021_plain_text_mode`. Compliance gains a global
+`email_format` defaulting to `plain_text`; Minimal HTML remains selectable. The migration changes
+only the exact previous default role line to `Automation Specialist`, preserving custom wording,
+and marks existing sent rows `minimal_html` without rewriting their bodies. Plain-text sends omit
+the HTML MIME part. The renderer preserves internal draft line breaks, joins a terminal `Best,`
+directly to the signature, and leaves one blank line before the opt-out/address block. It never
+inserts `Best,`. The actual mailbox supplies the unlinked domain text; blank unsubscribe URL uses
+the saved opt-out sentence, and configured URL appears as text in plain-text mode. Minimal HTML
+retains both alternatives and its existing styling.
+
+Template and personalized retries reuse complete saved subject/body/format snapshots, including
+the original unsubscribe URL. Legacy HTML snapshots stay HTML; legacy template rows without saved
+bodies use their previous HTML fallback. Sequence previews expose the entire text alternative in
+one whitespace-preserving block, identify the selected format, retain the preview mailbox and
+domain placeholder, and use the nonfunctional `.invalid` URL when applicable. Compliance preview
+reflects the selected format. Existing saved draft bodies and sent history are untouched.
+
+Verified locally: typecheck, lint, formatting, unit/web **425/425**, API **146/146** with final
+focused settings/sequence checks **16/16**, serial integration **177/177** including migration
+apply/down/apply and retry cases, GreenMail **29/29** including MIME-part inspection, locked golden
+**47/47**, focused Settings/Sequence browser tests **9/9**, real-backend walkthrough **1/1**, and
+production web build. Read-only local projection dry-run reports **0 enrollments, 0 diffs**;
+self-check has no invariant violations. The empty local projection database does not establish a
+populated replay result. No golden fixtures were regenerated. The existing large-bundle build
+warning remains.
+
+No production deployment, live Compliance change, campaign mutation, copy cleanup, or outbound
+mail occurred. Production remains at `767b964` with blank unsubscribe URL and text opt-out.
+Deployment of this release requires a separate operator authorization. The 17 unsent pilot copies
+with manual `Sambhav` sign-offs remain a separately authorized cleanup task.
+
 ## 2026-09-27 automatic sender signature — deployed at `767b964`
 
 Operator-approved signature support adds migration `0020_sender_signature`, initializing the

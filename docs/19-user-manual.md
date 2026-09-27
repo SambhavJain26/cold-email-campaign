@@ -893,12 +893,12 @@ Save first, then select a variant's **Preview**, search for a representative lea
 choose **Render preview**.
 
 Choose **Sequence defaults** or a specific campaign context. The panel shows the exact
-saved-template render, locked compliance footer, score, warnings, and fatal errors. Expand
+saved-template render with the complete signature and compliance footer, score, warnings, and fatal errors. Expand
 **Resolution details** to inspect lead values, the matched observation rule, sequence-variable
 sources, fallbacks, and deterministic spintax choices. Unsaved edits are not included; save and
 render again. Test multiple leads, including missing-name and missing-custom-field cases.
 
-When Compliance has an Unsubscribe URL configured, preview shows the link-style footer with a safe,
+When Compliance has an Unsubscribe URL configured, preview shows the complete text URL with a safe,
 non-working `.invalid` example URL. Rendering a preview never creates a real unsubscribe token;
 real recipient-specific URLs are created only by the sending pipeline.
 
@@ -1331,16 +1331,26 @@ that protection and is reported as not launch-ready.
 
 ### 15.6 Compliance
 
+**Email format** applies globally to new messages in all campaigns. **Plain text** is the default:
+the entire message uses actual line breaks and blank lines, with no bold name, small gray footer,
+or HTML alternative. **Minimal HTML** enables the styling described below. Retries keep the format
+and content of their original saved message.
+
+The default role line is **Automation Specialist**. End your draft with `Best,` to put your name
+on the immediately following line; the app does not insert `Best,` itself. Otherwise it adds one
+blank line before the signature. Sequence previews show the entire text, including the signature,
+opt-out wording (or placeholder unsubscribe URL), and full postal address, in one block.
+
 ![Compliance settings showing postal address, opt-out wording, unsubscribe URL, and live footer preview](images/user-manual/15-settings-compliance.png)
 
 > **Current preview:** the screenshot predates the sender signature. The current screen shows the
-> editable name and title/company line, a sending-domain placeholder, and the muted compliance
-> footer without a visible divider.
+> editable name and role line, email-format choice, sending-domain placeholder, and compliance
+> footer. Plain text has no special signature or footer styling.
 
 - **Physical address:** legally valid business postal address appended to every send. Empty blocks
   all sending. Use a registered office, PO box, coworking address, or legitimate commercial mailbox
   if you do not want to publish a home address.
-- **Signature name and title/company line:** editable once for all mailboxes. The domain line is
+- **Signature name and role line:** editable once for all mailboxes. The domain line is
   drawn from the mailbox that actually sends each message and is rendered as plain text, without
   an application-created hyperlink.
 - **Opt-out text:** used verbatim when the public unsubscribe URL is dormant.
@@ -1350,12 +1360,12 @@ that protection and is reported as not launch-ready.
   also accepted; no trailing slash, query, or fragment is allowed.
 
 When the base URL is blank, the app emits no unsubscribe link or `List-Unsubscribe` headers and
-uses the configured opt-out text. When configured, every send receives an opaque token, a body
-link, and the paired one-click headers. The visible footer contains only **Unsubscribe** and the
-postal address on separate lines. Inbound STOP and other opt-out phrases are still detected and
-honored automatically.
+uses the configured opt-out text. When configured, every send receives an opaque token, a body URL,
+and the paired one-click headers. Plain text displays the URL as text; Minimal HTML links
+**Unsubscribe** to it. The postal address follows on the next line. Inbound STOP and other opt-out
+phrases are still detected and honored automatically.
 
-The live preview mirrors the canonical styling. The delivered message is `multipart/alternative`:
+The live preview follows the selected format. In **Minimal HTML**, the message is `multipart/alternative`:
 
 - the HTML alternative starts the first body paragraph at zero top margin, preserves deliberate
   16px paragraph gaps, shows the signature at body size with a bold name, and places the compliance

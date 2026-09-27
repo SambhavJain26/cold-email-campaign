@@ -1,5 +1,5 @@
 import { useEffect } from 'react';
-import { useForm, useWatch } from 'react-hook-form';
+import { Controller, useForm, useWatch } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { toast } from 'sonner';
 import { complianceSchema, type ComplianceDto } from '@coldemail/shared';
@@ -11,6 +11,14 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Field, FieldGroup, FieldLabel, FieldError } from '@/components/ui/field';
 import { usePutCompliance } from '@/api/mutations/settings';
+import {
+  Select,
+  SelectContent,
+  SelectGroup,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 
 /** F2.6 — CAN-SPAM footer editor with live preview (docs/12 §10). An empty
  *  physical address BLOCKS all sends (B4 guard) — the banner says so. */
@@ -36,6 +44,7 @@ export function ComplianceTab({
   useEffect(() => onDirtyChange(isDirty), [isDirty, onDirtyChange]);
 
   const address = useWatch({ control, name: 'physical_address' });
+  const emailFormat = useWatch({ control, name: 'email_format' });
   const optout = useWatch({ control, name: 'optout_text' });
   const signatureName = useWatch({ control, name: 'signature_name' });
   const signatureRoleLine = useWatch({ control, name: 'signature_role_line' });
@@ -71,6 +80,30 @@ export function ComplianceTab({
         </CardHeader>
         <CardContent className="space-y-3">
           <FieldGroup>
+            <Controller
+              control={control}
+              name="email_format"
+              render={({ field }) => (
+                <Field data-invalid={Boolean(errors.email_format)}>
+                  <FieldLabel htmlFor="email-format">Email format</FieldLabel>
+                  <Select value={field.value} onValueChange={field.onChange}>
+                    <SelectTrigger id="email-format" aria-invalid={Boolean(errors.email_format)}>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectGroup>
+                        <SelectItem value="plain_text">Plain text — default</SelectItem>
+                        <SelectItem value="minimal_html">Minimal HTML</SelectItem>
+                      </SelectGroup>
+                    </SelectContent>
+                  </Select>
+                  <p className="text-xs text-muted-foreground">
+                    Applies to new messages in all campaigns. Retries keep their original format.
+                  </p>
+                  {errors.email_format && <FieldError>{errors.email_format.message}</FieldError>}
+                </Field>
+              )}
+            />
             <Field data-invalid={Boolean(errors.signature_name)}>
               <FieldLabel htmlFor="compliance-signature-name">Signature name</FieldLabel>
               <Input
@@ -81,7 +114,7 @@ export function ComplianceTab({
               {errors.signature_name && <FieldError>{errors.signature_name.message}</FieldError>}
             </Field>
             <Field data-invalid={Boolean(errors.signature_role_line)}>
-              <FieldLabel htmlFor="compliance-signature-role">Title and company line</FieldLabel>
+              <FieldLabel htmlFor="compliance-signature-role">Role line</FieldLabel>
               <Input
                 id="compliance-signature-role"
                 aria-invalid={Boolean(errors.signature_role_line)}
@@ -143,25 +176,35 @@ export function ComplianceTab({
             className="rounded-md border border-dashed border-border bg-muted/30 p-3"
             data-testid="footer-preview"
           >
-            <div className="font-mono text-xs">
-              <strong>{signatureName}</strong>
-              <br />
-              {signatureRoleLine}
-              <br />
-              [sending mailbox domain]
-            </div>
-            <div className="mt-5 font-mono text-[10px] leading-[15px] text-[#767676]">
-              {hasLiveLink ? (
-                <span className="font-bold no-underline">Unsubscribe</span>
-              ) : (
-                <span>{optout}</span>
-              )}
-              <br />
-              <span>{address || '⟨no address — sends blocked⟩'}</span>
-            </div>
+            {emailFormat === 'plain_text' ? (
+              <pre className="font-mono text-xs whitespace-pre-wrap break-words">{`${signatureName}\n${signatureRoleLine}\n[sending mailbox domain]\n\n${hasLiveLink ? 'Unsubscribe: https://unsubscribe-preview.invalid/u/not-a-live-token' : optout}\n${address || '⟨no address — sends blocked⟩'}`}</pre>
+            ) : (
+              <>
+                <div className="font-mono text-xs">
+                  <strong>{signatureName}</strong>
+                  <br />
+                  {signatureRoleLine}
+                  <br />
+                  [sending mailbox domain]
+                </div>
+                <div className="mt-5 font-mono text-[10px] leading-[15px] text-[#767676]">
+                  {hasLiveLink ? (
+                    <span className="font-bold no-underline">Unsubscribe</span>
+                  ) : (
+                    <span>{optout}</span>
+                  )}
+                  <br />
+                  <span className="whitespace-pre-wrap">
+                    {address || '⟨no address — sends blocked⟩'}
+                  </span>
+                </div>
+              </>
+            )}
           </div>
           <p className="mt-2 text-xs text-muted-foreground">
-            Delivered 20px below the message in 10px muted gray text. No visible divider is added.
+            {emailFormat === 'plain_text'
+              ? 'Plain text uses line breaks and blank lines only. End your draft with Best, to place your name immediately below it.'
+              : 'The compliance footer appears 20px below the signature in 10px muted gray text.'}
           </p>
         </CardContent>
       </Card>

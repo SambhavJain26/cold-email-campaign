@@ -119,6 +119,10 @@ export const sentMessages = pgTable(
     renderedSubject: text('rendered_subject'),
     renderedBodyText: text('rendered_body_text'),
     renderedBodyHtml: text('rendered_body_html'),
+    emailFormat: text('email_format')
+      .$type<'plain_text' | 'minimal_html'>()
+      .notNull()
+      .default('minimal_html'),
     contentSource: text('content_source').$type<'template' | 'personalized'>(),
     personalizedCopyId: bigint('personalized_copy_id', { mode: 'number' }),
     sentAt: tz('sent_at').notNull(),

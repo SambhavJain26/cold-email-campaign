@@ -36,7 +36,7 @@ import {
   getUnsentManualDraft,
   markManualDraftSent,
 } from '../db/repos/manualDraftsRepo';
-import { FOOTER_SEPARATOR } from '../render/footer';
+import { stripAutomaticFooter } from '../render/footer';
 
 /** No sendable mailbox (all at cap/unhealthy, or the override is) → 409 mailbox_unhealthy. */
 export class MailboxUnhealthyError extends Error {
@@ -417,9 +417,6 @@ export async function manualComposePrefill(
       literal: Boolean(draft),
     },
   });
-  const footerStart = rendered.bodyText.lastIndexOf(FOOTER_SEPARATOR);
-  const signatureStart =
-    footerStart < 0 ? -1 : rendered.bodyText.lastIndexOf(FOOTER_SEPARATOR, footerStart - 1);
   return {
     enrollmentId: enrollment.id,
     leadId: lead.id,
@@ -429,7 +426,7 @@ export async function manualComposePrefill(
     dueAt: enrollment.nextSendAt,
     personalizationMode: enrollment.personalizationMode,
     subject: rendered.subject,
-    body: signatureStart < 0 ? rendered.bodyText : rendered.bodyText.slice(0, signatureStart),
+    body: stripAutomaticFooter(rendered.bodyText, compliance),
     variantId: draft ? null : variant.id,
     draftId: draft?.id ?? null,
     draftStatus: draft?.status === 'sent' ? null : (draft?.status ?? null),

@@ -246,6 +246,7 @@ describe('B6.5 sequences', () => {
       });
       expect(res.statusCode).toBe(200);
       const p = res.json();
+      expect(p.email_format).toBe('plain_text');
       expect(p.subject).toBe('Quick question about Acme Realty');
       expect(p.body).toContain('Hi Amy');
       expect(p.body).toContain('your Dallas listings move fast'); // researched-mode observation

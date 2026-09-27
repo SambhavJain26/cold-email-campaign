@@ -63,14 +63,29 @@ matched observation rule, resolved variable source, fallbacks, and deterministic
 
 ## 4. Sender signature and CAN-SPAM footer (spec Part 8 — non-removable)
 
-```
-\n\n{signature_name}\n{signature_role_line}\n{sending mailbox domain}
-\n\n{opt-out clause}\n{compliance_settings.physical_address}
+Global `compliance_settings.email_format` defaults to `plain_text`: send only `text/plain`, with
+no HTML alternative or styling. `minimal_html` retains both MIME alternatives and the styling
+below. The default role is `Automation Specialist`. A draft ending in `Best,` receives the name
+on the very next line; otherwise one blank line separates body and signature. Internal draft
+whitespace is preserved, and one blank line precedes the opt-out/address block.
+Sequence previews display the complete text representation, including all appended content.
+Every new sent snapshot records its format; retries reuse complete saved bodies and format.
+Legacy HTML snapshots remain HTML, and legacy template retries without snapshots retain their
+existing rendering fallback.
+
+```text
+Best,
+{signature_name}
+{signature_role_line}
+{sending mailbox domain}
+
+{opt-out clause}
+{compliance_settings.physical_address}
 ```
 
 - Appended at render time, **after** all expansion; template text cannot alter or remove it (a template containing its own footer text just gets the canonical one appended anyway — check #6 warns on duplication).
-- The name and title/company line are editable in Compliance; the domain is derived from the mailbox used for the send. HTML shows the name in bold, the identity at body size, and the domain as escaped text without an anchor. Email clients may independently link plain domains.
-- The boundary is one blank paragraph rather than a visible divider. Every HTML body paragraph uses explicit inline margins; the first starts at `margin-top:0` and intentional paragraph gaps remain 16px. The compliance footer is a one-cell, email-safe presentation table 20px below the signature, rendered at `10px`, `line-height:1.5`, and `#767676`. **Unsubscribe** is bold and has no underline; the postal address appears on the next line in the same gray. The plain-text alternative carries the same content without markup. The footer contains no blockquote/signature marker, hidden content, or invisible-character variation; Gmail visibility remains a real-provider canary result rather than an offline guarantee.
+- The name and role line are editable in Compliance; the domain is derived from the mailbox used for the send. HTML shows the name in bold, the identity at body size, and the domain as escaped text without an anchor. Email clients may independently link plain domains.
+- In Minimal HTML, every body paragraph uses explicit inline margins; the first starts at `margin-top:0` and intentional paragraph gaps remain 16px. `Best,` joins the signature on the next line. The compliance footer is a one-cell, email-safe presentation table 20px below the signature, rendered at `10px`, `line-height:1.5`, and `#767676`. **Unsubscribe** is bold and has no underline; the postal address appears on the next line in the same gray. The plain-text alternative carries the same content without markup. The footer contains no blockquote/signature marker, hidden content, or invisible-character variation; Gmail visibility remains a real-provider canary result rather than an offline guarantee.
 - Fatal boot/send guard: `physical_address` empty → sends are refused globally, alert raised (CAN-SPAM requires it; empty address = non-compliant mail).
 
 ## 5. Pre-send checks + deliverability score (decision W)
@@ -94,7 +109,7 @@ matched observation rule, resolved variable source, fallbacks, and deterministic
 
 ## 6. Threading headers (with docs/07 §4)
 
-`render` returns text and minimal HTML; the scheduler's `buildMime` adds: `Message-ID` (app-generated), `In-Reply-To`/`References` for in-thread steps, `Re: `-prefixed exact Step-1 subject for follow-ups, `From: {display_name} <{from_address}>`. `List-Unsubscribe: <url>` **and** `List-Unsubscribe-Post: List-Unsubscribe=One-Click` (RFC 8058) are emitted when `compliance_settings.unsubscribe_base_url` is set — both headers or neither, sourced from `OutboundMessage.headers.listUnsubscribeUrl` so the pair cannot disagree. With no base URL configured the feature is dormant: no headers or body link, and the footer carries the operator's `optout_text`. With a live URL, the visible footer contains only **Unsubscribe** and the postal address on separate lines. Inbound STOP/opt-out detection remains active and globally suppressive, but `or reply STOP` is not printed in the live-link footer.
+`render` returns text and, only in `minimal_html` mode, an HTML alternative; the scheduler's `buildMime` adds: `Message-ID` (app-generated), `In-Reply-To`/`References` for in-thread steps, `Re: `-prefixed exact Step-1 subject for follow-ups, `From: {display_name} <{from_address}>`. `List-Unsubscribe: <url>` **and** `List-Unsubscribe-Post: List-Unsubscribe=One-Click` (RFC 8058) are emitted when `compliance_settings.unsubscribe_base_url` is set — both headers or neither, sourced from `OutboundMessage.headers.listUnsubscribeUrl` so the pair cannot disagree. With no base URL configured the feature is dormant: no headers or body link, and the footer carries the operator's `optout_text`. With a live URL, the visible footer contains only **Unsubscribe** and the postal address on separate lines. Inbound STOP/opt-out detection remains active and globally suppressive, but `or reply STOP` is not printed in the live-link footer.
 
 ## 7. Tests (B4)
 

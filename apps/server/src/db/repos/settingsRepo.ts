@@ -10,6 +10,7 @@ export type SettingsPatch = Partial<Omit<SettingsRow, 'id' | 'updatedAt'>>;
  * (0010). `unsubscribeBaseUrl` is '' whenever the feature is dormant.
  */
 export interface ComplianceRow {
+  emailFormat: 'plain_text' | 'minimal_html';
   physicalAddress: string;
   optoutText: string;
   signatureName: string;
@@ -19,6 +20,7 @@ export interface ComplianceRow {
 
 function toComplianceRow(row: typeof complianceSettings.$inferSelect): ComplianceRow {
   return {
+    emailFormat: row.emailFormat,
     physicalAddress: row.physicalAddress,
     optoutText: row.optoutText,
     signatureName: row.signatureName,

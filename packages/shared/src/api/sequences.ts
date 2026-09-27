@@ -124,6 +124,7 @@ export type RenderChecks = z.infer<typeof renderChecksSchema>;
 
 export const previewResponseSchema = z
   .object({
+    email_format: z.enum(['plain_text', 'minimal_html']),
     subject: z.string(),
     body: z.string(),
     checks: renderChecksSchema,

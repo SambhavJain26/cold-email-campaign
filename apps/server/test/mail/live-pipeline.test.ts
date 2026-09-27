@@ -150,6 +150,8 @@ describe('live pipeline over SmtpImapTransport (B8.1)', () => {
     expect(inbox).toHaveLength(1);
     expect(inbox[0]!.source).toContain(`Message-ID: ${ourId}`);
     expect(inbox[0]!.source).toContain('From: Arjun Mehta <canary@coldemail.test>');
+    expect(inbox[0]!.source).toMatch(/Content-Type: text\/plain/i);
+    expect(inbox[0]!.source).not.toMatch(/Content-Type: (text\/html|multipart\/alternative)/i);
 
     // confirm-delivery is scheduled per send (decision N) — run them.
     expect(confirmJobs).toHaveLength(3);

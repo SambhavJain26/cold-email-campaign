@@ -1,6 +1,5 @@
 // F4 — builder unit coverage: the draft ⇔ contract mapping (replace-set,
-// positional step_no, retired variants) and the footer split the preview panel
-// relies on.
+// positional step_no, retired variants) and preview prerequisites.
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
@@ -14,7 +13,7 @@ import {
   parseSaveErrors,
   toWriteBody,
 } from './draft';
-import { footerPreviewParts, previewRequirement, splitFooter } from './preview-panel';
+import { previewRequirement } from './preview-panel';
 import { StepCard } from './step-card';
 
 const sequence: SequenceDto = {
@@ -186,44 +185,6 @@ describe('parseSaveErrors', () => {
       conflicts: ['step 3 has sends'],
     });
     expect(parseSaveErrors(undefined)).toEqual({ errors: [], conflicts: [] });
-  });
-});
-
-describe('splitFooter', () => {
-  it('splits the engine-appended CAN-SPAM footer off the body', () => {
-    const body =
-      'Hi Mike,\n\nWorth a chat?\n\nSambhav Jain\nAutomation Specialist | Sambhav Builds\nsambhavpmtech.com\n\n4517 Congress Ave\nReply "stop".';
-    expect(splitFooter(body)).toEqual({
-      body: 'Hi Mike,\n\nWorth a chat?',
-      signature: 'Sambhav Jain\nAutomation Specialist | Sambhav Builds\nsambhavpmtech.com',
-      footer: '4517 Congress Ave\nReply "stop".',
-    });
-  });
-
-  it('returns a null footer when the separator is absent', () => {
-    expect(splitFooter('no footer here')).toEqual({
-      body: 'no footer here',
-      signature: null,
-      footer: null,
-    });
-  });
-});
-
-describe('footerPreviewParts', () => {
-  it('shows the live capability URL as a conventional link label', () => {
-    expect(
-      footerPreviewParts(
-        'Unsubscribe: https://unsubscribe.example/u/private-token\n4517 Congress Ave',
-      ),
-    ).toEqual({ optout: 'Unsubscribe', address: '4517 Congress Ave', linked: true });
-  });
-
-  it('keeps dormant opt-out wording and multiline addresses visible', () => {
-    expect(footerPreviewParts('Reply STOP.\n4517 Congress Ave\nAustin, TX')).toEqual({
-      optout: 'Reply STOP.',
-      address: '4517 Congress Ave\nAustin, TX',
-      linked: false,
-    });
   });
 });
 
