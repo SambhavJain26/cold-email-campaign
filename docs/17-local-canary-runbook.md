@@ -1,5 +1,21 @@
 # Local canary runbook (B8.3-local) — two-week validation on throwaway Gmail
 
+## 2026-09-27 VPS usage review and bounded cache cleanup
+
+Read-only inspection found the 24 GB root filesystem at **9.6 GB used / 14 GB available (42%)**,
+inode use **9%**, and about **1.3 GiB** memory available. Docker had four active images, four
+running containers, two active volumes (database and backups), and about **922 MB** reclaimable
+build cache. The backup volume held about **71 MB**. `/var/log` used about **867 MB**, including
+about **529 MB** of journal files plus authentication records; these logs were retained for
+incident review. Temporary deployment bundles used about **30 MB** and were also retained.
+
+With no build running, `docker builder prune --force --filter until=1h` removed only unused build
+cache older than one hour and reclaimed **867 MB**. The root filesystem then reported **8.8 GB
+used / 15 GB available (38%)**. Docker retained all four active images and containers, both
+volumes, and recent build cache. All four services remained up, app/database health stayed green,
+and public HTTPS health returned 200. This cache cleanup changes no application data, backups,
+campaign state, or sent history; a future image build may take longer without the removed cache.
+
 ## 2026-09-27 authorized cleanup of 17 unsent pilot sign-offs
 
 The operator separately authorized correction of Campaign 2's 17 Ready personalized copies.
