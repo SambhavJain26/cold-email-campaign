@@ -1,6 +1,6 @@
 # Local canary runbook (B8.3-local) — two-week validation on throwaway Gmail
 
-## 2026-09-27 plain-text email mode — local candidate, not deployed
+## 2026-09-27 plain-text email mode — deployed at `d6f3e1b`
 
 The operator-approved release adds migration `0021_plain_text_mode`. Compliance gains a global
 `email_format` defaulting to `plain_text`; Minimal HTML remains selectable. The migration changes
@@ -28,10 +28,24 @@ self-check has no invariant violations. The empty local projection database does
 populated replay result. No golden fixtures were regenerated. The existing large-bundle build
 warning remains.
 
-No production deployment, live Compliance change, campaign mutation, copy cleanup, or outbound
-mail occurred. Production remains at `767b964` with blank unsubscribe URL and text opt-out.
-Deployment of this release requires a separate operator authorization. The 17 unsent pilot copies
-with manual `Sambhav` sign-offs remain a separately authorized cleanup task.
+The operator separately authorized deployment. A reviewed Git bundle fast-forwarded the clean
+Spaceship checkout from `767b964` to `d6f3e1b`; local and remote SHA-256 matched
+`9b2f8d87a5121740a98122bd508b6aba64bcf985d0a0dec677842d115b485302`.
+`origin/canary` also advanced. The production app and gateway images built; the pruned app runtime
+audit reports zero vulnerabilities (10 development/build advisories remain). The app restarted
+healthy and applied `0021`, giving **22** migrations. Live Compliance reports `plain_text`,
+`Automation Specialist`, and a blank unsubscribe URL. All **44** historical sent rows are marked
+`minimal_html`; their stored bodies were not rewritten. Served UI assets contain the format choice
+and complete-preview markers. Internal health and the public app, direct SPA, outreach redirect,
+portfolio, and unsubscribe-root route checks pass.
+
+Pre-deploy `coldemail-20260927-101936.dump` (**1,711,415 bytes**) and post-deploy
+`coldemail-20260927-102428.dump` (**1,712,486 bytes**) both pass **342-line** restore catalogs.
+Production reports `checked 13 enrollments — 0 diff(s)` and clean self-check before and after.
+Event count/max ID remain **104/104**, with **44** sent messages. Campaign 2 remains active with
+automatic enrollment off and **43 sent / 17 Ready** campaign copies. No mail was emitted and no
+campaign, mailbox, saved copy, or historical message was altered. The 17 Ready bodies still have
+manual `Sambhav` sign-offs; cleanup remains separately gated. Oracle and `main` are unchanged.
 
 ## 2026-09-27 automatic sender signature — deployed at `767b964`
 

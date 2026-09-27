@@ -3,12 +3,13 @@
 Single always-on VPS (finalized decision). Docker Compose primary; systemd alternative. Implemented
 in B7 and cut over to Spaceship production on 2026-08-22.
 
-**Production status (2026-09-27 IST):** sender signatures are deployed at `767b964` on `canary`,
-through migration `0020` (21 applied migrations). Health/routes, 13-enrollment zero drift,
-self-check, live renderer probes, served UI markers, and validated pre/post backups pass.
-Live opt-out remains text-only. Saved copy/history are unchanged; Campaign 2 retains 43 sent and
+**Production status (2026-09-27 IST):** plain-text email mode is deployed at `d6f3e1b` on `canary`,
+through migration `0021` (22 applied migrations). The global format is `plain_text`, the role is
+`Automation Specialist`, and the unsubscribe URL remains blank. Health/routes, 13-enrollment zero
+drift, self-check, served UI markers, and validated pre/post backups pass. All 44 historical sent
+rows retain `minimal_html`; event/sent watermarks remain 104/44. Campaign 2 retains 43 sent and
 17 Ready unsent copies. Cleanup of their trailing `Sambhav` remains separately gated. Deployment
-emitted no mail (44 total sent events). See docs/17 for exact evidence and pending copy cleanup.
+emitted no mail. See docs/17 for exact evidence and pending copy cleanup.
 
 **Previous production status (2026-09-14 IST):** F-W35 is verified and deployed at `9f1ada0` on `canary`.
 Valid complete CSV personalized pairs now become Ready automatically; manual drafts and later
@@ -215,11 +216,11 @@ Full stack built and brought up from a clean state (`docker compose -f docker-co
 
 Remaining for a full **M3** close: the real-backend walkthrough replay (§5, `e2e/walkthrough.spec.ts` — Playwright web ⇄ real server + MockTransport + `advance-clock`), which the frontend track deferred here from F8.
 
-## 8. Spaceship shared-VPS production — deployed 2026-08-22, latest rollout 2026-09-13
+## 8. Spaceship shared-VPS production — deployed 2026-08-22, latest rollout 2026-09-27
 
 Production is live at `https://sambhavpmtech.com/email-campaign/` on the existing Spaceship VM.
 The portfolio at `sambhavbuilds.com` remained online throughout. Application code is pinned to
-`baac951` on `canary`; `main` was not merged. Oracle remains paused and unchanged as the temporary
+`d6f3e1b` on `canary`; `main` was not merged. Oracle remains paused and unchanged as the temporary
 rollback environment.
 
 The 2026-09-04 footer-presentation rollout changed only the canonical HTML anchor and the two

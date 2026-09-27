@@ -8,14 +8,16 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Current operating boundary
 
-- **2026-09-27 plain-text email mode:** the operator-approved release is implemented and verified
-  locally on `canary`, with migration `0021`. New messages default to text/plain only; Minimal HTML
+- **2026-09-27 plain-text email mode:** the operator-approved release is verified and deployed
+  on Spaceship at `d6f3e1b`, with migration `0021`. New messages default to text/plain only; Minimal HTML
   remains optional. Drafts ending in `Best,` join the automatic signature on the next line, and
   the default role is `Automation Specialist`. Sequence previews show the complete text message.
   Both template and personalized retries retain their saved bodies and format; legacy HTML rows
-  stay HTML. The full local gate and rollout handoff are in docs/17. This release has **not** been
-  deployed; production remains at `767b964` until separately authorized. The 17 unsent pilot
-  copies with manual `Sambhav` sign-offs still need separately authorized cleanup.
+  stay HTML. The full local gate and deployment evidence are in docs/17. Production migration,
+  health/routes, 13-enrollment zero drift, self-check, and pre/post backup catalogs pass. The
+  unsubscribe URL remains blank, the event/sent watermarks remain 104/44, and deployment emitted
+  no mail. The 17 unsent pilot copies with manual `Sambhav` sign-offs still need separately
+  authorized cleanup.
 
 - **2026-09-27 automatic sender signature:** implemented locally with migration `0020`, editable
   global signature name/title, sending-mailbox plain-text domain, matching previews, and unchanged
@@ -276,7 +278,7 @@ rollback/canary environment.
 - Stack: `docker-compose.spaceship.yml` with `.env.prod`
 - UI: `https://sambhavpmtech.com/email-campaign/`
 - Internal gateway: `127.0.0.1:18080`; host Caddy alone owns public 80/443
-- Deployed application release: `canary` at `767b964`
+- Deployed application release: `canary` at `d6f3e1b`
 
 The private repository currently has no GitHub deploy credential on the VPS. Until a read-only
 deploy key is deliberately installed, transfer a reviewed `git bundle`, fetch the pinned branch
