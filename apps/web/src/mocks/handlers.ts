@@ -1059,10 +1059,14 @@ export const handlers: RequestHandler[] = [
         base === ''
           ? db.compliance.optout_text
           : 'Unsubscribe: https://unsubscribe-preview.invalid/u/not-a-live-token';
+      const mailbox = db.mailboxes.find((item) => item.id === body.mailbox_id);
+      const domain =
+        mailbox?.from_address.split('@')[1] ?? '[sender domain — select a preview mailbox]';
+      const signature = `\n\n${db.compliance.signature_name}\n${db.compliance.signature_role_line}\n${domain}`;
       const footer = `\n\n${optoutLine}\n${db.compliance.physical_address}`;
       return HttpResponse.json({
         subject,
-        body: bodyPreFooter + footer,
+        body: bodyPreFooter + signature + footer,
         checks: {
           ...mockRenderChecks(body.step_no, subject, bodyPreFooter, db.compliance),
           variations:

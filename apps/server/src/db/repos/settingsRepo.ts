@@ -12,6 +12,8 @@ export type SettingsPatch = Partial<Omit<SettingsRow, 'id' | 'updatedAt'>>;
 export interface ComplianceRow {
   physicalAddress: string;
   optoutText: string;
+  signatureName: string;
+  signatureRoleLine: string;
   unsubscribeBaseUrl: string;
 }
 
@@ -19,6 +21,8 @@ function toComplianceRow(row: typeof complianceSettings.$inferSelect): Complianc
   return {
     physicalAddress: row.physicalAddress,
     optoutText: row.optoutText,
+    signatureName: row.signatureName,
+    signatureRoleLine: row.signatureRoleLine,
     unsubscribeBaseUrl: row.unsubscribeBaseUrl,
   };
 }

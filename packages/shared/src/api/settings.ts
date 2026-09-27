@@ -90,6 +90,18 @@ export const complianceSchema = z
   .object({
     physical_address: z.string(),
     optout_text: z.string().min(1),
+    signature_name: z
+      .string()
+      .trim()
+      .min(1)
+      .max(100)
+      .regex(/^[^\r\n]+$/),
+    signature_role_line: z
+      .string()
+      .trim()
+      .min(1)
+      .max(160)
+      .regex(/^[^\r\n]+$/),
     unsubscribe_base_url: unsubscribeBaseUrlSchema,
   })
   .strict();

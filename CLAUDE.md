@@ -8,6 +8,13 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Current operating boundary
 
+- **2026-09-27 automatic sender signature:** implemented locally with migration `0020`, editable
+  global signature name/title, sending-mailbox plain-text domain, matching previews, and unchanged
+  blank-URL/text versus configured-URL/link behavior. Verification and release handoffs are in
+  docs/17. No deployment or production mutation occurred. Read-only production review confirms
+  text-only opt-out and all 60 Campaign 2 pilot bodies already ending in `Sambhav`; resolve duplicate
+  sign-offs under separate copy-change authorization before deployment. Preserve sent history.
+
 - **2026-09-23 footer plain-text and muted presentation update:** the operator-approved
   footer change softens text color from `#595959` to `#767676`, retaining 10px, 20px top
   separation, and 1.5 line height, and sets default opt-out copy to "Prefer I don't reach out?

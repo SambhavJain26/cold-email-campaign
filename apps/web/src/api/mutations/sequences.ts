@@ -42,6 +42,7 @@ export function usePreviewSequence(sequenceId: number) {
       step_no: number;
       variant_id?: number;
       campaign_id?: number;
+      mailbox_id?: number;
     }) =>
       apiFetch(`/sequences/${sequenceId}/preview`, previewResponseSchema, {
         method: 'POST',

@@ -36,6 +36,10 @@ export const complianceSettings = pgTable('compliance_settings', {
   id: integer('id').primaryKey(),
   physicalAddress: text('physical_address').notNull().default(''),
   optoutText: text('optout_text').notNull(),
+  signatureName: text('signature_name').notNull().default('Sambhav Jain'),
+  signatureRoleLine: text('signature_role_line')
+    .notNull()
+    .default('Automation Specialist | Sambhav Builds'),
   fromNameRules: text('from_name_rules'),
   /** Base URL of the public unsubscribe endpoint; '' = feature dormant (0010). */
   unsubscribeBaseUrl: text('unsubscribe_base_url').notNull().default(''),

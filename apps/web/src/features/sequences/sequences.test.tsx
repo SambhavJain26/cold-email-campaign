@@ -191,15 +191,21 @@ describe('parseSaveErrors', () => {
 
 describe('splitFooter', () => {
   it('splits the engine-appended CAN-SPAM footer off the body', () => {
-    const body = 'Hi Mike,\n\nWorth a chat?\n\n4517 Congress Ave\nReply "stop".';
+    const body =
+      'Hi Mike,\n\nWorth a chat?\n\nSambhav Jain\nAutomation Specialist | Sambhav Builds\nsambhavpmtech.com\n\n4517 Congress Ave\nReply "stop".';
     expect(splitFooter(body)).toEqual({
       body: 'Hi Mike,\n\nWorth a chat?',
+      signature: 'Sambhav Jain\nAutomation Specialist | Sambhav Builds\nsambhavpmtech.com',
       footer: '4517 Congress Ave\nReply "stop".',
     });
   });
 
   it('returns a null footer when the separator is absent', () => {
-    expect(splitFooter('no footer here')).toEqual({ body: 'no footer here', footer: null });
+    expect(splitFooter('no footer here')).toEqual({
+      body: 'no footer here',
+      signature: null,
+      footer: null,
+    });
   });
 });
 

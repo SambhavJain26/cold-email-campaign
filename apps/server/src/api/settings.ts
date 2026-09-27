@@ -28,6 +28,8 @@ function toComplianceDto(row: ComplianceRow): ComplianceDto {
   return {
     physical_address: row.physicalAddress,
     optout_text: row.optoutText,
+    signature_name: row.signatureName,
+    signature_role_line: row.signatureRoleLine,
     unsubscribe_base_url: row.unsubscribeBaseUrl,
   };
 }
@@ -145,6 +147,8 @@ export async function settingsRoutes(app: FastifyInstance, services: AppServices
         {
           physicalAddress: req.body.physical_address,
           optoutText: req.body.optout_text,
+          signatureName: req.body.signature_name,
+          signatureRoleLine: req.body.signature_role_line,
           unsubscribeBaseUrl: req.body.unsubscribe_base_url.trim(),
         },
         clock.now(),

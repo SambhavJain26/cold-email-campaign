@@ -97,6 +97,14 @@ test('build a sequence: 24 variations, fatal link in step 1, fix, save', async (
   // The footer is a separate, locked block — never part of the editable body.
   await expect(panel.getByTestId('preview-footer')).toContainText('4517 Congress Ave');
   await expect(panel.getByTestId('preview-body')).not.toContainText('4517 Congress Ave');
+  await expect(panel.getByTestId('preview-signature')).toContainText('Sambhav Jain');
+  await expect(panel.getByTestId('preview-signature')).toContainText('[sender domain');
+  await panel.getByRole('combobox', { name: 'Preview mailbox' }).click();
+  await page.getByRole('option', { name: 'sales1@coldmail-domain1.com', exact: true }).click();
+  await expect(panel.getByTestId('preview-result')).not.toBeVisible();
+  await panel.getByRole('button', { name: 'Render preview' }).click();
+  await expect(panel.getByTestId('preview-signature')).toContainText('coldmail-domain1.com');
+  await expect(panel.getByTestId('preview-signature').locator('a')).toHaveCount(0);
 
   // 24 variations, and the URL is FATAL in step 1 (docs/08 §5 check #3).
   await expect(panel.getByTestId('preview-checks')).toContainText('24 variations');

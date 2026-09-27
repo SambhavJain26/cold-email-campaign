@@ -105,6 +105,7 @@ export const previewBodySchema = z
     step_no: z.number().int().min(1),
     variant_id: z.number().int().positive().optional(),
     campaign_id: z.number().int().positive().optional(),
+    mailbox_id: z.number().int().positive().optional(),
   })
   .strict();
 

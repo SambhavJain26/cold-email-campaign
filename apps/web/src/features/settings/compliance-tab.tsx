@@ -9,6 +9,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
+import { Field, FieldGroup, FieldLabel, FieldError } from '@/components/ui/field';
 import { usePutCompliance } from '@/api/mutations/settings';
 
 /** F2.6 — CAN-SPAM footer editor with live preview (docs/12 §10). An empty
@@ -36,6 +37,8 @@ export function ComplianceTab({
 
   const address = useWatch({ control, name: 'physical_address' });
   const optout = useWatch({ control, name: 'optout_text' });
+  const signatureName = useWatch({ control, name: 'signature_name' });
+  const signatureRoleLine = useWatch({ control, name: 'signature_role_line' });
   const unsubBase = useWatch({ control, name: 'unsubscribe_base_url' });
   const addressEmpty = address.trim() === '';
 
@@ -64,9 +67,34 @@ export function ComplianceTab({
 
       <Card>
         <CardHeader>
-          <CardTitle className="text-sm">Footer content</CardTitle>
+          <CardTitle className="text-sm">Sender signature and footer</CardTitle>
         </CardHeader>
         <CardContent className="space-y-3">
+          <FieldGroup>
+            <Field data-invalid={Boolean(errors.signature_name)}>
+              <FieldLabel htmlFor="compliance-signature-name">Signature name</FieldLabel>
+              <Input
+                id="compliance-signature-name"
+                aria-invalid={Boolean(errors.signature_name)}
+                {...register('signature_name')}
+              />
+              {errors.signature_name && <FieldError>{errors.signature_name.message}</FieldError>}
+            </Field>
+            <Field data-invalid={Boolean(errors.signature_role_line)}>
+              <FieldLabel htmlFor="compliance-signature-role">Title and company line</FieldLabel>
+              <Input
+                id="compliance-signature-role"
+                aria-invalid={Boolean(errors.signature_role_line)}
+                {...register('signature_role_line')}
+              />
+              {errors.signature_role_line && (
+                <FieldError>{errors.signature_role_line.message}</FieldError>
+              )}
+              <p className="text-xs text-muted-foreground">
+                The sending mailbox domain appears as plain text on the next line.
+              </p>
+            </Field>
+          </FieldGroup>
           <div className="space-y-1">
             <Label htmlFor="compliance-address">Physical address</Label>
             <Textarea id="compliance-address" rows={2} {...register('physical_address')} />
@@ -115,7 +143,14 @@ export function ComplianceTab({
             className="rounded-md border border-dashed border-border bg-muted/30 p-3"
             data-testid="footer-preview"
           >
-            <div className="font-mono text-[10px] leading-[15px] text-[#767676]">
+            <div className="font-mono text-xs">
+              <strong>{signatureName}</strong>
+              <br />
+              {signatureRoleLine}
+              <br />
+              [sending mailbox domain]
+            </div>
+            <div className="mt-5 font-mono text-[10px] leading-[15px] text-[#767676]">
               {hasLiveLink ? (
                 <span className="font-bold no-underline">Unsubscribe</span>
               ) : (

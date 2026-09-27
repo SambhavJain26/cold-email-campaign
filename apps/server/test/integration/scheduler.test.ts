@@ -32,6 +32,15 @@ describe('scheduler (B3.7/B3.8)', () => {
 
     const sent = s.mock.sentLog.filter((e) => e.result.accepted);
     expect(sent).toHaveLength(3);
+    const mailbox = (await s.pool.query(`SELECT from_address FROM mailboxes WHERE id = 1`)).rows[0];
+    for (const entry of sent) {
+      const domain = mailbox.from_address.split('@')[1];
+      expect(entry.msg.bodyText).toContain(
+        `\nSambhav Jain\nAutomation Specialist | Sambhav Builds\n${domain}\n\n`,
+      );
+      expect(entry.msg.bodyHtml).toContain(`<br>${domain}</p>`);
+      expect(entry.msg.bodyHtml).not.toContain('[sender domain');
+    }
     // oldest-first: enrollments share next_send_at, so id order breaks the tie
     expect(sent.map((e) => e.msg.to)).toEqual([
       leadEmail('L0001'),
@@ -320,6 +329,51 @@ describe('scheduler (B3.7/B3.8)', () => {
     expect(
       (await s.pool.query(`SELECT count(*)::int n FROM personalized_copy_blockers`)).rows[0].n,
     ).toBe(0);
+  }, 30_000);
+
+  it('personalized retry preserves its signature snapshot after settings change', async () => {
+    s = await scenario({ mailboxes: 1, sequence: twoStep, tickMinutes: 30 });
+    const sequenceId = await createSequence(s.db, {
+      name: 'Signature retry',
+      steps: [
+        { stepNo: 1, waitDays: 0, inThread: false, contentSource: 'personalized', variants: [] },
+        { stepNo: 2, waitDays: 3, inThread: true, contentSource: 'personalized', variants: [] },
+      ],
+    });
+    await s.pool.query('UPDATE campaigns SET sequence_id=$1 WHERE id=$2', [
+      sequenceId,
+      s.campaignId,
+    ]);
+    const def = (await loadSequenceDef(s.db, sequenceId))!;
+    s.sequences.register(s.campaignId, def);
+    await s.importLeads(1);
+    for (const step of def.steps) {
+      const subject = `Note ${step.stepNo}`;
+      const body = `Hi there,\n\nA personal note for this step.`;
+      await createOrReplaceCampaignPersonalizedCopy(s.db, {
+        leadId: 1,
+        campaignId: s.campaignId,
+        sequenceStepId: step.id!,
+        stepNo: step.stepNo,
+        subject,
+        body,
+        contentHash: contentHashOf(subject, body),
+        status: 'ready',
+        replace: false,
+      });
+    }
+    s.onSend('L0001', { outcome: 'soft_bounce_then_deliver', retries: 1 });
+    await s.enroll({ count: 1 });
+    await s.advanceHours(1);
+    const original = s.mock.sentTo(leadEmail('L0001'))[0]!.msg;
+    expect(original.bodyText).toContain('\nSambhav Jain\n');
+    await s.pool.query("UPDATE compliance_settings SET signature_name='Updated Name' WHERE id=1");
+    await s.advanceDays(6);
+    const sends = s.mock.sentTo(leadEmail('L0001'));
+    expect(sends).toHaveLength(3);
+    expect(sends[1]!.msg.bodyText).toBe(original.bodyText);
+    expect(sends[1]!.msg.bodyHtml).toBe(original.bodyHtml);
+    expect(sends[2]!.msg.bodyText).toContain('\nUpdated Name\n');
   }, 30_000);
 
   it('daily cap: 2/day drains 5 due enrollments across 3 days, never bursting', async () => {

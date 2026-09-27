@@ -38,6 +38,7 @@ import {
 } from '../db/repos/sentMessagesRepo';
 import { issueToken } from '../db/repos/unsubscribeTokensRepo';
 import { resolveUnsubscribeBaseUrl } from '../services/unsubscribeBaseUrl';
+import { senderDomainOf } from '../render/footer';
 import {
   autoObservationConfigOf,
   autoObservationsOf,
@@ -553,7 +554,11 @@ export class Scheduler {
           step,
           lead: this.leadLiteOf(e),
           enrollmentId: e.id,
-          ctx: await this.renderContextFor(e, seq, step, { literal, unsubscribeUrl }),
+          ctx: await this.renderContextFor(e, seq, step, {
+            literal,
+            unsubscribeUrl,
+            senderDomain: senderDomainOf(mb.fromAddress),
+          }),
         });
 
     // Fatal pre-send checks block the send (docs/08 §5); the enrollment stays
@@ -792,7 +797,7 @@ export class Scheduler {
     e: DueEnrollment,
     seq: SequenceDef,
     step: SequenceStepDef,
-    opts: { literal: boolean; unsubscribeUrl?: string },
+    opts: { literal: boolean; unsubscribeUrl?: string; senderDomain: string },
   ): Promise<RenderContext> {
     const compliance = this.tickCtx?.compliance ?? (await getComplianceSettings(this.deps.db));
     const campaign = await getCampaign(this.deps.db, e.campaignId);
@@ -803,7 +808,11 @@ export class Scheduler {
       autoObservations: await this.autoObsFor(e.campaignId),
       autoObservationField: autoConfig?.field ?? null,
       sequenceVariables: campaign ? resolvedVariablesOf(campaign) : {},
-      compliance: { ...compliance, unsubscribeUrl: opts.unsubscribeUrl },
+      compliance: {
+        ...compliance,
+        unsubscribeUrl: opts.unsubscribeUrl,
+        senderDomain: opts.senderDomain,
+      },
       literal: opts.literal,
     };
     if (step.inThread && step.stepNo > 1) {

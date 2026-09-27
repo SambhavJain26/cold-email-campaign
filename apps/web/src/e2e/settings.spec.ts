@@ -61,6 +61,9 @@ test('compliance: empty address blocks saving with the explanation', async ({ pa
   await page.getByRole('tab', { name: 'Compliance' }).click();
 
   await expect(page.getByTestId('footer-preview')).toContainText('4517 Congress Ave');
+  await expect(page.getByLabel('Signature name')).toHaveValue('Sambhav Jain');
+  await page.getByLabel('Title and company line').fill('Automation Consultant | Sambhav Builds');
+  await expect(page.getByTestId('footer-preview')).toContainText('Automation Consultant');
 
   await page.getByLabel('Physical address').fill('');
   await expect(page.getByTestId('empty-address-block')).toBeVisible();
@@ -71,6 +74,11 @@ test('compliance: empty address blocks saving with the explanation', async ({ pa
   await expect(page.getByTestId('footer-preview')).toContainText('900 New Address Rd');
   await page.getByRole('button', { name: 'Save compliance' }).click();
   await expect(page.getByText('Compliance footer saved')).toBeVisible();
+  await page.getByRole('tab', { name: 'Rules' }).click();
+  await page.getByRole('tab', { name: 'Compliance' }).click();
+  await expect(page.getByLabel('Title and company line')).toHaveValue(
+    'Automation Consultant | Sambhav Builds',
+  );
 });
 
 test('account tab changes the password', async ({ page }) => {

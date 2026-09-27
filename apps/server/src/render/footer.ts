@@ -6,13 +6,14 @@
 // text and the HTML alternative must stay semantically identical, and keeping
 // them adjacent is what stops one from being changed without the other.
 //
-// Shape:  {opt-out clause}\n{physical address}
+// Shape: {signature name}\n{role line}\n{sender domain}, then a blank line and:
+// {opt-out clause}\n{physical address}
 //   dormant (no unsubscribe URL):  "{optout_text}\n12 Example St"
 //   live:  text  "Unsubscribe: https://…/u/tok\n12 Example St"
 //          html  "<a href=…>Unsubscribe</a><br>12 Example St"
 //
-// STOP detection remains active in the inbound pipeline, but the operator chose
-// to keep the visible footer to the link and postal address only.
+// STOP detection remains active in both modes. A configured URL replaces the
+// opt-out clause with the link; blank uses the saved opt-out text verbatim.
 import { escapeHtml } from './html';
 
 // A blank paragraph is the least distracting visual boundary in both the
@@ -23,12 +24,42 @@ export const FOOTER_SEPARATOR = '\n\n';
 export interface ComplianceInfo {
   physicalAddress: string;
   optoutText: string;
+  signatureName?: string;
+  signatureRoleLine?: string;
+  senderDomain?: string;
   /**
    * Fully-formed public unsubscribe URL for THIS send. Absent/empty = the
    * feature is dormant (no `unsubscribe_base_url` configured), and the footer
    * falls back to the operator's configured `optoutText`.
    */
   unsubscribeUrl?: string;
+}
+
+export const PREVIEW_SENDER_DOMAIN = '[sender domain — select a preview mailbox]';
+
+export function senderDomainOf(fromAddress: string): string {
+  const at = fromAddress.lastIndexOf('@');
+  const domain = fromAddress
+    .slice(at + 1)
+    .trim()
+    .toLowerCase();
+  if (at < 1 || !/^[a-z0-9.-]+\.[a-z0-9.-]+$/.test(domain)) {
+    throw new Error('sender mailbox has an invalid domain');
+  }
+  return domain;
+}
+
+function signatureLines(compliance: ComplianceInfo): [string, string, string] {
+  return [
+    compliance.signatureName ?? 'Sambhav Jain',
+    compliance.signatureRoleLine ?? 'Automation Specialist | Sambhav Builds',
+    compliance.senderDomain ?? PREVIEW_SENDER_DOMAIN,
+  ];
+}
+
+export function signatureHtml(compliance: ComplianceInfo): string {
+  const [name, role, domain] = signatureLines(compliance).map(escapeHtml);
+  return `<strong>${name}</strong><br>${role}<br>${domain}`;
 }
 
 const liveUrl = (c: ComplianceInfo): string | undefined => {
@@ -39,7 +70,7 @@ const liveUrl = (c: ComplianceInfo): string | undefined => {
 export function appendFooter(body: string, compliance: ComplianceInfo): string {
   const url = liveUrl(compliance);
   const optout = url ? `Unsubscribe: ${url}` : compliance.optoutText;
-  return `${body.trimEnd()}${FOOTER_SEPARATOR}${optout}\n${compliance.physicalAddress}`;
+  return `${body.trimEnd()}${FOOTER_SEPARATOR}${signatureLines(compliance).join('\n')}${FOOTER_SEPARATOR}${optout}\n${compliance.physicalAddress}`;
 }
 
 /** The HTML twin of appendFooter's trailing line — same words, linked. */

@@ -256,6 +256,29 @@ describe('B6.5 sequences', () => {
       expect(p.checks.score).toBeGreaterThan(0);
       expect(p.checks.fatal).toEqual([]);
       expect(p.checks.variations).toBeGreaterThanOrEqual(1);
+      expect(p.body).toContain('[sender domain — select a preview mailbox]');
+      const mailbox = await h.pool.query(`
+        INSERT INTO mailboxes (display_name, from_address, smtp_host, imap_host)
+        VALUES ('Sambhav', 'sambhav@sambhavpmops.com', 'smtp.test', 'imap.test') RETURNING id`);
+      const withMailbox = await h.inject({
+        method: 'POST',
+        url: `/api/v1/sequences/${seqId}/preview`,
+        payload: {
+          lead_id: 1,
+          step_no: 1,
+          variant_id: variantA.id,
+          mailbox_id: Number(mailbox.rows[0].id),
+        },
+      });
+      expect(withMailbox.statusCode).toBe(200);
+      expect(withMailbox.json().body).toContain('\nsambhavpmops.com\n\nUnsubscribe:');
+      expect(withMailbox.json().body).not.toContain('[sender domain');
+      const missingMailbox = await h.inject({
+        method: 'POST',
+        url: `/api/v1/sequences/${seqId}/preview`,
+        payload: { lead_id: 1, step_no: 1, variant_id: variantA.id, mailbox_id: 999999 },
+      });
+      expect(missingMailbox.statusCode).toBe(404);
 
       const missingVariant = await h.inject({
         method: 'POST',

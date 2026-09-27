@@ -11,7 +11,7 @@
 // Threading subjects (docs/08 §6): in-thread steps 2+ send `Re: {step-1
 // subject}` via ctx.threadSubject; absent → `Re:` on the step's own subject.
 import { expandTokens, makeResolver } from './merge';
-import { appendFooter, footerHtml } from './footer';
+import { appendFooter, footerHtml, signatureHtml } from './footer';
 import { htmlOfText } from './html';
 import { runChecks } from './checks';
 import { resolveObservation } from './slots';
@@ -34,7 +34,7 @@ export class RenderEngine implements Renderer {
       return {
         subject,
         bodyText,
-        bodyHtml: htmlOfText(bodyText, footerHtml(ctx.compliance)),
+        bodyHtml: htmlOfText(bodyText, footerHtml(ctx.compliance), signatureHtml(ctx.compliance)),
         contentHash: variant.contentHash,
         checks: runChecks({
           stepNo: step.stepNo,
@@ -76,7 +76,7 @@ export class RenderEngine implements Renderer {
     return {
       subject: this.threadedSubject(input, ownSubject),
       bodyText,
-      bodyHtml: htmlOfText(bodyText, footerHtml(ctx.compliance)),
+      bodyHtml: htmlOfText(bodyText, footerHtml(ctx.compliance), signatureHtml(ctx.compliance)),
       contentHash: variant.contentHash,
       checks: runChecks({
         stepNo: step.stepNo,

@@ -4,6 +4,12 @@
 
 **Legend:** `[ ]` not started · `[~]` in progress · `[x]` done · `[!]` blocked (note why in the log)
 
+**2026-09-27 signature feature:** local implementation and verification complete; not deployed.
+Editable name/title and actual sender-domain signature now precede the existing compliance footer.
+See docs/17 for tests and release handoffs. Live opt-out is already text-only; all 60 pilot copies
+contain a trailing `Sambhav`, so authorized unsent-copy cleanup is needed before release to avoid
+duplicate sign-offs. Production data and history are unchanged.
+
 **Latest operational handoff (2026-09-14 IST):** the operator explicitly authorized Campaign 2's
 12-prospect pilot, lifting the owner-only restriction for Import 2 leads 2–13 only. Authenticated
 UI activation/enrollment succeeded: active campaign, 12 ACTIVE enrollments, all 60 emails Ready,

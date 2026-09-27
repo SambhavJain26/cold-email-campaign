@@ -18,9 +18,12 @@ const fullLead: LeadLite = {
 const compliance = {
   physicalAddress: '123 Main St, Austin TX 78701',
   optoutText: "Don't want future emails? Reply STOP and I'll remove you immediately.",
+  signatureName: 'Sambhav Jain',
+  signatureRoleLine: 'Automation Specialist | Sambhav Builds',
+  senderDomain: 'sambhavpmtech.com',
 };
 
-const FOOTER = `\n\n${compliance.optoutText}\n${compliance.physicalAddress}`;
+const FOOTER = `\n\n${compliance.signatureName}\n${compliance.signatureRoleLine}\n${compliance.senderDomain}\n\n${compliance.optoutText}\n${compliance.physicalAddress}`;
 
 const SUBJECT = 'Quick question about {{company|your listings}}';
 const BODY =
@@ -134,7 +137,39 @@ describe('footer is unconditional (docs/08 §4)', () => {
     expect(r.bodyHtml).toContain('color:#767676');
     expect(r.bodyHtml).toContain('margin-top:20px');
     expect(r.bodyHtml).toContain('123 Main St');
+    expect(r.bodyHtml).toContain(
+      '<strong>Sambhav Jain</strong><br>Automation Specialist | Sambhav Builds<br>sambhavpmtech.com',
+    );
+    expect(r.bodyHtml).not.toContain('href="sambhavpmtech.com"');
     expect(r.bodyHtml).not.toContain('<unsafe>');
+  });
+});
+
+describe('sender domain signature', () => {
+  it('uses the actual mailbox domain and keeps it unlinked in both opt-out modes', () => {
+    for (const domain of ['sambhavpmtech.com', 'sambhavpmops.com']) {
+      const r = engine.render(
+        input({ ctx: { compliance: { ...compliance, senderDomain: domain } } }),
+      );
+      expect(r.bodyText).toContain(`\n${domain}\n\n${compliance.optoutText}`);
+      expect(r.bodyHtml).toContain(`<br>${domain}</p>`);
+      expect(r.bodyHtml).not.toContain('<a href');
+    }
+  });
+
+  it('uses one link only for configured URL mode, after the signature', () => {
+    const r = engine.render(
+      input({
+        ctx: {
+          compliance: { ...compliance, unsubscribeUrl: 'https://unsubscribe.example/u/token' },
+        },
+      }),
+    );
+    expect(r.bodyText).toContain(
+      '\nsambhavpmtech.com\n\nUnsubscribe: https://unsubscribe.example/u/token',
+    );
+    expect(r.bodyHtml.match(/<a href=/g)).toHaveLength(1);
+    expect(r.bodyHtml).toContain('<br>sambhavpmtech.com</p>');
   });
 });
 

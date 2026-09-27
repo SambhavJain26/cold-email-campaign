@@ -61,14 +61,16 @@ draft campaign may override them, and first activation freezes the resolved snap
 literal and are never recursively parsed as tags or spintax. Campaign-context preview reports the
 matched observation rule, resolved variable source, fallbacks, and deterministic spintax choices.
 
-## 4. CAN-SPAM footer (spec Part 8 — non-removable)
+## 4. Sender signature and CAN-SPAM footer (spec Part 8 — non-removable)
 
 ```
-\n\n{opt-out clause} | {compliance_settings.physical_address}
+\n\n{signature_name}\n{signature_role_line}\n{sending mailbox domain}
+\n\n{opt-out clause}\n{compliance_settings.physical_address}
 ```
 
 - Appended at render time, **after** all expansion; template text cannot alter or remove it (a template containing its own footer text just gets the canonical one appended anyway — check #6 warns on duplication).
-- The boundary is one blank paragraph rather than a visible divider. Every HTML body paragraph uses explicit inline margins; the first starts at `margin-top:0` and intentional paragraph gaps remain 16px. The footer is a one-cell, email-safe presentation table 20px below the body, rendered at `10px`, `line-height:1.5`, and `#595959`. **Unsubscribe** is bold and has no underline; the postal address appears on the next line in the same gray. The plain-text alternative carries the same two visible lines after one blank line. The footer contains no blockquote/signature marker, hidden content, or invisible-character variation; Gmail visibility remains a real-provider canary result rather than an offline guarantee.
+- The name and title/company line are editable in Compliance; the domain is derived from the mailbox used for the send. HTML shows the name in bold, the identity at body size, and the domain as escaped text without an anchor. Email clients may independently link plain domains.
+- The boundary is one blank paragraph rather than a visible divider. Every HTML body paragraph uses explicit inline margins; the first starts at `margin-top:0` and intentional paragraph gaps remain 16px. The compliance footer is a one-cell, email-safe presentation table 20px below the signature, rendered at `10px`, `line-height:1.5`, and `#767676`. **Unsubscribe** is bold and has no underline; the postal address appears on the next line in the same gray. The plain-text alternative carries the same content without markup. The footer contains no blockquote/signature marker, hidden content, or invisible-character variation; Gmail visibility remains a real-provider canary result rather than an offline guarantee.
 - Fatal boot/send guard: `physical_address` empty → sends are refused globally, alert raised (CAN-SPAM requires it; empty address = non-compliant mail).
 
 ## 5. Pre-send checks + deliverability score (decision W)

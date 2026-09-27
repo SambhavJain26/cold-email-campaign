@@ -418,6 +418,8 @@ export async function manualComposePrefill(
     },
   });
   const footerStart = rendered.bodyText.lastIndexOf(FOOTER_SEPARATOR);
+  const signatureStart =
+    footerStart < 0 ? -1 : rendered.bodyText.lastIndexOf(FOOTER_SEPARATOR, footerStart - 1);
   return {
     enrollmentId: enrollment.id,
     leadId: lead.id,
@@ -427,7 +429,7 @@ export async function manualComposePrefill(
     dueAt: enrollment.nextSendAt,
     personalizationMode: enrollment.personalizationMode,
     subject: rendered.subject,
-    body: footerStart < 0 ? rendered.bodyText : rendered.bodyText.slice(0, footerStart),
+    body: signatureStart < 0 ? rendered.bodyText : rendered.bodyText.slice(0, signatureStart),
     variantId: draft ? null : variant.id,
     draftId: draft?.id ?? null,
     draftStatus: draft?.status === 'sent' ? null : (draft?.status ?? null),

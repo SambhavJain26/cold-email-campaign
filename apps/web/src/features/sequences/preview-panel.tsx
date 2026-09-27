@@ -7,12 +7,14 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useLeads } from '@/api/queries/leads';
 import { useCampaigns } from '@/api/queries/campaigns';
+import { useMailboxes } from '@/api/queries/mailboxes';
 import { usePreviewSequence } from '@/api/mutations/sequences';
 import { useDebounced } from '@/lib/use-debounced';
 import type { DraftVariant } from './draft';
 import {
   Select,
   SelectContent,
+  SelectGroup,
   SelectItem,
   SelectTrigger,
   SelectValue,
@@ -41,12 +43,23 @@ export function previewRequirement(
 
 const FOOTER_SEPARATOR = '\n\n';
 
-/** The engine appends the CAN-SPAM footer after all expansion (docs/08 §4) — split
- *  at the final blank line so earlier message paragraphs remain untouched. */
-export function splitFooter(body: string): { body: string; footer: string | null } {
+/** The engine appends identity and compliance as the final two blocks. */
+export function splitFooter(body: string): {
+  body: string;
+  signature: string | null;
+  footer: string | null;
+} {
   const index = body.lastIndexOf(FOOTER_SEPARATOR);
-  if (index === -1) return { body, footer: null };
-  return { body: body.slice(0, index), footer: body.slice(index + FOOTER_SEPARATOR.length) };
+  if (index === -1) return { body, signature: null, footer: null };
+  const preceding = body.slice(0, index);
+  const signatureAt = preceding.lastIndexOf(FOOTER_SEPARATOR);
+  if (signatureAt === -1)
+    return { body: preceding, signature: null, footer: body.slice(index + 2) };
+  return {
+    body: preceding.slice(0, signatureAt),
+    signature: preceding.slice(signatureAt + FOOTER_SEPARATOR.length),
+    footer: body.slice(index + FOOTER_SEPARATOR.length),
+  };
 }
 
 /** Convert the plain-text preview footer into the appearance used by the HTML
@@ -79,9 +92,11 @@ export function PreviewPanel({
   const [search, setSearch] = useState('');
   const [leadId, setLeadId] = useState<number | null>(null);
   const [campaignId, setCampaignId] = useState<number | null>(null);
+  const [mailboxId, setMailboxId] = useState<number | null>(null);
   const debouncedSearch = useDebounced(search, 300);
   const leads = useLeads({ per_page: 8, q: debouncedSearch === '' ? undefined : debouncedSearch });
   const campaigns = useCampaigns();
+  const mailboxes = useMailboxes();
   const preview = usePreviewSequence(sequenceId ?? 0);
 
   const selectedLead = leads.data?.items.find((lead) => lead.id === leadId);
@@ -171,6 +186,36 @@ export function PreviewPanel({
             </div>
           </div>
 
+          <div className="space-y-1.5">
+            <Label htmlFor="preview-mailbox" className="text-xs">
+              Preview mailbox
+            </Label>
+            <Select
+              value={mailboxId === null ? 'unselected' : String(mailboxId)}
+              onValueChange={(value) => {
+                setMailboxId(value === 'unselected' ? null : Number(value));
+                preview.reset();
+              }}
+            >
+              <SelectTrigger id="preview-mailbox" aria-label="Preview mailbox" className="w-full">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectGroup>
+                  <SelectItem value="unselected">No mailbox — show domain placeholder</SelectItem>
+                  {(mailboxes.data?.items ?? []).map((mailbox) => (
+                    <SelectItem key={mailbox.id} value={String(mailbox.id)}>
+                      {mailbox.from_address}
+                    </SelectItem>
+                  ))}
+                </SelectGroup>
+              </SelectContent>
+            </Select>
+            <p className="text-[11px] text-muted-foreground">
+              Live sends use the domain of the mailbox actually assigned to the message.
+            </p>
+          </div>
+
           {dirty && (
             <p className="text-[11px] text-warning">
               Unsaved edits are not previewed — the render runs against the saved templates.
@@ -188,6 +233,7 @@ export function PreviewPanel({
                 step_no: target.stepNo,
                 ...(target.variant?.id !== undefined && { variant_id: target.variant.id }),
                 ...(campaignId !== null && { campaign_id: campaignId }),
+                ...(mailboxId !== null && { mailbox_id: mailboxId }),
               });
             }}
           >
@@ -224,6 +270,20 @@ export function PreviewPanel({
                 >
                   {rendered?.body}
                 </pre>
+                {rendered?.signature && (
+                  <div className="px-2 py-1 font-mono text-xs" data-testid="preview-signature">
+                    <strong>{rendered.signature.split('\n')[0]}</strong>
+                    {rendered.signature
+                      .split('\n')
+                      .slice(1)
+                      .map((line, index) => (
+                        <span key={index}>
+                          <br />
+                          {line}
+                        </span>
+                      ))}
+                  </div>
+                )}
                 {rendered?.footer !== null && rendered !== null && (
                   <div
                     className="rounded-md border border-dashed border-border bg-muted/40 px-2 py-1"

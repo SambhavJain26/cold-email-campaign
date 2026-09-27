@@ -12,7 +12,7 @@ export const escapeHtml = (value: string) =>
  * text cannot carry (the unsubscribe anchor). Omitted → the footer is escaped
  * verbatim, which is the dormant case.
  */
-export function htmlOfText(bodyText: string, footerHtml?: string): string {
+export function htmlOfText(bodyText: string, footerHtml?: string, signatureHtml?: string): string {
   const paragraphs = (text: string) =>
     text
       .split('\n\n')
@@ -30,12 +30,14 @@ export function htmlOfText(bodyText: string, footerHtml?: string): string {
   if (footerAt === -1) return paragraphs(bodyText);
   const body = bodyText.slice(0, footerAt);
   const footer = bodyText.slice(footerAt + separator.length);
-  const bodyHtml = paragraphs(body);
+  const signatureAt = signatureHtml === undefined ? -1 : body.lastIndexOf(separator);
+  const bodyHtml = paragraphs(signatureAt === -1 ? body : body.slice(0, signatureAt));
+  const identityHtml = signatureAt === -1 ? '' : `<p style="margin:16px 0 0">${signatureHtml}</p>`;
   const inner = footerHtml ?? escapeHtml(footer).replaceAll('\n', '<br>');
   // A one-cell presentation table is deliberately used instead of a trailing
   // signature-like paragraph. It is robust across email clients, keeps the
   // two required lines in the new message's HTML, and adds no hidden or
   // recipient-specific variation. Gmail visibility still requires a live
   // provider canary; no offline renderer can promise a client's trim policy.
-  return `${bodyHtml}<table role="presentation" cellpadding="0" cellspacing="0" border="0" style="margin-top:20px;border-collapse:collapse"><tbody><tr><td style="padding:0;font-size:10px;color:#767676;line-height:1.5">${inner}</td></tr></tbody></table>`;
+  return `${bodyHtml}${identityHtml}<table role="presentation" cellpadding="0" cellspacing="0" border="0" style="margin-top:20px;border-collapse:collapse"><tbody><tr><td style="padding:0;font-size:10px;color:#767676;line-height:1.5">${inner}</td></tr></tbody></table>`;
 }

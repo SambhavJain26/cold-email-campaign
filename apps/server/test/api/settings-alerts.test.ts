@@ -99,10 +99,24 @@ describe('B6.10 settings + compliance', () => {
       payload: {
         physical_address: '1 Main St, Denver CO 80202',
         optout_text: before.optout_text,
+        signature_name: 'Sambhav Jain',
+        signature_role_line: 'Automation Specialist | Sambhav Builds',
         unsubscribe_base_url: before.unsubscribe_base_url,
       },
     });
     expect(updated.statusCode).toBe(200);
+    expect(updated.json()).toMatchObject({
+      signature_name: 'Sambhav Jain',
+      signature_role_line: 'Automation Specialist | Sambhav Builds',
+    });
+    for (const signature_name of ['', '  ', 'Name\nSecond line']) {
+      const rejected = await h.inject({
+        method: 'PUT',
+        url: '/api/v1/compliance',
+        payload: { ...updated.json<Record<string, unknown>>(), signature_name },
+      });
+      expect(rejected.statusCode).toBe(400);
+    }
     expect((await getComplianceSettings(h.services.db)).physicalAddress).toBe(
       '1 Main St, Denver CO 80202',
     );
@@ -113,6 +127,8 @@ describe('B6.10 settings + compliance', () => {
       payload: {
         physical_address: '   ',
         optout_text: before.optout_text,
+        signature_name: before.signature_name,
+        signature_role_line: before.signature_role_line,
         unsubscribe_base_url: before.unsubscribe_base_url,
       },
     });

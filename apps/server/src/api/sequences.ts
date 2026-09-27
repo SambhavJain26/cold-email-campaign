@@ -30,6 +30,8 @@ import {
 import { getLeadById } from '../db/repos/leadsRepo';
 import { getCampaignPersonalizedCopy } from '../db/repos/manualDraftsRepo';
 import { getComplianceSettings } from '../db/repos/settingsRepo';
+import { getMailbox } from '../db/repos/mailboxesRepo';
+import { senderDomainOf } from '../render/footer';
 import {
   autoObservationConfigOf,
   getCampaign,
@@ -241,13 +243,20 @@ export async function sequencesRoutes(app: FastifyInstance, services: AppService
           : { ...nested.sequence.variableDefaults, ...variableOverridesOf(campaign) }
         : nested.sequence.variableDefaults;
       const compliance = await getComplianceSettings(db);
+      const previewMailbox = req.body.mailbox_id
+        ? await getMailbox(db, req.body.mailbox_id)
+        : undefined;
+      if (req.body.mailbox_id && !previewMailbox) throw AppError.notFound('mailbox');
       const renderContext: RenderContext = {
         mode,
         customFields,
         autoObservations: Object.keys(autoConfig.rules).length > 0 ? autoConfig.rules : null,
         autoObservationField: autoConfig.field,
         sequenceVariables,
-        compliance: complianceForPreview(compliance),
+        compliance: {
+          ...complianceForPreview(compliance),
+          ...(previewMailbox && { senderDomain: senderDomainOf(previewMailbox.fromAddress) }),
+        },
       };
 
       if (stepEntry.step.contentSource === 'personalized') {

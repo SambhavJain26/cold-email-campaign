@@ -12,6 +12,8 @@ import { ComplianceTab } from './compliance-tab';
 const BASE: ComplianceDto = {
   physical_address: '106-460 Doyle Ave, Kelowna, BC V1Y 0C2',
   optout_text: 'Reply STOP to unsubscribe.',
+  signature_name: 'Sambhav Jain',
+  signature_role_line: 'Automation Specialist | Sambhav Builds',
   unsubscribe_base_url: '',
 };
 
