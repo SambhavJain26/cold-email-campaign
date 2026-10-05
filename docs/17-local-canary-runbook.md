@@ -1,5 +1,21 @@
 # Local canary runbook (B8.3-local) — two-week validation on throwaway Gmail
 
+## 2026-10-05 VPS usage review and authorized build-cache cleanup
+
+Read-only inspection found the 24 GB root filesystem at **9.6 GB used / 14 GB available (42%)**,
+inode use **9%**, and about **1.2 GiB** memory available. The single CPU was **86–99% idle** during
+sampling, with no active swap-in/out. All four application containers were running; app/database
+health passed. Database and backup volumes used approximately **103 MB / 74 MB**. Docker reported
+about **1 GB** reclaimable build cache; journal files used about **547 MB** and were retained.
+
+The operator explicitly authorized build-cache cleanup. With the deployment build completed,
+`docker builder prune --force --filter until=1h` removed only unused cache older than one hour and
+reclaimed **902.9 MB**. Root usage fell to **8.7 GB used / 15 GB available (38%)**. Docker retained
+all **four active images**, **four running containers**, both database/backup volumes, and recent
+build cache (**1.31 GB** total remaining, **97.84 MB** reported reclaimable). All services remained
+running and internal app/database health passed after cleanup. No logs, backups, application data,
+campaign settings, or sent history were changed. Future builds may take longer without the cache.
+
 ## 2026-10-05 import campaign selector repair — deployed at `988adc0`
 
 The operator reported that **Choose campaign** did not respond while importing 100 leads and
