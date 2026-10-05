@@ -19,6 +19,13 @@ call planned work implemented.
 
 ## Current operating boundary
 
+- **2026-10-05 operator activation follow-up:** the operator reports activating Campaign 3 and
+  enrolling its leads after the transfer below; the authenticated UI confirms it is active and
+  a new-cohort Step 1 copy is already sent. The agent rendered that saved copy read-only to
+  diagnose the Sequence picker. No agent activation, enrollment, campaign edit, or send occurred
+  during this follow-up. Inspect current state before further operations; the transfer-time
+  draft/zero-enrollment snapshot below is historical. Further mutations remain separately gated.
+
 - **2026-10-05 authorized 100-lead campaign transfer:** created draft Campaign 3,
   **US Property Management — Batch 100**, on the existing five-email sequence, with all ramp
   stages and permanent cap at 100/day. Paused the completed pilot Campaign 2 and moved exactly

@@ -5,6 +5,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { CollectionPagination } from '@/components/shared/collection-pagination';
 import { useLeads } from '@/api/queries/leads';
 import { useCampaigns } from '@/api/queries/campaigns';
 import { useCompliance } from '@/api/queries/settings';
@@ -54,11 +55,17 @@ export function PreviewPanel({
   dirty: boolean;
 }) {
   const [search, setSearch] = useState('');
+  const [leadPage, setLeadPage] = useState(1);
   const [leadId, setLeadId] = useState<number | null>(null);
   const [campaignId, setCampaignId] = useState<number | null>(null);
   const [mailboxId, setMailboxId] = useState<number | null>(null);
   const debouncedSearch = useDebounced(search, 300);
-  const leads = useLeads({ per_page: 8, q: debouncedSearch === '' ? undefined : debouncedSearch });
+  const leads = useLeads({
+    page: leadPage,
+    per_page: 8,
+    q: debouncedSearch === '' ? undefined : debouncedSearch,
+    ...(campaignId !== null && { campaign_id: campaignId, campaign_scope: 'both' as const }),
+  });
   const campaigns = useCampaigns();
   const mailboxes = useMailboxes();
   const preview = usePreviewSequence(sequenceId ?? 0);
@@ -106,9 +113,12 @@ export function PreviewPanel({
             <Label className="text-xs">Campaign context</Label>
             <Select
               value={campaignId === null ? 'sequence-defaults' : String(campaignId)}
-              onValueChange={(value) =>
-                setCampaignId(value === 'sequence-defaults' ? null : Number(value))
-              }
+              onValueChange={(value) => {
+                setCampaignId(value === 'sequence-defaults' ? null : Number(value));
+                setLeadPage(1);
+                setLeadId(null);
+                preview.reset();
+              }}
             >
               <SelectTrigger aria-label="Preview campaign context" className="w-full">
                 <SelectValue />
@@ -134,7 +144,12 @@ export function PreviewPanel({
               className="h-8"
               placeholder="Search leads by email, name, company"
               value={search}
-              onChange={(event) => setSearch(event.target.value)}
+              onChange={(event) => {
+                setSearch(event.target.value);
+                setLeadPage(1);
+                setLeadId(null);
+                preview.reset();
+              }}
             />
             <div className="max-h-40 overflow-y-auto rounded-md border border-border">
               {(leads.data?.items ?? []).map((lead) => (
@@ -152,10 +167,31 @@ export function PreviewPanel({
                   </span>
                 </button>
               ))}
-              {leads.data?.items.length === 0 && (
+              {leads.isPending && (
+                <p className="px-2 py-2 text-xs text-muted-foreground">Loading leads…</p>
+              )}
+              {leads.isError && (
+                <p role="alert" className="px-2 py-2 text-xs text-destructive">
+                  Leads could not be loaded. Try searching again.
+                </p>
+              )}
+              {leads.data?.items.length === 0 && !leads.isError && (
                 <p className="px-2 py-2 text-xs text-muted-foreground">No leads match.</p>
               )}
             </div>
+            {leads.data && (
+              <CollectionPagination
+                page={leads.data.page}
+                perPage={leads.data.per_page}
+                total={leads.data.total}
+                paginationLabel="Preview leads pagination"
+                onPageChange={(page) => {
+                  setLeadPage(page);
+                  setLeadId(null);
+                  preview.reset();
+                }}
+              />
+            )}
           </div>
 
           <div className="space-y-1.5">

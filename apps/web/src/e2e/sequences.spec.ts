@@ -4,6 +4,68 @@ import { expect, test, type Page } from '@playwright/test';
 import { login } from './helpers';
 
 const SUBJECT = '{{RANDOM|Quick question|Quick note}} about {{company}}'; // 2 variations
+
+test('preview scopes and pages all 100 pooled and enrolled campaign leads', async ({ page }) => {
+  await login(page);
+  await page.evaluate(async () => {
+    const moduleUrl = '/src/mocks/db.ts';
+    const { db } = await import(/* @vite-ignore */ moduleUrl);
+    const base = structuredClone(db.leads[0]);
+    // Use a saved template variant so the mock renderer can verify the full
+    // preview request as well as membership filtering (personalized rendering
+    // is covered by the real API suite).
+    db.leads.splice(0);
+    db.leads.push({ ...base, pool_assignment: undefined, latest_enrollment: undefined });
+    db.leads.push(
+      ...Array.from({ length: 100 }, (_, index) => ({
+        ...base,
+        id: 5001 + index,
+        email: `batch-${index + 1}@example.test`,
+        first_name: `Batch ${index + 1}`,
+        company: 'New batch',
+        pool_assignment:
+          index < 50
+            ? { campaign_id: 1, campaign_name: 'Golden Pass 1', status: 'available' }
+            : undefined,
+        latest_enrollment:
+          index >= 50
+            ? {
+                campaign_id: 1,
+                campaign_name: 'Golden Pass 1',
+                current_step_no: 0,
+                awaiting_completion: false,
+                current_state: 'ACTIVE',
+              }
+            : undefined,
+      })),
+    );
+  });
+  await page.getByRole('link', { name: 'Sequences', exact: true }).click();
+  await page.getByRole('link', { name: 'Real Estate Outreach v2', exact: true }).click();
+  await page.getByTestId('step-card-1').getByRole('button', { name: 'Preview' }).first().click();
+  const panel = page.getByTestId('preview-panel');
+  await panel.getByLabel('Preview campaign context').click();
+  await page.getByRole('option', { name: /Golden Pass 1/ }).click();
+  await expect(panel.getByText('1–8 of 100')).toBeVisible();
+  await expect(panel.getByRole('button', { name: /batch-1@example.test/ })).toBeVisible();
+  await panel.getByRole('button', { name: 'Next', exact: true }).click();
+  await expect(panel.getByText('9–16 of 100')).toBeVisible();
+  await panel.getByRole('button', { name: /batch-9@example.test/ }).click();
+  await expect(panel.getByRole('button', { name: 'Render preview' })).toBeEnabled();
+  await panel.getByRole('button', { name: 'Render preview' }).click();
+  await expect(panel.getByTestId('preview-result')).toBeVisible();
+
+  // Search reaches an enrolled lead well beyond the first page and resets paging.
+  await panel.getByLabel('Lead', { exact: true }).fill('batch-100@');
+  await expect(panel.getByRole('button', { name: /batch-100@example.test/ })).toBeVisible();
+  await expect(panel.getByRole('button', { name: 'Render preview' })).toBeDisabled();
+  await panel.getByRole('button', { name: /batch-100@example.test/ }).click();
+  await expect(panel.getByRole('button', { name: 'Render preview' })).toBeEnabled();
+  await panel.getByLabel('Preview campaign context').click();
+  await page.getByRole('option', { name: 'Sequence defaults', exact: true }).click();
+  await expect(panel.getByTestId('preview-result')).toHaveCount(0);
+  await expect(panel.getByRole('button', { name: 'Render preview' })).toBeDisabled();
+});
 // 3 × 2 × 2 = 12 variations; 45 words expanded, so no body-length warning.
 const BODY_CLEAN = `Hi {{first_name|there}},
 

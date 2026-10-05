@@ -891,8 +891,11 @@ out,” “15 minutes,” “per my last email,” and promotional claims such a
 
 ### 10.6 Preview panel
 
-Save first, then select a variant's **Preview**, search for a representative lead, select it, and
-choose **Render preview**.
+Save first, then select a step's **Preview**, choose the campaign context, search for a
+representative lead, select it, and choose **Render preview**. Personalized Copy steps require a
+campaign context. A selected campaign limits the lead picker to its available pool and enrolled
+leads; use the page controls to reach leads beyond the first eight. Sequence defaults searches the
+global lead list. Changing campaign, search, or page clears the selected lead and previous render.
 
 Choose **Sequence defaults** or a specific campaign context. The panel shows the exact
 saved-template render with the complete signature and compliance footer, score, warnings, and fatal errors. Expand

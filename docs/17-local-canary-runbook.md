@@ -1,5 +1,32 @@
 # Local canary runbook (B8.3-local) — two-week validation on throwaway Gmail
 
+## 2026-10-05 Sequence campaign lead picker repair — local candidate
+
+After the transfer below, the operator reported activating Campaign 3 and enrolling leads.
+Authenticated Sequence UI confirms **US Property Management — Batch 100** is active. The old
+picker requested only the first eight global leads, ignoring the selected campaign, and exposed
+no pagination. Its disabled Render button also correctly required choosing Preview on a step card.
+
+The local frontend fix requests `campaign_id` with `campaign_scope=both`, covering available pool
+and enrolled leads, and adds eight-row pagination plus loading/error feedback. Campaign, search,
+and page changes clear the selected lead and previous render. Sequence defaults retains global
+search. No backend, migration, scheduler, or mail behavior changes.
+
+Typecheck, lint, format, **425 unit/web tests**, **5 Sequence browser tests**, **47 locked golden
+tests**, and the real-API
+`/email-campaign/` production web build pass. The new 100-lead browser regression covers both
+membership types, excludes an unrelated global lead, pages beyond eight, renders a selected lead,
+searches the last enrolled lead, and clears selection/render on context changes.
+The first golden attempt could not connect because Docker Desktop was stopped; after starting
+Docker and the local Compose services, the complete locked suite passes without fixture changes.
+
+Live read-only workaround verification selected Step 1 Preview, Campaign 3, searched a known
+new-cohort address, and rendered its saved personalized copy with the complete signature/footer.
+The copy was already marked sent by the operator-activated campaign; this preview did not send
+mail or change campaign, enrollment, copy, or event state. Screenshot evidence:
+`C:/Users/jains/AppData/Local/Temp/new-campaign-preview-proof.jpg`. No deployment has occurred;
+each deployment still needs explicit operator approval.
+
 ## 2026-10-05 authorized new campaign and 100-lead pool transfer
 
 The operator explicitly requested a new campaign, transfer of the 100 waiting leads from Campaign

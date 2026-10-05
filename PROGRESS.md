@@ -4,6 +4,13 @@
 
 **Legend:** `[ ]` not started · `[~]` in progress · `[x]` done · `[!]` blocked (note why in the log)
 
+**2026-10-05 Sequence picker repair:** implemented locally; selected campaign now scopes pooled
+and enrolled leads, with paging, search, loading/error states, and cleared stale selections/renders.
+Typecheck/lint/format, unit/web 425, Sequence browser 5, locked golden 47, and real-API subpath
+web build pass.
+Live search plus step Preview successfully renders a new-cohort saved copy. Not deployed.
+The operator subsequently activated/enrolled Campaign 3 themselves; see docs/17 for evidence.
+
 **2026-10-05 authorized campaign transfer:** created draft Campaign 3 with 100/day caps and
 transferred exactly the 100 waiting leads from the now-paused pilot. All 500 copied emails are
 identical and Ready; automatic enrollment is off, with zero new enrollments or sends. Production
