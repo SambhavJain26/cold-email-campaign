@@ -62,12 +62,18 @@ Shapes below in TS notation. `Metric = { numerator: number, denominator: number 
 | POST `/imports` | multipart CSV → `{import_id, counts, samples, personalized_copy}` (preview; nothing committed) |
 | POST `/imports/:id/allocation-preview` | `{mode, allocations:[{campaign_id,count,generic_copy_step_no?}]}` → requested/allocatable campaign totals, exclusions, copy-binding outcomes, safe existing leads, and global remainder. Read-only. A multi-personalized-step campaign requires an explicit generic destination; a one-step campaign resolves it automatically. |
 | POST `/imports/:id/commit` | `{mode, copy_readiness?, replace_existing_copy?, allocations?}` → separate lead/source/campaign-copy/allocation counts and global remainder. Exact allocations and destinations are rechecked and committed atomically; drift aborts the whole commit. Legacy draft fields remain accepted for old clients only. |
+
 | GET `/imports` | → import history rows including durable per-campaign pool allocation summaries and preview-only attempts |
 | DELETE `/imports/:id` | → `{ok}` for an uncommitted preview and its staged rows. Committed import history returns 409 and is immutable. |
 | DELETE `/suppressions/:email` | `{confirm: string}` (must equal the email) → `{ok}` — decision U; audit alert emitted |
 | GET `/leads/:id/personalized-copies` | → reusable sources plus campaign/step snapshots, readiness, provenance, hashes, and sent state |
 | PUT `/leads/:id/personalized-copy-sources/:slot` | save draft or mark ready for reusable lead copy; never sends |
 | PUT `/leads/:id/campaigns/:campaignId/steps/:stepNo/personalized-copy` | save/ready/copy-from-source for an exact personalized step; sent copy is immutable |
+
+Import allocation targets may be draft, paused, or active with automatic enrollment off.
+Archived campaigns and active campaigns with automatic enrollment on return 409. Preview and
+commit enforce the same rule, and commit holds a campaign row lock through allocation. Import
+never activates, enrolls, or sends. Request and response schemas are unchanged.
 
 ## Sequences
 | | |

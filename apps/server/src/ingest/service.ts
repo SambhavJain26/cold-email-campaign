@@ -501,8 +501,16 @@ export async function previewImportAllocations(
   }
   for (const id of campaignIds) {
     const campaign = await getCampaign(deps.db, id);
-    if (!campaign || !['draft', 'paused'].includes(campaign.status)) {
-      throw new PoolAllocationError(`campaign ${id} must be draft or paused`);
+    if (
+      !campaign ||
+      !(
+        ['draft', 'paused'].includes(campaign.status) ||
+        (campaign.status === 'active' && !campaign.autoEnrollEnabled)
+      )
+    ) {
+      throw new PoolAllocationError(
+        `campaign ${id} must be draft, paused, or active with automatic enrollment off`,
+      );
     }
   }
   const emails = rows.flatMap((row) => (row.emailNormalized ? [row.emailNormalized] : []));

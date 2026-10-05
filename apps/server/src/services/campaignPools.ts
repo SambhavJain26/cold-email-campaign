@@ -7,7 +7,7 @@ import {
   releasePoolLeads,
   setCampaignPoolMode,
 } from '../db/repos/campaignPoolRepo';
-import { getCampaign } from '../db/repos/campaignsRepo';
+import { getCampaign, lockCampaignForImport } from '../db/repos/campaignsRepo';
 import { enrolledLeadIdsIn } from '../db/repos/enrollmentsRepo';
 import {
   activeEnrollmentLeadIds,
@@ -170,10 +170,16 @@ export async function allocateExactPools(
   const results: ExactPoolAllocationResult['byCampaign'] = [];
 
   for (const request of input.requests) {
-    const campaign = await getCampaign(db, request.campaignId);
+    const campaign = await lockCampaignForImport(db, request.campaignId);
     if (!campaign) throw new PoolAllocationError(`campaign ${request.campaignId} not found`);
-    if (campaign.status !== 'draft' && campaign.status !== 'paused') {
-      throw new PoolAllocationError(`${campaign.name} must be draft or paused to change its pool`);
+    if (
+      campaign.status !== 'draft' &&
+      campaign.status !== 'paused' &&
+      !(campaign.status === 'active' && !campaign.autoEnrollEnabled)
+    ) {
+      throw new PoolAllocationError(
+        `${campaign.name} must be draft, paused, or active with automatic enrollment off to import into its pool`,
+      );
     }
     const pinned =
       request.campaignId === input.draftCampaignId

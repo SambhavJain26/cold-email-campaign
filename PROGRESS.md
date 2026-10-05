@@ -4,6 +4,14 @@
 
 **Legend:** `[ ]` not started · `[~]` in progress · `[x]` done · `[!]` blocked (note why in the log)
 
+**2026-10-05 import selector repair:** local implementation and focused verification complete.
+CSV pool allocation now includes active campaigns with automatic enrollment off; preview/commit
+enforce the same eligibility and commit locks campaign settings. Loading/error/empty selector
+states explain unavailable choices. Typecheck/lint/format, unit/web 425, API 146, import browser 5,
+and real-API subpath web build pass. The 100-lead active-campaign regression verifies 500 Ready
+sources/copies, no enrollment/events, and atomic rejection after automatic enrollment is enabled.
+See docs/17 for production prechecks and deployment evidence.
+
 **2026-09-27 plain-text email mode:** implemented, verified, and deployed at `d6f3e1b` on `canary`.
 Migration `0021` defaults new sends to text/plain only
 and changes only the exact former default role to `Automation Specialist`. Minimal HTML stays

@@ -178,6 +178,12 @@ export function ImportWizard({
   const [allocations, setAllocations] = useState<AllocationRow[]>([]);
   const campaigns = useCampaigns();
   const sequences = useSequences();
+  const importCampaigns = (campaigns.data?.items ?? []).filter(
+    (campaign) =>
+      campaign.status === 'draft' ||
+      campaign.status === 'paused' ||
+      (campaign.status === 'active' && !campaign.auto_enroll_enabled),
+  );
   const validAllocations = allocations.filter(
     (allocation): allocation is { campaignId: number; count: number; genericCopyStepNo?: number } =>
       allocation.campaignId !== undefined && allocation.count > 0,
@@ -470,6 +476,11 @@ export function ImportWizard({
               </div>
               <FieldGroup className="gap-3">
                 {allocations.map((allocation, index) => {
+                  const availableCampaigns = importCampaigns.filter(
+                    (campaign) =>
+                      campaign.id === allocation.campaignId ||
+                      !allocations.some((row) => row.campaignId === campaign.id),
+                  );
                   const stepNos = personalizedSteps(allocation.campaignId);
                   const campaignCopyPreview = allocationPreview.isFetching
                     ? undefined
@@ -493,6 +504,7 @@ export function ImportWizard({
                           Campaign
                         </FieldLabel>
                         <Select
+                          disabled={campaigns.isPending || availableCampaigns.length === 0}
                           value={allocation.campaignId ? String(allocation.campaignId) : ''}
                           onValueChange={(value) =>
                             setAllocations((current) =>
@@ -512,28 +524,33 @@ export function ImportWizard({
                             id={`allocation-campaign-${index + 1}`}
                             aria-label={`Allocation campaign ${index + 1}`}
                           >
-                            <SelectValue placeholder="Choose campaign…" />
+                            <SelectValue
+                              placeholder={
+                                campaigns.isPending ? 'Loading campaigns…' : 'Choose campaign…'
+                              }
+                            />
                           </SelectTrigger>
                           <SelectContent>
                             <SelectGroup>
-                              {(campaigns.data?.items ?? [])
-                                .filter(
-                                  (campaign) =>
-                                    campaign.status === 'draft' || campaign.status === 'paused',
-                                )
-                                .filter(
-                                  (campaign) =>
-                                    campaign.id === allocation.campaignId ||
-                                    !allocations.some((row) => row.campaignId === campaign.id),
-                                )
-                                .map((campaign) => (
-                                  <SelectItem key={campaign.id} value={String(campaign.id)}>
-                                    {campaign.name}
-                                  </SelectItem>
-                                ))}
+                              {availableCampaigns.map((campaign) => (
+                                <SelectItem key={campaign.id} value={String(campaign.id)}>
+                                  {campaign.name}
+                                </SelectItem>
+                              ))}
                             </SelectGroup>
                           </SelectContent>
                         </Select>
+                        {campaigns.isError ? (
+                          <FieldError>
+                            Campaigns could not be loaded. Reopen the import to try again.
+                          </FieldError>
+                        ) : !campaigns.isPending && availableCampaigns.length === 0 ? (
+                          <FieldDescription>
+                            No campaigns are available. Choose a draft or paused campaign, or an
+                            active campaign with automatic enrollment off. Each campaign can be
+                            allocated once.
+                          </FieldDescription>
+                        ) : null}
                       </Field>
                       <Field>
                         <FieldLabel htmlFor={`allocation-count-${index + 1}`}>Leads</FieldLabel>

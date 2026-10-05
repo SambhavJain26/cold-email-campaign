@@ -1,5 +1,34 @@
 # Local canary runbook (B8.3-local) — two-week validation on throwaway Gmail
 
+## 2026-10-05 import campaign selector repair — verified local behavior
+
+The operator reported that **Choose campaign** did not respond while importing 100 leads and
+explicitly requested a fix and deployment. Production inspection found only an archived campaign
+and active **US Property Management**, with automatic enrollment off. The selector silently
+filtered both out, and allocation preview/commit rejected active campaigns as well.
+
+The repair permits CSV allocation to draft/paused campaigns or active campaigns with automatic
+enrollment off. Archived campaigns and active campaigns with automatic enrollment on remain
+excluded. Preview and commit enforce the same rule; commit locks each campaign row until its
+transaction completes. The selector shows loading, fetch-error, and no-available-campaign messages
+instead of an unexplained empty menu. Other pool editing operations retain their existing guards.
+
+Verified locally: typecheck, lint, format check, unit/web **425/425**, API **146/146**, import
+browser checks **5/5**, and the real-API subpath production web build. The 100-lead API regression
+proves **500/500** reusable sources and **500/500** campaign copies Ready in an active campaign,
+with zero enrollments and no appended events. Enabling automatic enrollment between preview and
+commit rejects both preview and commit with 409 and rolls back created leads. Browser coverage
+proves active campaign selection, exact count preview, an enabled import action, empty-state
+guidance, generic copy destination selection, and the existing upload/commit flow. No migration or
+golden fixture change is required. The existing large-bundle build warning remains.
+
+Read-only production prechecks report **13 enrollments, 0 diffs**, clean self-check, **124** events
+and **54** sent messages. All enrollments are terminal (**10 completed / 3 unsubscribed**), with
+no next-send timestamps. Campaign 2 remains active, automatic enrollment off, with **13** leads
+and **13** pool entries. Pre-deploy `coldemail-20261005-151001.dump` (**1,706,919 bytes**) passes a
+**342-line** restore catalog. No live import, allocation, enrollment, campaign mutation, or send
+was performed during diagnosis and local verification.
+
 ## 2026-09-27 VPS usage review and bounded cache cleanup
 
 Read-only inspection found the 24 GB root filesystem at **9.6 GB used / 14 GB available (42%)**,

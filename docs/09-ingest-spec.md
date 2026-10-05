@@ -53,7 +53,10 @@ Preview response = counts per flag + 20 sample rows per flag (walkthrough Stage 
   receive a draft without overwriting profile data; suppressed/erased leads do not. Existing
   unsent-draft conflicts skip unless replacement is explicitly selected. Results report lead and
   draft counts separately.
-- The optional `allocations` list reserves exact counts into distinct draft/paused campaign pools.
+- The optional `allocations` list reserves exact counts into distinct draft/paused campaign pools,
+  or active campaigns with automatic enrollment off. Archived campaigns and active campaigns
+  with automatic enrollment on are excluded. Preview and commit both enforce this rule; commit
+  locks each campaign row until the transaction completes. Import does not enroll or send.
   `POST /imports/:id/allocation-preview` reports requested/allocatable counts, exclusions, safely
   linked existing leads, and the global remainder before commit. Candidates follow accepted CSV
   row order. A safely allocatable existing duplicate may be reserved without overwriting its lead

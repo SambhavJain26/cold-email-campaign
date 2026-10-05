@@ -465,7 +465,7 @@ describe('B6.4 imports', () => {
     ]);
   });
 
-  it('marks all 500 valid copies ready in one 100-lead, five-step CSV import', async () => {
+  it('imports 100 leads and 500 Ready copies into an active manual-enrollment campaign without events', async () => {
     const wm = await eventWatermark(h.pool);
     const sequence = (
       await h.inject({
@@ -491,6 +491,10 @@ describe('B6.4 imports', () => {
         payload: { name: 'Hundred-lead personalized import', sequence_id: sequence.id },
       })
     ).json();
+    await h.pool.query(
+      "UPDATE campaigns SET status = 'active', auto_enroll_enabled = false WHERE id = $1",
+      [campaign.id],
+    );
     const copyColumns = Array.from({ length: 5 }, (_, index) => [
       'step_' + (index + 1) + '_subject',
       'step_' + (index + 1) + '_body',
@@ -514,6 +518,41 @@ describe('B6.4 imports', () => {
     });
     expect(preview.statusCode, preview.body).toBe(200);
     expect(preview.json().draft_counts).toMatchObject({ valid_drafts: 500, invalid_drafts: 0 });
+
+    const allocationPayload = {
+      mode: 'drop_flagged',
+      allocations: [{ campaign_id: campaign.id, count: 100 }],
+    };
+    const allocationPreview = await h.inject({
+      method: 'POST',
+      url: `/api/v1/imports/${preview.json().import_id}/allocation-preview`,
+      payload: allocationPayload,
+    });
+    expect(allocationPreview.statusCode, allocationPreview.body).toBe(200);
+    expect(allocationPreview.json().campaigns[0]).toMatchObject({
+      requested: 100,
+      allocatable: 100,
+    });
+
+    // A setting change after preview must fail closed and roll back the whole import.
+    await h.pool.query('UPDATE campaigns SET auto_enroll_enabled = true WHERE id = $1', [
+      campaign.id,
+    ]);
+    for (const endpoint of ['allocation-preview', 'commit']) {
+      const rejected = await h.inject({
+        method: 'POST',
+        url: `/api/v1/imports/${preview.json().import_id}/${endpoint}`,
+        payload: allocationPayload,
+      });
+      expect(rejected.statusCode, rejected.body).toBe(409);
+    }
+    expect(
+      (await h.pool.query("SELECT count(*)::int AS n FROM leads WHERE email LIKE 'bulk-ready-%'"))
+        .rows[0].n,
+    ).toBe(0);
+    await h.pool.query('UPDATE campaigns SET auto_enroll_enabled = false WHERE id = $1', [
+      campaign.id,
+    ]);
 
     const commit = await h.inject({
       method: 'POST',
@@ -549,6 +588,20 @@ describe('B6.4 imports', () => {
     ).rows[0];
     expect(sourceCoverage).toEqual({ total: 500, ready: 500 });
     expect(campaignCoverage).toEqual({ total: 500, ready: 500 });
+    expect(
+      (
+        await h.pool.query('SELECT count(*)::int AS n FROM enrollments WHERE campaign_id = $1', [
+          campaign.id,
+        ])
+      ).rows[0].n,
+    ).toBe(0);
+    expect(
+      (
+        await h.pool.query('SELECT status, auto_enroll_enabled FROM campaigns WHERE id = $1', [
+          campaign.id,
+        ])
+      ).rows[0],
+    ).toEqual({ status: 'active', auto_enroll_enabled: false });
     await expectNoNewEvents(h.pool, wm);
   });
 

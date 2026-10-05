@@ -499,7 +499,9 @@ All imported leads start untiered.
 #### Optional campaign allocation during import
 
 After hygiene preview, expand **Campaign allocation** to reserve exact numbers of the accepted
-leads for one or more draft/paused campaigns. For example, add Campaign A = 100 and Campaign B =
+leads for one or more draft/paused campaigns, or active campaigns with automatic enrollment off.
+Archived campaigns and active campaigns with automatic enrollment on cannot receive import
+allocations. For example, add Campaign A = 100 and Campaign B =
 100; if the accepted set contains 1,000 unique safe leads, the preview shows 800 remaining global.
 Nothing is enrolled or sent by this action.
 

@@ -7,6 +7,52 @@ const CSV = Buffer.from(
     'sarah.chen@example.com,Sarah,Chen,Apex Realty,Austin,TX\n',
 );
 
+test('campaign allocation selects an active campaign with automatic enrollment off', async ({
+  page,
+}) => {
+  await login(page);
+  await page.getByRole('link', { name: 'Leads' }).click();
+  await page.getByRole('button', { name: 'Import CSV' }).click();
+  await page
+    .getByTestId('upload-input')
+    .setInputFiles({ name: 'leads.csv', mimeType: 'text/csv', buffer: CSV });
+  await page.getByRole('button', { name: 'Add campaign allocation' }).click();
+  await page.getByLabel('Allocation campaign 1').click();
+  await page.getByRole('option', { name: 'Manual Send Fixture', exact: true }).click();
+  await expect(page.getByLabel('Allocation campaign 1')).toHaveText('Manual Send Fixture');
+  await page.getByLabel('Allocation count 1').fill('100');
+  await expect(page.getByText(/Manual Send Fixture: first 100 accepted leads/)).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Import 885 leads' })).toBeEnabled();
+});
+
+test('campaign allocation explains when all campaigns are archived', async ({ page }) => {
+  await login(page);
+  // The mock API runs inside MSW's service worker, so change fixtures through
+  // browser fetch rather than Playwright network routing.
+  await page.evaluate(async () => {
+    const body = await (await fetch('/api/v1/campaigns')).json();
+    for (const campaign of body.items) {
+      const response = await fetch(`/api/v1/campaigns/${campaign.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json', 'X-Requested-With': 'fetch' },
+        body: JSON.stringify({ status: 'archived' }),
+      });
+      if (!response.ok) throw new Error('Could not archive mock campaign');
+    }
+    const moduleUrl = '/src/api/queryClient.ts';
+    const { queryClient } = await import(/* @vite-ignore */ moduleUrl);
+    await queryClient.invalidateQueries({ queryKey: ['campaigns'] });
+  });
+  await page.getByRole('link', { name: 'Leads' }).click();
+  await page.getByRole('button', { name: 'Import CSV' }).click();
+  await page
+    .getByTestId('upload-input')
+    .setInputFiles({ name: 'leads.csv', mimeType: 'text/csv', buffer: CSV });
+  await page.getByRole('button', { name: 'Add campaign allocation' }).click();
+  await expect(page.getByLabel('Allocation campaign 1')).toBeDisabled();
+  await expect(page.getByText(/No campaigns are available/)).toBeVisible();
+});
+
 test('upload → the exact preview split → commit 885 → result', async ({ page }) => {
   await login(page);
   await page.getByRole('link', { name: 'Leads' }).click();
