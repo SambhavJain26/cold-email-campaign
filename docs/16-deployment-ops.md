@@ -3,7 +3,15 @@
 Single always-on VPS (finalized decision). Docker Compose primary; systemd alternative. Implemented
 in B7 and cut over to Spaceship production on 2026-08-22.
 
-**Production status (2026-09-27 IST):** plain-text email mode is deployed at `d6f3e1b` on `canary`,
+**Production status (2026-10-05 IST):** import campaign selector repair is deployed at `988adc0`
+on `canary`, with the existing 22 migrations. Active campaigns with automatic enrollment off can
+receive CSV allocations; the live saved 100-row Import 3 preview verifies 100 allocatable leads
+and 500 bound copies. Health/routes, 13-enrollment zero drift, self-check, served markers, and
+validated pre/post backups pass. Live watermarks remain 124 events / 54 sent messages; Campaign 2
+remains active with automatic enrollment off. No live import, enrollment, or send occurred.
+The current audit reports six runtime dependency findings for a separate remediation; see docs/17.
+
+**Previous production status (2026-09-27 IST):** plain-text email mode is deployed at `d6f3e1b` on `canary`,
 through migration `0021` (22 applied migrations). The global format is `plain_text`, the role is
 `Automation Specialist`, and the unsubscribe URL remains blank. Health/routes, 13-enrollment zero
 drift, self-check, served UI markers, and validated pre/post backups pass. All 44 historical sent

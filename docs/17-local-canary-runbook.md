@@ -1,6 +1,6 @@
 # Local canary runbook (B8.3-local) — two-week validation on throwaway Gmail
 
-## 2026-10-05 import campaign selector repair — verified local behavior
+## 2026-10-05 import campaign selector repair — deployed at `988adc0`
 
 The operator reported that **Choose campaign** did not respond while importing 100 leads and
 explicitly requested a fix and deployment. Production inspection found only an archived campaign
@@ -22,12 +22,39 @@ proves active campaign selection, exact count preview, an enabled import action,
 guidance, generic copy destination selection, and the existing upload/commit flow. No migration or
 golden fixture change is required. The existing large-bundle build warning remains.
 
+The remaining serial gate also passes: integration **177/177**, GreenMail **29/29**, and locked
+golden exactly **47/47** (253 tests across 34 files). No fixtures were regenerated.
+
 Read-only production prechecks report **13 enrollments, 0 diffs**, clean self-check, **124** events
 and **54** sent messages. All enrollments are terminal (**10 completed / 3 unsubscribed**), with
 no next-send timestamps. Campaign 2 remains active, automatic enrollment off, with **13** leads
 and **13** pool entries. Pre-deploy `coldemail-20261005-151001.dump` (**1,706,919 bytes**) passes a
 **342-line** restore catalog. No live import, allocation, enrollment, campaign mutation, or send
 was performed during diagnosis and local verification.
+
+Under the operator's explicit deploy authorization, `origin/canary` and the clean VPS checkout
+advanced to `988adc0`. The reviewed bundle's local/remote SHA-256 matched
+`137b0ced5748c1551cc09ab2b2272de89f305d9d5911a12da28175e6dab16e92`.
+App, gateway, and backup images built and services restarted successfully. App/database health,
+the public app/direct SPA/redirect/portfolio/unsubscribe-root matrix, and served selector/backend
+eligibility markers pass. No migration was added; **22** remain applied. Production reports
+**13 enrollments, 0 diffs** and clean self-check. Event count/max ID remain **124/124**, sent
+messages **54**, leads/pool entries **13/13**, and all existing enrollments terminal. Campaign 2
+remains active, pool-backed, automatic enrollment off. Post-deploy
+`coldemail-20261005-152324.dump` (**1,708,996 bytes**) passes a **342-line** restore catalog.
+
+A read-only service probe against the operator's already-saved **Import 3 / 100-row** preview
+confirms Campaign 2 **100 requested / 100 allocatable**, Personalized Steps **1–5**, **500** copies
+bound, zero unassigned copies, and no generic destination required. The probe created no import,
+allocation, enrollment, event, or send. Authenticated production visual replay was not performed;
+local browser interaction and the live saved-import service path are both verified. Deployment
+emitted no mail. Oracle, `main`, DNS, and campaign/mailbox settings are unchanged.
+
+The build's current audit reports **16** findings before pruning and **6 runtime findings** after
+pruning (**4 high / 2 moderate**), superseding the September zero-runtime audit snapshot. Runtime
+packages are `@fastify/busboy`, `fast-uri`, `fastify`, `ip-address`, `mailparser`, and `nodemailer`.
+This repair changes no dependency versions or lockfile. Dependency remediation is a separate
+follow-up; no forced audit rewrite was run. Nodemailer's advertised fix includes a major upgrade.
 
 ## 2026-09-27 VPS usage review and bounded cache cleanup
 

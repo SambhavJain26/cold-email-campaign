@@ -8,6 +8,16 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Current operating boundary
 
+- **2026-10-05 import campaign selector repair:** explicitly authorized, verified, and deployed
+  at `988adc0` on `canary`. CSV allocations permit active campaigns with automatic enrollment
+  off as well as draft/paused campaigns; archived and active auto-enrollment targets remain
+  excluded. Preview/commit enforce the same guard, with a campaign row lock during commit.
+  Production's saved 100-row Import 3 preview verifies 100 allocatable leads and 500 bound copies.
+  Health/routes, 13-enrollment zero drift, self-check, and pre/post backup catalogs pass;
+  watermarks remain 124 events / 54 sent messages. No live import, enrollment, or send occurred.
+  The current audit reports six runtime dependency findings; remediation remains separate.
+  See docs/17. This repair does not authorize a new cohort, enrollment, or outbound batch.
+
 - **2026-09-27 plain-text email mode:** the operator-approved release is verified and deployed
   on Spaceship at `d6f3e1b`, with migration `0021`. New messages default to text/plain only; Minimal HTML
   remains optional. Drafts ending in `Best,` join the automatic signature on the next line, and
@@ -278,7 +288,7 @@ rollback/canary environment.
 - Stack: `docker-compose.spaceship.yml` with `.env.prod`
 - UI: `https://sambhavpmtech.com/email-campaign/`
 - Internal gateway: `127.0.0.1:18080`; host Caddy alone owns public 80/443
-- Deployed application release: `canary` at `d6f3e1b`
+- Deployed application release: `canary` at `988adc0`
 
 The private repository currently has no GitHub deploy credential on the VPS. Until a read-only
 deploy key is deliberately installed, transfer a reviewed `git bundle`, fetch the pinned branch

@@ -4,13 +4,18 @@
 
 **Legend:** `[ ]` not started · `[~]` in progress · `[x]` done · `[!]` blocked (note why in the log)
 
-**2026-10-05 import selector repair:** local implementation and focused verification complete.
+**2026-10-05 import selector repair:** implemented, verified, pushed, and deployed at `988adc0`.
 CSV pool allocation now includes active campaigns with automatic enrollment off; preview/commit
 enforce the same eligibility and commit locks campaign settings. Loading/error/empty selector
 states explain unavailable choices. Typecheck/lint/format, unit/web 425, API 146, import browser 5,
-and real-API subpath web build pass. The 100-lead active-campaign regression verifies 500 Ready
+real-API subpath web build, integration 177, GreenMail 29, and locked golden 47 pass.
+The 100-lead active-campaign regression verifies 500 Ready
 sources/copies, no enrollment/events, and atomic rejection after automatic enrollment is enabled.
-See docs/17 for production prechecks and deployment evidence.
+Production's saved Import 3 preview verifies 100 allocatable leads and 500 bound copies.
+Health/routes, 13-enrollment zero drift, self-check, and validated pre/post backups pass;
+124 events and 54 sent messages remain unchanged. No live import/enrollment/send occurred.
+The deployment audit reports six existing runtime dependency findings, recorded for separate
+remediation in docs/17 with the complete verification and deployment evidence.
 
 **2026-09-27 plain-text email mode:** implemented, verified, and deployed at `d6f3e1b` on `canary`.
 Migration `0021` defaults new sends to text/plain only
