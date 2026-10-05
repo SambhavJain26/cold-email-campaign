@@ -19,6 +19,13 @@ call planned work implemented.
 
 ## Current operating boundary
 
+- **2026-10-05 Sequence picker repair:** explicitly authorized, verified, pushed, and deployed
+  at `4b4e0c7` on `canary`. Preview lead search now scopes available pooled and enrolled leads
+  to the selected campaign and supports pagination. Live replay shows all 100 Campaign 3 leads
+  and renders a Ready second-page copy. Health/routes, 22 migrations, 93-enrollment zero drift,
+  self-check, and backup catalogs pass. Event/sent counts stay 208/58 through deployment; no
+  campaign/enrollment/mailbox-setting change or send occurred. See docs/17.
+
 - **2026-10-05 operator activation follow-up:** the operator reports activating Campaign 3 and
   enrolling its leads after the transfer below; the authenticated UI confirms it is active and
   a new-cohort Step 1 copy is already sent. The agent rendered that saved copy read-only to

@@ -1,6 +1,6 @@
 # Local canary runbook (B8.3-local) — two-week validation on throwaway Gmail
 
-## 2026-10-05 Sequence campaign lead picker repair — local candidate
+## 2026-10-05 Sequence campaign lead picker repair — deployed at `4b4e0c7`
 
 After the transfer below, the operator reported activating Campaign 3 and enrolling leads.
 Authenticated Sequence UI confirms **US Property Management — Batch 100** is active. The old
@@ -24,8 +24,24 @@ Live read-only workaround verification selected Step 1 Preview, Campaign 3, sear
 new-cohort address, and rendered its saved personalized copy with the complete signature/footer.
 The copy was already marked sent by the operator-activated campaign; this preview did not send
 mail or change campaign, enrollment, copy, or event state. Screenshot evidence:
-`C:/Users/jains/AppData/Local/Temp/new-campaign-preview-proof.jpg`. No deployment has occurred;
-each deployment still needs explicit operator approval.
+`C:/Users/jains/AppData/Local/Temp/new-campaign-preview-proof.jpg`.
+
+The operator explicitly authorized deployment. Reviewed bundle SHA-256
+`5a9d406d9624179944eec6a0e1bbbd233451395ceee3e0c643be3f1a2eef57e9` matched on both hosts;
+production fast-forwarded from `988adc0` to `4b4e0c7` and Compose build/up succeeded. The release
+is pushed to `origin/canary`. App/database health, running services, all 22 migrations, public
+app/sequence/asset/portfolio routes, canonical/host redirects, and unsubscribe-root 404s pass.
+Projection replay checks **93 enrollments — 0 diffs**; self-check has no invariant violations.
+Pre/post backups `coldemail-20261005-162432.dump` (**1,976,320 bytes**) and
+`coldemail-20261005-162644.dump` (**1,976,533 bytes**) each pass **342-line** restore catalogs.
+
+Campaign 3 remains active, automatic enrollment off, cap 100, **80 enrolled / 20 available**;
+Campaign 2 remains paused. Event count/max ID **208/208** and sent count **58** match before/after
+deployment. The deployment emitted no mail and changed no campaign/enrollment/mailbox settings.
+Authenticated UI replay shows **1–8 of 100**, then **9–16 of 100**, and successfully renders a Ready
+second-page lead's complete Step 1 copy. Deployment screenshot:
+`C:/Users/jains/AppData/Local/Temp/deployed-preview-picker-proof.jpg`. Existing six runtime audit
+findings (four high, two moderate) remain the separately recorded dependency follow-up.
 
 ## 2026-10-05 authorized new campaign and 100-lead pool transfer
 

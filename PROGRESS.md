@@ -4,11 +4,13 @@
 
 **Legend:** `[ ]` not started · `[~]` in progress · `[x]` done · `[!]` blocked (note why in the log)
 
-**2026-10-05 Sequence picker repair:** implemented locally; selected campaign now scopes pooled
+**2026-10-05 Sequence picker repair:** verified, pushed, and deployed at `4b4e0c7`; selected campaign now scopes pooled
 and enrolled leads, with paging, search, loading/error states, and cleared stale selections/renders.
 Typecheck/lint/format, unit/web 425, Sequence browser 5, locked golden 47, and real-API subpath
 web build pass.
-Live search plus step Preview successfully renders a new-cohort saved copy. Not deployed.
+Live replay shows all 100 campaign leads, pages beyond eight, and renders a Ready second-page copy.
+Production health/routes, 22 migrations, 93-enrollment zero drift, self-check, and validated
+pre/post backup catalogs pass. Watermarks remain 208 events / 58 sent messages through deployment.
 The operator subsequently activated/enrolled Campaign 3 themselves; see docs/17 for evidence.
 
 **2026-10-05 authorized campaign transfer:** created draft Campaign 3 with 100/day caps and

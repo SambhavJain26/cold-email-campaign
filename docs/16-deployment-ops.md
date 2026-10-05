@@ -3,7 +3,14 @@
 Single always-on VPS (finalized decision). Docker Compose primary; systemd alternative. Implemented
 in B7 and cut over to Spaceship production on 2026-08-22.
 
-**Production status (2026-10-05 IST):** import campaign selector repair is deployed at `988adc0`
+**Production status (2026-10-05 IST):** Sequence campaign lead picker repair is deployed at `4b4e0c7`
+on `canary`. Live replay shows all 100 Campaign 3 pooled/enrolled leads, pagination, and a complete
+Ready second-page Step 1 preview. Health/routes, 22 migrations, 93-enrollment zero drift,
+self-check, and pre/post backup catalogs pass. Event/sent watermarks stay 208/58 through deployment.
+Campaign 3 remains operator-activated with 80 enrolled / 20 available and automatic enrollment off;
+Campaign 2 is paused. Deployment emitted no mail or campaign/settings mutation. See docs/17.
+
+**Previous production status (2026-10-05 IST):** import campaign selector repair is deployed at `988adc0`
 on `canary`, with the existing 22 migrations. Active campaigns with automatic enrollment off can
 receive CSV allocations; the live saved 100-row Import 3 preview verifies 100 allocatable leads
 and 500 bound copies. Health/routes, 13-enrollment zero drift, self-check, served markers, and
