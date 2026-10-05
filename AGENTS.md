@@ -19,6 +19,18 @@ call planned work implemented.
 
 ## Current operating boundary
 
+- **2026-10-05 authorized 100-lead campaign transfer:** created draft Campaign 3,
+  **US Property Management — Batch 100**, on the existing five-email sequence, with all ramp
+  stages and permanent cap at 100/day. Paused the completed pilot Campaign 2 and moved exactly
+  its 100 Available leads through the guarded reassignment UI. Campaign 3 has 100 Available
+  leads and 500 identical Ready copies; automatic enrollment is off and no activation or
+  enrollment occurred. Campaign 2 retains its 12 historical enrollments and is paused.
+  Health, 13-enrollment zero drift, self-check, and pre/post backup catalogs pass; watermarks
+  remain 124 events / 54 sent messages. No outbound mail occurred. Existing mailbox caps of
+  20/day each and the global campaign ceiling of 100 were observed, not changed. Activation,
+  enrollment, auto-enrollment, and an outbound batch still require separate authorization.
+  See docs/17 for exact reconciliation and pool provenance behavior.
+
 - **2026-10-05 import campaign selector repair:** explicitly authorized, verified, and deployed
   at `988adc0` on `canary`. CSV allocations permit active campaigns with automatic enrollment
   off as well as draft/paused campaigns; archived and active auto-enrollment targets remain

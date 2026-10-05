@@ -1,5 +1,39 @@
 # Local canary runbook (B8.3-local) — two-week validation on throwaway Gmail
 
+## 2026-10-05 authorized new campaign and 100-lead pool transfer
+
+The operator explicitly requested a new campaign, transfer of the 100 waiting leads from Campaign
+2, and a daily enrollment cap of 100 or higher. Read-only checks found the global campaign ceiling
+already set to **100**, mailbox ceiling **30**, and minimum ramp days **0**; the four healthy
+mailboxes were already configured for **20 messages/day each**. These existing settings were not
+changed. Higher configuration ceilings are not evidence of deliverability safety.
+
+Through the authenticated in-app browser, created **US Property Management — Batch 100**
+(`campaign_id=3`) as a draft using the same **US Personalized — Five Emails** sequence
+(`sequence_id=2`). Its five ramp stages retain the seven-day schedule, with each stage cap **100**
+and permanent enrollment cap **100**. Automatic enrollment remains off and first activation is
+null. Paused the already-finished Campaign 2 to enable its guarded pool reassignment UI, then
+selected only Available entries and reassigned two pages of **50** leads each to Campaign 3.
+No activation, resume, enrollment, or outbound batch was authorized or performed.
+
+Reconciliation confirms Campaign 2 retains **12 enrolled / 100 released / 0 available**, while
+Campaign 3 has **100 available / 0 enrolled** and is pool-backed. The sorted lead-ID digest before
+and after transfer matches `d3620eb9dd6decc6e753933fc001ef22`, proving the exact waiting set moved.
+Campaign 3 has **100 Ready copies per step**, **500/500** total, with subject, body, content hash,
+and source-copy ID identical to Campaign 2's corresponding copies. Reassignment records target
+pool source-import IDs as null (the UI labels these Global); the original released pool rows and
+copy/source relationships retain the original provenance. Original campaign copies/history remain
+intact. The new campaign has zero enrollments; event count/max ID remain **124/124** and sent
+messages **54**. The UI confirms all five steps have 100 Ready and zero review/missing/blocked.
+
+Production health, **13-enrollment zero drift**, and self-check pass. Pre-change
+`coldemail-20261005-155421.dump` (**1,893,982 bytes**) and post-change
+`coldemail-20261005-155830.dump` (**1,969,346 bytes**) both pass **342-line** restore catalogs.
+The UI currently suggests **80** new enrollments from shared mailbox capacity; a campaign ceiling
+of 100 does not bypass mailbox caps or follow-up reservations. No code release, migration,
+mailbox/global-setting change, or email send was part of this transfer. Campaign 3 is ready for a
+separately authorized activation/enrollment handoff; Campaign 2 remains paused.
+
 ## 2026-10-05 VPS usage review and authorized build-cache cleanup
 
 Read-only inspection found the 24 GB root filesystem at **9.6 GB used / 14 GB available (42%)**,

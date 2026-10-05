@@ -4,6 +4,11 @@
 
 **Legend:** `[ ]` not started · `[~]` in progress · `[x]` done · `[!]` blocked (note why in the log)
 
+**2026-10-05 authorized campaign transfer:** created draft Campaign 3 with 100/day caps and
+transferred exactly the 100 waiting leads from the now-paused pilot. All 500 copied emails are
+identical and Ready; automatic enrollment is off, with zero new enrollments or sends. Production
+health, 13-enrollment zero drift, self-check, and validated pre/post backups pass. See docs/17.
+
 **2026-10-05 import selector repair:** implemented, verified, pushed, and deployed at `988adc0`.
 CSV pool allocation now includes active campaigns with automatic enrollment off; preview/commit
 enforce the same eligibility and commit locks campaign settings. Loading/error/empty selector
