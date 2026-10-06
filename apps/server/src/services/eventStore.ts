@@ -3,6 +3,7 @@
 // ONE Postgres transaction. Nothing else writes `events` or
 // `enrollments.current_state`.
 import type { Db, DbLike, Tx } from '../db/client';
+import { liveStopTargets } from '../db/repos/incomingStopsRepo';
 import { insertEvents, listByEnrollments } from '../db/repos/eventsRepo';
 import {
   writeProjection,
@@ -115,7 +116,15 @@ export class EventStore {
 
     // Serialize BEFORE inserting facts. Poller and scheduler therefore cannot
     // both observe an enrollment as active and append contradictory outcomes.
-    const ids = await insertEvents(tx, evs);
+    // Revalidate policy stops after locking; concurrent incoming messages may
+    // have already stopped/completed the enrollment while classification ran.
+    const liveIds = evs.some((event) => event.type === 'outreach_stopped')
+      ? await liveStopTargets(tx, enrollmentIds)
+      : new Set<number>();
+    const effective = evs.filter(
+      (event) => event.type !== 'outreach_stopped' || liveIds.has(event.enrollmentId),
+    );
+    const ids = await insertEvents(tx, effective);
 
     const byEnrollment = await listByEnrollments(tx, enrollmentIds);
     const terminalIds = new Set<number>();

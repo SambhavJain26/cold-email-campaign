@@ -124,6 +124,7 @@ export async function poolEligibility(
     else if (activeElsewhere.has(id)) reason = 'active_enrollment_elsewhere';
     else if (already.has(id)) reason = 'already_enrolled';
     else if (conflicts.has(id)) reason = 'content_hash_conflict';
+    else if (recontact.get(id)?.hasStop) reason = 'prior_incoming_email_stop';
     else if (recontact.get(id)?.hasReply) reason = 'prior_human_reply';
     else if (recontact.get(id)?.hasUndispositionedReply) reason = 'reply_needs_disposition';
     else if ((recontact.get(id)?.blockedUntil?.getTime() ?? 0) > now.getTime())

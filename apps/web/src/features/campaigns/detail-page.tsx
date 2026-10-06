@@ -194,6 +194,7 @@ export default function CampaignDetailPage() {
                     ['BOUNCED', outcomes.data.BOUNCED],
                     ['UNSUBSCRIBED', outcomes.data.UNSUBSCRIBED],
                     ['COMPLETED', outcomes.data.COMPLETED],
+                    ['STOPPED', outcomes.data.STOPPED],
                   ] as const
                 ).map(([state, count]) => (
                   <div key={state} className="space-y-1">

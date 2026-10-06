@@ -30,6 +30,21 @@ function snapIn(state: EnrollmentState): EnrollmentSnapshot {
     attributes: { content_hash: 'h1' },
   });
   const history: Record<EnrollmentState, DomainEvent[]> = {
+    STOPPED: [
+      enrolled,
+      sent,
+      buildEvent.outreachStopped({
+        ...ids,
+        occurredAt: at(2),
+        reason: 'Incoming company email',
+        attributes: {
+          incoming_message_id: 1,
+          sender: 'support@x.com',
+          matching_method: 'company_domain',
+          company_domain: 'x.com',
+        },
+      }),
+    ],
     NEW: [],
     ACTIVE: [enrolled, sent],
     REPLIED: [

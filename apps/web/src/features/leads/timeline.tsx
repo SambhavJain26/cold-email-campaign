@@ -3,6 +3,7 @@ import { formatDateTime } from '@/lib/format';
 
 /** Event-type glyphs for the detail timeline (docs/12 §2 — newest first). */
 const ICON: Record<EventViewDto['type'], string> = {
+  outreach_stopped: '⏹️',
   enrolled: '➕',
   sent: '📤',
   delivered: '✅',
@@ -34,6 +35,13 @@ export function Timeline({ events }: { events: EventViewDto[] }) {
           <div className="min-w-0 flex-1">
             <p className="text-sm">
               <span className="font-medium">{event.type.replaceAll('_', ' ')}</span>
+              {event.type === 'outreach_stopped' && (
+                <span>
+                  {' '}
+                  · Incoming email from {String(event.attributes.sender ?? 'company domain')} (
+                  {String(event.attributes.matching_method ?? 'domain match')})
+                </span>
+              )}
               {event.step_no !== null && (
                 <span className="text-muted-foreground"> · step {event.step_no}</span>
               )}

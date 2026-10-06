@@ -30,6 +30,7 @@ export const settings = pgTable('settings', {
   maxRampDailyEnrollCap: integer('max_ramp_daily_enroll_cap').notNull().default(25),
   minRampDays: integer('min_ramp_days').notNull().default(0),
   updatedAt: tz('updated_at').notNull().defaultNow(),
+  incomingStopSince: tz('incoming_stop_since').notNull().defaultNow(),
 });
 
 export const complianceSettings = pgTable('compliance_settings', {

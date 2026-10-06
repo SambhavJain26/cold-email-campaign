@@ -4,6 +4,7 @@ import type { OutcomesResponse } from '@coldemail/shared';
 import { outcomeRows, outcomesSum } from './completion-panel';
 
 const golden: OutcomesResponse = {
+  STOPPED: 0,
   UNSUBSCRIBED: 40,
   BOUNCED: 18,
   REPLIED: { positive: 28, neutral: 19 },
@@ -25,6 +26,7 @@ describe('outcomes reconciliation', () => {
       'Unsubscribed',
       'Hard bounced',
       'Completed (no reply)',
+      'Stopped by incoming email',
     ]);
   });
 

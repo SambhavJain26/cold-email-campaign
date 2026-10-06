@@ -138,6 +138,7 @@ async function evaluateRecycle(
     const blocked =
       lead.isSuppressed ||
       lead.isErased ||
+      status?.hasStop === true ||
       status?.hasReply === true ||
       status?.hasUndispositionedReply === true ||
       (status?.blockedUntil?.getTime() ?? 0) > now.getTime();

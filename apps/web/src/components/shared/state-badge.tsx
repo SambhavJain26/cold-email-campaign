@@ -4,6 +4,7 @@ import { cn } from '@/lib/utils';
 
 /** State accents per docs/11 §5: green ok/positive, amber warning, red failed, blue info. */
 const STYLE: Record<EnrollmentState, string> = {
+  STOPPED: 'border-transparent bg-muted text-muted-foreground',
   NEW: 'border-border bg-transparent text-muted-foreground',
   ACTIVE: 'border-transparent bg-info/15 text-info',
   REPLIED: 'border-transparent bg-success/15 text-success',

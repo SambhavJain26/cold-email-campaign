@@ -373,6 +373,16 @@ export async function selfCheckViolations(
   const enrFilter = c != null ? sql`AND en.campaign_id = ${c}` : sql``;
   const checks: [string, SQL][] = [
     [
+      'STOPPED without outreach_stopped event',
+      sql`SELECT count(*)::int n FROM enrollments en WHERE en.current_state='STOPPED' ${enrFilter}
+        AND NOT EXISTS (SELECT 1 FROM events e WHERE e.enrollment_id=en.id AND e.type='outreach_stopped')`,
+    ],
+    [
+      'outreach_stopped enrollment remains sendable',
+      sql`SELECT count(DISTINCT en.id)::int n FROM enrollments en JOIN events e ON e.enrollment_id=en.id AND e.type='outreach_stopped'
+        WHERE en.current_state IN ('NEW','ACTIVE') ${enrFilter}`,
+    ],
+    [
       'enrollment count != enrolled events',
       sql`SELECT abs((SELECT count(*) FROM enrollments en WHERE true ${enrFilter})
             - (SELECT count(*) FROM events e WHERE e.type = 'enrolled'

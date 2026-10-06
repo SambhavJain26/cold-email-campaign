@@ -13,6 +13,7 @@ export function outcomeRows(outcomes: OutcomesResponse): Array<[string, number]>
     ['Unsubscribed', outcomes.UNSUBSCRIBED],
     ['Hard bounced', outcomes.BOUNCED],
     ['Completed (no reply)', outcomes.COMPLETED],
+    ['Stopped by incoming email', outcomes.STOPPED ?? 0],
   ];
 }
 

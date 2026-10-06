@@ -1,5 +1,27 @@
 # Poller Spec — IMAP Fetch, Classification, Threading, STOP Detection, Idempotency
 
+## 2026-10-06 incoming-company stopping policy
+
+Migration 0022 persists `settings.incoming_stop_since` at application time. Only newly ingested
+messages received at or after that cutoff qualify; historical mail is not replayed. Any incoming
+message, including fresh mail, acknowledgement or OOO, can stop previously contacted leads across
+campaigns. Existing reply, bounce and explicit opt-out classification remains unchanged.
+
+Sender and lead domains use pinned `tldts` public/private suffix boundaries: company subdomains
+match, unrelated hosted tenants do not. A bundled reviewed shared-provider snapshot and local
+extensions restrict shared/unknown/invalid domains to exact-address or thread matches. No runtime
+download occurs. Never-contacted leads and pool-only leads remain untouched.
+
+Policy stops append `outreach_stopped` with incoming-message ID, sender, method and company domain,
+produce terminal `STOPPED`, and clear scheduling. Genuine classified human replies, hard bounces
+and opt-outs keep their own outcomes; policy matches do not inflate those analytics. Under the
+existing enrollment locks, terminal targets are rechecked before insertion. Events, incoming
+ledger and cursor advancement commit atomically. Duplicate/concurrent decisions create no second
+stop. A recorded policy stop blocks automatic and ordinary re-enrollment across campaigns.
+
+Rollback preserves stop facts and the cutoff. Use a compatible release that understands STOPPED;
+an older binary is not a safe rollback after new facts exist. See [runbook](17-local-canary-runbook.md).
+
 Implements spec Part 6 (the four buckets) + Part 9 (failure states) + decision F (auto opt-out). Lives in `apps/server/src/poller/`. Runs as pg-boss job `imap-poll:<mailboxId>` every `settings.poll_interval_minutes` per non-`auth_failed` mailbox.
 
 ---

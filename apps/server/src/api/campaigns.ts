@@ -758,6 +758,7 @@ export async function campaignsRoutes(app: FastifyInstance, services: AppService
         // disappear from the mutually-exclusive outcome sum.
         REPLIED: { positive: repliedPositive, neutral: replied - repliedPositive },
         COMPLETED: count('COMPLETED'),
+        STOPPED: count('STOPPED'),
         ACTIVE: count('ACTIVE'),
         NEW: count('NEW'),
         total: rows.reduce((a, x) => a + x.n, 0),

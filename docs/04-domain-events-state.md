@@ -1,5 +1,12 @@
 # Domain — Event Catalog, State Machine Reducer, Invariants
 
+> **Migration 0022:** `outreach_stopped` records the incoming-message ID, sender, matching method
+> and normalized company domain. It moves only NEW/ACTIVE enrollments to terminal `STOPPED`,
+> without human-reply or unsubscribe analytics/suppression. Existing terminal outcomes survive;
+> later genuine reply/bounce/opt-out facts retain their normal stronger precedence. STOPPED clears
+> scheduling, counts as finished, and prevents re-enrollment. The append-only fact, enum vocabulary
+> and policy cutoff survive migration rollback. Self-check validates stop/projection consistency.
+
 > **Migration 0019 overlay:** personalized steps still use the same append-only enrollment/event
 > state machine. Exact rendered content is snapshotted in `sent_messages`; copy blockers are
 > durable operational state and PII erasure scrubs copy/snapshots without rewriting event lineage.

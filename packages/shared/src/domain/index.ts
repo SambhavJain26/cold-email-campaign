@@ -15,6 +15,7 @@ export const EVENT_TYPES = [
   'deal_lost',
   'sentiment_tagged',
   'reply_dispositioned',
+  'outreach_stopped',
 ] as const;
 export type EventType = (typeof EVENT_TYPES)[number];
 
@@ -25,10 +26,17 @@ export const ENROLLMENT_STATES = [
   'BOUNCED',
   'UNSUBSCRIBED',
   'COMPLETED',
+  'STOPPED',
 ] as const;
 export type EnrollmentState = (typeof ENROLLMENT_STATES)[number];
 
-export const TERMINAL_STATES = ['REPLIED', 'BOUNCED', 'UNSUBSCRIBED', 'COMPLETED'] as const;
+export const TERMINAL_STATES = [
+  'REPLIED',
+  'BOUNCED',
+  'UNSUBSCRIBED',
+  'COMPLETED',
+  'STOPPED',
+] as const;
 export type TerminalState = (typeof TERMINAL_STATES)[number];
 
 /** Spec Part 3: UNSUBSCRIBED > BOUNCED > REPLIED > COMPLETED. */
@@ -37,6 +45,7 @@ export const TERMINAL_PRIORITY: Record<TerminalState, number> = {
   BOUNCED: 3,
   REPLIED: 2,
   COMPLETED: 1,
+  STOPPED: 1.5,
 };
 
 export function isTerminal(state: EnrollmentState): state is TerminalState {

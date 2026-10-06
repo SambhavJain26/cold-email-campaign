@@ -18,6 +18,7 @@ import {
   type NewIncomingMessage,
 } from '../db/repos/incomingMessagesRepo';
 import { classify, type ClassificationResult } from './classifier';
+import { incomingStops } from './companyStop';
 import type { SentimentSuggester } from '../sentiment/types';
 
 export interface PollerDeps {
@@ -120,6 +121,19 @@ export class Poller {
         };
       }
 
+      // Apply company stopping outside poison-message isolation: DB failures
+      // must retry, never silently advance the cursor without enforcing policy.
+      classified.events.push(
+        ...(await incomingStops(
+          db,
+          m,
+          settings,
+          rowId,
+          now,
+          classified.events,
+          classified.matchedEnrollmentId,
+        )),
+      );
       if (classified.events.length > 0) {
         // Events + ledger row + UID high-water land in ONE transaction; the
         // row's resultingEventIds come from the just-inserted event ids.

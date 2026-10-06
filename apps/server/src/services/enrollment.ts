@@ -319,6 +319,7 @@ export async function enrollByIds(
       else if (already.has(id)) skip('already_enrolled');
       else if (activeElsewhere.has(id)) skip('active_enrollment_elsewhere');
       else if (conflicted.has(id)) skip('content_hash_conflict');
+      else if (recontact.get(id)?.hasStop) skip('prior_incoming_email_stop');
       else if (recontact.get(id)?.hasReply && !opts.allowRecontact) skip('prior_human_reply');
       else if (recontact.get(id)?.hasUndispositionedReply) skip('reply_needs_disposition');
       else if ((recontact.get(id)?.blockedUntil?.getTime() ?? 0) > now.getTime())

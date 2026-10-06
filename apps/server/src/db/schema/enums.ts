@@ -16,6 +16,7 @@ export const eventTypeEnum = pgEnum('event_type', [
   'deal_lost',
   'sentiment_tagged',
   'reply_dispositioned',
+  'outreach_stopped',
 ]);
 export const enrollmentStateEnum = pgEnum('enrollment_state', [
   'NEW',
@@ -24,6 +25,7 @@ export const enrollmentStateEnum = pgEnum('enrollment_state', [
   'BOUNCED',
   'UNSUBSCRIBED',
   'COMPLETED',
+  'STOPPED',
 ]);
 export const sentimentEnum = pgEnum('sentiment', ['positive', 'neutral', 'negative']);
 export const leadTierEnum = pgEnum('lead_tier', ['A', 'B', 'C', 'nurture']);

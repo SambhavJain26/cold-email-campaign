@@ -119,7 +119,21 @@ const replyDispositioned_ = base.extend({
   }),
 });
 
+const outreachStopped_ = base.extend({
+  type: z.literal('outreach_stopped'),
+  enrollmentId: id,
+  campaignId: id,
+  reason: z.string().min(1),
+  attributes: z.object({
+    incoming_message_id: id,
+    sender: z.string().min(1),
+    matching_method: z.enum(['company_domain', 'exact_address', 'thread']),
+    company_domain: z.string().nullable(),
+  }),
+});
+
 export const domainEventSchema = z.discriminatedUnion('type', [
+  outreachStopped_,
   enrolled_,
   sent_,
   delivered_,
@@ -146,6 +160,8 @@ type Input<S extends z.ZodType> = z.input<S>;
 
 /** The constructors. Usage: buildEvent.sent({...}) — throws on malformed input. */
 export const buildEvent = {
+  outreachStopped: (a: Omit<Input<typeof outreachStopped_>, 'type'>) =>
+    outreachStopped_.parse({ ...a, type: 'outreach_stopped' }),
   enrolled: (a: Omit<Input<typeof enrolled_>, 'type'>) =>
     enrolled_.parse({ ...a, type: 'enrolled' }),
   sent: (a: Omit<Input<typeof sent_>, 'type'>) => sent_.parse({ ...a, type: 'sent' }),

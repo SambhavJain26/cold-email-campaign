@@ -96,6 +96,8 @@ export function applyEvent(
 
     case 'unsubscribe':
       return toTerminal(s, 'UNSUBSCRIBED', e.occurredAt);
+    case 'outreach_stopped':
+      return isTerminal(s.state) ? s : toTerminal(s, 'STOPPED', e.occurredAt);
 
     case 'meeting_booked':
       return { ...s, meetingBooked: true }; // milestone flag — state unchanged (spec Part 3)

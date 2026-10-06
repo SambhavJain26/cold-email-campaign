@@ -116,7 +116,7 @@ export async function campaignCounts(db: DbLike, campaignId: number): Promise<Ca
           )) AS pending_delivery_confirmation,
       (SELECT count(*)::int FROM enrollments e JOIN ${leads} l ON l.id = e.lead_id AND NOT l.is_erased
         WHERE e.campaign_id = ${campaignId}
-          AND e.current_state IN ('REPLIED', 'BOUNCED', 'UNSUBSCRIBED', 'COMPLETED')) AS finished,
+          AND e.current_state IN ('REPLIED', 'BOUNCED', 'UNSUBSCRIBED', 'COMPLETED', 'STOPPED')) AS finished,
       (SELECT count(*)::int
         FROM enrollments e
         JOIN ${leads} l ON l.id = e.lead_id AND NOT l.is_erased

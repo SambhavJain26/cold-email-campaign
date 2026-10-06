@@ -356,6 +356,7 @@ describe('B6.6 campaigns', () => {
     expect(res).toEqual({
       UNSUBSCRIBED: 0,
       BOUNCED: 0,
+      STOPPED: 0,
       REPLIED: { positive: 1, neutral: 2 },
       COMPLETED: 2,
       ACTIVE: 0, // every enrollment was placed into a terminal state above

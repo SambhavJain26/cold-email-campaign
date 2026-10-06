@@ -42,7 +42,9 @@ describe('B6.14 golden parity — API === committed fixtures', () => {
     const res = (
       await h.inject({ method: 'GET', url: `/api/v1/campaigns/${GOLDEN.campaignId}/outcomes` })
     ).json();
-    expect(res).toEqual(fixture('outcomes.json'));
+    const { STOPPED, ...legacyOutcomes } = res;
+    expect(STOPPED).toBe(0);
+    expect(legacyOutcomes).toEqual(fixture('outcomes.json'));
   });
 
   it('GET /analytics/overview matches overview.json (every headline number)', async () => {

@@ -37,6 +37,7 @@ export async function resetCoreTables(pool: Pool): Promise<void> {
   await pool.query(
     `INSERT INTO auto_enrollment_state (singleton) VALUES (true) ON CONFLICT DO NOTHING`,
   );
+  await pool.query('UPDATE settings SET incoming_stop_since = now() WHERE id = 1');
   // compliance_settings survives TRUNCATE (single seeded row) and its seed
   // default physical_address is '' — which trips the B4 global send guard
   // (docs/08 §4). Restore a test address so every DB suite can send; suites

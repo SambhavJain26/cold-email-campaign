@@ -542,6 +542,7 @@ export interface EligibleLead {
 }
 
 export interface RecontactStatus {
+  hasStop: boolean;
   hasReply: boolean;
   hasUndispositionedReply: boolean;
   blockedUntil: Date | null;
@@ -559,6 +560,7 @@ export async function recontactStatusByLeadIds(
   if (leadIds.length === 0) return new Map();
   const result = await db.execute(sql`
     SELECT l.id AS lead_id,
+      EXISTS (SELECT 1 FROM events os WHERE os.lead_id=l.id AND os.type='outreach_stopped') AS has_stop,
       EXISTS (
         SELECT 1 FROM events hr
         WHERE hr.lead_id = l.id AND hr.type = 'human_reply'
@@ -592,11 +594,13 @@ export async function recontactStatusByLeadIds(
   for (const raw of result.rows as unknown as Array<{
     lead_id: number | string;
     has_reply: boolean;
+    has_stop: boolean;
     has_undispositioned_reply: boolean;
     blocked_until: Date | string | null;
   }>) {
     statuses.set(Number(raw.lead_id), {
       hasReply: raw.has_reply,
+      hasStop: raw.has_stop,
       hasUndispositionedReply: raw.has_undispositioned_reply,
       blockedUntil: raw.blocked_until === null ? null : new Date(raw.blocked_until),
     });
@@ -640,7 +644,7 @@ export async function selectEligibleLeads(
           WHERE e.lead_id = ${leads.id} AND e.campaign_id = ${campaignId})
         AND NOT EXISTS (
           SELECT 1 FROM events hr
-          WHERE hr.lead_id = ${leads.id} AND hr.type = 'human_reply')
+          WHERE hr.lead_id = ${leads.id} AND hr.type IN ('human_reply','outreach_stopped'))
         AND ${hashGuard}`,
     )
     .orderBy(
