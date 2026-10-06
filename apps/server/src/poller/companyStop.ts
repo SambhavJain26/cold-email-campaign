@@ -60,12 +60,7 @@ export async function incomingStops(
   classified: readonly DomainEvent[],
   threadEnrollmentId?: number,
 ): Promise<DomainEvent[]> {
-  if (
-    !settings.incomingStopSince ||
-    m.receivedAt < settings.incomingStopSince ||
-    m.receivedAt > now
-  )
-    return [];
+  if (!settings.incomingStopSince || m.receivedAt < settings.incomingStopSince) return [];
   const sender = senderIdentity(m.from);
   const thread = await threadLeadId(db, threadEnrollmentId);
   const targets = await contactedStopTargets(db, m.receivedAt);

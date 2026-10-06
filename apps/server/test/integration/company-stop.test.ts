@@ -218,5 +218,13 @@ describe('incoming company stops', () => {
     expect(replay.checked).toBe(8);
     expect(replay.diffs).toEqual([]);
     expect(await selfCheckViolations(db, null)).toEqual([]);
+    // A fresh message may arrive while fetch runs, after the poll's clock snapshot.
+    incoming('two@gmail.com', '<during-fetch@gmail.com>', '2026-10-06T12:00:01Z', {
+      'auto-submitted': 'auto-replied',
+    });
+    await poller.poll(1);
+    expect(
+      (await pool.query('SELECT current_state FROM enrollments WHERE lead_id=4 ORDER BY id')).rows,
+    ).toEqual([{ current_state: 'STOPPED' }, { current_state: 'STOPPED' }]);
   });
 });

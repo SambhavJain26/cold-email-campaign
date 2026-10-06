@@ -32,12 +32,19 @@ describe('application update detection', () => {
     expect(screen.queryByText('A newer application version is available.')).toBeNull();
   });
   it('does not announce matching or malformed metadata', async () => {
-    vi.stubGlobal(
-      'fetch',
-      vi.fn().mockResolvedValue({ ok: true, json: async () => ({ version: 'running' }) }),
-    );
+    const fetcher = vi
+      .fn()
+      .mockResolvedValue({ ok: true, json: async () => ({ version: 'running' }) });
+    vi.stubGlobal('fetch', fetcher);
+    for (let mount = 1; mount <= 3; mount++) {
+      const view = render(<UpdateAvailableBanner version="running" enabled />);
+      await waitFor(() => expect(fetcher).toHaveBeenCalledTimes(mount));
+      expect(screen.queryByRole('button', { name: 'Refresh now' })).toBeNull();
+      view.unmount();
+    }
+    fetcher.mockResolvedValue({ ok: true, json: async () => ({ unexpected: 'new' }) });
     render(<UpdateAvailableBanner version="running" enabled />);
-    await waitFor(() => expect(fetch).toHaveBeenCalled());
+    await waitFor(() => expect(fetcher).toHaveBeenCalledTimes(4));
     expect(screen.queryByRole('button', { name: 'Refresh now' })).toBeNull();
   });
   it('protects dirty forms, clears the guard on unmount, and never reloads automatically', () => {
@@ -50,8 +57,11 @@ describe('application update detection', () => {
     vi.spyOn(window, 'confirm').mockReturnValue(false);
     refreshApplication(reload);
     expect(reload).not.toHaveBeenCalled();
-    view.unmount();
+    vi.mocked(window.confirm).mockReturnValue(true);
     refreshApplication(reload);
     expect(reload).toHaveBeenCalledOnce();
+    view.unmount();
+    refreshApplication(reload);
+    expect(reload).toHaveBeenCalledTimes(2);
   });
 });
