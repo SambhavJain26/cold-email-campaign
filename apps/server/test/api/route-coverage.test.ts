@@ -47,6 +47,8 @@ const CONTRACT_ROUTES = [
   'DELETE /api/v1/imports/:id',
   'POST /api/v1/imports/:id/commit',
   'POST /api/v1/imports/:id/allocation-preview',
+  'POST /api/v1/imports/:id/copy-update-preview',
+  'POST /api/v1/imports/:id/copy-update-commit',
   'GET /api/v1/imports',
   'GET /api/v1/imports/:id/draft-preview',
   'GET /api/v1/sequences',

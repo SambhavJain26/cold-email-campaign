@@ -44,6 +44,7 @@ import { useCampaigns } from '@/api/queries/campaigns';
 import { useImportAllocationPreview, useImports } from '@/api/queries/imports';
 import { useSequences } from '@/api/queries/sequences';
 import { CollectionPagination } from '@/components/shared/collection-pagination';
+import { CopyUpdatePanel } from './copy-update-panel';
 
 interface AllocationRow {
   campaignId?: number;
@@ -145,6 +146,13 @@ function ImportHistory() {
                 ))}
               </ul>
             )}
+            {item.copy_update && (
+              <p>
+                Copy update · Campaign #{item.copy_update.campaign_id} ·{' '}
+                {item.copy_update.counts.changed} changed · {item.copy_update.counts.unmatched}{' '}
+                unmatched
+              </p>
+            )}
           </article>
         ))}
       </div>
@@ -168,6 +176,7 @@ export function ImportWizard({
   onOpenChange: (open: boolean) => void;
 }) {
   const upload = useUploadImport();
+  const [operation, setOperation] = useState('import');
   const commit = useCommitImport();
   const [preview, setPreview] = useState<PreviewState | null>(null);
   const [result, setResult] = useState<CommitImportResponse | null>(null);
@@ -207,6 +216,7 @@ export function ImportWizard({
   const handleOpenChange = (next: boolean) => {
     if (!next) {
       setPreview(null);
+      setOperation('import');
       setResult(null);
       setUploadError(null);
       setExpanded(null);
@@ -333,7 +343,22 @@ export function ImportWizard({
         )}
 
         {/* Step 2 — Preview (the walkthrough panel verbatim) */}
-        {preview && counts && result === null && (
+        {preview && result === null && (
+          <>
+            <RadioGroup value={operation} onValueChange={setOperation} className="mb-4">
+              <label className="flex items-center gap-2">
+                <RadioGroupItem value="import" />
+                Import leads
+              </label>
+              <label className="flex items-center gap-2">
+                <RadioGroupItem value="update" />
+                Update existing campaign copy
+              </label>
+            </RadioGroup>
+            {operation === 'update' && <CopyUpdatePanel importId={preview.importId} />}
+          </>
+        )}
+        {preview && counts && result === null && operation === 'import' && (
           <div className="space-y-3">
             <ul className="divide-y divide-border rounded-lg border border-border text-sm">
               {IMPORT_ROW_FLAGS.map((flag) => {

@@ -16,6 +16,9 @@ import {
   okResponseSchema,
   pageQuerySchema,
   type ImportDto,
+  copyUpdateBodySchema,
+  copyUpdateCommitBodySchema,
+  copyUpdatePreviewSchema,
 } from '@coldemail/shared';
 import type { AppServices } from '../composition';
 import {
@@ -36,6 +39,7 @@ import { PoolAllocationError } from '../services/campaignPools';
 import { getCampaign } from '../db/repos/campaignsRepo';
 import { MAX_BYTES } from '../ingest/parse';
 import { AppError } from './errors';
+import { previewCopyUpdate, commitCopyUpdate } from '../ingest/copyUpdate';
 import type { ZodTypeProvider } from './plugins/zodCompilers';
 
 function toImportDto(row: ImportRow, allocations: ImportPoolAllocationSummary[] = []): ImportDto {
@@ -55,6 +59,7 @@ function toImportDto(row: ImportRow, allocations: ImportPoolAllocationSummary[] 
       released: allocation.released,
     })),
     created_at: row.createdAt.toISOString(),
+    copy_update: row.copyUpdate as ImportDto['copy_update'],
   };
 }
 
@@ -67,6 +72,29 @@ export async function importsRoutes(app: FastifyInstance, services: AppServices)
   await app.register(fastifyMultipart, {
     limits: { files: 1, fileSize: MAX_BYTES },
   });
+
+  r.post(
+    '/imports/:id/copy-update-preview',
+    {
+      schema: {
+        params: idParamSchema,
+        body: copyUpdateBodySchema,
+        response: { 200: copyUpdatePreviewSchema },
+      },
+    },
+    async (req) => previewCopyUpdate(db, req.params.id, req.body),
+  );
+  r.post(
+    '/imports/:id/copy-update-commit',
+    {
+      schema: {
+        params: idParamSchema,
+        body: copyUpdateCommitBodySchema,
+        response: { 200: copyUpdatePreviewSchema },
+      },
+    },
+    async (req) => commitCopyUpdate(db, req.params.id, req.body, clock.now()),
+  );
 
   r.post(
     '/imports',

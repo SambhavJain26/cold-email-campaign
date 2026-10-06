@@ -36,6 +36,7 @@ export const imports = pgTable('imports', {
   counts: jsonb('counts').$type<ImportCounts>().notNull(),
   committed: boolean('committed').notNull().default(false),
   commitMode: text('commit_mode'),
+  copyUpdate: jsonb('copy_update').$type<{ campaign_id: number; counts: Record<string, number> }>(),
   createdAt: tz('created_at').notNull().defaultNow(),
 });
 

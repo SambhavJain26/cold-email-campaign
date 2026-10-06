@@ -3,6 +3,56 @@
 import { z } from 'zod';
 import { isoDateTime, listOf } from './common';
 
+export const copyUpdateBodySchema = z
+  .object({
+    campaign_id: z.number().int().positive(),
+    generic_copy_step_no: z.number().int().positive().optional(),
+    page: z.number().int().positive().optional(),
+  })
+  .strict();
+export const COPY_UPDATE_STATUSES = [
+  'changed',
+  'unchanged',
+  'sent_protected',
+  'retry_protected',
+  'invalid',
+  'suppressed',
+  'unmatched',
+] as const;
+export const copyUpdatePreviewSchema = z
+  .object({
+    campaign_id: z.number().int(),
+    fingerprint: z.string(),
+    counts: z
+      .object({
+        changed: z.number().int(),
+        unchanged: z.number().int(),
+        sent_protected: z.number().int(),
+        retry_protected: z.number().int(),
+        invalid: z.number().int(),
+        suppressed: z.number().int(),
+        unmatched: z.number().int(),
+      })
+      .strict(),
+    entries: z.array(
+      z
+        .object({
+          row_no: z.number().int(),
+          email: z.string().nullable(),
+          step_no: z.number().int().nullable(),
+          status: z.enum(COPY_UPDATE_STATUSES),
+          reason: z.string(),
+        })
+        .strict(),
+    ),
+    total_entries: z.number().int(),
+  })
+  .strict();
+export const copyUpdateCommitBodySchema = copyUpdateBodySchema
+  .extend({ fingerprint: z.string().min(1) })
+  .strict();
+export type CopyUpdatePreview = z.infer<typeof copyUpdatePreviewSchema>;
+
 export const IMPORT_ROW_FLAGS = [
   'ok',
   'missing_first_name',
@@ -176,7 +226,11 @@ export const importSchema = z
     rows_total: z.number().int(),
     counts: importCountsSchema,
     committed: z.boolean(),
-    commit_mode: z.enum(['drop_flagged', 'import_all']).nullable(),
+    commit_mode: z.enum(['drop_flagged', 'import_all', 'update_copy']).nullable(),
+    copy_update: z
+      .object({ campaign_id: z.number().int(), counts: copyUpdatePreviewSchema.shape.counts })
+      .nullable()
+      .optional(),
     pool_allocations: z.array(
       z
         .object({

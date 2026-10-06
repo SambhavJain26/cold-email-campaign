@@ -1,5 +1,23 @@
 # Ingest Spec — CSV Import, Hygiene, Tiering, Suppression, Recycling
 
+## 2026-10-06 campaign copy update mode
+
+After CSV upload, choose Import leads or Update existing campaign copy. Update mode requires a
+draft/paused target and matches normalized emails to its enrolled or available pooled members.
+It bypasses allocation and creates no leads, memberships, enrollments or sends. Outside rows are
+skipped/reported. Progress, schedules, mailboxes, stopped states and suppression stay unchanged.
+
+`step_N_subject`/`step_N_body` map exact personalized steps. Generic copy needs an explicit
+destination when multiple personalized steps exist. Blank pairs leave saved copy alone; partial
+pairs or conflicting duplicate/destination copy are invalid. Preview reports changed, unchanged,
+sent-protected, retry-protected, invalid, suppressed and unmatched entries in 100-entry pages.
+
+Commit locks the campaign, enrolled members and saved inputs, rejects stale fingerprints and
+rechecks send/retry protection atomically. Only eligible unsent copies and reusable sources are
+replaced/created Ready; blockers for those steps are cleared. Identical reimports cause no further
+copy changes. Sent snapshots and saved retry payloads stay intact. Migration 0024 records selected
+campaign and result counts in committed `update_copy` history, retained on rollback.
+
 > **Migration 0019 overlay:** `manual_subject`/`manual_body` create global copy sources and
 > `step_N_subject`/`step_N_body` can bind exact personalized steps. Copy cells alone decode `\n`;
 > assignment snapshots are independent; current tiers are A/B/Untiered with separate Nurture
