@@ -4,6 +4,12 @@
 
 **Legend:** `[ ]` not started · `[~]` in progress · `[x]` done · `[!]` blocked (note why in the log)
 
+**2026-10-06 separately authorized deployment:** [x] `b721684` pushed/deployed; all 25 migrations,
+routes/services/caching, 93-enrollment zero drift, self-check and validated pre/post backups pass.
+Campaigns remain paused, auto-enrollment off, watermarks unchanged at 245 events / 74 sent.
+VPS usage and cleanup opportunities are recorded in docs/17; no cleanup was executed. Authenticated
+browser replay awaits operator sign-in. Revised CSV import and resume remain separate.
+
 **2026-10-06 four-part update — local implementation complete:**
 
 - [x] Reliable build-ID notification and guarded manual refresh; correct subpath caching.
@@ -16,8 +22,9 @@
 - [x] Repository/browser/migration gates, populated zero-drift/self-check and backup restore.
 
 Workstreams are committed on `canary`; docs/17 records exact verification and rollout boundaries.
-Production remains `4b4e0c7`. No deployment, production CSV operation, push, campaign resume or
-outbound mail occurred. Deployment and revised-file import require separate operational instructions.
+At the implementation checkpoint production remained `4b4e0c7`; the deployment entry above
+supersedes that status. No production CSV operation, campaign resume or outbound mail occurred.
+Revised-file import still requires a separate operational instruction.
 
 **2026-10-05 Sequence picker repair:** verified, pushed, and deployed at `4b4e0c7`; selected campaign now scopes pooled
 and enrolled leads, with paging, search, loading/error states, and cleared stale selections/renders.

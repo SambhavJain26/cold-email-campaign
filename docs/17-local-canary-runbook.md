@@ -1,5 +1,56 @@
 # Local canary runbook (B8.3-local) — two-week validation on throwaway Gmail
 
+## 2026-10-06 four-part production deployment and VPS assessment
+
+The operator separately authorized deployment and a post-deployment VPS usage/cleanup assessment.
+Production was clean at `4b4e0c71d`; Campaigns 2/3 were paused, automatic enrollment off, Campaign 1
+archived. Watermarks were **245 events / max ID 245 / 74 sent messages**. The reviewed bundle for
+`b721684` matched SHA-256 `a64372c1a91e963838b61ef520003b381d22664a8962312bc5f924e23b075642`
+on both hosts. `origin/canary` was pushed, production fast-forwarded, and Compose build/up passed.
+Paused state was rechecked immediately before up. No production CSV upload/import, campaign edit,
+enrollment, resume or outbound send occurred.
+
+Pre-backup `coldemail-20261006-063954.dump` (**2,096,380 bytes**) and post-backup
+`coldemail-20261006-064227.dump` (**2,096,925 bytes**) each pass a **342-line** restore catalog.
+All **25 migrations** are applied; persistent policy cutoff is
+**2026-10-06 06:41:30.403034 UTC**. Signature operator configuration exactly matches the requested
+name, role and address. App/database are healthy and gateway/backup are running. Projection replay
+checks **93 enrollments — zero diffs**; self-check is clean. Post-deployment watermarks remain
+**245/245/74** and Campaigns 2/3 remain paused with automatic enrollment off.
+
+Public health/app/Sequence/Leads/portfolio routes return 200; bare app and outreach roots retain
+308 redirects; both unsubscribe roots return 404. HTML and version metadata are no-store, hashed
+JS is immutable, missing JS returns 404, and served version
+`c828875b-b8f6-4f0c-ae07-c6fd03b63393` matches the loaded bundle. A read-only production Ready-copy
+render verifies exact signature lines/actual mailbox domain in both text and HTML without saving
+copy or issuing a send. The in-app browser is signed out. One normal login probe with the existing
+configured initial credential returned 401; no credential reset or further attempt was made.
+**Authenticated browser replay remains pending operator sign-in.** The sign-in page was shown for
+handoff; all other deployment verification above is complete.
+
+VPS snapshot after builds at 06:42 UTC: **1 vCPU**, CPU **1–2%** in the two fresh one-second samples
+(98–99% idle), RAM **751,190,016 / 2,063,601,664 bytes** used (**36%**), with
+**1,312,411,648 bytes available**. Swap uses **117,764,096 / 2,147,479,552 bytes** with zero swap I/O
+in those samples. Root disk uses **11,516,100,608 / 24,883,167,232 bytes**, **47%**, with
+**13,350,289,408 bytes available**. App container is **164.1 MiB**, database **72.99 MiB**, gateway
+**12.63 MiB**, backup **2.75 MiB**. Post-build load averages 0.82/0.51/0.22 include build history;
+fresh CPU samples demonstrate current low utilization.
+
+Docker reports **3.492 GB** build cache, **3.387 GB reclaimable**. This is the main safe cleanup
+candidate once explicitly authorized; pruning it affects future build speed, not running services
+or database/backup volumes. Actual physical recovery may differ because layers are shared. Docker
+also misleadingly reports active images as 100% reclaimable; **all four images are active**, so
+do not count those as disposable. Docker's containerd store is 4.6G in addition to 1.3G under
+`/var/lib/docker`. Logs total 773M, journals 555.3M; older journals could be trimmed after choosing
+retention. APT archives are only 8.4M (most of the 120M cache directory is metadata), app checkout
+138M, temporary files 14M. No urgent cleanup is necessary at 47% disk usage. **No cleanup was
+performed**, beyond removing the agent-created in-container verification helpers. Database,
+backup volumes, production dumps and service images were preserved. `docker buildx` is unavailable
+on this host; built-in Compose builds and `docker system df` work normally.
+
+Application release remains pinned to `b721684`; subsequent documentation commits do not require
+an image rebuild. Revised production CSV commit and campaign resume remain separate operator steps.
+
 ## 2026-10-06 four-part local release — verified, not deployed
 
 The operator authorized implementation on `canary` while their production campaign remains

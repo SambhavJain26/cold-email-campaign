@@ -1,6 +1,15 @@
 # Deployment & Operations
 
-**2026-10-06 local candidate:** the four-part release is implemented and locally verified on
+**2026-10-06 production deployment:** operator-authorized four-part release `b721684` is pushed
+and deployed. All 25 migrations, public routes/caching, services, 93-enrollment zero drift,
+self-check and validated pre/post backups pass. Campaigns 2/3 remain paused; automatic enrollment
+is off; event/sent counts remain 245/74. The persistent incoming-stop cutoff is
+`2026-10-06T06:41:30.403034Z`. Production Ready-copy renderer verifies text/HTML signatures.
+Authenticated browser replay awaits operator sign-in. CSV commit and resume remain separate.
+VPS disk is 47% used; 3.387 GB of build cache is reported reclaimable. Assessment only; no cleanup.
+See [deployment evidence](17-local-canary-runbook.md).
+
+**Previous 2026-10-06 local candidate:** the four-part release was implemented and locally verified on
 `canary`, with migrations 0022–0024. It is not deployed; production remains `4b4e0c7`. The operator
 reports pausing outreach. Before separately authorized deployment, verify that live state, record
 watermarks and validate a backup. Deploy the complete reviewed candidate, then verify all 25

@@ -19,6 +19,17 @@ call planned work implemented.
 
 ## Current operating boundary
 
+- **2026-10-06 four-part deployment:** separately authorized, pushed and deployed at `b721684`
+  on `canary`. All 25 migrations, services/routes/version caching, 93-enrollment zero drift,
+  self-check and validated pre/post backup catalogs pass. Production Ready-copy rendering verifies
+  exact signature lines and actual mailbox domain in text/HTML. Campaigns 2/3 remain paused with
+  automatic enrollment off; watermarks stay 245 events / 74 sent messages. The policy cutoff is
+  `2026-10-06T06:41:30.403034Z`. No production CSV operation, enrollment, resume or send occurred.
+  Authenticated browser replay remains pending operator sign-in; the browser is signed out and
+  the configured initial credential is no longer valid. Do not reset credentials to verify it.
+  VPS cleanup was assessed only: build cache is the principal candidate; no cleanup was executed.
+  See docs/17 for measurements, backups and remaining operational boundaries.
+
 - **2026-10-06 four-part local release:** operator-authorized implementation on `canary`
   adds build-ID update detection, newly received company-mail stopping, protected CSV campaign
   copy updates, and the requested four-line signature without automatic opt-out body wording.
@@ -27,7 +38,8 @@ call planned work implemented.
   Local gates, populated replay/self-check and backup restore are verified in docs/17.
   The operator reports the campaign paused; no production mutation, CSV upload, outbound mail,
   activation/enrollment/resume, push or deployment occurred. Deployment needs separate explicit
-  authorization, a fresh paused-state check and validated backup. Production remains `4b4e0c7`.
+  authorization, a fresh paused-state check and validated backup. At that checkpoint production
+  remained `4b4e0c7`; the separately authorized deployment above supersedes that release status.
   STOPPED facts and the policy cutoff survive rollback; only use rollback code that understands
   the new vocabulary after such facts exist. Production CSV commit and resume remain separate.
 
@@ -350,7 +362,7 @@ temporary rollback/canary environment.
 - App: `/opt/email-campaign`; stack: `docker-compose.spaceship.yml` with `.env.prod`
 - Public UI: `https://sambhavpmtech.com/email-campaign/`
 - Internal gateway: `127.0.0.1:18080`; host Caddy is the only public 80/443 listener
-- Deployed application release: `canary` at `4b4e0c7`
+- Deployed application release: `canary` at `b721684`
 
 The repository is private and the VPS currently has no GitHub deploy credential. Until a read-only
 deploy key is deliberately installed, transfer a reviewed `git bundle`, fetch the pinned branch
