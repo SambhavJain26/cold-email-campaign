@@ -23,6 +23,7 @@ import {
 } from './draft';
 import { PreviewPanel, type PreviewTarget } from './preview-panel';
 import { StepCard } from './step-card';
+import { useUnsavedChanges } from '@/lib/unsaved-changes';
 
 /** F4.2/F4.3/F4.4 — the sequence builder (docs/12 §5). Mounted with `key={sequence.id}`
  *  so a different sequence remounts with fresh state initializers (no setState-in-effect). */
@@ -42,6 +43,7 @@ export function SequenceBuilder({ sequence }: { sequence?: SequenceDto }) {
   const saving = create.isPending || update.isPending;
   const blockers = draftBlockers(draft);
   const dirty = !draftsEqual(draft, savedDraft);
+  useUnsavedChanges(dirty);
 
   const edit = (next: SequenceDraft) => setDraft(next);
   const patchStep = (uid: string, next: DraftStep) =>

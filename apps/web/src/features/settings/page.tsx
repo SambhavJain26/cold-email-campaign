@@ -6,6 +6,7 @@ import { useCompliance, useSettings } from '@/api/queries/settings';
 import { AccountTab } from './account-tab';
 import { ComplianceTab } from './compliance-tab';
 import { RulesTab } from './rules-tab';
+import { useUnsavedChanges } from '@/lib/unsaved-changes';
 
 /** F2.5–F2.7 — Settings (docs/12 §10): rules | compliance | account tabs,
  *  with a dirty-state guard on tab switch. */
@@ -14,6 +15,7 @@ export default function SettingsPage() {
   const compliance = useCompliance();
   const [tab, setTab] = useState('rules');
   const [dirtyTabs, setDirtyTabs] = useState<Record<string, boolean>>({});
+  useUnsavedChanges(Boolean(dirtyTabs[tab]));
 
   const setDirty = useCallback(
     (name: string) => (dirty: boolean) =>
