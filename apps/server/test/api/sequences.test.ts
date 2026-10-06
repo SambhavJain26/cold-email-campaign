@@ -251,9 +251,8 @@ describe('B6.5 sequences', () => {
       expect(p.body).toContain('Hi Amy');
       expect(p.body).toContain('your Dallas listings move fast'); // researched-mode observation
       expect(p.body).toContain('100 Test Street, Austin TX 78701'); // footer, unconditional
-      expect(p.body).toContain(
-        'Unsubscribe: https://unsubscribe-preview.invalid/u/not-a-live-token',
-      );
+      expect(p.body).not.toContain('Unsubscribe:');
+      expect(p.body).toContain('Best,\nSambhav Jain\nAutomation Specialist | ');
       expect(p.checks.score).toBeGreaterThan(0);
       expect(p.checks.fatal).toEqual([]);
       expect(p.checks.variations).toBeGreaterThanOrEqual(1);
@@ -272,7 +271,10 @@ describe('B6.5 sequences', () => {
         },
       });
       expect(withMailbox.statusCode).toBe(200);
-      expect(withMailbox.json().body).toContain('\nsambhavpmops.com\n\nUnsubscribe:');
+      expect(withMailbox.json().body).toContain(
+        'Automation Specialist | sambhavpmops.com\n100 Test Street',
+      );
+      expect(withMailbox.json().body).not.toContain('Unsubscribe:');
       expect(withMailbox.json().body).not.toContain('[sender domain');
       const missingMailbox = await h.inject({
         method: 'POST',

@@ -41,18 +41,21 @@ describe('migration runner', () => {
   });
 
   it('plain text migration changes only the old default role and preserves custom wording', async () => {
-    await migrateDown(pool, MIGRATIONS_DIR, 1);
+    const migration = (await loadMigrations(MIGRATIONS_DIR)).find(
+      (m) => m.name === '0021_plain_text_mode',
+    )!;
+    await pool.query(migration.downSql);
     await pool.query(
       "UPDATE compliance_settings SET signature_role_line='Automation Specialist | Sambhav Builds'",
     );
-    await migrateUp(pool, MIGRATIONS_DIR);
+    await pool.query(migration.upSql);
     expect(
       (await pool.query('SELECT email_format, signature_role_line FROM compliance_settings'))
         .rows[0],
     ).toEqual({ email_format: 'plain_text', signature_role_line: 'Automation Specialist' });
-    await migrateDown(pool, MIGRATIONS_DIR, 1);
     await pool.query("UPDATE compliance_settings SET signature_role_line='Custom role'");
-    await migrateUp(pool, MIGRATIONS_DIR);
+    await pool.query(migration.downSql);
+    await pool.query(migration.upSql);
     expect(
       (await pool.query('SELECT signature_role_line FROM compliance_settings')).rows[0]
         .signature_role_line,
@@ -60,6 +63,46 @@ describe('migration runner', () => {
     await expect(
       pool.query("UPDATE compliance_settings SET email_format='invalid'"),
     ).rejects.toThrow();
+    await resetCoreTables(pool);
+  });
+
+  it('four-part rollback preserves the policy cutoff and copy-update history', async () => {
+    const cutoff = (await pool.query('SELECT incoming_stop_since FROM settings WHERE id=1')).rows[0]
+      .incoming_stop_since;
+    const importId = (
+      await pool.query(
+        "INSERT INTO imports (filename, rows_total, counts, copy_update) VALUES ('history.csv',0,'{}','{\"campaign_id\":1}') RETURNING id",
+      )
+    ).rows[0].id;
+    expect(await migrateDown(pool, MIGRATIONS_DIR, 3)).toEqual(names.slice(-3).reverse());
+    expect(
+      (await pool.query('SELECT incoming_stop_since FROM settings WHERE id=1')).rows[0]
+        .incoming_stop_since,
+    ).toEqual(cutoff);
+    expect(
+      (await pool.query('SELECT copy_update FROM imports WHERE id=$1', [importId])).rows[0]
+        .copy_update,
+    ).toEqual({ campaign_id: 1 });
+    expect(await migrateUp(pool, MIGRATIONS_DIR)).toEqual(names.slice(-3));
+    expect(
+      (await pool.query('SELECT incoming_stop_since FROM settings WHERE id=1')).rows[0]
+        .incoming_stop_since,
+    ).toEqual(cutoff);
+    expect(
+      (await pool.query('SELECT copy_update FROM imports WHERE id=$1', [importId])).rows[0]
+        .copy_update,
+    ).toEqual({ campaign_id: 1 });
+    expect(
+      (
+        await pool.query(
+          'SELECT signature_name, signature_role_line, physical_address FROM compliance_settings WHERE id=1',
+        )
+      ).rows[0],
+    ).toEqual({
+      signature_name: 'Sambhav Jain',
+      signature_role_line: 'PM Systems & Automation Specialist',
+      physical_address: '17, Radhaswami Nagar, Jaipur 302020, IN',
+    });
     await resetCoreTables(pool);
   });
 

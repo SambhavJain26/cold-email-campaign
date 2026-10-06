@@ -247,7 +247,7 @@ function mockRenderChecks(
     if (stepNo === 1) fatal.push({ id: 'url_in_step1', message: 'step 1 must not contain URLs' });
     else warnings.push({ id: 'url', message: 'follow-up contains a URL' });
   }
-  if (compliance.physical_address.trim() === '' || compliance.optout_text.trim() === '') {
+  if (compliance.physical_address.trim() === '') {
     fatal.push({
       id: 'footer',
       message: 'compliance footer needs a physical address and opt-out text',
@@ -1054,18 +1054,15 @@ export const handlers: RequestHandler[] = [
       // The real engine appends the footer after all expansion (docs/08 §4) —
       // final blank line included so the panel can split it back out. Mirrors
       // render/footer.ts appendFooter, including the dormant-URL fallback.
-      const base = db.compliance.unsubscribe_base_url.trim();
-      const optoutLine =
-        base === ''
-          ? db.compliance.optout_text
-          : 'Unsubscribe: https://unsubscribe-preview.invalid/u/not-a-live-token';
       const mailbox = db.mailboxes.find((item) => item.id === body.mailbox_id);
       const domain =
         mailbox?.from_address.split('@')[1] ?? '[sender domain — select a preview mailbox]';
-      const content = bodyPreFooter.trimEnd();
-      const separator = content.split(/\r?\n/).at(-1)?.trim() === 'Best,' ? '\n' : '\n\n';
-      const signature = `${separator}${db.compliance.signature_name}\n${db.compliance.signature_role_line}\n${domain}`;
-      const footer = `\n\n${optoutLine}\n${db.compliance.physical_address}`;
+      const content = bodyPreFooter
+        .trimEnd()
+        .replace(/(?:^|\n)\s*Best,\s*$/i, '')
+        .trimEnd();
+      const signature = `\n\nBest,\n${db.compliance.signature_name}\n${db.compliance.signature_role_line} | ${domain}`;
+      const footer = `\n${db.compliance.physical_address}`;
       return HttpResponse.json({
         subject,
         body: content + signature + footer,

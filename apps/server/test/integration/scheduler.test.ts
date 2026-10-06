@@ -35,7 +35,9 @@ describe('scheduler (B3.7/B3.8)', () => {
     const mailbox = (await s.pool.query(`SELECT from_address FROM mailboxes WHERE id = 1`)).rows[0];
     for (const entry of sent) {
       const domain = mailbox.from_address.split('@')[1];
-      expect(entry.msg.bodyText).toContain(`\nSambhav Jain\nAutomation Specialist\n${domain}\n\n`);
+      expect(entry.msg.bodyText).toContain(
+        `Best,\nSambhav Jain\nAutomation Specialist | ${domain}\n`,
+      );
       expect(entry.msg.bodyHtml).toBeUndefined();
       expect(entry.msg.bodyText).not.toContain('[sender domain');
     }
@@ -379,7 +381,7 @@ describe('scheduler (B3.7/B3.8)', () => {
       expect(sends[1]!.msg.bodyText).toBe(original.bodyText);
       expect(sends[1]!.msg.bodyHtml).toBe(original.bodyHtml);
       expect(sends[2]!.msg.bodyText).toContain('\nUpdated Name\n');
-      expect(sends[2]!.msg.bodyText).toContain('\nUpdated Role\n');
+      expect(sends[2]!.msg.bodyText).toContain('\nUpdated Role | ');
       expect(Boolean(sends[2]!.msg.bodyHtml)).toBe(format === 'plain_text');
     },
     30_000,
@@ -407,7 +409,9 @@ describe('scheduler (B3.7/B3.8)', () => {
       expect(sends.length).toBeGreaterThanOrEqual(2);
       expect(sends[1]!.msg.bodyText).toBe(original.bodyText);
       expect(sends[1]!.msg.bodyHtml).toBe(original.bodyHtml);
-      expect(sends[1]!.msg.headers.listUnsubscribeUrl).toBe(original.headers.listUnsubscribeUrl);
+      expect(sends[1]!.msg.headers.listUnsubscribeUrl).toMatch(
+        /^https:\/\/unsubscribe.example.com\/u\//,
+      );
       const snapshots = await s.pool.query(
         'SELECT email_format, rendered_body_html FROM sent_messages WHERE step_no=1 ORDER BY sent_at',
       );
@@ -434,7 +438,7 @@ describe('scheduler (B3.7/B3.8)', () => {
     await s.advanceDays(2);
     const sends = s.mock.sentTo(leadEmail('L0001'));
     expect(sends).toHaveLength(2);
-    expect(sends[1]!.msg.bodyHtml).toContain('<strong>Sambhav Jain</strong>');
+    expect(sends[1]!.msg.bodyHtml).toContain('Best,<br>Sambhav Jain');
     expect(sends[1]!.msg.subject).toBe(sends[0]!.msg.subject);
   }, 30_000);
 

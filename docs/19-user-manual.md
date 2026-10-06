@@ -1341,51 +1341,42 @@ the entire message uses actual line breaks and blank lines, with no bold name, s
 or HTML alternative. **Minimal HTML** enables the styling described below. Retries keep the format
 and content of their original saved message.
 
-The default role line is **Automation Specialist**. End your draft with `Best,` to put your name
-on the immediately following line; the app does not insert `Best,` itself. Otherwise it adds one
-blank line before the signature. Sequence previews show the entire text, including the signature,
-opt-out wording (or placeholder unsubscribe URL), and full postal address, in one block.
+The revised role default is **PM Systems & Automation Specialist**. New messages and previews
+append exactly one `Best,`, immediately followed by the name, then `role | sending domain`, then
+the postal address. A trailing legacy `Best,` and name are replaced. Include your opt-out instruction
+in the email body; the application no longer appends opt-out wording or a body link.
 
 ![Compliance settings showing postal address, opt-out wording, unsubscribe URL, and live footer preview](images/user-manual/15-settings-compliance.png)
 
-> **Current preview:** the screenshot predates the sender signature. The current screen shows the
-> editable name and role line, email-format choice, sending-domain placeholder, and compliance
-> footer. Plain text has no special signature or footer styling.
+> **Revised preview:** this historical screenshot predates the four-line signature and automatic
+> opt-out removal. The revised screen retains editable name, role, address, email format and
+> unsubscribe header configuration; it removes the opt-out-wording control. Release status is
+> recorded in [the runbook](17-local-canary-runbook.md).
 
 - **Physical address:** legally valid business postal address appended to every send. Empty blocks
   all sending. Use a registered office, PO box, coworking address, or legitimate commercial mailbox
   if you do not want to publish a home address.
-- **Signature name and role line:** editable once for all mailboxes. The domain line is
-  drawn from the mailbox that actually sends each message and is rendered as plain text, without
+- **Signature name and role line:** editable once for all mailboxes. The domain after the role is
+  drawn from the mailbox that actually sends each message and is rendered as text, without
   an application-created hyperlink.
-- **Opt-out text:** used verbatim when the public unsubscribe URL is dormant.
 - **Unsubscribe base URL:** use `https://unsubscribe.{sender_domain}` in this deployment. The
   placeholder is replaced from each sending mailbox's domain, so mail from `sambhavpmtech.com` and
   `sambhavpmops.com` receives links on the corresponding unsubscribe host. A fixed HTTPS origin is
   also accepted; no trailing slash, query, or fragment is allowed.
 
-When the base URL is blank, the app emits no unsubscribe link or `List-Unsubscribe` headers and
-uses the configured opt-out text. When configured, every send receives an opaque token, a body URL,
-and the paired one-click headers. Plain text displays the URL as text; Minimal HTML links
-**Unsubscribe** to it. The postal address follows on the next line. Inbound STOP and other opt-out
-phrases are still detected and honored automatically.
+When the base URL is blank, the app emits no `List-Unsubscribe` headers. When configured, it emits
+the paired one-click unsubscribe headers with an opaque token. Neither format appends a body URL
+or opt-out wording. Inbound STOP and other opt-out phrases remain detected and honored.
 
 The live preview follows the selected format. In **Minimal HTML**, the message is `multipart/alternative`:
 
 - the HTML alternative starts the first body paragraph at zero top margin, preserves deliberate
-  16px paragraph gaps, shows the signature at body size with a bold name, and places the compliance
-  footer in a one-cell presentation table after a 20px top gap
-  at `10px` and `line-height: 1.5`;
-- the unsubscribe destination is linked behind a bold, non-underlined **Unsubscribe** in the same
-  muted gray (`#767676`) as the address below it, and normal HTML-capable email clients do
-  not display the full token URL;
-- the plain-text alternative shows the complete URL because plain text cannot hide a destination
-  behind linked words;
-- both alternatives contain the same signature, opt-out meaning, and postal address, with no
-  `---` or em-dash divider; and
+  16px paragraph gaps, and places the four-line signature and address at body size;
+- both alternatives contain the same signature and postal address, with no automatic opt-out
+  wording/link or divider; and
 - the HTML contains no quote/signature marker, hidden element, or invisible-character variation.
 
-Templates cannot remove or restyle this server-appended footer. It intentionally has no images,
+The server-appended signature intentionally has no images,
 tracking pixels, click tracking, external fonts, or complex HTML.
 
 Sequence previews include a **Preview mailbox** selector. Select a mailbox to see its domain;

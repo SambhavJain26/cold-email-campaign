@@ -61,13 +61,15 @@ draft campaign may override them, and first activation freezes the resolved snap
 literal and are never recursively parsed as tags or spintax. Campaign-context preview reports the
 matched observation rule, resolved variable source, fallbacks, and deterministic spintax choices.
 
-## 4. Sender signature and CAN-SPAM footer (spec Part 8 — non-removable)
+## 4. Sender signature and postal address (2026-10-06 operator revision)
 
 Global `compliance_settings.email_format` defaults to `plain_text`: send only `text/plain`, with
 no HTML alternative or styling. `minimal_html` retains both MIME alternatives and the styling
-below. The default role is `Automation Specialist`. A draft ending in `Best,` receives the name
-on the very next line; otherwise one blank line separates body and signature. Internal draft
-whitespace is preserved, and one blank line precedes the opt-out/address block.
+below. The default role is `PM Systems & Automation Specialist`. Terminal `Best,` signoffs,
+including a legacy name line, are replaced by one automatic signoff. One blank line separates
+body and signature; no blank lines separate the four signature lines. Internal body whitespace
+is preserved. The automatic opt-out wording/link is removed; the operator supplies the instruction
+in campaign copy. Legacy stored opt-out configuration remains readable.
 Sequence previews display the complete text representation, including all appended content.
 Every new sent snapshot records its format; retries reuse complete saved bodies and format.
 Legacy HTML snapshots remain HTML, and legacy template retries without snapshots retain their
@@ -76,16 +78,13 @@ existing rendering fallback.
 ```text
 Best,
 {signature_name}
-{signature_role_line}
-{sending mailbox domain}
-
-{opt-out clause}
+{signature_role_line} | {sending mailbox domain}
 {compliance_settings.physical_address}
 ```
 
-- Appended at render time, **after** all expansion; template text cannot alter or remove it (a template containing its own footer text just gets the canonical one appended anyway — check #6 warns on duplication).
-- The name and role line are editable in Compliance; the domain is derived from the mailbox used for the send. HTML shows the name in bold, the identity at body size, and the domain as escaped text without an anchor. Email clients may independently link plain domains.
-- In Minimal HTML, every body paragraph uses explicit inline margins; the first starts at `margin-top:0` and intentional paragraph gaps remain 16px. `Best,` joins the signature on the next line. The compliance footer is a one-cell, email-safe presentation table 20px below the signature, rendered at `10px`, `line-height:1.5`, and `#767676`. **Unsubscribe** is bold and has no underline; the postal address appears on the next line in the same gray. The plain-text alternative carries the same content without markup. The footer contains no blockquote/signature marker, hidden content, or invisible-character variation; Gmail visibility remains a real-provider canary result rather than an offline guarantee.
+- Appended at render time after expansion. Name, role and address remain editable. Migration 0023 explicitly sets the requested existing operator configuration and defaults.
+- The domain comes from the actual sending mailbox. Previews without a mailbox show an explicit placeholder. HTML escapes identity/address and uses the same four lines without an automatic body link.
+- Minimal HTML retains explicit paragraph margins and 16px paragraph gaps, followed by the signature and adjacent address. Email clients may independently link domains or trim signatures.
 - Fatal boot/send guard: `physical_address` empty → sends are refused globally, alert raised (CAN-SPAM requires it; empty address = non-compliant mail).
 
 ## 5. Pre-send checks + deliverability score (decision W)
@@ -97,9 +96,9 @@ Best,
 | 1 | All merge tags parse; unknown/no-fallback empty fields | **fatal** |
 | 2 | Spintax valid (≥2 options, no nesting); report variation count | fatal if invalid |
 | 3 | Step 1 contains no URLs (`https?://` or `www.`) | fatal for step 1 (walkthrough rule), warning for later steps |
-| 4 | Footer present with non-empty address + opt-out text | **fatal** |
+| 4 | Signature has a non-empty postal address | **fatal** |
 | 5 | No HTML tags / no image markup | fatal |
-| 6 | Template body duplicates opt-out/footer text | warning |
+| 6 | Template body duplicates the postal address | warning |
 | 7 | Subject ≤ 60 chars (post-expansion, longest spintax branch) | warning |
 | 8 | Body 40–180 words | warning |
 | 9 | Spam-trigger lexicon (data file `render/spamwords.ts`: "free!!!", "guarantee", "act now", "risk-free", "100% free", "click here", ALL-CAPS words > 2, > 1 exclamation mark) | warning each |
@@ -109,7 +108,7 @@ Best,
 
 ## 6. Threading headers (with docs/07 §4)
 
-`render` returns text and, only in `minimal_html` mode, an HTML alternative; the scheduler's `buildMime` adds: `Message-ID` (app-generated), `In-Reply-To`/`References` for in-thread steps, `Re: `-prefixed exact Step-1 subject for follow-ups, `From: {display_name} <{from_address}>`. `List-Unsubscribe: <url>` **and** `List-Unsubscribe-Post: List-Unsubscribe=One-Click` (RFC 8058) are emitted when `compliance_settings.unsubscribe_base_url` is set — both headers or neither, sourced from `OutboundMessage.headers.listUnsubscribeUrl` so the pair cannot disagree. With no base URL configured the feature is dormant: no headers or body link, and the footer carries the operator's `optout_text`. With a live URL, the visible footer contains only **Unsubscribe** and the postal address on separate lines. Inbound STOP/opt-out detection remains active and globally suppressive, but `or reply STOP` is not printed in the live-link footer.
+`render` returns text and, only in `minimal_html` mode, an HTML alternative. The scheduler retains Message-ID, conversation-scoped In-Reply-To/References and From headers. Configured unsubscribe URLs still produce both RFC 8058 headers, never a body link. Inbound explicit opt-out detection remains globally suppressive. Saved retries retain their exact text/HTML bodies and format. Legacy retry header URLs are recovered from their saved body link; new bodies without that link receive a fresh configured header token on retry. Raw tokens are not persisted separately.
 
 ## 7. Tests (B4)
 

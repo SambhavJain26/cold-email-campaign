@@ -163,7 +163,7 @@ test('build a sequence: 24 variations, fatal link in step 1, fix, save', async (
   await expect(panel.getByTestId('preview-body')).toContainText('Sambhav Jain');
   await expect(panel.getByTestId('preview-body')).toContainText('[sender domain');
   expect(await panel.getByTestId('preview-body').textContent()).toContain(
-    'Best,\nSambhav Jain\nAutomation Specialist\n',
+    'Best,\nSambhav Jain\nAutomation Specialist | ',
   );
   await expect(panel.getByText('Plain text — complete email')).toBeVisible();
   await panel.getByRole('combobox', { name: 'Preview mailbox' }).click();

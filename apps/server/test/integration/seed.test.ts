@@ -43,6 +43,6 @@ describe('seeded settings', () => {
       `SELECT column_default FROM information_schema.columns
        WHERE table_name = 'compliance_settings' AND column_name = 'physical_address'`,
     );
-    expect(def.rows[0].column_default).toBe("''::text");
+    expect(def.rows[0].column_default).toBe("'17, Radhaswami Nagar, Jaipur 302020, IN'::text");
   });
 });

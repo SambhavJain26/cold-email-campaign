@@ -11,7 +11,7 @@
 // Threading subjects (docs/08 §6): in-thread steps 2+ send `Re: {step-1
 // subject}` via ctx.threadSubject; absent → `Re:` on the step's own subject.
 import { expandTokens, makeResolver } from './merge';
-import { appendFooter, footerHtml, signatureHtml } from './footer';
+import { appendFooter, footerHtml, signatureHtml, bodyWithoutSignoff } from './footer';
 import { htmlOfText } from './html';
 import { runChecks } from './checks';
 import { resolveObservation } from './slots';
@@ -28,7 +28,11 @@ export class RenderEngine implements Renderer {
     const emailFormat = ctx.compliance.emailFormat ?? 'plain_text';
     const html = (body: string) =>
       emailFormat === 'minimal_html'
-        ? htmlOfText(body, footerHtml(ctx.compliance), signatureHtml(ctx.compliance))
+        ? htmlOfText(
+            bodyWithoutSignoff(body),
+            footerHtml(ctx.compliance),
+            signatureHtml(ctx.compliance),
+          )
         : undefined;
 
     // Mode-1 manual compose (docs/08 §3): text is already literal — stages

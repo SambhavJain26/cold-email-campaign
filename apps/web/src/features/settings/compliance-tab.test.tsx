@@ -37,7 +37,7 @@ describe('unsubscribe base URL field', () => {
       physical_address: 'Street\n\nCity',
     });
     expect(preview()).toBe(
-      'Sambhav Jain\nAutomation Specialist\n[sending mailbox domain]\n\nReply STOP to unsubscribe.\nStreet\n\nCity',
+      'Best,\nSambhav Jain\nAutomation Specialist | [sending mailbox domain]\nStreet\n\nCity',
     );
     expect(screen.getByTestId('footer-preview').querySelector('strong')).toBeNull();
     expect(screen.getByRole('combobox', { name: 'Email format' })).toHaveTextContent('Plain text');
@@ -48,22 +48,20 @@ describe('unsubscribe base URL field', () => {
       email_format: 'plain_text',
       unsubscribe_base_url: 'https://unsubscribe.example.com',
     });
-    expect(preview()).toContain(
-      'Unsubscribe: https://unsubscribe-preview.invalid/u/not-a-live-token\n',
-    );
+    expect(preview()).not.toContain('Unsubscribe:');
     expect(screen.getByTestId('footer-preview').querySelector('a')).toBeNull();
   });
   it('dormant: preview shows the operator opt-out text and no link', () => {
     renderTab();
-    expect(preview()).toContain('Reply STOP to unsubscribe.106-460 Doyle Ave');
+    expect(preview()).toContain('106-460 Doyle Ave');
+    expect(preview()).not.toContain('Reply STOP');
     expect(preview()).not.toContain('https://');
   });
 
   it('live: preview switches to the link-and-address form', () => {
     renderTab({ unsubscribe_base_url: 'https://unsubscribe.example.com' });
-    expect(preview()).toContain('Unsubscribe106-460 Doyle Ave');
-    expect(screen.getByText('Unsubscribe')).toHaveClass('font-bold', 'no-underline');
-    expect(screen.getByText('Unsubscribe')).not.toHaveClass('text-[#1155cc]', 'underline');
+    expect(preview()).toContain('106-460 Doyle Ave');
+    expect(screen.queryByText('Unsubscribe')).toBeNull();
     expect(preview()).not.toContain('reply STOP');
     expect(preview()).not.toContain('⟨token⟩');
   });
@@ -71,9 +69,7 @@ describe('unsubscribe base URL field', () => {
   it('explains that blank means reply-STOP only', () => {
     renderTab();
     expect(screen.getByLabelText('Unsubscribe base URL')).toBeInTheDocument();
-    expect(
-      screen.getByText(/Leave blank until you have a real sending domain/),
-    ).toBeInTheDocument();
+    expect(screen.getByText(/This configures unsubscribe headers only/)).toBeInTheDocument();
   });
 
   it('rejects a non-HTTPS URL rather than silently shipping a broken link', async () => {
@@ -98,6 +94,6 @@ describe('unsubscribe base URL field', () => {
 
   it('accepts the sender-domain host template used by multiple outreach domains', () => {
     renderTab({ unsubscribe_base_url: 'https://unsubscribe.{sender_domain}' });
-    expect(screen.getByText('Unsubscribe')).toHaveClass('font-bold', 'no-underline');
+    expect(screen.queryByText('Unsubscribe')).toBeNull();
   });
 });

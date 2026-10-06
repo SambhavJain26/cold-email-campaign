@@ -538,14 +538,19 @@ export class Scheduler {
       variant = await this.pickVariant(e.campaignId, step);
     }
 
-    // Issued BEFORE render: the URL goes in the body, so it must exist first.
+    // Issued BEFORE send for unsubscribe headers. Legacy retry bodies keep
+    // their original capability; new signature-only bodies mint a fresh header
+    // token without altering their saved body or persisting raw tokens separately.
     // A send that then fails leaves an unused token row, which is harmless.
     const compliance = this.tickCtx?.compliance ?? (await getComplianceSettings(db));
-    const unsubscribeUrl = retrySnapshot
+    const legacyRetryUrl = retrySnapshot
       ? [
           ...retrySnapshot.renderedBodyText!.matchAll(/\n\nUnsubscribe: (https:\/\/[^\s]+)\r?\n/g),
         ].at(-1)?.[1]
-      : await this.unsubscribeUrlFor(e, stepNo, compliance.unsubscribeBaseUrl, mb.fromAddress);
+      : undefined;
+    const unsubscribeUrl =
+      legacyRetryUrl ??
+      (await this.unsubscribeUrlFor(e, stepNo, compliance.unsubscribeBaseUrl, mb.fromAddress));
 
     const rendered: RenderedMessage = retrySnapshot
       ? {

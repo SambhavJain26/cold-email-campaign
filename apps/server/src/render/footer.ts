@@ -1,23 +1,10 @@
-// CAN-SPAM footer (docs/08 §4): appended at render time AFTER all expansion,
-// unconditional — template text cannot alter or remove it. NOT stored in
-// step_variants.body_template. Subjects never get the footer.
-//
-// BOTH representations live in this file on purpose (finding 19): the plain
-// text and the HTML alternative must stay semantically identical, and keeping
-// them adjacent is what stops one from being changed without the other.
-//
-// Shape: {signature name}\n{role line}\n{sender domain}, then a blank line and:
-// {opt-out clause}\n{physical address}
-//   dormant (no unsubscribe URL):  "{optout_text}\n12 Example St"
-//   live:  text  "Unsubscribe: https://…/u/tok\n12 Example St"
-//          html  "<a href=…>Unsubscribe</a><br>12 Example St"
-//
-// STOP detection remains active in both modes. A configured URL replaces the
-// opt-out clause with the link; blank uses the saved opt-out text verbatim.
+// Sender signature appended after expansion. Legacy opt-out configuration
+// remains readable, but new bodies contain only the signature and address.
+// Unsubscribe headers/endpoints and incoming STOP suppression remain active.
 import { escapeHtml } from './html';
 
-// One blank line separates signature and compliance text. Best, joins directly
-// to the name; other body endings also use this separator before the signature.
+// One blank line separates the message from the signature; its four lines are
+// adjacent, including Best, immediately followed by the name.
 export const FOOTER_SEPARATOR = '\n\n';
 
 export interface ComplianceInfo {
@@ -28,9 +15,7 @@ export interface ComplianceInfo {
   signatureRoleLine?: string;
   senderDomain?: string;
   /**
-   * Fully-formed public unsubscribe URL for THIS send. Absent/empty = the
-   * feature is dormant (no `unsubscribe_base_url` configured), and the footer
-   * falls back to the operator's configured `optoutText`.
+   * Compatibility input: used by callers for headers, never appended to new bodies.
    */
   unsubscribeUrl?: string;
 }
@@ -51,28 +36,29 @@ export function senderDomainOf(fromAddress: string): string {
 
 function signatureLines(compliance: ComplianceInfo): [string, string, string] {
   return [
+    'Best,',
     compliance.signatureName ?? 'Sambhav Jain',
-    compliance.signatureRoleLine ?? 'Automation Specialist',
-    compliance.senderDomain ?? PREVIEW_SENDER_DOMAIN,
+    `${compliance.signatureRoleLine ?? 'PM Systems & Automation Specialist'} | ${compliance.senderDomain ?? PREVIEW_SENDER_DOMAIN}`,
   ];
 }
 
 export function signatureHtml(compliance: ComplianceInfo): string {
-  const [name, role, domain] = signatureLines(compliance).map(escapeHtml);
-  return `<strong>${name}</strong><br>${role}<br>${domain}`;
+  return signatureLines(compliance).map(escapeHtml).join('<br>');
 }
 
-const liveUrl = (c: ComplianceInfo): string | undefined => {
-  const url = c.unsubscribeUrl?.trim();
-  return url === undefined || url === '' ? undefined : url;
-};
+/** A terminal sign-off belongs to the automatic signature, not the body. */
+export const bodyWithoutSignoff = (body: string): string =>
+  body
+    .trimEnd()
+    .replace(
+      /(?:^|\n)[ \t]*Best,[ \t]*(?:\n[ \t]*Best,[ \t]*)*(?:\n[ \t]*[\p{L}][\p{L} .'-]{0,79})?\s*$/iu,
+      '',
+    )
+    .trimEnd();
 
 export function appendFooter(body: string, compliance: ComplianceInfo): string {
-  const url = liveUrl(compliance);
-  const optout = url ? `Unsubscribe: ${url}` : compliance.optoutText;
-  const content = body.trimEnd();
-  const separator = content.split(/\r?\n/).at(-1)?.trim() === 'Best,' ? '\n' : FOOTER_SEPARATOR;
-  return `${content}${separator}${signatureLines(compliance).join('\n')}${FOOTER_SEPARATOR}${optout}\n${compliance.physicalAddress}`;
+  const content = bodyWithoutSignoff(body);
+  return `${content ? content + FOOTER_SEPARATOR : ''}${signatureLines(compliance).join('\n')}\n${compliance.physicalAddress}`;
 }
 
 /** Strip the known automatic suffix, never infer its boundary from body paragraphs. */
@@ -81,12 +67,8 @@ export function stripAutomaticFooter(body: string, compliance: ComplianceInfo): 
   return body.endsWith(suffix) ? body.slice(0, -suffix.length).trimEnd() : body;
 }
 
-/** The HTML twin of appendFooter's trailing line — same words, linked. */
+/** The HTML twin of appendFooter's address line. */
 export function footerHtml(compliance: ComplianceInfo): string {
-  const url = liveUrl(compliance);
-  const optout = url
-    ? `<a href="${escapeHtml(url)}" style="color:#767676;text-decoration:none;font-weight:700">Unsubscribe</a>`
-    : escapeHtml(compliance.optoutText);
   const address = escapeHtml(compliance.physicalAddress).replaceAll('\n', '<br>');
-  return `${optout}<br>${address}`;
+  return address;
 }

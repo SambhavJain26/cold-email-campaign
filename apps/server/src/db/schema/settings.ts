@@ -39,10 +39,14 @@ export const complianceSettings = pgTable('compliance_settings', {
     .$type<'plain_text' | 'minimal_html'>()
     .notNull()
     .default('plain_text'),
-  physicalAddress: text('physical_address').notNull().default(''),
+  physicalAddress: text('physical_address')
+    .notNull()
+    .default('17, Radhaswami Nagar, Jaipur 302020, IN'),
   optoutText: text('optout_text').notNull(),
   signatureName: text('signature_name').notNull().default('Sambhav Jain'),
-  signatureRoleLine: text('signature_role_line').notNull().default('Automation Specialist'),
+  signatureRoleLine: text('signature_role_line')
+    .notNull()
+    .default('PM Systems & Automation Specialist'),
   fromNameRules: text('from_name_rules'),
   /** Base URL of the public unsubscribe endpoint; '' = feature dormant (0010). */
   unsubscribeBaseUrl: text('unsubscribe_base_url').notNull().default(''),

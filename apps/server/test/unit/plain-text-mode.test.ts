@@ -36,23 +36,32 @@ describe('plain-text mode', () => {
           expect(rendered.emailFormat).toBe('plain_text');
           expect(rendered.bodyHtml).toBeUndefined();
           expect(rendered.bodyText).toBe(
-            `Hi Jane,\n\nA note.\n\nBest,\nSambhav Jain\nAutomation Specialist\n${domain}\n\n${unsubscribeUrl ? `Unsubscribe: ${unsubscribeUrl}` : compliance.optoutText}\n123 Main St\n\nAustin, TX`,
+            `Hi Jane,\n\nA note.\n\nBest,\nSambhav Jain\nPM Systems & Automation Specialist | ${domain}\n123 Main St\n\nAustin, TX`,
           );
-          expect(stripAutomaticFooter(rendered.bodyText, compliance)).toBe(
-            'Hi Jane,\n\nA note.\n\nBest,',
-          );
+          expect(stripAutomaticFooter(rendered.bodyText, compliance)).toBe('Hi Jane,\n\nA note.');
         });
       }
     }
   }
 
-  it('does not insert Best and keeps a blank line before identity without that closing', () => {
+  it('inserts the canonical signoff when the body has none', () => {
     const rendered = engine.render({
       ...input,
       variant: { ...input.variant, bodyTemplate: 'One\n\n\nTwo' },
     });
-    expect(rendered.bodyText).toMatch(/^One\n\n\nTwo\n\nSambhav Jain/);
-    expect(rendered.bodyText).not.toContain('Best,');
+    expect(rendered.bodyText).toMatch(/^One\n\n\nTwo\n\nBest,\nSambhav Jain/);
+    expect(rendered.bodyText.match(/Best,/g)).toHaveLength(1);
+  });
+
+  it('replaces a terminal legacy signoff and name once in both formats', () => {
+    const rendered = engine.render({
+      ...input,
+      variant: { ...input.variant, bodyTemplate: 'A note.\n\nBest,\nSam' },
+      ctx: { ...input.ctx, compliance: { ...input.ctx.compliance, emailFormat: 'minimal_html' } },
+    });
+    expect(rendered.bodyText.match(/Best,/g)).toHaveLength(1);
+    expect(rendered.bodyHtml?.match(/Best,/g)).toHaveLength(1);
+    expect(rendered.bodyText).toMatch(/^A note\.\n\nBest,\nSambhav Jain/);
   });
 
   it('keeps minimal HTML styling and attaches identity directly below Best on follow-ups', () => {
@@ -70,9 +79,10 @@ describe('plain-text mode', () => {
       },
     });
     expect(rendered.subject).toBe('Re: Original');
-    expect(rendered.bodyHtml).toContain('Best,<br><strong>Sambhav Jain</strong>');
-    expect(rendered.bodyHtml).toContain('font-size:10px;color:#767676');
-    expect(rendered.bodyHtml).toContain('margin-top:20px');
+    expect(rendered.bodyHtml).toContain(
+      'Best,<br>Sambhav Jain<br>PM Systems &amp; Automation Specialist | sambhavpmops.com<br>123 Main St',
+    );
+    expect(rendered.bodyHtml).not.toContain('reply stop');
     expect(rendered.bodyHtml).not.toContain('<a');
     expect(rendered.bodyText).not.toContain('<strong>');
   });

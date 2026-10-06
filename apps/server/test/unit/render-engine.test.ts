@@ -24,7 +24,7 @@ const compliance = {
   senderDomain: 'sambhavpmtech.com',
 };
 
-const FOOTER = `\n\n${compliance.signatureName}\n${compliance.signatureRoleLine}\n${compliance.senderDomain}\n\n${compliance.optoutText}\n${compliance.physicalAddress}`;
+const FOOTER = `\n\nBest,\n${compliance.signatureName}\n${compliance.signatureRoleLine} | ${compliance.senderDomain}\n${compliance.physicalAddress}`;
 
 const SUBJECT = 'Quick question about {{company|your listings}}';
 const BODY =
@@ -133,13 +133,11 @@ describe('footer is unconditional (docs/08 §4)', () => {
     expect(r.bodyHtml).toContain('<p style="margin:0 0 16px">Hi Jane, &lt;unsafe&gt;</p>');
     expect(r.bodyHtml).toContain('<p style="margin:0 0 0">Second paragraph.</p>');
     expect(r.bodyHtml!.startsWith('<p style="margin:0')).toBe(true);
-    expect(r.bodyHtml).toContain('<table role="presentation"');
-    expect(r.bodyHtml).toContain('font-size:10px');
-    expect(r.bodyHtml).toContain('color:#767676');
-    expect(r.bodyHtml).toContain('margin-top:20px');
+    expect(r.bodyHtml).not.toContain('<table');
+    expect(r.bodyHtml).not.toContain(compliance.optoutText);
     expect(r.bodyHtml).toContain('123 Main St');
     expect(r.bodyHtml).toContain(
-      '<strong>Sambhav Jain</strong><br>Automation Specialist | Sambhav Builds<br>sambhavpmtech.com',
+      'Best,<br>Sambhav Jain<br>Automation Specialist | Sambhav Builds | sambhavpmtech.com',
     );
     expect(r.bodyHtml).not.toContain('href="sambhavpmtech.com"');
     expect(r.bodyHtml).not.toContain('<unsafe>');
@@ -152,8 +150,8 @@ describe('sender domain signature', () => {
       const r = engine.render(
         input({ ctx: { compliance: { ...compliance, senderDomain: domain } } }),
       );
-      expect(r.bodyText).toContain(`\n${domain}\n\n${compliance.optoutText}`);
-      expect(r.bodyHtml).toContain(`<br>${domain}</p>`);
+      expect(r.bodyText).toContain(` | ${domain}\n${compliance.physicalAddress}`);
+      expect(r.bodyHtml).toContain(` | ${domain}<br>${compliance.physicalAddress}`);
       expect(r.bodyHtml).not.toContain('<a href');
     }
   });
@@ -166,11 +164,9 @@ describe('sender domain signature', () => {
         },
       }),
     );
-    expect(r.bodyText).toContain(
-      '\nsambhavpmtech.com\n\nUnsubscribe: https://unsubscribe.example/u/token',
-    );
-    expect(r.bodyHtml!.match(/<a href=/g)).toHaveLength(1);
-    expect(r.bodyHtml).toContain('<br>sambhavpmtech.com</p>');
+    expect(r.bodyText).not.toContain('https://unsubscribe.example/u/token');
+    expect(r.bodyHtml).not.toContain('<a href=');
+    expect(r.bodyHtml).toContain(' | sambhavpmtech.com<br>');
   });
 });
 
@@ -184,27 +180,26 @@ describe('unsubscribe link in the footer (0010, docs/16 §8)', () => {
 
   it('dormant: no URL configured → operator opt-out text, no link, no scheme', () => {
     const r = engine.render(input({}));
-    expect(r.bodyText).toContain(`${compliance.optoutText}\n${compliance.physicalAddress}`);
+    expect(r.bodyText).not.toContain(compliance.optoutText);
     expect(r.bodyText).not.toContain('https://');
     expect(r.bodyHtml).not.toContain('<a href');
   });
 
   it('live: the plain-text part carries only the raw URL and address', () => {
-    expect(withLink().bodyText).toContain(`Unsubscribe: ${URL}\n${compliance.physicalAddress}`);
+    expect(withLink().bodyText).not.toContain(URL);
+    expect(withLink().bodyText).toContain(compliance.physicalAddress);
     expect(withLink().bodyText).not.toContain('or reply STOP');
   });
 
   it('live: the HTML part says the SAME thing with the word linked', () => {
     const html = withLink().bodyHtml;
-    expect(html).toContain(
-      `<a href="${URL}" style="color:#767676;text-decoration:none;font-weight:700">Unsubscribe</a>`,
-    );
-    expect(html).toContain(`</a><br>${compliance.physicalAddress}`);
+    expect(html).not.toContain('<a href=');
+    expect(html).toContain(`<br>${compliance.physicalAddress}`);
     expect(html).not.toContain('or reply STOP');
     expect(html).not.toContain('aria-hidden');
     expect(html).toContain(compliance.physicalAddress);
     // De-emphasised but legible — CAN-SPAM "clear and conspicuous".
-    expect(html).toContain('font-size:10px');
+    expect(html).not.toContain('font-size:10px');
     expect(html).not.toContain('#1155cc');
     expect(html).not.toContain('text-decoration:underline');
   });
@@ -212,8 +207,8 @@ describe('unsubscribe link in the footer (0010, docs/16 §8)', () => {
   it('the two parts stay semantically identical (finding 19)', () => {
     const r = withLink();
     const textFooter = r.bodyText.slice(r.bodyText.lastIndexOf('\n\n') + 2);
-    const htmlFooter = r.bodyHtml!.slice(r.bodyHtml!.lastIndexOf('<table role='));
-    for (const fragment of ['Unsubscribe', compliance.physicalAddress, URL]) {
+    const htmlFooter = r.bodyHtml!;
+    for (const fragment of ['Best,', compliance.physicalAddress, compliance.signatureName]) {
       expect(textFooter).toContain(fragment);
       expect(htmlFooter).toContain(fragment);
     }
@@ -225,7 +220,7 @@ describe('unsubscribe link in the footer (0010, docs/16 §8)', () => {
     expect(html).not.toContain('gmail_quote');
     expect(html).not.toContain('display:none');
     expect(html).not.toMatch(/(?:\u200B|\u200C|\u200D|\u2060|\uFEFF)/u);
-    expect(html).toContain('<table role="presentation"');
+    expect(html).toContain('Best,<br>Sambhav Jain');
   });
 
   it('a hostile URL cannot break out of the anchor', () => {
@@ -235,7 +230,7 @@ describe('unsubscribe link in the footer (0010, docs/16 §8)', () => {
       }),
     );
     expect(r.bodyHtml).not.toContain('<script>');
-    expect(r.bodyHtml).toContain('&quot;&gt;&lt;script&gt;');
+    expect(r.bodyHtml).not.toContain('https://x.test');
   });
 
   it('the footer URL does NOT trip the step-1 fatal URL check', () => {

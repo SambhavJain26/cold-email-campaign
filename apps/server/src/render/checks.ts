@@ -59,12 +59,11 @@ export function runChecks(inp: CheckInputs): RenderChecks {
     else warnings.push({ id: 'url', message: 'follow-up contains a URL' });
   }
 
-  // #4 footer ingredients present (the engine always appends — this guards
-  // empty compliance_settings; the scheduler additionally refuses globally).
-  if (inp.compliance.physicalAddress.trim() === '' || inp.compliance.optoutText.trim() === '') {
+  // #4 required postal address (the signature appends it to every new body).
+  if (inp.compliance.physicalAddress.trim() === '') {
     fatal.push({
       id: 'footer',
-      message: 'compliance footer needs a physical address and opt-out text',
+      message: 'signature needs a physical address',
     });
   }
 
@@ -73,15 +72,13 @@ export function runChecks(inp: CheckInputs): RenderChecks {
     fatal.push({ id: 'html', message: 'HTML tags / image markup are not allowed' });
   }
 
-  // #6 template duplicates the footer text (canonical one is appended anyway).
+  // #6 duplicate postal address. Body opt-out wording is operator supplied.
   const bodyLower = inp.renderedBodyPreFooter.toLowerCase();
   if (
-    (inp.compliance.optoutText.trim() !== '' &&
-      bodyLower.includes(inp.compliance.optoutText.trim().toLowerCase())) ||
-    (inp.compliance.physicalAddress.trim() !== '' &&
-      bodyLower.includes(inp.compliance.physicalAddress.trim().toLowerCase()))
+    inp.compliance.physicalAddress.trim() !== '' &&
+    bodyLower.includes(inp.compliance.physicalAddress.trim().toLowerCase())
   ) {
-    warnings.push({ id: 'footer_duplicate', message: 'body duplicates opt-out/footer text' });
+    warnings.push({ id: 'footer_duplicate', message: 'body duplicates the signature address' });
   }
 
   // #7 subject length — post-expansion, longest spintax branch.

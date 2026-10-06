@@ -45,14 +45,9 @@ export function ComplianceTab({
 
   const address = useWatch({ control, name: 'physical_address' });
   const emailFormat = useWatch({ control, name: 'email_format' });
-  const optout = useWatch({ control, name: 'optout_text' });
   const signatureName = useWatch({ control, name: 'signature_name' });
   const signatureRoleLine = useWatch({ control, name: 'signature_role_line' });
-  const unsubBase = useWatch({ control, name: 'unsubscribe_base_url' });
   const addressEmpty = address.trim() === '';
-
-  // Mirrors render/footer.ts: opt-out and address are separate visible lines.
-  const hasLiveLink = unsubBase.trim() !== '';
 
   const onSubmit = (body: ComplianceDto) =>
     put.mutate(body, {
@@ -124,26 +119,19 @@ export function ComplianceTab({
                 <FieldError>{errors.signature_role_line.message}</FieldError>
               )}
               <p className="text-xs text-muted-foreground">
-                The sending mailbox domain appears as plain text on the next line.
+                The sending mailbox domain appears immediately after the role, separated by |.
               </p>
             </Field>
           </FieldGroup>
           <div className="space-y-1">
             <Label htmlFor="compliance-address">Physical address</Label>
-            <Textarea id="compliance-address" rows={2} {...register('physical_address')} />
+            <Controller
+              control={control}
+              name="physical_address"
+              render={({ field }) => <Textarea id="compliance-address" rows={2} {...field} />}
+            />
             {errors.physical_address && (
               <p className="text-xs text-destructive">{errors.physical_address.message}</p>
-            )}
-          </div>
-          <div className="space-y-1">
-            <Label htmlFor="compliance-optout">Opt-out text</Label>
-            <Input id="compliance-optout" {...register('optout_text')} />
-            <p className="text-xs text-muted-foreground">
-              Used verbatim while no unsubscribe URL is set. Once one is, the footer switches to a
-              one-click link. Replies containing STOP are still detected and honored automatically.
-            </p>
-            {errors.optout_text && (
-              <p className="text-xs text-destructive">{errors.optout_text.message}</p>
             )}
           </div>
           <div className="space-y-1">
@@ -154,7 +142,8 @@ export function ComplianceTab({
               {...register('unsubscribe_base_url')}
             />
             <p className="text-xs text-muted-foreground">
-              Leave blank until you have a real sending domain. Blank means no link and no
+              This configures unsubscribe headers only. It does not append wording or a link to the
+              body. Blank means no
               <code className="mx-1">List-Unsubscribe</code>
               header — recipients opt out by replying STOP. Use{' '}
               <code>https://unsubscribe.{'{sender_domain}'}</code> to select the matching host for
@@ -177,22 +166,15 @@ export function ComplianceTab({
             data-testid="footer-preview"
           >
             {emailFormat === 'plain_text' ? (
-              <pre className="font-mono text-xs whitespace-pre-wrap break-words">{`${signatureName}\n${signatureRoleLine}\n[sending mailbox domain]\n\n${hasLiveLink ? 'Unsubscribe: https://unsubscribe-preview.invalid/u/not-a-live-token' : optout}\n${address || '⟨no address — sends blocked⟩'}`}</pre>
+              <pre className="font-mono text-xs whitespace-pre-wrap break-words">{`Best,\n${signatureName}\n${signatureRoleLine} | [sending mailbox domain]\n${address || '⟨no address — sends blocked⟩'}`}</pre>
             ) : (
               <>
                 <div className="font-mono text-xs">
-                  <strong>{signatureName}</strong>
+                  Best,
                   <br />
-                  {signatureRoleLine}
+                  {signatureName}
                   <br />
-                  [sending mailbox domain]
-                </div>
-                <div className="mt-5 font-mono text-[10px] leading-[15px] text-[#767676]">
-                  {hasLiveLink ? (
-                    <span className="font-bold no-underline">Unsubscribe</span>
-                  ) : (
-                    <span>{optout}</span>
-                  )}
+                  {signatureRoleLine} | [sending mailbox domain]
                   <br />
                   <span className="whitespace-pre-wrap">
                     {address || '⟨no address — sends blocked⟩'}
@@ -203,8 +185,8 @@ export function ComplianceTab({
           </div>
           <p className="mt-2 text-xs text-muted-foreground">
             {emailFormat === 'plain_text'
-              ? 'Plain text uses line breaks and blank lines only. End your draft with Best, to place your name immediately below it.'
-              : 'The compliance footer appears 20px below the signature in 10px muted gray text.'}
+              ? 'The signature adds Best, with no blank line before your name. Include your opt-out instruction in each email body.'
+              : 'The signature and address appear together. Include your opt-out instruction in each email body.'}
           </p>
         </CardContent>
       </Card>

@@ -117,9 +117,9 @@ describe('#4 footer ingredients (fatal)', () => {
     expect(r.checks.fatal.some((f) => f.id === 'footer')).toBe(true);
   });
 
-  it('empty opt-out text is fatal', () => {
+  it('legacy opt-out text is not required for the signature', () => {
     const r = render({ ctx: { compliance: { ...compliance, optoutText: '' } } });
-    expect(r.checks.fatal.some((f) => f.id === 'footer')).toBe(true);
+    expect(r.checks.fatal.some((f) => f.id === 'footer')).toBe(false);
   });
 });
 
@@ -142,10 +142,10 @@ describe('#5 plain text only (fatal)', () => {
 });
 
 describe('#6 duplicated footer text (warning)', () => {
-  it('body containing the opt-out text warns and costs 0.5', () => {
+  it('operator-supplied opt-out wording is retained without a duplicate-footer penalty', () => {
     const r = render({ body: BODY + ' ' + compliance.optoutText });
-    expect(r.checks.warnings.some((w) => w.id === 'footer_duplicate')).toBe(true);
-    expect(r.checks.score).toBe(9.5);
+    expect(r.checks.warnings.some((w) => w.id === 'footer_duplicate')).toBe(false);
+    expect(r.checks.score).toBe(10);
   });
 });
 
