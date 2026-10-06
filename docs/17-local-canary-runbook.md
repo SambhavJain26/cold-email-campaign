@@ -1,5 +1,19 @@
 # Local canary runbook (B8.3-local) — two-week validation on throwaway Gmail
 
+## 2026-10-06 authorized VPS build-cache cleanup
+
+After the deployment assessment below, the operator explicitly requested reclaiming the cache.
+`docker builder prune --all --force` removed all 66 unused cache objects; Docker reports 3.492 GB
+reclaimed and build cache is now zero. Actual root-filesystem recovery is **2,938,626,048 bytes
+(2.94 GB)**: used space fell from **11,516,358,656** to **8,577,732,608 bytes**, usage **47% to
+35%**, and available space rose to **16,288,657,408 bytes (16.29 GB)**. Shared-layer accounting
+explains the difference between Docker's total and filesystem recovery. All four service images,
+four running containers and two active volumes remain. App/database remain healthy; gateway and
+backup remain running without restart. Public health/application routes return HTTP 200.
+Campaigns 2/3 remain paused, automatic enrollment off, and watermarks remain **245/245/74**.
+No image, container, volume, database, backup, log or journal pruning was performed. Future builds
+will regenerate their cache. Application release remains `b721684`.
+
 ## 2026-10-06 four-part production deployment and VPS assessment
 
 The operator separately authorized deployment and a post-deployment VPS usage/cleanup assessment.

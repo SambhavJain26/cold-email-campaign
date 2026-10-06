@@ -27,7 +27,8 @@ call planned work implemented.
   `2026-10-06T06:41:30.403034Z`. No production CSV operation, enrollment, resume or send occurred.
   Authenticated browser replay passes after operator sign-in: settings, all 100 preview leads,
   Ready follow-up rendering with the actual mailbox domain, and refresh without a false banner.
-  VPS cleanup was assessed only: build cache is the principal candidate; no cleanup was executed.
+  Subsequently authorized VPS build-cache cleanup completed: cache is zero, actual disk recovery
+  is 2.94 GB, disk usage fell from 47% to 35%, and services remain healthy. Data/backups are intact.
   See docs/17 for measurements, backups and remaining operational boundaries.
 
 - **2026-10-06 four-part local release:** operator-authorized implementation on `canary`

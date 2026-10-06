@@ -8,7 +8,8 @@ is off; event/sent counts remain 245/74. The persistent incoming-stop cutoff is
 Authenticated browser replay passes: migrated settings, 100 campaign preview leads, Ready follow-up
 rendering with the actual mailbox domain, and refresh without a false banner. CSV commit and resume
 remain separate.
-VPS disk is 47% used; 3.387 GB of build cache is reported reclaimable. Assessment only; no cleanup.
+Subsequently authorized build-cache pruning completed: zero cache, 2.94 GB actual disk recovery,
+35% disk usage, healthy services; running images, database and backup volumes retained.
 See [deployment evidence](17-local-canary-runbook.md).
 
 **Previous 2026-10-06 local candidate:** the four-part release was implemented and locally verified on
