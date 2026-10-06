@@ -14,8 +14,8 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
   exact signature lines and actual mailbox domain in text/HTML. Campaigns 2/3 remain paused with
   automatic enrollment off; watermarks stay 245 events / 74 sent messages. The policy cutoff is
   `2026-10-06T06:41:30.403034Z`. No production CSV operation, enrollment, resume or send occurred.
-  Authenticated browser replay remains pending operator sign-in; the browser is signed out and
-  the configured initial credential is no longer valid. Do not reset credentials to verify it.
+  Authenticated browser replay passes after operator sign-in: settings, all 100 preview leads,
+  Ready follow-up rendering with the actual mailbox domain, and refresh without a false banner.
   VPS cleanup was assessed only: build cache is the principal candidate; no cleanup was executed.
   See docs/17 for measurements, backups and remaining operational boundaries.
 

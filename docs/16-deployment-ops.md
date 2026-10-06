@@ -5,7 +5,9 @@ and deployed. All 25 migrations, public routes/caching, services, 93-enrollment 
 self-check and validated pre/post backups pass. Campaigns 2/3 remain paused; automatic enrollment
 is off; event/sent counts remain 245/74. The persistent incoming-stop cutoff is
 `2026-10-06T06:41:30.403034Z`. Production Ready-copy renderer verifies text/HTML signatures.
-Authenticated browser replay awaits operator sign-in. CSV commit and resume remain separate.
+Authenticated browser replay passes: migrated settings, 100 campaign preview leads, Ready follow-up
+rendering with the actual mailbox domain, and refresh without a false banner. CSV commit and resume
+remain separate.
 VPS disk is 47% used; 3.387 GB of build cache is reported reclaimable. Assessment only; no cleanup.
 See [deployment evidence](17-local-canary-runbook.md).
 

@@ -23,10 +23,16 @@ Public health/app/Sequence/Leads/portfolio routes return 200; bare app and outre
 JS is immutable, missing JS returns 404, and served version
 `c828875b-b8f6-4f0c-ae07-c6fd03b63393` matches the loaded bundle. A read-only production Ready-copy
 render verifies exact signature lines/actual mailbox domain in both text and HTML without saving
-copy or issuing a send. The in-app browser is signed out. One normal login probe with the existing
-configured initial credential returned 401; no credential reset or further attempt was made.
-**Authenticated browser replay remains pending operator sign-in.** The sign-in page was shown for
-handoff; all other deployment verification above is complete.
+copy or issuing a send. The browser initially required operator sign-in; one normal initial-credential
+probe returned 401, with no reset or further attempt. The operator subsequently signed in.
+**Authenticated browser replay passes.** Compliance shows the exact migrated name, role and address,
+adjacent Best/name lines, and no obsolete opt-out wording control. Sequence 2 scoped to paused
+Campaign 3 reports all 100 preview leads; Mary's unsent Ready Step 2 renders successfully with
+`sambhavpmtech.com` after the role, one signature/address and no automatic opt-out body text.
+A fresh reload loads the authenticated sequence without a false update banner. The browser was
+left on Campaigns, both Campaigns 2/3 paused. A final database check confirms automatic enrollment
+off and unchanged **245/245/74** watermarks. No form was saved, CSV uploaded, campaign resumed or
+send issued. The operator confirms their revised CSV will supply the opt-out instruction.
 
 VPS snapshot after builds at 06:42 UTC: **1 vCPU**, CPU **1–2%** in the two fresh one-second samples
 (98–99% idle), RAM **751,190,016 / 2,063,601,664 bytes** used (**36%**), with

@@ -8,7 +8,8 @@
 routes/services/caching, 93-enrollment zero drift, self-check and validated pre/post backups pass.
 Campaigns remain paused, auto-enrollment off, watermarks unchanged at 245 events / 74 sent.
 VPS usage and cleanup opportunities are recorded in docs/17; no cleanup was executed. Authenticated
-browser replay awaits operator sign-in. Revised CSV import and resume remain separate.
+browser replay passes for settings, campaign leads, Ready follow-up and refresh. Revised CSV import
+and resume remain separate.
 
 **2026-10-06 four-part update — local implementation complete:**
 
