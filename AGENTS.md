@@ -19,6 +19,18 @@ call planned work implemented.
 
 ## Current operating boundary
 
+- **2026-10-06 four-part local release:** operator-authorized implementation on `canary`
+  adds build-ID update detection, newly received company-mail stopping, protected CSV campaign
+  copy updates, and the requested four-line signature without automatic opt-out body wording.
+  This supersedes earlier instructions to retain the automatic footer. Existing unsubscribe
+  headers/endpoints, explicit opt-out suppression, sent history and saved retry bodies remain.
+  Local gates, populated replay/self-check and backup restore are verified in docs/17.
+  The operator reports the campaign paused; no production mutation, CSV upload, outbound mail,
+  activation/enrollment/resume, push or deployment occurred. Deployment needs separate explicit
+  authorization, a fresh paused-state check and validated backup. Production remains `4b4e0c7`.
+  STOPPED facts and the policy cutoff survive rollback; only use rollback code that understands
+  the new vocabulary after such facts exist. Production CSV commit and resume remain separate.
+
 - **2026-10-05 Sequence picker repair:** explicitly authorized, verified, pushed, and deployed
   at `4b4e0c7` on `canary`. Preview lead search now scopes available pooled and enrolled leads
   to the selected campaign and supports pagination. Live replay shows all 100 Campaign 3 leads
@@ -338,7 +350,7 @@ temporary rollback/canary environment.
 - App: `/opt/email-campaign`; stack: `docker-compose.spaceship.yml` with `.env.prod`
 - Public UI: `https://sambhavpmtech.com/email-campaign/`
 - Internal gateway: `127.0.0.1:18080`; host Caddy is the only public 80/443 listener
-- Deployed application release: `canary` at `988adc0`
+- Deployed application release: `canary` at `4b4e0c7`
 
 The repository is private and the VPS currently has no GitHub deploy credential. Until a read-only
 deploy key is deliberately installed, transfer a reviewed `git bundle`, fetch the pinned branch

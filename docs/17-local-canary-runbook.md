@@ -1,5 +1,78 @@
 # Local canary runbook (B8.3-local) — two-week validation on throwaway Gmail
 
+## 2026-10-06 four-part local release — verified, not deployed
+
+The operator authorized implementation on `canary` while their production campaign remains
+paused. Deployment, production CSV import and campaign resume are separate steps. No production
+connection/mutation, push, enrollment, activation, resume or outbound mail occurred. Local browser
+walkthrough sends use the mock transport only. Production remains the previously verified
+`4b4e0c7`; the operator's paused-state report must be independently checked before a deployment.
+
+Completed workstreams:
+
+- `29736b3`: build-generated version ID shared by the bundle and static `version.json`, startup
+  and minute polling with set/clear comparison, failed-request tolerance, dirty-form confirmation
+  and manual refresh only. HTML/version use no-store; hashed assets use immutable caching.
+- `b3c0573`: append-only incoming-company stops with terminal STOPPED, private/public suffix
+  boundaries, exact/thread fallback for shared providers, cross-campaign contacted-only stopping,
+  migration-time cutoff and re-enrollment guards. Thread/reply/bounce/opt-out classification and
+  analytics remain distinct. Incoming records, stop facts and cursor commit atomically under
+  enrollment locks; duplicate and concurrent stops recheck terminal state.
+- `8ddb8e5`: upload choice and dedicated preview/commit APIs for draft/paused campaign copy
+  updates. Preview has 100-entry pages and complete result counts. A mixed 100-member cohort
+  protects sent Email 1 and retries, replaces later unsent copies Ready, skips outside rows,
+  rejects stale/conflicting/partial inputs, requires generic destinations and preserves progress.
+  Sources update only with eligible replacements; committed history records campaign and counts.
+- `189c29e`: four adjacent signature lines, actual mailbox domain after the role, postal address
+  directly below, and no automatic opt-out body text/link. Editable name/role/address remain;
+  migration 0023 explicitly updates defaults and operator configuration. Header/endpoints and
+  explicit suppression remain; sent/retry bodies and formats stay immutable. New signature-only
+  retry bodies mint a fresh configured header token; legacy saved links retain their header URL.
+- `dcd9bc6`: missing asset URLs return 404 rather than cached SPA HTML; repeated mounts/malformed
+  metadata and confirmed/discarded dirty refreshes are tested. Fresh mail arriving after the
+  poll's clock snapshot still qualifies. Pool enrollment and recycling also honor prior stops.
+
+Pinned dependencies/data: `tldts` **7.4.16**; **14,346** shared-provider domains from
+`Kikobeats/free-email-domains` revision `ea1dfe996d6ba0a9198dfd7dc1cf946e4f1e15d3`, with
+MIT attribution and a local extension list. Regional/shared providers, unknown/invalid domains,
+company subdomains and unrelated hosted tenants are covered. Updates are reviewed/bundled;
+there is no runtime provider-list download.
+
+Verified gates: typecheck, lint, formatting; **389 unit**, **68 web**, **180 integration** and
+**147 API** tests; subsequent focused integration runs **33** (migration/company-stop/scheduler)
+and **15** (final stop/pool/recycling); **29 GreenMail** and exactly **47 locked golden** tests,
+without fixture regeneration. **66 mock-browser** and **2 real-backend browser** flows pass.
+The real CSV flow verifies saved preview content, unmatched-row history, draft status and zero
+enrollments. Subpath production build and real local Caddy checks pass: app/sequence HTML and
+version JSON 200/no-store, hashed JS 200/immutable, missing JS 404, metadata ID equals bundle ID.
+Root Caddy configuration also validates. An initial browser assertion used `search` instead of
+the API's `q`; correcting the test's intended lead lookup resolved it.
+The clean Linux app image builds from the locked install and its production runtime passes
+company-subdomain and regional shared-provider normalization checks.
+Final signature polish (`4b18d3d`) covers blank lines between a legacy Best/name and repeated signoffs;
+the complete unit suite and latest renderer mounted into that Linux runtime pass exact-whitespace
+checks. New messages retain one Best/name pair with adjacent signature lines.
+
+Migrations **0022–0024** apply/down/apply successfully. Rollback retains cutoff, STOPPED/event
+vocabulary, operator values and committed copy-update history; **do not run an older binary that
+cannot understand STOPPED after stop facts exist**. Use a compatible forward rollback and retain
+the ledger. No historical message replay is performed.
+
+The incoming-stop cohort replays **8 enrollments — zero diffs** with clean self-check. Final
+browser-populated state replays **5 enrollments — zero diffs**, self-check clean. Local custom
+dump `backups/fourpart-20261006.dump` is **127,683 bytes**, with a validated **332-line** catalog
+and SHA-256 `1fa6cbb9a8d4a5d8d6f52bcf7ac9f7da534f2df01599efab137ffded8f3aec99`.
+Scratch restore, rebuild (zero rewrites), five-enrollment zero-drift and self-check pass; the
+temporary scratch database was removed. The local dump remains ignored by Git.
+
+Deployment handoff: obtain separate authorization, verify campaigns still paused, capture current
+event/sent watermarks and validated backup, bundle the complete reviewed candidate, then apply
+all 25 migrations. Confirm stored cutoff once, services/routes/version/cache behavior,
+projection consistency, self-check, backup catalogs and authenticated update/copy/signature UI.
+Do not upload/commit a production CSV without the revised file and operational instruction.
+Leave campaign resume to the operator after copy review. Historical entries below describe their
+own deployment-time state and do not authorize further operations.
+
 ## 2026-10-05 Sequence campaign lead picker repair — deployed at `4b4e0c7`
 
 After the transfer below, the operator reported activating Campaign 3 and enrolling leads.

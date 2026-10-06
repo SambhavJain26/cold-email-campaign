@@ -4,6 +4,10 @@
 
 Progress is tracked in [PROGRESS.md](../PROGRESS.md) at the repo root.
 
+The four-part 2026-10-06 local release and deployment boundaries are recorded in
+[the runbook](17-local-canary-runbook.md). Current stopping, copy-update and signature behavior
+supersedes older pre-release excerpts; see docs/03, 04, 07, 08, 09 and 10 for the revised contracts.
+
 ---
 
 ## Document map

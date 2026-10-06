@@ -1,5 +1,11 @@
 # Database Schema — Full DDL
 
+> **Migrations 0022–0024:** event/enrollment enums add `outreach_stopped` / `STOPPED`;
+> `settings.incoming_stop_since` is a persistent non-null deployment cutoff defaulting to now();
+> compliance signature role/address defaults and operator configuration adopt the requested
+> four-line structure; `imports.copy_update` stores campaign ID and status counts. Stop vocabulary,
+> cutoff and committed import history survive rollback. Sent snapshots and events remain immutable.
+
 > **Migration 0019 overlay:** current copy/tier tables and compatibility rules are specified in
 > [docs/22](22-personalized-copy-two-tier.md). In particular, `personalized_copy_sources`,
 > `campaign_personalized_copies`, `personalized_copy_blockers`, step `content_source`, separate

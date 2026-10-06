@@ -1,5 +1,14 @@
 # Deployment & Operations
 
+**2026-10-06 local candidate:** the four-part release is implemented and locally verified on
+`canary`, with migrations 0022–0024. It is not deployed; production remains `4b4e0c7`. The operator
+reports pausing outreach. Before separately authorized deployment, verify that live state, record
+watermarks and validate a backup. Deploy the complete reviewed candidate, then verify all 25
+migrations, persistent incoming-stop cutoff, routes/services, version/cache behavior, projections,
+self-check, backup catalogs and authenticated UI. CSV commit and resume remain separate.
+Rollback must preserve new stop facts/cutoff/import history and use code compatible with STOPPED.
+See [verified handoff](17-local-canary-runbook.md).
+
 Single always-on VPS (finalized decision). Docker Compose primary; systemd alternative. Implemented
 in B7 and cut over to Spaceship production on 2026-08-22.
 

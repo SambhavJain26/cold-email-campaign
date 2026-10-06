@@ -4,6 +4,21 @@
 
 **Legend:** `[ ]` not started · `[~]` in progress · `[x]` done · `[!]` blocked (note why in the log)
 
+**2026-10-06 four-part update — local implementation complete:**
+
+- [x] Reliable build-ID notification and guarded manual refresh; correct subpath caching.
+- [x] Contacted-company incoming-mail stopping, shared-provider exclusions, persistent cutoff,
+  terminal STOPPED facts/history and cross-campaign re-enrollment guards.
+- [x] Protected CSV campaign-copy update preview/commit, pagination, stale-input protection,
+  Ready replacements and durable results without progression/enrollment/send changes.
+- [x] Requested four-line signature and removal of automatic opt-out body wording/link,
+  retaining unsubscribe headers/endpoints, suppression and immutable sent/retry snapshots.
+- [x] Repository/browser/migration gates, populated zero-drift/self-check and backup restore.
+
+Workstreams are committed on `canary`; docs/17 records exact verification and rollout boundaries.
+Production remains `4b4e0c7`. No deployment, production CSV operation, push, campaign resume or
+outbound mail occurred. Deployment and revised-file import require separate operational instructions.
+
 **2026-10-05 Sequence picker repair:** verified, pushed, and deployed at `4b4e0c7`; selected campaign now scopes pooled
 and enrolled leads, with paging, search, loading/error states, and cleared stale selections/renders.
 Typecheck/lint/format, unit/web 425, Sequence browser 5, locked golden 47, and real-API subpath

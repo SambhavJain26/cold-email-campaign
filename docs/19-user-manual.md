@@ -9,6 +9,16 @@
 **Reconciled through:** the deployed Personalized Copy/two-tier/campaign-filter, import-wizard
 clarity, and owner-walkthrough remediation at Spaceship application commit `8ed86a4`.
 
+**2026-10-06 verified local revision (awaiting deployment):** after uploading a CSV, choose
+**Update existing campaign copy** and a draft/paused campaign to preview unsent replacements,
+protected sent/retry steps and skipped outside rows. Review the complete counts and paginated
+results before committing. This changes copy only; enrollment progress and sending stay unchanged.
+Any newly received company mail stops ongoing outreach for previously contacted leads across
+campaigns, including acknowledgements and fresh mail. Shared-provider domains use exact-address
+or thread matching, preventing unrelated Yahoo/Outlook/Gmail users from stopping each other.
+Lead history explains the separate **Stopped** outcome. See the revised signature in §15.6 and
+[the release runbook](17-local-canary-runbook.md) for rollout boundaries.
+
 This manual explains the complete operator-facing application: what every screen does, how to use
 each action, what the system does automatically, and which safeguards or edge cases matter. It is a
 product-use guide, not legal advice and not a promise of email deliverability.
