@@ -51,7 +51,7 @@ export const bodyWithoutSignoff = (body: string): string =>
   body
     .trimEnd()
     .replace(
-      /(?:^|\n)[ \t]*Best,[ \t]*(?:\n[ \t]*Best,[ \t]*)*(?:\n[ \t]*[\p{L}][\p{L} .'-]{0,79})?\s*$/iu,
+      /(?:^|\n)[ \t]*Best,[ \t]*(?:\n\s*Best,[ \t]*)*(?:\n\s*[\p{L}][\p{L} .'-]{0,79})?\s*$/iu,
       '',
     )
     .trimEnd();

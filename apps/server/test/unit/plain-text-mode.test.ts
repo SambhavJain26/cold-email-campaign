@@ -53,16 +53,19 @@ describe('plain-text mode', () => {
     expect(rendered.bodyText.match(/Best,/g)).toHaveLength(1);
   });
 
-  it('replaces a terminal legacy signoff and name once in both formats', () => {
-    const rendered = engine.render({
-      ...input,
-      variant: { ...input.variant, bodyTemplate: 'A note.\n\nBest,\nSam' },
-      ctx: { ...input.ctx, compliance: { ...input.ctx.compliance, emailFormat: 'minimal_html' } },
-    });
-    expect(rendered.bodyText.match(/Best,/g)).toHaveLength(1);
-    expect(rendered.bodyHtml?.match(/Best,/g)).toHaveLength(1);
-    expect(rendered.bodyText).toMatch(/^A note\.\n\nBest,\nSambhav Jain/);
-  });
+  it.each(['Best,\nSam', 'Best,\n\nSam', 'Best,\nBest,\nSam'])(
+    'replaces a terminal legacy signoff and name once in both formats: %s',
+    (signoff) => {
+      const rendered = engine.render({
+        ...input,
+        variant: { ...input.variant, bodyTemplate: `A note.\n\n${signoff}` },
+        ctx: { ...input.ctx, compliance: { ...input.ctx.compliance, emailFormat: 'minimal_html' } },
+      });
+      expect(rendered.bodyText.match(/Best,/g)).toHaveLength(1);
+      expect(rendered.bodyHtml?.match(/Best,/g)).toHaveLength(1);
+      expect(rendered.bodyText).toMatch(/^A note\.\n\nBest,\nSambhav Jain/);
+    },
+  );
 
   it('keeps minimal HTML styling and attaches identity directly below Best on follow-ups', () => {
     const rendered = engine.render({
