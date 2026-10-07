@@ -1,5 +1,24 @@
 # Local canary runbook (B8.3-local) — two-week validation on throwaway Gmail
 
+## 2026-10-08 IST reported email-link redirect — read-only provider verification
+
+The operator reported that clicking Gmail's blue `sambhavpmops.com` signature domain reached
+`sambhavbuilds.com`. Fresh HTTP checks show root/www HTTP 308 only to HTTPS on the same hostname;
+HTTPS root/www return 200 without a Location header. The active host Caddyfile directly serves
+the shared website build. Public A records for both outreach roots and pmops www resolve to
+`104.207.93.174`; pmops has no AAAA answer and uses Spaceship's launch1/launch2 nameservers.
+
+At the operator's request, authenticated Spaceship Advanced DNS was inspected for both outreach
+domains. Root/www A records point to the VPS. Each URL Redirect tab has an empty destination and
+zero subdomain redirect records. No provider setting, DNS record or server configuration changed.
+A fresh in-app browser visit to `http://sambhavpmops.com/` loads the complete website at
+`https://sambhavpmops.com/`, retaining that hostname and relative internal navigation links.
+
+The reported Gmail click is not yet reproduced. A previously cached permanent redirect is a
+plausible explanation, not a confirmed cause. The operator was asked for the blue link's copied
+destination URL to distinguish the actual link target from browser cache behavior. No email was
+sent, campaign resumed or immutable message changed during this investigation.
+
 ## 2026-10-08 IST authorized signature/range/alias production deployment
 
 The operator explicitly authorized deployment. Fresh prechecks found clean production `a6489a9`,
