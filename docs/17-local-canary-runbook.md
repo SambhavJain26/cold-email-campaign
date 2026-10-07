@@ -14,10 +14,11 @@ zero subdomain redirect records. No provider setting, DNS record or server confi
 A fresh in-app browser visit to `http://sambhavpmops.com/` loads the complete website at
 `https://sambhavpmops.com/`, retaining that hostname and relative internal navigation links.
 
-The reported Gmail click is not yet reproduced. A previously cached permanent redirect is a
-plausible explanation, not a confirmed cause. The operator was asked for the blue link's copied
-destination URL to distinguish the actual link target from browser cache behavior. No email was
-sent, campaign resumed or immutable message changed during this investigation.
+The operator supplied the copied Gmail destination: `http://sambhavpmops.com/`, matching the
+successful fresh-browser test exactly. The reported redirect to the main domain is not reproduced.
+A previously cached permanent redirect is the likely explanation, not a confirmed cause in the
+operator's Gmail browser. A private-window test can confirm whether that browser's stored state
+is responsible. No email was sent, campaign resumed or immutable message changed.
 
 ## 2026-10-08 IST authorized signature/range/alias production deployment
 
