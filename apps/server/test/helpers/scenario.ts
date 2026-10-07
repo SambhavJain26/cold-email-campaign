@@ -169,10 +169,12 @@ export class Scenario {
   async init(): Promise<void> {
     await resetCoreTables(this.pool);
     const window = this.cfg.sendWindow ?? { days: [1, 2, 3, 4, 5], start: '08:00', end: '17:00' };
+    // Explicit legacy configuration preserves existing scenario/golden inputs.
+    // Randomized-spacing scenarios enable the new range after this seed.
     for (let i = 1; i <= this.cfg.mailboxes; i++) {
       await this.pool.query(
-        `INSERT INTO mailboxes (display_name, from_address, smtp_host, imap_host, daily_cap, send_window)
-         VALUES ($1, $2, 'smtp.scenario.dev', 'imap.scenario.dev', $3, $4)`,
+        `INSERT INTO mailboxes (display_name, from_address, smtp_host, imap_host, daily_cap, send_window, send_interval_min_minutes, send_interval_max_minutes)
+         VALUES ($1, $2, 'smtp.scenario.dev', 'imap.scenario.dev', $3, $4, NULL, NULL)`,
         [`mb${i}`, `mb${i}@scenario.dev`, this.cfg.dailyCap, JSON.stringify(window)],
       );
     }

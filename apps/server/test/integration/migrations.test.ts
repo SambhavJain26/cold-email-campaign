@@ -137,6 +137,83 @@ describe('migration runner', () => {
     await resetCoreTables(pool);
   });
 
+  it('initializes the hidden address and range once, preserving configuration and deadlines on reapply', async () => {
+    await resetCoreTables(pool);
+    const migrations = await loadMigrations(MIGRATIONS_DIR);
+    const signature = migrations.find((m) => m.name === '0026_signature_address_toggle')!;
+    const spacing = migrations.find((m) => m.name === '0027_randomized_mailbox_spacing')!;
+    await pool.query('ALTER TABLE compliance_settings DROP COLUMN include_postal_address');
+    await pool.query(
+      "UPDATE compliance_settings SET signature_role_line='PM Systems & Automation Specialist',physical_address='Retained address'",
+    );
+    await pool.query(signature.upSql);
+    expect(
+      (
+        await pool.query(
+          'SELECT include_postal_address,signature_role_line,physical_address FROM compliance_settings',
+        )
+      ).rows[0],
+    ).toEqual({
+      include_postal_address: false,
+      signature_role_line: 'Property Management Automation Specialist',
+      physical_address: 'Retained address',
+    });
+    await pool.query(
+      "UPDATE compliance_settings SET include_postal_address=true,signature_role_line='Custom role'",
+    );
+    await pool.query(signature.downSql);
+    await pool.query(signature.upSql);
+    expect(
+      (
+        await pool.query(
+          'SELECT include_postal_address,signature_role_line FROM compliance_settings',
+        )
+      ).rows[0],
+    ).toEqual({ include_postal_address: true, signature_role_line: 'Custom role' });
+    await pool.query(
+      'ALTER TABLE mailboxes DROP CONSTRAINT mailbox_send_range_valid, DROP COLUMN send_interval_min_minutes, DROP COLUMN send_interval_max_minutes, DROP COLUMN next_allowed_send_at',
+    );
+    await pool.query(
+      "INSERT INTO mailboxes(display_name,from_address,smtp_host,imap_host,send_interval_minutes,last_send_at) VALUES ('Legacy','legacy@test.dev','smtp.test.dev','imap.test.dev',4,'2026-10-07T13:00:00Z')",
+    );
+    await pool.query(spacing.upSql);
+    const row = (
+      await pool.query(
+        'SELECT send_interval_minutes,send_interval_min_minutes,send_interval_max_minutes,last_send_at,next_allowed_send_at FROM mailboxes',
+      )
+    ).rows[0];
+    expect(row).toMatchObject({
+      send_interval_minutes: 4,
+      send_interval_min_minutes: 4,
+      send_interval_max_minutes: 7,
+    });
+    expect(row.next_allowed_send_at.getTime() - row.last_send_at.getTime()).toBeGreaterThanOrEqual(
+      240_000,
+    );
+    expect(row.next_allowed_send_at.getTime() - row.last_send_at.getTime()).toBeLessThanOrEqual(
+      420_000,
+    );
+    await pool.query(spacing.downSql);
+    await pool.query(spacing.upSql);
+    expect(
+      (await pool.query('SELECT next_allowed_send_at FROM mailboxes')).rows[0].next_allowed_send_at,
+    ).toEqual(row.next_allowed_send_at);
+    for (const [min, max] of [
+      [0, 7],
+      [4, 4],
+      [7, 4],
+      [4, 1441],
+      [null, 7],
+    ])
+      await expect(
+        pool.query(
+          'UPDATE mailboxes SET send_interval_min_minutes=$1,send_interval_max_minutes=$2',
+          [min, max],
+        ),
+      ).rejects.toThrow();
+    await resetCoreTables(pool);
+  });
+
   it('backfills legacy single-source campaign and enrollment provenance', async () => {
     const targetMigration = '0017_multi_source_recycling';
     const targetIndex = names.indexOf(targetMigration);

@@ -133,12 +133,14 @@ export class Jobs implements JobPort {
     }
   }
 
-  /** Fixed intervals require minute checks; reload after a mailbox edit. */
+  /** Configured ranges/fixed intervals require minute checks; reload on edit. */
   async refreshSendSchedule(): Promise<void> {
     if (!this.boss) return;
     const settings = await getSettings(this.deps.db);
     const boxes = await listMailboxes(this.deps.db);
-    const cron = boxes.some((mb) => mb.sendIntervalMinutes !== null)
+    const cron = boxes.some(
+      (mb) => mb.sendIntervalMinMinutes !== null || mb.sendIntervalMinutes !== null,
+    )
       ? '* * * * *'
       : `*/${Math.min(59, Math.max(1, settings.schedulerTickMinutes))} * * * *`;
     await this.boss.schedule(TICK_QUEUE, cron, undefined, { retryLimit: 1 });

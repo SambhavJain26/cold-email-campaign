@@ -34,6 +34,9 @@ const CSV = Buffer.from(
 test('real backend: import → enroll → advance → reply/STOP → tag → metrics → complete', async ({
   page,
 }) => {
+  // Range pacing uses minute ticks: multi-day replay executes thousands of
+  // real database decisions while preserving every original outcome assertion.
+  test.setTimeout(600_000);
   await login(page);
 
   // 1 — Mailbox: add through the UI, Test Connection round-trips the real

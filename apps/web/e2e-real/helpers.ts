@@ -23,6 +23,7 @@ export async function api<T = unknown>(
   const res = await page.request[method](url, {
     headers: { 'x-requested-with': 'fetch' },
     data,
+    ...(url === '/api/v1/system/advance-clock' && { timeout: 180_000 }),
   });
   if (!res.ok()) {
     throw new Error(`${method.toUpperCase()} ${url} → ${res.status()} ${await res.text()}`);

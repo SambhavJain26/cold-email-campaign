@@ -34,6 +34,7 @@ import { AutoEnrollmentService } from './services/autoEnrollment';
 export interface AppServices {
   config: Config;
   clock: Clock;
+  rng: Rng;
   transport: MailTransport;
   db: Db;
   pool: Pool;
@@ -183,6 +184,7 @@ export function compose(config: Config, overrides: ComposeOverrides = {}): AppSe
   return {
     config,
     clock,
+    rng,
     transport,
     db,
     pool,

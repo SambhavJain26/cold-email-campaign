@@ -16,7 +16,7 @@ import type {
   VerifyResult,
 } from '../transport/types';
 import { getSettings } from '../db/repos/settingsRepo';
-import { listMailboxesByStatus } from '../db/repos/mailboxesRepo';
+import { listMailboxes, listMailboxesByStatus } from '../db/repos/mailboxesRepo';
 
 /** In-process JobPort (pg-boss cron is meaningless against virtual time). */
 export class InlineJobQueue implements JobPort {
@@ -67,7 +67,12 @@ export class SimulationDriver {
   async advance(d: Duration): Promise<{ now: Date; ticks: number }> {
     const { db, clock, scheduler, poller, queue } = this.deps;
     const settings = await getSettings(db);
-    const tickMinutes = settings.schedulerTickMinutes;
+    const boxes = await listMailboxes(db);
+    const tickMinutes = boxes.some(
+      (mb) => mb.sendIntervalMinMinutes !== null || mb.sendIntervalMinutes !== null,
+    )
+      ? 1
+      : settings.schedulerTickMinutes;
     const pollMinutes = settings.pollIntervalMinutes;
     const target = new Date(clock.now().getTime() + durationMs(d));
     let ticks = 0;

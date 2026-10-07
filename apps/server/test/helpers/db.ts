@@ -66,10 +66,12 @@ export async function resetCoreTables(pool: Pool): Promise<void> {
  * events needs these rows first.
  */
 export async function seedMailboxes(pool: Pool, n: number, dailyCap = 30): Promise<void> {
+  // Historical test cohorts explicitly select legacy pacing; range scenarios
+  // opt in after seeding. This preserves the locked golden mathematical inputs.
   for (let i = 1; i <= n; i++) {
     await pool.query(
-      `INSERT INTO mailboxes (display_name, from_address, smtp_host, imap_host, daily_cap)
-       VALUES ($1, $2, 'smtp.test.dev', 'imap.test.dev', $3)`,
+      `INSERT INTO mailboxes (display_name, from_address, smtp_host, imap_host, daily_cap, send_interval_min_minutes, send_interval_max_minutes)
+       VALUES ($1, $2, 'smtp.test.dev', 'imap.test.dev', $3, NULL, NULL)`,
       [`Test Mailbox ${i}`, `mb${i}@test.dev`, dailyCap],
     );
   }

@@ -25,6 +25,7 @@ import {
   databaseAcceptsTimezone,
   getMailbox,
   listMailboxes,
+  lockMailbox,
   patchMailbox,
   upsertMailboxSecret,
   type MailboxRow,
@@ -43,6 +44,7 @@ import type { MailboxVerifyConfig } from '../transport/types';
 import { GoogleOauthError } from '../services/googleOAuth';
 import { AppError } from './errors';
 import type { ZodTypeProvider } from './plugins/zodCompilers';
+import { nextAllowedSendAt } from '../scheduler/pacing';
 
 function toMailboxDto(row: MailboxRow, stats: MailboxStats, oauthConnected: boolean): MailboxDto {
   return {
@@ -55,6 +57,9 @@ function toMailboxDto(row: MailboxRow, stats: MailboxStats, oauthConnected: bool
     imap_port: row.imapPort,
     daily_cap: row.dailyCap,
     send_interval_minutes: row.sendIntervalMinutes,
+    send_interval_min_minutes: row.sendIntervalMinMinutes,
+    send_interval_max_minutes: row.sendIntervalMaxMinutes,
+    next_allowed_send_at: row.nextAllowedSendAt?.toISOString() ?? null,
     effective_cap: row.resumeCap ?? row.dailyCap,
     send_window: row.sendWindow,
     timezone: row.timezone,
@@ -79,9 +84,6 @@ function patchColumns(body: PatchMailboxBody) {
     ...(body.imap_host !== undefined && { imapHost: body.imap_host }),
     ...(body.imap_port !== undefined && { imapPort: body.imap_port }),
     ...(body.daily_cap !== undefined && { dailyCap: body.daily_cap }),
-    ...(body.send_interval_minutes !== undefined && {
-      sendIntervalMinutes: body.send_interval_minutes,
-    }),
     ...(body.send_window !== undefined && { sendWindow: body.send_window }),
     ...(body.timezone !== undefined && { timezone: body.timezone }),
     ...(body.poll_folders !== undefined && { pollFolders: body.poll_folders }),
@@ -326,6 +328,11 @@ export async function mailboxesRoutes(app: FastifyInstance, services: AppService
           authType,
           dailyCap: b.daily_cap,
           sendIntervalMinutes: b.send_interval_minutes,
+          // Old API clients may still explicitly choose legacy fixed pacing.
+          sendIntervalMinMinutes:
+            b.send_interval_minutes !== undefined ? null : (b.send_interval_min_minutes ?? 4),
+          sendIntervalMaxMinutes:
+            b.send_interval_minutes !== undefined ? null : (b.send_interval_max_minutes ?? 7),
           sendWindow: b.send_window,
           timezone: b.timezone,
           pollFolders,
@@ -363,6 +370,36 @@ export async function mailboxesRoutes(app: FastifyInstance, services: AppService
       if (req.body.timezone !== undefined) await assertIanaTimezone(db, req.body.timezone);
       await assertDailyCapWithinGuardrail(db, req.body.daily_cap);
       const cols = patchColumns(req.body);
+      const updateLocked = async (tx: Parameters<typeof patchMailbox>[0]) => {
+        const current = await lockMailbox(tx, req.params.id);
+        if (!current) throw AppError.notFound('mailbox');
+        const min = req.body.send_interval_min_minutes;
+        const max = req.body.send_interval_max_minutes;
+        if (
+          min !== undefined &&
+          max !== undefined &&
+          (min !== current.sendIntervalMinMinutes || max !== current.sendIntervalMaxMinutes)
+        ) {
+          await patchMailbox(tx, current.id, {
+            ...cols,
+            sendIntervalMinMinutes: min,
+            sendIntervalMaxMinutes: max,
+            nextAllowedSendAt: current.lastSendAt
+              ? nextAllowedSendAt(current.lastSendAt, min, max, services.rng)
+              : null,
+          });
+        } else if (req.body.send_interval_minutes !== undefined) {
+          await patchMailbox(tx, current.id, {
+            ...cols,
+            sendIntervalMinutes: req.body.send_interval_minutes,
+            sendIntervalMinMinutes: null,
+            sendIntervalMaxMinutes: null,
+            nextAllowedSendAt: null,
+          });
+        } else if (Object.keys(cols).length > 0) {
+          await patchMailbox(tx, current.id, cols);
+        }
+      };
       if (req.body.poll_folders !== undefined) {
         const connection = await mailboxConnections.load(existing.id);
         if (!connection) {
@@ -383,13 +420,13 @@ export async function mailboxesRoutes(app: FastifyInstance, services: AppService
           })),
         );
         await db.transaction(async (tx) => {
-          await patchMailbox(tx, req.params.id, cols);
+          await updateLocked(tx);
           for (const seed of seeds) {
             await seedCursorIfAbsent(tx, req.params.id, seed.folder, seed.uid);
           }
         });
-      } else if (Object.keys(cols).length > 0) {
-        await patchMailbox(db, req.params.id, cols);
+      } else {
+        await db.transaction(updateLocked);
       }
       if (req.body.password !== undefined) {
         if (existing.authType === 'google_oauth') {
@@ -398,7 +435,11 @@ export async function mailboxesRoutes(app: FastifyInstance, services: AppService
         const sealed = await sealSecret(req.body.password, config.SECRET_KEY);
         await upsertMailboxSecret(db, req.params.id, sealed, clock.now());
       }
-      if (req.body.send_interval_minutes !== undefined) await jobs.refreshSendSchedule();
+      if (
+        req.body.send_interval_minutes !== undefined ||
+        req.body.send_interval_min_minutes !== undefined
+      )
+        await jobs.refreshSendSchedule();
       return dtoOf(await requireMailbox(req.params.id));
     },
   );

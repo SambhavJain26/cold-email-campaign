@@ -38,7 +38,7 @@ function oauthMailbox(id: number, connected: boolean): MailboxDto {
 }
 
 describe('Google OAuth mailbox UI', () => {
-  it('lets the operator set fixed spacing and warns when the cap cannot fit the window', async () => {
+  it('defaults to a randomized range and warns when its minimum cannot fit the window', async () => {
     const user = userEvent.setup({ pointerEventsCheck: 0 });
     const mailbox = { ...oauthMailbox(1, true), daily_cap: 25, send_interval_minutes: 4 };
     render(
@@ -46,12 +46,15 @@ describe('Google OAuth mailbox UI', () => {
         <MailboxDialog open mailbox={mailbox} onOpenChange={() => {}} />
       </QueryClientProvider>,
     );
-    const interval = screen.getByLabelText('Time between emails (minutes)');
+    const interval = screen.getByLabelText('Minimum minutes');
     expect(interval).toHaveValue(4);
-    expect(screen.getByText(/25 emails take at least 96 minutes/)).toBeInTheDocument();
+    expect(screen.getByLabelText('Maximum minutes')).toHaveValue(7);
+    expect(screen.getByText(/25 emails have 96–168 minutes/)).toBeInTheDocument();
     await user.clear(interval);
     await user.type(interval, '30');
     expect(screen.getByText(/cannot fit the daily cap/)).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: 'Save changes' }));
+    expect(await screen.findByText('Maximum must be greater than minimum')).toBeInTheDocument();
   });
   it('defaults new Workspace mailboxes to OAuth and retains app password as fallback', async () => {
     const user = userEvent.setup({ pointerEventsCheck: 0 });

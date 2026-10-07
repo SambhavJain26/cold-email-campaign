@@ -15,6 +15,8 @@ export interface NewMailbox {
   authType?: 'app_password' | 'google_oauth';
   dailyCap?: number;
   sendIntervalMinutes?: number;
+  sendIntervalMinMinutes?: number | null;
+  sendIntervalMaxMinutes?: number | null;
   sendWindow?: MailboxRow['sendWindow'];
   timezone?: string;
   /** Folders to poll (0012). Omitted → the column default, INBOX only. */
@@ -71,6 +73,9 @@ export async function patchMailbox(
       | 'lastPollUid'
       | 'dailyCap'
       | 'sendIntervalMinutes'
+      | 'sendIntervalMinMinutes'
+      | 'sendIntervalMaxMinutes'
+      | 'nextAllowedSendAt'
       | 'sendWindow'
       | 'displayName'
       | 'fromAddress'
@@ -85,6 +90,12 @@ export async function patchMailbox(
   >,
 ): Promise<void> {
   await db.update(mailboxes).set(patch).where(eq(mailboxes.id, id));
+}
+
+/** Shared with accepted sends: editing pacing waits for any in-flight send. */
+export async function lockMailbox(db: DbLike, id: number): Promise<MailboxRow | undefined> {
+  const rows = await db.select().from(mailboxes).where(eq(mailboxes.id, id)).for('update');
+  return rows[0];
 }
 
 /** Seal-then-store is the caller's job (secrets/seal.ts) — this repo only moves bytes. */

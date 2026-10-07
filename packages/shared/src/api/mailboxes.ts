@@ -14,6 +14,36 @@ export const sendWindowSchema = z
   .strict();
 export type SendWindowDto = z.infer<typeof sendWindowSchema>;
 
+const intervalMinutes = z.number().int().min(1).max(1440);
+const checkRange = (
+  body: {
+    send_interval_min_minutes?: number;
+    send_interval_max_minutes?: number;
+    send_interval_minutes?: number;
+  },
+  ctx: z.RefinementCtx,
+) => {
+  const min = body.send_interval_min_minutes;
+  const max = body.send_interval_max_minutes;
+  if (
+    (min !== undefined || max !== undefined) &&
+    (min === undefined || max === undefined || min >= max)
+  ) {
+    ctx.addIssue({
+      code: 'custom',
+      path: ['send_interval_max_minutes'],
+      message: 'Provide both minutes; minimum must be below maximum',
+    });
+  }
+  if (min !== undefined && body.send_interval_minutes !== undefined) {
+    ctx.addIssue({
+      code: 'custom',
+      path: ['send_interval_minutes'],
+      message: 'Use a range or the legacy interval, not both',
+    });
+  }
+};
+
 export const mailboxSchema = z
   .object({
     id: z.number().int(),
@@ -25,6 +55,9 @@ export const mailboxSchema = z
     imap_port: z.number().int(),
     daily_cap: z.number().int(),
     send_interval_minutes: z.number().int().min(1).max(1440).nullable().optional(),
+    send_interval_min_minutes: intervalMinutes.nullable().optional(),
+    send_interval_max_minutes: intervalMinutes.nullable().optional(),
+    next_allowed_send_at: isoDateTime.nullable().optional(),
     effective_cap: z.number().int(),
     send_window: sendWindowSchema,
     timezone: ianaTimezoneSchema,
@@ -61,12 +94,15 @@ export const createMailboxBodySchema = z
     password: z.string().min(1).optional(),
     daily_cap: z.number().int().min(1).optional(),
     send_interval_minutes: z.number().int().min(1).max(1440).optional(),
+    send_interval_min_minutes: intervalMinutes.optional(),
+    send_interval_max_minutes: intervalMinutes.optional(),
     send_window: sendWindowSchema.optional(),
     timezone: ianaTimezoneSchema.optional(),
     poll_folders: z.array(z.string().min(1)).min(1).optional(),
   })
   .strict()
   .superRefine((body, ctx) => {
+    checkRange(body, ctx);
     if ((body.auth_type ?? 'app_password') === 'app_password' && !body.password) {
       ctx.addIssue({
         code: 'custom',
@@ -101,11 +137,14 @@ export const patchMailboxBodySchema = z
     password: z.string().min(1).optional(),
     daily_cap: z.number().int().min(1).optional(),
     send_interval_minutes: z.number().int().min(1).max(1440).optional(),
+    send_interval_min_minutes: intervalMinutes.optional(),
+    send_interval_max_minutes: intervalMinutes.optional(),
     send_window: sendWindowSchema.optional(),
     timezone: ianaTimezoneSchema.optional(),
     poll_folders: z.array(z.string().min(1)).min(1).optional(),
   })
-  .strict();
+  .strict()
+  .superRefine(checkRange);
 export type PatchMailboxBody = z.infer<typeof patchMailboxBodySchema>;
 
 export const testConnectionResponseSchema = z

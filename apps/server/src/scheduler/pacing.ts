@@ -1,6 +1,5 @@
-// Pacing (decision P, docs/06 §2): per-mailbox minimum gap between sends =
-// window ÷ cap, jittered ±settings.send_jitter_pct. Never-burst is EMERGENT:
-// cap + pace make bursting structurally impossible — no special catch-up path.
+// New mailboxes persist a randomly selected next-send deadline. The older
+// window/cap and fixed-interval helpers remain for rollback/legacy configuration.
 import type { SendWindow } from '../db/schema/transport';
 import type { Rng } from '../util/rng';
 import { windowMinutes } from './window';
@@ -20,4 +19,15 @@ export function jitterFactor(rng: Rng, jitterPct: number): number {
 export function paceReady(now: Date, lastSendAt: Date | null, gapMs: number): boolean {
   if (lastSendAt === null) return true;
   return now.getTime() - lastSendAt.getTime() >= gapMs;
+}
+
+/** Uniform inclusive integer seconds, drawn once per accepted send or range edit. */
+export function nextAllowedSendAt(
+  lastSendAt: Date,
+  minMinutes: number,
+  maxMinutes: number,
+  rng: Rng,
+): Date {
+  const seconds = minMinutes * 60 + Math.floor(rng() * ((maxMinutes - minMinutes) * 60 + 1));
+  return new Date(lastSendAt.getTime() + seconds * 1000);
 }

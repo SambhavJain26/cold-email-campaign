@@ -296,7 +296,8 @@ describe('B6.12 SIMULATED_CLOCK advance-clock', () => {
 
     const status = (await h.inject({ method: 'GET', url: '/api/v1/system/status' })).json();
     expect(status.scheduler_last_tick_at).not.toBeNull();
-  });
+    // Three days exercise hundreds of serial real-database ticks.
+  }, 90_000);
 
   it('advance-clock validates its body', async () => {
     const res = await h.inject({

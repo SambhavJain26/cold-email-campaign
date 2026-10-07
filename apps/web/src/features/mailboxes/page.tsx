@@ -82,9 +82,11 @@ export default function MailboxesPage() {
     },
     {
       key: 'send-interval',
-      header: 'Send interval',
+      header: 'Send spacing',
       cell: (mailbox) =>
-        mailbox.send_interval_minutes != null ? `${mailbox.send_interval_minutes} min` : 'Not set',
+        mailbox.send_interval_min_minutes != null && mailbox.send_interval_max_minutes != null
+          ? `${mailbox.send_interval_min_minutes}–${mailbox.send_interval_max_minutes} min`
+          : 'Legacy spacing',
     },
     {
       key: 'average',

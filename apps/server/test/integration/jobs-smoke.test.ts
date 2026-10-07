@@ -84,7 +84,9 @@ describe('pg-boss wiring smoke (B3.16)', () => {
   }, 30_000);
 
   it('registers a runtime-added mailbox once, and is inert before start()', async () => {
-    await pool.query('UPDATE mailboxes SET send_interval_minutes=4 WHERE id=1');
+    await pool.query(
+      'UPDATE mailboxes SET send_interval_min_minutes=4,send_interval_max_minutes=7 WHERE id=1',
+    );
     await jobs.refreshSendSchedule();
     expect(
       (await pool.query("SELECT cron FROM pgboss.schedule WHERE name='scheduler-tick'")).rows[0]

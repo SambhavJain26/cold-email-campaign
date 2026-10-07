@@ -16,7 +16,7 @@ import {
   type ComplianceRow,
   type SettingsRow,
 } from '../db/repos/settingsRepo';
-import { listMailboxesByStatus, patchMailbox } from '../db/repos/mailboxesRepo';
+import { listMailboxesByStatus, lockMailbox, patchMailbox } from '../db/repos/mailboxesRepo';
 import {
   countSentForStep,
   countSentSince,
@@ -58,7 +58,7 @@ import {
 import { evaluateAutoPause } from '../services/autoPause';
 import { resolveTimezone } from './tzmap';
 import { insideWindow, startOfLocalDay } from './window';
-import { jitterFactor, minGapMs, paceReady } from './pacing';
+import { jitterFactor, minGapMs, nextAllowedSendAt, paceReady } from './pacing';
 import { pickMailbox, type RotationCandidate } from './rotation';
 import { buildMessageId, buildThreadHeaders } from './mime';
 import { isRateLimitError, transientVerdict } from './providerBlock';
@@ -228,16 +228,22 @@ export class Scheduler {
         mb.id,
         startOfLocalDay(now, mb.timezone || settings.defaultTimezone),
       );
-      const gap =
-        mb.sendIntervalMinutes !== null
-          ? mb.sendIntervalMinutes * 60_000
-          : minGapMs(mb.sendWindow, capToday) * jitterFactor(rng, settings.sendJitterPct);
+      const ready =
+        mb.sendIntervalMinMinutes !== null
+          ? mb.nextAllowedSendAt === null || now >= mb.nextAllowedSendAt
+          : paceReady(
+              now,
+              mb.lastSendAt,
+              mb.sendIntervalMinutes !== null
+                ? mb.sendIntervalMinutes * 60_000
+                : minGapMs(mb.sendWindow, capToday) * jitterFactor(rng, settings.sendJitterPct),
+            );
       const remaining = Math.max(0, capToday - sentToday);
       budgets.set(mb.id, {
         id: mb.id,
         sentToday,
         capToday,
-        budget: paceReady(now, mb.lastSendAt, gap) ? remaining : 0,
+        budget: ready ? remaining : 0,
         lastSendAt: mb.lastSendAt,
         window: mb.sendWindow,
         timezone: mb.timezone,
@@ -614,14 +620,32 @@ export class Scheduler {
     // `listDue` is a snapshot.  Re-read and send while holding the same
     // enrollment lock EventStore uses for inbound poller appends.  A reply that
     // gets the lock first turns the projection terminal and this sends nothing.
+    let acceptedAt = now;
     const result = await store.withEnrollmentLock(e.id, async (tx) => {
       const current = await getEnrollmentById(tx, e.id);
       if (!current || current.currentState !== 'ACTIVE') return null;
+      // Range edits and sends share this row lock. Recheck the persisted deadline
+      // and cap after locking, so an edit or concurrent manual send cannot race.
+      const mailbox = await lockMailbox(tx, mb.id);
+      if (!mailbox || mailbox.status !== 'ok') return null;
+      if (mailbox.sendIntervalMinMinutes !== null) {
+        if (mailbox.nextAllowedSendAt !== null && now < mailbox.nextAllowedSendAt) return null;
+        const sentToday = await countSentSince(tx, mb.id, startOfLocalDay(now, mailbox.timezone));
+        if (sentToday >= (mailbox.resumeCap ?? mailbox.dailyCap)) return null;
+        if (
+          settings.enforceSendWindow &&
+          !insideWindow(mailbox.sendWindow, now, resolveTimezone(e.leadState, mailbox.timezone))
+        )
+          return null;
+      }
       const delivery = await transport.send(msg);
       if (!delivery.accepted) return delivery;
+      acceptedAt = this.deps.clock.now();
 
       const nextStep = stepOf(seq, stepNo + 1);
-      const nextSendAt = nextStep ? new Date(now.getTime() + nextStep.waitDays * 86_400_000) : null;
+      const nextSendAt = nextStep
+        ? new Date(acceptedAt.getTime() + nextStep.waitDays * 86_400_000)
+        : null;
       await store.appendUnderEnrollmentLock(
         tx,
         e.id,
@@ -630,7 +654,7 @@ export class Scheduler {
             leadId: e.leadId,
             enrollmentId: e.id,
             campaignId: e.campaignId,
-            occurredAt: now,
+            occurredAt: acceptedAt,
             stepNo,
             mailboxId: mb.id,
             messageId,
@@ -652,6 +676,18 @@ export class Scheduler {
             },
           ],
           txWork: async (lockedTx, eventIds) => {
+            await patchMailbox(lockedTx, mb.id, {
+              lastSendAt: acceptedAt,
+              nextAllowedSendAt:
+                mailbox.sendIntervalMinMinutes !== null && mailbox.sendIntervalMaxMinutes !== null
+                  ? nextAllowedSendAt(
+                      acceptedAt,
+                      mailbox.sendIntervalMinMinutes,
+                      mailbox.sendIntervalMaxMinutes,
+                      this.deps.rng,
+                    )
+                  : null,
+            });
             await insertSentMessage(lockedTx, {
               messageId,
               enrollmentId: e.id,
@@ -666,7 +702,7 @@ export class Scheduler {
                 rendered.emailFormat ?? (rendered.bodyHtml ? 'minimal_html' : 'plain_text'),
               contentSource: personalized ? 'personalized' : 'template',
               personalizedCopyId: personalizedCopy?.id ?? retrySnapshot?.personalizedCopyId ?? null,
-              sentAt: now,
+              sentAt: acceptedAt,
             });
             if (personalizedCopy) {
               await markManualDraftSent(
@@ -674,7 +710,7 @@ export class Scheduler {
                 personalizedCopy.id,
                 messageId,
                 eventIds[0]!,
-                now,
+                acceptedAt,
               );
             }
             if (opts.acceptedTxWork) {
@@ -688,12 +724,11 @@ export class Scheduler {
     if (result === null) return 'no_step';
 
     if (result.accepted) {
-      await patchMailbox(db, mb.id, { lastSendAt: now });
       await jobs.scheduleConfirmDelivery({
         enrollmentId: e.id,
         stepNo,
-        sentAt: now,
-        runAt: new Date(now.getTime() + settings.deliveryConfirmHours * 3_600_000),
+        sentAt: acceptedAt,
+        runAt: new Date(acceptedAt.getTime() + settings.deliveryConfirmHours * 3_600_000),
       });
       this.transientFailures.delete(mb.id);
       return 'sent';
