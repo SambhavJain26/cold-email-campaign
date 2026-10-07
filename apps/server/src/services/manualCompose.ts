@@ -426,7 +426,9 @@ export async function manualComposePrefill(
     dueAt: enrollment.nextSendAt,
     personalizationMode: enrollment.personalizationMode,
     subject: rendered.subject,
-    body: stripAutomaticFooter(rendered.bodyText, compliance),
+    // Imported drafts are editable source copy, not a rendered message. Keep
+    // their exact body so reviewing them does not discard a saved sign-off.
+    body: draft ? draft.body : stripAutomaticFooter(rendered.bodyText, compliance),
     variantId: draft ? null : variant.id,
     draftId: draft?.id ?? null,
     draftStatus: draft?.status === 'sent' ? null : (draft?.status ?? null),
