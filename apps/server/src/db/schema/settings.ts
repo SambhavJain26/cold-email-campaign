@@ -31,6 +31,7 @@ export const settings = pgTable('settings', {
   minRampDays: integer('min_ramp_days').notNull().default(0),
   updatedAt: tz('updated_at').notNull().defaultNow(),
   incomingStopSince: tz('incoming_stop_since').notNull().defaultNow(),
+  incomingContentRetentionDays: integer('incoming_content_retention_days').default(30),
 });
 
 export const complianceSettings = pgTable('compliance_settings', {

@@ -132,7 +132,72 @@ const outreachStopped_ = base.extend({
   }),
 });
 
+const reviewRequired_ = base.extend({
+  type: z.literal('incoming_review_required'),
+  enrollmentId: id,
+  campaignId: id,
+  attributes: z.object({ incoming_message_id: id }),
+});
+const reviewDecided_ = base.extend({
+  type: z.literal('outreach_review_decided'),
+  enrollmentId: id,
+  campaignId: id,
+  attributes: z.object({
+    action: z.enum(['continue', 'delay']),
+    hold_event_ids: z.array(id),
+    until: z.string().datetime().optional(),
+    operation_id: z.string().min(1),
+  }),
+});
+const sequenceStopped_ = base.extend({
+  type: z.literal('sequence_stopped'),
+  enrollmentId: id,
+  campaignId: id,
+  attributes: z.object({
+    hold_event_ids: z.array(id),
+    resume_due_at: z.string().datetime().nullable(),
+    operation_id: z.string().min(1),
+  }),
+});
+const sequenceRestored_ = base.extend({
+  type: z.literal('sequence_restored'),
+  enrollmentId: id,
+  campaignId: id,
+  attributes: z.object({
+    blocker_event_ids: z.array(id).min(1),
+    reason: z.string().min(1).max(1000),
+    resume_due_at: z.string().datetime(),
+    operation_id: z.string().min(1),
+  }),
+});
+const authorshipConfirmed_ = base.extend({
+  type: z.literal('incoming_authorship_confirmed'),
+  enrollmentId: id,
+  campaignId: id,
+  stepNo: z.number().int().positive().optional(),
+  sentiment: z.enum(SENTIMENTS).nullable().default(null),
+  attributes: z.object({
+    incoming_message_id: id,
+    authorship: z.enum(['human', 'automatic', 'unsure']),
+    operation_id: z.string().min(1),
+  }),
+});
+const addressSuppressed_ = base.extend({
+  type: z.literal('address_suppressed'),
+  attributes: z.object({
+    incoming_message_id: id.optional(),
+    rule: z.enum(['manual', 'explicit_optout']),
+    operation_id: z.string().min(1),
+  }),
+});
+
 export const domainEventSchema = z.discriminatedUnion('type', [
+  reviewRequired_,
+  reviewDecided_,
+  sequenceStopped_,
+  sequenceRestored_,
+  authorshipConfirmed_,
+  addressSuppressed_,
   outreachStopped_,
   enrolled_,
   sent_,
@@ -160,6 +225,18 @@ type Input<S extends z.ZodType> = z.input<S>;
 
 /** The constructors. Usage: buildEvent.sent({...}) — throws on malformed input. */
 export const buildEvent = {
+  reviewRequired: (a: Omit<Input<typeof reviewRequired_>, 'type'>) =>
+    reviewRequired_.parse({ ...a, type: 'incoming_review_required' }),
+  reviewDecided: (a: Omit<Input<typeof reviewDecided_>, 'type'>) =>
+    reviewDecided_.parse({ ...a, type: 'outreach_review_decided' }),
+  sequenceStopped: (a: Omit<Input<typeof sequenceStopped_>, 'type'>) =>
+    sequenceStopped_.parse({ ...a, type: 'sequence_stopped' }),
+  sequenceRestored: (a: Omit<Input<typeof sequenceRestored_>, 'type'>) =>
+    sequenceRestored_.parse({ ...a, type: 'sequence_restored' }),
+  authorshipConfirmed: (a: Omit<Input<typeof authorshipConfirmed_>, 'type'>) =>
+    authorshipConfirmed_.parse({ ...a, type: 'incoming_authorship_confirmed' }),
+  addressSuppressed: (a: Omit<Input<typeof addressSuppressed_>, 'type'>) =>
+    addressSuppressed_.parse({ ...a, type: 'address_suppressed' }),
   outreachStopped: (a: Omit<Input<typeof outreachStopped_>, 'type'>) =>
     outreachStopped_.parse({ ...a, type: 'outreach_stopped' }),
   enrolled: (a: Omit<Input<typeof enrolled_>, 'type'>) =>

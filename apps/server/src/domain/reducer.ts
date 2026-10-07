@@ -30,6 +30,11 @@ export interface EnrollmentSnapshot {
   terminalAt: Date | null;
   /** reply event id → effective sentiment (latest sentiment_tagged wins over the insert value). */
   replySentiments: Record<number, Sentiment | null>;
+  reviewHoldIds?: number[];
+  reviewRevision?: number;
+  delayedUntil?: Date | null;
+  resumeDueAt?: Date | null;
+  manualStopEventId?: number | null;
 }
 
 export function initialSnapshot(): EnrollmentSnapshot {
@@ -66,6 +71,51 @@ export function applyEvent(
   ctx: SequenceShape,
 ): EnrollmentSnapshot {
   switch (e.type) {
+    case 'incoming_review_required':
+      return isTerminal(s.state)
+        ? s
+        : { ...s, reviewHoldIds: [...(s.reviewHoldIds ?? []), e.id!], reviewRevision: e.id! };
+    case 'outreach_review_decided':
+      return isTerminal(s.state)
+        ? s
+        : {
+            ...s,
+            reviewHoldIds: (s.reviewHoldIds ?? []).filter(
+              (id) => !e.attributes.hold_event_ids.includes(id),
+            ),
+            delayedUntil:
+              e.attributes.action === 'delay' && e.attributes.until
+                ? new Date(e.attributes.until)
+                : null,
+            reviewRevision: e.id!,
+          };
+    case 'sequence_stopped':
+      return isTerminal(s.state)
+        ? s
+        : {
+            ...toTerminal(s, 'STOPPED', e.occurredAt),
+            reviewHoldIds: [],
+            reviewRevision: e.id!,
+            manualStopEventId: e.id!,
+            resumeDueAt: e.attributes.resume_due_at ? new Date(e.attributes.resume_due_at) : null,
+          };
+    case 'sequence_restored':
+      return s.state !== 'STOPPED' && s.state !== 'REPLIED'
+        ? s
+        : {
+            ...s,
+            state: 'ACTIVE',
+            terminalAt: null,
+            reviewHoldIds: [e.id!],
+            reviewRevision: e.id!,
+            manualStopEventId: null,
+            resumeDueAt: new Date(e.attributes.resume_due_at),
+            delayedUntil: null,
+          };
+    case 'incoming_authorship_confirmed':
+      return bumpSentiment(s, -e.attributes.incoming_message_id, e.attributes.authorship === 'human' ? e.sentiment : null);
+    case 'address_suppressed':
+      return { ...s, reviewHoldIds: [], reviewRevision: e.id! };
     case 'enrolled':
       return s.state === 'NEW' ? { ...s, state: 'ACTIVE', currentStepNo: 1 } : s;
 

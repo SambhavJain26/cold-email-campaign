@@ -222,7 +222,7 @@ down migration drops facts/tombstones/holds/suppression.
 ## Incremental checklist and verification
 
 - [x] Stage 0: persisted approved spec, indexed, operating/decision boundaries reconciled.
-- [ ] Stage 1: state/contracts/additive schema; transition tests, apply/down/apply, legacy parity.
+- [x] Stage 1: state/contracts/additive schema; transition tests, apply/down/apply, legacy parity.
 - [ ] Stage 2: scheduler locks/guards/checkpoints; deterministic race/retry/no-burst tests.
 - [ ] Stage 3: identity/capture/matching/opt-outs; header/HTML/folder/dedupe fixtures.
 - [ ] Stage 4: actions/link/ack/permanent suppression/restoration; API concurrency/idempotency.
@@ -230,6 +230,16 @@ down migration drops facts/tombstones/holds/suppression.
 - [ ] Stage 6: retention/recovery/analytics/manifest; cleanup races/no inflation/restore drill.
 - [ ] Stage 7: independently verified app-wide top navigation.
 - [ ] Stage 8: full serial gates, populated replay/self-check/backup, docs and release handoff.
+
+### Verified local stage outcomes
+
+- 2026-10-08: Stage 1 introduces six prospective event types, optional event-derived control
+  fields, shared action/reader contracts, removable content/location/link/activity tables, and
+  preservation-only rollback. Typecheck passes; unit 396/396; existing event-store integration
+  7/7; new state integration 3/3. The populated new-state replay checks one enrollment with
+  zero projection differences. Apply/down/apply retains holds and append-only activity.
+  No incoming records were replayed and no production operation occurred. Later stages and
+  the final populated CLI/backup/full serial gates remain open.
 
 Required scenarios include human away reply holds; automatic threaded/fresh labels; all exact-address
 unfinished holds; no company auto-action; conservative quotes/STOP; opt-out protection without ack;

@@ -9,12 +9,13 @@ import {
   writeProjection,
   listIdsActivePastStep,
   patchScheduling,
+  getById,
 } from '../db/repos/enrollmentsRepo';
 import { suppressLead } from '../db/repos/suppressionsRepo';
 import { getSettings } from '../db/repos/settingsRepo';
 import { loadSequenceDef } from '../db/repos/sequencesRepo';
 import { getCampaign } from '../db/repos/campaignsRepo';
-import { acquireRebuildLockShared, lockEnrollment } from '../db/repos/locksRepo';
+import { acquireRebuildLockShared, lockEnrollment, lockLead } from '../db/repos/locksRepo';
 import type { DomainEvent } from '../domain/events';
 import {
   completeSnapshot,
@@ -72,6 +73,9 @@ export class EventStore {
   async withEnrollmentLock<T>(enrollmentId: number, work: (tx: Tx) => Promise<T>): Promise<T> {
     return this.db.transaction(async (tx) => {
       await acquireRebuildLockShared(tx);
+      const enrollment = await getById(tx, enrollmentId);
+      if (!enrollment) throw new Error(`enrollment ${enrollmentId} not found`);
+      await lockLead(tx, enrollment.leadId);
       await lockEnrollment(tx, enrollmentId);
       return work(tx);
     });
@@ -101,6 +105,10 @@ export class EventStore {
     if (evs.length === 0) return [];
     // Rebuild takes this exclusively; appends share it.
     await acquireRebuildLockShared(tx);
+
+    for (const leadId of [...new Set(evs.map((event) => event.leadId))].sort((a, b) => a - b)) {
+      await lockLead(tx, leadId);
+    }
 
     const settings = await getSettings(tx);
     const enrollmentIds = [
@@ -152,7 +160,7 @@ export class EventStore {
     for (const e of evs) {
       if (e.type === 'hard_bounce') {
         await suppressLead(tx, e.leadId, 'hard_bounce', e.occurredAt);
-      } else if (e.type === 'unsubscribe' && settings.suppressUnsubs) {
+      } else if (e.type === 'unsubscribe' || e.type === 'address_suppressed') {
         await suppressLead(tx, e.leadId, 'unsubscribed', e.occurredAt);
       }
     }
@@ -202,7 +210,7 @@ export class EventStore {
     for (const e of evs) {
       if (e.type === 'hard_bounce') {
         await suppressLead(tx, e.leadId, 'hard_bounce', e.occurredAt);
-      } else if (e.type === 'unsubscribe' && settings.suppressUnsubs) {
+      } else if (e.type === 'unsubscribe' || e.type === 'address_suppressed') {
         await suppressLead(tx, e.leadId, 'unsubscribed', e.occurredAt);
       }
     }
@@ -227,9 +235,16 @@ export class EventStore {
       // Only enrollments already past the last step can complete — exact
       // SQL prefilter, keeps the per-tick sweep cheap.
       const activeIds = await listIdsActivePastStep(tx, campaignId, shape.lastStepNo);
-      const byEnrollment = await listByEnrollments(tx, activeIds);
+      const activeRows = await Promise.all(activeIds.map((id) => getById(tx, id)));
+      for (const leadId of [
+        ...new Set(activeRows.flatMap((row) => (row ? [row.leadId] : []))),
+      ].sort((a, b) => a - b)) {
+        await lockLead(tx, leadId);
+      }
+      for (const id of [...activeIds].sort((a, b) => a - b)) await lockEnrollment(tx, id);
       let completed = 0;
       for (const eid of activeIds) {
+        const byEnrollment = await listByEnrollments(tx, [eid]);
         const evs = byEnrollment.get(eid) ?? [];
         const snapshot = foldEvents(evs, shape);
         const lastSentAt = evs.filter((e) => e.type === 'sent').at(-1)?.occurredAt ?? null;

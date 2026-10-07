@@ -47,6 +47,11 @@ function diffSnapshot(
     bestReplySentiment: string | null;
     meetingBooked: boolean;
     terminalAt: Date | null;
+    reviewHoldIds: number[];
+    reviewRevision: number;
+    delayedUntil: Date | null;
+    resumeDueAt: Date | null;
+    manualStopEventId: number | null;
   },
   derived: EnrollmentSnapshot,
 ): ProjectionDiff[] {
@@ -57,6 +62,15 @@ function diffSnapshot(
     ['best_reply_sentiment', stored.bestReplySentiment, derived.bestReplySentiment],
     ['meeting_booked', stored.meetingBooked, derived.meetingBooked],
     ['terminal_at', ms(stored.terminalAt), ms(derived.terminalAt)],
+    [
+      'review_hold_ids',
+      JSON.stringify(stored.reviewHoldIds),
+      JSON.stringify(derived.reviewHoldIds ?? []),
+    ],
+    ['review_revision', stored.reviewRevision, derived.reviewRevision ?? 0],
+    ['delayed_until', ms(stored.delayedUntil), ms(derived.delayedUntil ?? null)],
+    ['resume_due_at', ms(stored.resumeDueAt), ms(derived.resumeDueAt ?? null)],
+    ['manual_stop_event_id', stored.manualStopEventId, derived.manualStopEventId ?? null],
   ];
   return checks
     .filter(([, a, b]) => a !== b)
@@ -100,7 +114,7 @@ export async function rebuildProjections(db: Db, opts: RebuildOptions): Promise<
         for (const e of evs) {
           if (e.type === 'hard_bounce')
             await suppressLead(tx, e.leadId, 'hard_bounce', e.occurredAt);
-          else if (e.type === 'unsubscribe')
+          else if (e.type === 'unsubscribe' || e.type === 'address_suppressed')
             await suppressLead(tx, e.leadId, 'unsubscribed', e.occurredAt);
         }
       }

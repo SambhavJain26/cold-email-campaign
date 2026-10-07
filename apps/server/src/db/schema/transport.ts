@@ -10,7 +10,6 @@ import {
   primaryKey,
   text,
   timestamp,
-  unique,
   uniqueIndex,
 } from 'drizzle-orm/pg-core';
 import { sql } from 'drizzle-orm';
@@ -72,6 +71,7 @@ export const mailboxPollCursors = pgTable(
       .notNull()
       .references(() => mailboxes.id, { onDelete: 'cascade' }),
     folder: text('folder').notNull(),
+    uidValidity: text('uid_validity'),
     lastPollUid: bigint('last_poll_uid', { mode: 'number' }).notNull().default(0),
   },
   (t) => [primaryKey({ columns: [t.mailboxId, t.folder] })],
@@ -157,9 +157,18 @@ export const incomingMessages = pgTable(
     dsnStatus: text('dsn_status'),
     snippet: text('snippet'),
     bodyText: text('body_text'), // full unquoted reply text (0007) — unibox detail view
+    policyVersion: text('policy_version').notNull().default('legacy'),
+    automation: text('automation').notNull().default('uncertain'),
+    relationship: text('relationship').notNull().default('unmatched'),
+    reviewRevision: bigint('review_revision', { mode: 'number' }).notNull().default(0),
+    canonicalId: bigint('canonical_id', { mode: 'number' }),
+    primaryEnrollmentId: bigint('primary_enrollment_id', { mode: 'number' }).references(
+      () => enrollments.id,
+    ),
+    linkingStatus: text('linking_status').notNull().default('needs_linking'),
+    contentDeletedAt: tz('content_deleted_at'),
   },
   (t) => [
-    unique().on(t.mailboxId, t.imapUid),
     index('im_class').on(t.classification, sql`${t.processedAt} DESC`),
     uniqueIndex('im_msgid')
       .on(t.messageId)

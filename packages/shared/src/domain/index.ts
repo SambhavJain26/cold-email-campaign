@@ -16,6 +16,12 @@ export const EVENT_TYPES = [
   'sentiment_tagged',
   'reply_dispositioned',
   'outreach_stopped',
+  'incoming_review_required',
+  'outreach_review_decided',
+  'sequence_stopped',
+  'sequence_restored',
+  'incoming_authorship_confirmed',
+  'address_suppressed',
 ] as const;
 export type EventType = (typeof EVENT_TYPES)[number];
 

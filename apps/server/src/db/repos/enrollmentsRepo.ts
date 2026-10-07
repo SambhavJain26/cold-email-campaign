@@ -26,6 +26,11 @@ export async function writeProjection(
       bestReplySentiment: s.bestReplySentiment,
       meetingBooked: s.meetingBooked,
       terminalAt: s.terminalAt,
+      reviewHoldIds: s.reviewHoldIds ?? [],
+      reviewRevision: s.reviewRevision ?? 0,
+      delayedUntil: s.delayedUntil ?? null,
+      resumeDueAt: s.resumeDueAt ?? null,
+      manualStopEventId: s.manualStopEventId ?? null,
       ...(terminal ? { nextSendAt: null } : {}),
     })
     .where(eq(enrollments.id, enrollmentId));
@@ -53,6 +58,7 @@ export interface DueEnrollment {
   currentStepNo: number;
   assignedMailboxId: number | null;
   nextSendAt: Date;
+  reviewRevision?: number;
   personalizationMode: PersonalizationMode;
   leadEmail: string;
   leadFirstName: string | null;
@@ -80,6 +86,7 @@ export async function listDue(db: DbLike, now: Date): Promise<DueEnrollment[]> {
       currentStepNo: enrollments.currentStepNo,
       assignedMailboxId: enrollments.assignedMailboxId,
       nextSendAt: enrollments.nextSendAt,
+      reviewRevision: enrollments.reviewRevision,
       personalizationMode: enrollments.personalizationMode,
       leadEmail: leads.email,
       leadFirstName: leads.firstName,
@@ -95,6 +102,8 @@ export async function listDue(db: DbLike, now: Date): Promise<DueEnrollment[]> {
     .where(
       and(
         eq(enrollments.currentState, 'ACTIVE'),
+        sql`cardinality(${enrollments.reviewHoldIds}) = 0`,
+        or(isNull(enrollments.delayedUntil), lte(enrollments.delayedUntil, now)),
         eq(campaigns.status, 'active'),
         lte(enrollments.nextSendAt, now),
         or(isNull(enrollments.snoozedUntil), lte(enrollments.snoozedUntil, now)),
