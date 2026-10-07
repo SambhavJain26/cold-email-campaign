@@ -1,5 +1,40 @@
 # Local canary runbook (B8.3-local) — two-week validation on throwaway Gmail
 
+## 2026-10-07 authorized fixed-spacing production deployment
+
+The operator separately authorized deployment of the verified spacing candidate. Fresh read-only
+prechecks found clean production `b721684`, Campaign 3 active after operator actions, Campaign 2
+paused, Campaign 1 archived, all auto-enrollment off. Four mailboxes were healthy, 20/day, no resume
+cap, New York weekdays 09:00–17:00. Deployment ran before the 13:00 UTC / **18:30 IST** window
+opening, guarded against crossing that boundary. No campaign pause/resume or setting edit occurred.
+
+`origin/canary` was pushed to `a6489a9`. Reviewed bundle SHA-256
+`c39fa8f9abf606d640a64aae8ef107f4ad16e3b712b61250c8144921322f26fe` matched on both hosts;
+production fetched it and fast-forwarded to `a6489a9d4fa67e98ab48b9f593edb91fe8a4f343`.
+Compose build/up succeeded. App/database are healthy, gateway/backup running. All **26 migrations**
+are applied, including 0025. Projection dry run checks **113 enrollments — zero diffs**;
+self-check is clean. Policy cutoff remains `2026-10-06T06:41:30.403034Z`.
+
+Pre-backup `coldemail-20261007-105027.dump` is **2,226,522 bytes**; post-backup
+`coldemail-20261007-105255.dump` is **2,226,947 bytes**. Both pass **342-line** restore catalogs.
+Public health returns `{ok:true,db:true}`; app/mailboxes/campaigns/login/sequences return 200;
+bare app and outreach roots redirect 308; portfolio returns 200; unsubscribe roots return 404.
+HTML/version responses are `no-store`; hashed assets use one-year immutable caching. Served build
+version is `155ef1ec-22f9-404e-8e88-ad511f85a158`, and the live asset contains the interval control.
+
+After operator sign-in, authenticated Mailboxes shows all four healthy mailboxes with **0/20**,
+**Send interval: Not set**, and total capacity 80. Opening Edit verifies the blank **Time between
+emails (minutes)** control beside Daily cap, with minimum-gap/window guidance. The dialog was closed
+without edits/saving; refreshing does not show a false update notice. Local proof is saved at
+`backups/spacing-live-control.png`; the Mailboxes tab is left open for the operator.
+
+Campaign state, auto-enrollment, mailbox caps/windows and watermarks remain unchanged:
+**422 events / max ID 422 / 148 sent messages**. Existing interval values are null and scheduler
+cron remains `*/5 * * * *`; saving a chosen interval switches the all-role scheduler to minute checks.
+The operator can set four minutes independently on each mailbox, and later choose 25/day separately.
+No production CSV operation, enrollment, activation/resume, interval/cap edit or send was performed.
+Root disk is **38% used**, approximately **15 GiB available** after rebuilding; no cleanup was run.
+
 ## 2026-10-07 operator-controlled mailbox spacing — verified locally
 
 The operator rejected spreading sends across the window and requested a directly editable gap.
@@ -38,11 +73,12 @@ It restores into the newly created disposable `coldemail_spacing_restore_2026100
 intervals remain four minutes, five-enrollment dry run has zero diffs, and self-check is clean.
 The dump and scratch database are retained locally. No production operation or outbound send occurred.
 
-Implementation is on `canary`, not deployed or pushed. Production remains `b721684`; the earlier
+At this local checkpoint implementation was on `canary`, not deployed or pushed. Production remained `b721684`; the earlier
 read-only diagnosis below records Campaign 3 active after operator actions. Deployment needs separate
 authorization, fresh live-state/watermark checks and a validated backup. Saving production intervals,
 raising caps, enrollment and campaign resume remain separate operational actions. The proposed slot
-approach was discarded before this implementation; it is not part of the candidate.
+approach was discarded before this implementation; it is not part of the candidate. The separately
+authorized deployment above supersedes this checkpoint's release status.
 
 ## 2026-10-07 read-only 74-of-80 send diagnosis
 

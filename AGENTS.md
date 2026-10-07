@@ -19,6 +19,14 @@ call planned work implemented.
 
 ## Current operating boundary
 
+- **2026-10-07 fixed-spacing deployment:** separately authorized, pushed and deployed at
+  `a6489a9` on `canary`. All 26 migrations, services/routes/caching, 113-enrollment zero drift,
+  self-check and validated pre/post backups pass. Authenticated Mailboxes shows the interval column
+  and edit control; no settings were saved. Campaign 3 remains active, auto-enrollment off;
+  four healthy mailboxes remain 20/day with intervals unset, preserving legacy pacing until the
+  operator chooses a value. Watermarks remain 422 events / 148 sent. No campaign, cap, interval,
+  enrollment or send change occurred. See docs/17 for deployment evidence and operator handoff.
+
 - **2026-10-07 fixed mailbox spacing — local only:** operator-authorized implementation adds
   **Time between emails (minutes)** per mailbox, independent of its window/cap and without jitter.
   Migration 0025 preserves existing pacing until an interval is saved and retains values on rollback.
@@ -378,7 +386,7 @@ temporary rollback/canary environment.
 - App: `/opt/email-campaign`; stack: `docker-compose.spaceship.yml` with `.env.prod`
 - Public UI: `https://sambhavpmtech.com/email-campaign/`
 - Internal gateway: `127.0.0.1:18080`; host Caddy is the only public 80/443 listener
-- Deployed application release: `canary` at `b721684`
+- Deployed application release: `canary` at `a6489a9`
 
 The repository is private and the VPS currently has no GitHub deploy credential. Until a read-only
 deploy key is deliberately installed, transfer a reviewed `git bundle`, fetch the pinned branch
