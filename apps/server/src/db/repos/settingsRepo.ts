@@ -12,6 +12,7 @@ export type SettingsPatch = Partial<Omit<SettingsRow, 'id' | 'updatedAt'>>;
 export interface ComplianceRow {
   emailFormat: 'plain_text' | 'minimal_html';
   physicalAddress: string;
+  includePostalAddress: boolean;
   optoutText: string;
   signatureName: string;
   signatureRoleLine: string;
@@ -22,6 +23,7 @@ function toComplianceRow(row: typeof complianceSettings.$inferSelect): Complianc
   return {
     emailFormat: row.emailFormat,
     physicalAddress: row.physicalAddress,
+    includePostalAddress: row.includePostalAddress,
     optoutText: row.optoutText,
     signatureName: row.signatureName,
     signatureRoleLine: row.signatureRoleLine,

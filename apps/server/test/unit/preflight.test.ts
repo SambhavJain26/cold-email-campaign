@@ -44,6 +44,20 @@ const statusOf = (r: Awaited<ReturnType<typeof runPreflight>>, id: string) =>
   r.checks.find((c) => c.id === id)?.status;
 
 describe('a fully configured domain', () => {
+  it('does not block a hidden blank address but blocks a visible blank address', async () => {
+    const hidden = await runPreflight(
+      { ...READY, physicalAddress: '', includePostalAddress: false },
+      FULL_DNS,
+    );
+    expect(statusOf(hidden, 'compliance_address')).toBe('pass');
+    expect(hidden.ready).toBe(true);
+    const visible = await runPreflight(
+      { ...READY, physicalAddress: '', includePostalAddress: true },
+      FULL_DNS,
+    );
+    expect(statusOf(visible, 'compliance_address')).toBe('fail');
+    expect(visible.ready).toBe(false);
+  });
   it('is ready with every DNS check passing', async () => {
     const r = await runPreflight(READY, FULL_DNS);
     expect(r.ready).toBe(true);

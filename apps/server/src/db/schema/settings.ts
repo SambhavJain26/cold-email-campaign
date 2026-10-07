@@ -43,10 +43,11 @@ export const complianceSettings = pgTable('compliance_settings', {
     .notNull()
     .default('17, Radhaswami Nagar, Jaipur 302020, IN'),
   optoutText: text('optout_text').notNull(),
+  includePostalAddress: boolean('include_postal_address').notNull().default(false),
   signatureName: text('signature_name').notNull().default('Sambhav Jain'),
   signatureRoleLine: text('signature_role_line')
     .notNull()
-    .default('PM Systems & Automation Specialist'),
+    .default('Property Management Automation Specialist'),
   fromNameRules: text('from_name_rules'),
   /** Base URL of the public unsubscribe endpoint; '' = feature dormant (0010). */
   unsubscribeBaseUrl: text('unsubscribe_base_url').notNull().default(''),

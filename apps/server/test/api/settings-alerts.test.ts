@@ -148,6 +148,26 @@ describe('B6.10 settings + compliance', () => {
     expect((await getComplianceSettings(h.services.db)).physicalAddress).toBe(
       '1 Main St, Denver CO 80202',
     );
+    const hidden = await h.inject({
+      method: 'PUT',
+      url: '/api/v1/compliance',
+      payload: { ...updated.json<Record<string, unknown>>(), include_postal_address: false },
+    });
+    expect(hidden.statusCode).toBe(200);
+    expect(hidden.json().physical_address).toBe('1 Main St, Denver CO 80202');
+    const blankHidden = await h.inject({
+      method: 'PUT',
+      url: '/api/v1/compliance',
+      payload: { ...hidden.json<Record<string, unknown>>(), physical_address: '' },
+    });
+    expect(blankHidden.statusCode).toBe(200);
+    const blankVisible = await h.inject({
+      method: 'PUT',
+      url: '/api/v1/compliance',
+      payload: { ...blankHidden.json<Record<string, unknown>>(), include_postal_address: true },
+    });
+    expect(blankVisible.statusCode).toBe(422);
+    await h.inject({ method: 'PUT', url: '/api/v1/compliance', payload: before });
   });
 });
 

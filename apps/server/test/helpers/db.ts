@@ -38,6 +38,8 @@ export async function resetCoreTables(pool: Pool): Promise<void> {
     `INSERT INTO auto_enrollment_state (singleton) VALUES (true) ON CONFLICT DO NOTHING`,
   );
   await pool.query('UPDATE settings SET incoming_stop_since = now() WHERE id = 1');
+  // Legacy test/golden fixtures explicitly retain the visible-address layout.
+  // Production/default behavior is false, verified by the migration/API suites.
   // compliance_settings survives TRUNCATE (single seeded row) and its seed
   // default physical_address is '' — which trips the B4 global send guard
   // (docs/08 §4). Restore a test address so every DB suite can send; suites
@@ -49,6 +51,7 @@ export async function resetCoreTables(pool: Pool): Promise<void> {
   await pool.query(
     `UPDATE compliance_settings
         SET physical_address = '100 Test Street, Austin TX 78701',
+            include_postal_address = true,
             signature_name = 'Sambhav Jain',
             signature_role_line = 'Automation Specialist',
             email_format = 'plain_text',

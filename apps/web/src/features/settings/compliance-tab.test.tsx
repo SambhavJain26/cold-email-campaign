@@ -11,6 +11,7 @@ import { ComplianceTab } from './compliance-tab';
 
 const BASE: ComplianceDto = {
   email_format: 'minimal_html',
+  include_postal_address: true,
   physical_address: '106-460 Doyle Ave, Kelowna, BC V1Y 0C2',
   optout_text: 'Reply STOP to unsubscribe.',
   signature_name: 'Sambhav Jain',
@@ -30,6 +31,25 @@ function renderTab(compliance: Partial<ComplianceDto> = {}) {
 const preview = () => screen.getByTestId('footer-preview').textContent ?? '';
 
 describe('unsubscribe base URL field', () => {
+  it('hides the saved address, restores it on toggle, and permits a blank hidden address', async () => {
+    const user = userEvent.setup();
+    renderTab({
+      email_format: 'plain_text',
+      include_postal_address: false,
+      signature_role_line: 'Property Management Automation Specialist',
+    });
+    expect(preview()).toBe(
+      'Best,\nSambhav Jain\nProperty Management Automation Specialist\n[sending mailbox domain]',
+    );
+    expect(screen.getByLabelText('Physical address')).toHaveValue(BASE.physical_address);
+    await user.click(screen.getByRole('switch', { name: 'Include postal address' }));
+    expect(preview()).toContain(` | [sending mailbox domain]\n${BASE.physical_address}`);
+    await user.clear(screen.getByLabelText('Physical address'));
+    expect(screen.getByTestId('empty-address-block')).toBeInTheDocument();
+    await user.click(screen.getByRole('switch', { name: 'Include postal address' }));
+    expect(screen.queryByTestId('empty-address-block')).toBeNull();
+    expect(screen.getByRole('button', { name: 'Save compliance' })).toBeEnabled();
+  });
   it('plain text previews exact line breaks and an unstyled signature and address', () => {
     renderTab({
       email_format: 'plain_text',

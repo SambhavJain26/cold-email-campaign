@@ -159,11 +159,11 @@ test('build a sequence: 24 variations, fatal link in step 1, fix, save', async (
   await panel.getByRole('button', { name: 'Render preview' }).click();
 
   // The complete outgoing text includes the signature and compliance footer.
-  await expect(panel.getByTestId('preview-body')).toContainText('4517 Congress Ave');
+  await expect(panel.getByTestId('preview-body')).not.toContainText('4517 Congress Ave');
   await expect(panel.getByTestId('preview-body')).toContainText('Sambhav Jain');
   await expect(panel.getByTestId('preview-body')).toContainText('[sender domain');
   expect(await panel.getByTestId('preview-body').textContent()).toContain(
-    'Best,\nSambhav Jain\nAutomation Specialist | ',
+    'Best,\nSambhav Jain\nProperty Management Automation Specialist\n',
   );
   await expect(panel.getByText('Plain text — complete email')).toBeVisible();
   await panel.getByRole('combobox', { name: 'Preview mailbox' }).click();

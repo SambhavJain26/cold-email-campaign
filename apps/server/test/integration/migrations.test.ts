@@ -103,7 +103,7 @@ describe('migration runner', () => {
       ).rows[0],
     ).toEqual({
       signature_name: 'Sambhav Jain',
-      signature_role_line: 'PM Systems & Automation Specialist',
+      signature_role_line: 'Property Management Automation Specialist',
       physical_address: '17, Radhaswami Nagar, Jaipur 302020, IN',
     });
     await resetCoreTables(pool);
@@ -121,12 +121,15 @@ describe('migration runner', () => {
         pool.query('UPDATE mailboxes SET send_interval_minutes=$1', [invalid]),
       ).rejects.toThrow();
     }
-    expect(await migrateDown(pool, MIGRATIONS_DIR, 1)).toEqual(['0025_mailbox_send_interval']);
+    const rollbackNames = names.slice(names.indexOf('0025_mailbox_send_interval'));
+    expect(await migrateDown(pool, MIGRATIONS_DIR, rollbackNames.length)).toEqual(
+      [...rollbackNames].reverse(),
+    );
     expect(
       (await pool.query('SELECT send_interval_minutes FROM mailboxes')).rows[0]
         .send_interval_minutes,
     ).toBe(4);
-    expect(await migrateUp(pool, MIGRATIONS_DIR)).toEqual(['0025_mailbox_send_interval']);
+    expect(await migrateUp(pool, MIGRATIONS_DIR)).toEqual(rollbackNames);
     expect(
       (await pool.query('SELECT send_interval_minutes FROM mailboxes')).rows[0]
         .send_interval_minutes,

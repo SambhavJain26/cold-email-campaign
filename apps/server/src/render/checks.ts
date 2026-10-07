@@ -30,7 +30,7 @@ export interface CheckInputs {
   longestSubject: string;
   /** Rendered body BEFORE the footer (checks #6/#8/#9 measure template content). */
   renderedBodyPreFooter: string;
-  compliance: { physicalAddress: string; optoutText: string };
+  compliance: { physicalAddress: string; optoutText: string; includePostalAddress?: boolean };
   variations: number;
   /** Mode-1 literal compose: parse/merge/personalization checks don't apply. */
   literal: boolean;
@@ -60,7 +60,10 @@ export function runChecks(inp: CheckInputs): RenderChecks {
   }
 
   // #4 required postal address (the signature appends it to every new body).
-  if (inp.compliance.physicalAddress.trim() === '') {
+  if (
+    inp.compliance.includePostalAddress !== false &&
+    inp.compliance.physicalAddress.trim() === ''
+  ) {
     fatal.push({
       id: 'footer',
       message: 'signature needs a physical address',
@@ -75,6 +78,7 @@ export function runChecks(inp: CheckInputs): RenderChecks {
   // #6 duplicate postal address. Body opt-out wording is operator supplied.
   const bodyLower = inp.renderedBodyPreFooter.toLowerCase();
   if (
+    inp.compliance.includePostalAddress !== false &&
     inp.compliance.physicalAddress.trim() !== '' &&
     bodyLower.includes(inp.compliance.physicalAddress.trim().toLowerCase())
   ) {

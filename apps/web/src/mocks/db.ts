@@ -660,10 +660,11 @@ function build(): MockDb {
       updated_at: '2026-01-04T12:00:00.000Z',
     },
     compliance: {
+      include_postal_address: false,
       physical_address: '4517 Congress Ave, Suite 210, Austin, TX 78745',
       optout_text: "Prefer I don't reach out? Just let me know or reply stop.",
       signature_name: 'Sambhav Jain',
-      signature_role_line: 'Automation Specialist',
+      signature_role_line: 'Property Management Automation Specialist',
       email_format: 'plain_text',
       // Dormant by default — mirrors an install with no sending domain yet.
       unsubscribe_base_url: '',

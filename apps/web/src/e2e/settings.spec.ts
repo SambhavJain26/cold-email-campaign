@@ -60,6 +60,9 @@ test('compliance: empty address blocks saving with the explanation', async ({ pa
   await page.getByRole('link', { name: 'Settings' }).click();
   await page.getByRole('tab', { name: 'Compliance' }).click();
 
+  await expect(page.getByRole('switch', { name: 'Include postal address' })).not.toBeChecked();
+  await expect(page.getByTestId('footer-preview')).not.toContainText('4517 Congress Ave');
+  await page.getByRole('switch', { name: 'Include postal address' }).click();
   await expect(page.getByTestId('footer-preview')).toContainText('4517 Congress Ave');
   await expect(page.getByLabel('Signature name')).toHaveValue('Sambhav Jain');
   await expect(page.getByRole('combobox', { name: 'Email format' })).toContainText('Plain text');
@@ -76,11 +79,20 @@ test('compliance: empty address blocks saving with the explanation', async ({ pa
   await expect(page.getByTestId('empty-address-block')).not.toBeVisible();
   await expect(page.getByTestId('footer-preview')).toContainText('900 New Address Rd');
   await page.getByRole('button', { name: 'Save compliance' }).click();
-  await expect(page.getByText('Compliance footer saved')).toBeVisible();
+  await expect(page.getByText('Sender signature saved')).toBeVisible();
   await page.getByRole('tab', { name: 'Rules' }).click();
   await page.getByRole('tab', { name: 'Compliance' }).click();
   await expect(page.getByLabel('Role line')).toHaveValue('Automation Consultant | Sambhav Builds');
   await expect(page.getByRole('combobox', { name: 'Email format' })).toContainText('Minimal HTML');
+  await page.getByRole('switch', { name: 'Include postal address' }).click();
+  await expect(page.getByTestId('footer-preview')).not.toContainText('900 New Address Rd');
+  await expect(page.getByLabel('Physical address')).toHaveValue(
+    '900 New Address Rd, Austin, TX 78702',
+  );
+  await page.getByRole('button', { name: 'Save compliance' }).click();
+  await page.getByRole('tab', { name: 'Rules' }).click();
+  await page.getByRole('tab', { name: 'Compliance' }).click();
+  await expect(page.getByRole('switch', { name: 'Include postal address' })).not.toBeChecked();
 });
 
 test('account tab changes the password', async ({ page }) => {

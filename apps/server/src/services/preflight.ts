@@ -36,6 +36,7 @@ export interface PreflightReport {
 
 export interface PreflightInput {
   physicalAddress: string;
+  includePostalAddress?: boolean;
   unsubscribeBaseUrl: string;
   minRampDays: number;
   maxMailboxDailyCap: number;
@@ -138,11 +139,18 @@ export async function runPreflight(
   checks.push({
     id: 'compliance_address',
     label: 'Compliance postal address',
-    status: input.physicalAddress.trim() === '' ? 'fail' : 'pass',
+    status:
+      input.includePostalAddress === false
+        ? 'pass'
+        : input.physicalAddress.trim() === ''
+          ? 'fail'
+          : 'pass',
     detail:
-      input.physicalAddress.trim() === ''
-        ? 'Empty — the renderer refuses ALL sends until this is set (docs/08 §4).'
-        : 'Set. It is published in every email, so confirm it is not a home address.',
+      input.includePostalAddress === false
+        ? 'Hidden by the sender signature setting.'
+        : input.physicalAddress.trim() === ''
+          ? 'Enter a postal address or turn off Include postal address in Settings.'
+          : 'Set. It is included in newly rendered messages.',
   });
 
   checks.push({

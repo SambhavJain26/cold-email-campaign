@@ -1,7 +1,6 @@
 // Settings + compliance route group (B6.10, docs/10 §Settings). PUT /settings
-// is full-replace of the editable row; PUT /compliance refuses an empty
-// physical address with 422 — an empty address halts ALL sends (docs/08 §4),
-// so the API won't let it in silently.
+// is full-replace of the editable row; PUT /compliance requires a non-empty
+// address only when Include postal address is enabled.
 import type { FastifyInstance } from 'fastify';
 import {
   complianceSchema,
@@ -28,6 +27,7 @@ function toComplianceDto(row: ComplianceRow): ComplianceDto {
   return {
     email_format: row.emailFormat,
     physical_address: row.physicalAddress,
+    include_postal_address: row.includePostalAddress,
     optout_text: row.optoutText,
     signature_name: row.signatureName,
     signature_role_line: row.signatureRoleLine,
@@ -135,18 +135,21 @@ export async function settingsRoutes(app: FastifyInstance, services: AppServices
     '/compliance',
     { schema: { body: complianceSchema, response: { 200: complianceSchema } } },
     async (req) => {
-      if (req.body.physical_address.trim() === '') {
+      const current = await getComplianceSettings(db);
+      const includeAddress = req.body.include_postal_address ?? current.includePostalAddress;
+      if (includeAddress && req.body.physical_address.trim() === '') {
         // Semantic 422 with the closed `validation` code (convention 2026-07-23).
         throw new AppError(
           'validation',
           422,
-          'physical_address must be non-empty — an empty address refuses all sends (CAN-SPAM guard)',
+          'physical_address must be non-empty when Include postal address is enabled',
         );
       }
       const row = await updateComplianceSettings(
         db,
         {
           physicalAddress: req.body.physical_address,
+          includePostalAddress: includeAddress,
           emailFormat: req.body.email_format,
           optoutText: req.body.optout_text,
           signatureName: req.body.signature_name,

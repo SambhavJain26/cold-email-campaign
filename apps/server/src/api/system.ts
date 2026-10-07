@@ -165,6 +165,7 @@ export async function systemRoutes(app: FastifyInstance, services: AppServices):
       return runPreflight(
         {
           physicalAddress: compliance.physicalAddress,
+          includePostalAddress: compliance.includePostalAddress,
           unsubscribeBaseUrl: compliance.unsubscribeBaseUrl,
           minRampDays: settings.minRampDays,
           maxMailboxDailyCap: settings.maxMailboxDailyCap,

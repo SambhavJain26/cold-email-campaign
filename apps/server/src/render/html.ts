@@ -17,5 +17,5 @@ export function htmlOfText(body: string, footerHtml: string, signatureHtml: stri
         `<p style="margin:0 0 ${index === all.length - 1 ? '0' : '16px'}">${escapeHtml(paragraph).replaceAll('\n', '<br>')}</p>`,
     )
     .join('');
-  return `${paragraphs}<p style="margin:16px 0 0">${signatureHtml}<br>${footerHtml}</p>`;
+  return `${paragraphs}<p style="margin:16px 0 0">${signatureHtml}${footerHtml ? `<br>${footerHtml}` : ''}</p>`;
 }

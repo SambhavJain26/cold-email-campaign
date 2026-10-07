@@ -232,7 +232,7 @@ function mockRenderChecks(
   stepNo: number,
   subject: string,
   body: string,
-  compliance: { physical_address: string; optout_text: string },
+  compliance: { physical_address: string; optout_text: string; include_postal_address?: boolean },
 ) {
   const fatal: Array<{ id: string; message: string }> = [];
   const warnings: Array<{ id: string; message: string }> = [];
@@ -247,7 +247,7 @@ function mockRenderChecks(
     if (stepNo === 1) fatal.push({ id: 'url_in_step1', message: 'step 1 must not contain URLs' });
     else warnings.push({ id: 'url', message: 'follow-up contains a URL' });
   }
-  if (compliance.physical_address.trim() === '') {
+  if (compliance.include_postal_address !== false && compliance.physical_address.trim() === '') {
     fatal.push({
       id: 'footer',
       message: 'compliance footer needs a physical address and opt-out text',
@@ -1062,8 +1062,9 @@ export const handlers: RequestHandler[] = [
         .trimEnd()
         .replace(/(?:^|\n)\s*Best,\s*$/i, '')
         .trimEnd();
-      const signature = `\n\nBest,\n${db.compliance.signature_name}\n${db.compliance.signature_role_line} | ${domain}`;
-      const footer = `\n${db.compliance.physical_address}`;
+      const signature = `\n\nBest,\n${db.compliance.signature_name}\n${db.compliance.signature_role_line}${db.compliance.include_postal_address === false ? `\n${domain}` : ` | ${domain}`}`;
+      const footer =
+        db.compliance.include_postal_address === false ? '' : `\n${db.compliance.physical_address}`;
       return HttpResponse.json({
         subject,
         body: content + signature + footer,
@@ -1935,9 +1936,15 @@ export const handlers: RequestHandler[] = [
     authed(async ({ request }) => {
       const body = await parseBody(request, complianceSchema);
       if (body instanceof Response) return body;
-      if (body.physical_address.trim() === '')
+      if (
+        (body.include_postal_address ?? db.compliance.include_postal_address ?? true) &&
+        body.physical_address.trim() === ''
+      )
         return err('validation', 'physical_address must not be empty', 422);
-      db.compliance = body;
+      db.compliance = {
+        ...body,
+        include_postal_address: body.include_postal_address ?? db.compliance.include_postal_address,
+      };
       return HttpResponse.json(db.compliance);
     }),
   ),

@@ -61,11 +61,11 @@ draft campaign may override them, and first activation freezes the resolved snap
 literal and are never recursively parsed as tags or spintax. Campaign-context preview reports the
 matched observation rule, resolved variable source, fallbacks, and deterministic spintax choices.
 
-## 4. Sender signature and postal address (2026-10-06 operator revision)
+## 4. Sender signature and optional postal address (2026-10-07 operator revision)
 
 Global `compliance_settings.email_format` defaults to `plain_text`: send only `text/plain`, with
 no HTML alternative or styling. `minimal_html` retains both MIME alternatives and the styling
-below. The default role is `PM Systems & Automation Specialist`. Terminal `Best,` signoffs,
+below. The default role is `Property Management Automation Specialist`. Terminal `Best,` signoffs,
 including a legacy name line, are replaced by one automatic signoff. One blank line separates
 body and signature; no blank lines separate the four signature lines. Internal body whitespace
 is preserved. The automatic opt-out wording/link is removed; the operator supplies the instruction
@@ -78,14 +78,23 @@ existing rendering fallback.
 ```text
 Best,
 {signature_name}
+{signature_role_line}
+{sending mailbox domain}
+```
+
+`include_postal_address` defaults to false. When enabled, use:
+
+```text
+Best,
+{signature_name}
 {signature_role_line} | {sending mailbox domain}
 {compliance_settings.physical_address}
 ```
 
-- Appended at render time after expansion. Name, role and address remain editable. Migration 0023 explicitly sets the requested existing operator configuration and defaults.
+- Appended at render time after expansion. Name, role and address remain editable. Migration 0026 starts the toggle off, updates the previous default role, and retains the address and custom role wording.
 - The domain comes from the actual sending mailbox. Previews without a mailbox show an explicit placeholder. HTML escapes identity/address and uses the same four lines without an automatic body link.
 - Minimal HTML retains explicit paragraph margins and 16px paragraph gaps, followed by the signature and adjacent address. Email clients may independently link domains or trim signatures.
-- Fatal boot/send guard: `physical_address` empty → sends are refused globally, alert raised (CAN-SPAM requires it; empty address = non-compliant mail).
+- A blank address blocks saving/rendering/sending only when Include postal address is on. Hiding the address retains its saved value. Existing body content, sent messages and retry snapshots remain unchanged.
 
 ## 5. Pre-send checks + deliverability score (decision W)
 
@@ -96,9 +105,9 @@ Best,
 | 1 | All merge tags parse; unknown/no-fallback empty fields | **fatal** |
 | 2 | Spintax valid (≥2 options, no nesting); report variation count | fatal if invalid |
 | 3 | Step 1 contains no URLs (`https?://` or `www.`) | fatal for step 1 (walkthrough rule), warning for later steps |
-| 4 | Signature has a non-empty postal address | **fatal** |
+| 4 | Visible signature address is non-empty | **fatal** when address inclusion is enabled |
 | 5 | No HTML tags / no image markup | fatal |
-| 6 | Template body duplicates the postal address | warning |
+| 6 | Template body duplicates the visible postal address | warning when address inclusion is enabled |
 | 7 | Subject ≤ 60 chars (post-expansion, longest spintax branch) | warning |
 | 8 | Body 40–180 words | warning |
 | 9 | Spam-trigger lexicon (data file `render/spamwords.ts`: "free!!!", "guarantee", "act now", "risk-free", "100% free", "click here", ALL-CAPS words > 2, > 1 exclamation mark) | warning each |

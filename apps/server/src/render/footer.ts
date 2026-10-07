@@ -10,6 +10,8 @@ export const FOOTER_SEPARATOR = '\n\n';
 export interface ComplianceInfo {
   emailFormat?: 'plain_text' | 'minimal_html';
   physicalAddress: string;
+  /** Undefined preserves legacy rendering for previously constructed inputs. */
+  includePostalAddress?: boolean;
   optoutText: string;
   signatureName?: string;
   signatureRoleLine?: string;
@@ -34,11 +36,13 @@ export function senderDomainOf(fromAddress: string): string {
   return domain;
 }
 
-function signatureLines(compliance: ComplianceInfo): [string, string, string] {
+function signatureLines(compliance: ComplianceInfo): string[] {
+  const role = compliance.signatureRoleLine ?? 'Property Management Automation Specialist';
+  const domain = compliance.senderDomain ?? PREVIEW_SENDER_DOMAIN;
   return [
     'Best,',
     compliance.signatureName ?? 'Sambhav Jain',
-    `${compliance.signatureRoleLine ?? 'PM Systems & Automation Specialist'} | ${compliance.senderDomain ?? PREVIEW_SENDER_DOMAIN}`,
+    ...(compliance.includePostalAddress === false ? [role, domain] : [`${role} | ${domain}`]),
   ];
 }
 
@@ -58,7 +62,9 @@ export const bodyWithoutSignoff = (body: string): string =>
 
 export function appendFooter(body: string, compliance: ComplianceInfo): string {
   const content = bodyWithoutSignoff(body);
-  return `${content ? content + FOOTER_SEPARATOR : ''}${signatureLines(compliance).join('\n')}\n${compliance.physicalAddress}`;
+  const address =
+    compliance.includePostalAddress === false ? '' : `\n${compliance.physicalAddress}`;
+  return `${content ? content + FOOTER_SEPARATOR : ''}${signatureLines(compliance).join('\n')}${address}`;
 }
 
 /** Strip the known automatic suffix, never infer its boundary from body paragraphs. */
@@ -69,6 +75,7 @@ export function stripAutomaticFooter(body: string, compliance: ComplianceInfo): 
 
 /** The HTML twin of appendFooter's address line. */
 export function footerHtml(compliance: ComplianceInfo): string {
+  if (compliance.includePostalAddress === false) return '';
   const address = escapeHtml(compliance.physicalAddress).replaceAll('\n', '<br>');
   return address;
 }

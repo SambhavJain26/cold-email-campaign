@@ -36,7 +36,7 @@ describe('plain-text mode', () => {
           expect(rendered.emailFormat).toBe('plain_text');
           expect(rendered.bodyHtml).toBeUndefined();
           expect(rendered.bodyText).toBe(
-            `Hi Jane,\n\nA note.\n\nBest,\nSambhav Jain\nPM Systems & Automation Specialist | ${domain}\n123 Main St\n\nAustin, TX`,
+            `Hi Jane,\n\nA note.\n\nBest,\nSambhav Jain\nProperty Management Automation Specialist | ${domain}\n123 Main St\n\nAustin, TX`,
           );
           expect(stripAutomaticFooter(rendered.bodyText, compliance)).toBe('Hi Jane,\n\nA note.');
         });
@@ -83,10 +83,46 @@ describe('plain-text mode', () => {
     });
     expect(rendered.subject).toBe('Re: Original');
     expect(rendered.bodyHtml).toContain(
-      'Best,<br>Sambhav Jain<br>PM Systems &amp; Automation Specialist | sambhavpmops.com<br>123 Main St',
+      'Best,<br>Sambhav Jain<br>Property Management Automation Specialist | sambhavpmops.com<br>123 Main St',
     );
     expect(rendered.bodyHtml).not.toContain('reply stop');
     expect(rendered.bodyHtml).not.toContain('<a');
     expect(rendered.bodyText).not.toContain('<strong>');
+  });
+
+  it('hides only the automatic address, with adjacent role/domain lines in both formats', () => {
+    const compliance = {
+      ...input.ctx.compliance,
+      includePostalAddress: false,
+      physicalAddress: '',
+      senderDomain: 'sambhavpmtech.com',
+      emailFormat: 'minimal_html' as const,
+    };
+    const rendered = engine.render({
+      ...input,
+      variant: {
+        ...input.variant,
+        bodyTemplate: 'Manually supplied address and opt-out.\n\nBest,',
+      },
+      ctx: { ...input.ctx, compliance },
+    });
+    expect(rendered.bodyText).toBe(
+      'Manually supplied address and opt-out.\n\nBest,\nSambhav Jain\nProperty Management Automation Specialist\nsambhavpmtech.com',
+    );
+    expect(rendered.bodyHtml).toContain(
+      'Best,<br>Sambhav Jain<br>Property Management Automation Specialist<br>sambhavpmtech.com</p>',
+    );
+    expect(rendered.checks.fatal).toEqual([]);
+    expect(stripAutomaticFooter(rendered.bodyText, compliance)).toBe(
+      'Manually supplied address and opt-out.',
+    );
+    const visible = engine.render({
+      ...input,
+      ctx: { ...input.ctx, compliance: { ...compliance, includePostalAddress: true } },
+    });
+    expect(visible.checks.fatal).toContainEqual({
+      id: 'footer',
+      message: 'signature needs a physical address',
+    });
   });
 });

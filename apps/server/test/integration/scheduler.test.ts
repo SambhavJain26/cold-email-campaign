@@ -23,6 +23,26 @@ describe('scheduler (B3.7/B3.8)', () => {
     await s.close();
   });
 
+  it('permits a blank hidden address, but blocks sends when inclusion is turned on', async () => {
+    s = await scenario({ mailboxes: 1, sequence: twoStep });
+    await s.pool.query(
+      "UPDATE compliance_settings SET include_postal_address=false,physical_address='',signature_role_line='Property Management Automation Specialist'",
+    );
+    await s.importLeads(2);
+    await s.enroll({ count: 2 });
+    expect((await s.scheduler.tick()).sent).toBe(1);
+    expect(s.mock.sentLog[0]!.msg.bodyText).toContain(
+      'Best,\nSambhav Jain\nProperty Management Automation Specialist\nscenario.dev',
+    );
+    await s.pool.query('UPDATE compliance_settings SET include_postal_address=true');
+    expect((await s.scheduler.tick()).sent).toBe(0);
+    expect(s.scheduler.sendBlockers).toContainEqual({
+      code: 'compliance_missing_address',
+      message: 'Set a physical address in Settings → Compliance.',
+    });
+    expect(s.mock.sentLog.filter((entry) => entry.result.accepted)).toHaveLength(1);
+  });
+
   it('sends step 1 to due enrollments: one per mailbox per tick, oldest first', async () => {
     s = await scenario({ mailboxes: 1, dailyCap: 30, sequence: fourStep });
     await s.importLeads(3);
@@ -372,7 +392,7 @@ describe('scheduler (B3.7/B3.8)', () => {
       expect(original.bodyText).toContain('\nSambhav Jain\n');
       expect(Boolean(original.bodyHtml)).toBe(format === 'minimal_html');
       await s.pool.query(
-        "UPDATE compliance_settings SET signature_name='Updated Name', signature_role_line='Updated Role', email_format=$1 WHERE id=1",
+        "UPDATE compliance_settings SET signature_name='Updated Name', signature_role_line='Updated Role', include_postal_address=false, email_format=$1 WHERE id=1",
         [format === 'plain_text' ? 'minimal_html' : 'plain_text'],
       );
       await s.advanceDays(6);
@@ -381,7 +401,8 @@ describe('scheduler (B3.7/B3.8)', () => {
       expect(sends[1]!.msg.bodyText).toBe(original.bodyText);
       expect(sends[1]!.msg.bodyHtml).toBe(original.bodyHtml);
       expect(sends[2]!.msg.bodyText).toContain('\nUpdated Name\n');
-      expect(sends[2]!.msg.bodyText).toContain('\nUpdated Role | ');
+      expect(sends[2]!.msg.bodyText).toContain('\nUpdated Role\nscenario.dev');
+      expect(sends[2]!.msg.bodyText).not.toContain('100 Test Street');
       expect(Boolean(sends[2]!.msg.bodyHtml)).toBe(format === 'plain_text');
     },
     30_000,
@@ -401,7 +422,7 @@ describe('scheduler (B3.7/B3.8)', () => {
       await s.advanceHours(1);
       const original = s.mock.sentTo(leadEmail('L0001'))[0]!.msg;
       await s.pool.query(
-        "UPDATE compliance_settings SET signature_name='Changed', email_format=$1 WHERE id=1",
+        "UPDATE compliance_settings SET signature_name='Changed', include_postal_address=false, signature_role_line='Property Management Automation Specialist', email_format=$1 WHERE id=1",
         [format === 'plain_text' ? 'minimal_html' : 'plain_text'],
       );
       await s.advanceDays(6);

@@ -206,9 +206,9 @@ export class Scheduler {
     await this.refreshMailboxHealth(now, settings);
     const completed = await this.completeFinished(now, settings);
 
-    // CAN-SPAM global guard (docs/08 §4): empty physical address → refuse all
-    // sends. setSendBlockers emits one durable alert per blocker episode.
-    if (compliance.physicalAddress.trim() === '') {
+    // A visible address must be configured. Hidden addresses do not block sends.
+    // setSendBlockers emits one durable alert per blocker episode.
+    if (compliance.includePostalAddress && compliance.physicalAddress.trim() === '') {
       await this.setSendBlockers([
         {
           code: 'compliance_missing_address',
