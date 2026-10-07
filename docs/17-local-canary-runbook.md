@@ -1,5 +1,76 @@
 # Local canary runbook (B8.3-local) — two-week validation on throwaway Gmail
 
+## 2026-10-07 signature controls, randomized spacing and website aliases — verified locally
+
+The operator-authorized three-part update is implemented on `canary`. Settings → Sender signature
+now has **Include postal address**, initially off. Hidden addresses remain saved/editable; the
+actual sending mailbox domain occupies the line below **Property Management Automation Specialist**.
+When enabled, the role/domain share one line and the configured address follows immediately.
+Text, HTML and previews agree, with adjacent lines and one Best sign-off. Address validation and
+send/preflight blockers apply only when enabled. Migration 0026 changes the former default role,
+preserves custom roles and retains the stored address. Sent messages and saved retry snapshots,
+unsubscribe headers/endpoints and suppression remain intact; manually supplied body text is retained.
+
+Application workstreams are committed as `23a4f18` (signature controls) and `74a54be`
+(persisted random spacing); `63b6816` contains the hosting configuration and local rehearsal.
+
+Mailboxes → Edit replaces the fixed interval with **Minimum minutes / Maximum minutes**. Migration
+0027 and new forms default to **4–7 minutes**, with whole-minute bounds 1–1440 and minimum below
+maximum. Each accepted send draws one uniformly distributed inclusive integer-second delay;
+its deadline, actual acceptance timestamp, sent event and message commit atomically. Ordinary
+checks, failures and restarts do not redraw. A changed range draws once anchored to the latest
+accepted send under the same mailbox row lock; identical saves and cap changes preserve it.
+No history is immediately eligible within its window. Minute checks, assignments, caps, windows,
+reply stopping and carry-forward remain enforced. Old fixed columns and new settings/deadlines
+survive rollback/reapply. Separate API/worker installations need a worker restart after range edits.
+
+Real browser verification found that Edit submitted unchanged folder settings, unnecessarily
+attempting OAuth discovery on an unconnected mailbox. The dialog now omits unchanged folders;
+actual folder changes retain discovery and cursor-seeding guards. Authenticated range editing,
+reload persistence and zero sends on that mailbox pass against the real backend.
+
+The reviewed Caddy fragment serves the existing `/var/www/sambhavbuilds/dist` directly on
+`sambhavpmtech.com`, `sambhavpmops.com` and both www hosts, retaining each website hostname.
+The main-domain block is unchanged. App/API/OAuth routing, app canonicalization and both
+unsubscribe hosts remain. No additional website installation, DNS or mail-record change is needed.
+Production Caddy configuration validation and the local Docker rehearsal pass for all four
+website hosts, SPA navigation, two assets per host, immutable caching, application/OAuth proxying
+and unsubscribe routing. The repeatable rehearsal is `scripts/verify-alias-hosting.mjs`.
+
+Verified gates: typecheck, lint and formatting; unit/web **462**; API **149**; GreenMail **29**;
+locked golden **47 without regeneration**; full mock browser **67**; real-backend browser **3**;
+real-API `/email-campaign/` production build. Full integration **189/189** passed before the last
+two regression additions; the affected scheduler/random-spacing suites then passed **28/28**,
+covering **191 distinct integration tests** in total. The latest slow-SMTP atomic-storage test
+passes separately. After the dialog correction, focused UI **3**, mailbox browser **6**, the full
+real-backend replay, typecheck/lint and production build pass again. Unit/web uses two workers
+to avoid desktop-load timeouts; the existing long virtual-clock API/browser replays have bounded
+larger timeouts, with their assertions unchanged. No golden fixture was regenerated.
+
+Migration apply/down/reapply preserves toggles, customized roles and deadlines and rejects invalid
+ranges. Four-mailbox scenarios reach **80/100 accepted mock sends** at **20/25 each**, with varied
+bounded gaps, no cap overflow, daily carry-forward, persisted restart/failure deadlines, concurrent
+tick protection and no downtime bursts. Template and personalized retries retain saved bodies.
+
+A fresh local fixture contains **five event-backed enrollments, seven events and two accepted
+mock sends**, with 4–7 ranges and the hidden-address signature. Projection dry run reports
+**checked 5 enrollments — 0 diff(s)** and self-check is clean. Dump
+`backups/signature-range-20261007.dump` is **126,313 bytes**, passes a **332-line** catalog and has
+SHA-256 `ce930cd7ae6c5b811f43248c8bdc5ce716c80c2d7fa442dae6dfda9c71efa736`.
+Restoring to fresh local `coldemail_signature_range_restore_20261007`, rebuilding and rerunning
+dry-run/self-check gives five enrollments, zero rewrites/diffs and no invariant violations.
+Both mailbox deadlines, signature toggle/role/address, all **28 migrations** and ledger/sent counts
+match the source exactly. The dump, snapshot and scratch database are retained locally.
+
+**Operational boundary:** this release is local only. No push, deployment, VPS/Caddy/DNS change,
+production setting/cap/campaign/enrollment edit, CSV operation, resume or outbound mail occurred.
+Production's last verified release remains `a6489a9`; its active-campaign snapshot below is
+historical, not a current paused-state assertion. Deployment requires separate authorization,
+a fresh check that outreach is paused, captured live settings/watermarks, a validated database
+backup and preserved Caddyfile. After rollout verify services/routes/migrations, authenticated
+controls, projection consistency, backup catalogs and VPS usage, leaving campaigns paused for
+operator review and resumption. Do not pause or resume implicitly.
+
 ## 2026-10-07 authorized fixed-spacing production deployment
 
 The operator separately authorized deployment of the verified spacing candidate. Fresh read-only

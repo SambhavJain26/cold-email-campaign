@@ -19,6 +19,19 @@ call planned work implemented.
 
 ## Current operating boundary
 
+- **2026-10-07 signature/range/alias update — local only:** operator-authorized implementation
+  starts Include postal address off, retains the saved address and uses the requested role/domain
+  layout. Mailboxes use editable 4–7 minute ranges, with one persisted random deadline committed
+  atomically per accepted send. Migrations 0026/0027 retain configuration/deadlines on rollback.
+  The reviewed Caddy fragment directly serves the same portfolio build on both outreach domains
+  and their www hosts, preserving app/OAuth/unsubscribe routing. Repository/browser/golden gates,
+  five-enrollment zero drift/self-check and populated backup restore pass; docs/17 records evidence.
+  No push, deployment, VPS/Caddy/DNS change, production settings/cap/campaign/enrollment change or
+  outbound mail occurred. Production's last verified release remains `a6489a9`. Deployment needs
+  separate authorization, a fresh paused-state check, captured settings/watermarks, validated backup
+  and preserved Caddyfile. Leave campaigns paused after separately authorized rollout; resume is
+  the operator's action. Do not infer paused state from this local verification or pause implicitly.
+
 - **2026-10-07 fixed-spacing deployment:** separately authorized, pushed and deployed at
   `a6489a9` on `canary`. All 26 migrations, services/routes/caching, 113-enrollment zero drift,
   self-check and validated pre/post backups pass. Authenticated Mailboxes shows the interval column

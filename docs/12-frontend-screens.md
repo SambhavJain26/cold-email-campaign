@@ -1,5 +1,13 @@
 # Frontend Screens — Low-Level Spec
 
+> **2026-10-07 controls:** Settings → Compliance → Sender signature adds **Include postal
+> address**, off by default. Hidden addresses remain editable/saved; the sending domain moves
+> below the role. With inclusion on, the domain follows the role with ` | ` and the address
+> follows on the next line. Empty-address validation applies only when inclusion is on.
+> Mailboxes → Edit replaces the fixed interval with **Minimum minutes / Maximum minutes**,
+> default 4–7, whole minutes 1–1440 with min < max. The table displays the saved range; the form
+> explains that windows, caps and processing can extend the actual gap. See docs/06 and docs/08.
+
 > **Migration 0019 overlay:** the Leads screen adds Campaign + Pool/Enrolled/Both scope, exact bulk
 > A/B/Untiered actions, and separate Nurture controls. Lead detail renames Manual Compose to
 > Personalized Copy and removes all direct-send controls. Sequence steps choose Template or

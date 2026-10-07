@@ -1,5 +1,24 @@
 # Deployment & Operations
 
+**Signature/range/alias release rollout boundary:** migrations 0026/0027 start postal-address
+inclusion off, update the previous default role, and give existing mailboxes 4–7 minute ranges.
+This candidate requires a separately authorized deployment. Before rollout, verify all outreach
+campaigns are paused, capture mailbox settings/event and sent-message watermarks, validate a fresh
+database backup, and preserve `/etc/caddy/Caddyfile`. Do not pause/resume campaigns implicitly.
+
+The reviewed `deploy/spaceship/host-Caddyfile.fragment` replaces outreach-root redirects with the
+same `/var/www/sambhavbuilds/dist` files for both domains and their www hosts. Keep the existing
+main-domain block unchanged. Preserve app/API/OAuth handling on pmtech and both unsubscribe blocks.
+Validate the complete merged Caddyfile before reloading Caddy. No DNS or mail records change.
+Local rehearsal: `node scripts/verify-alias-hosting.mjs /absolute/path/to/existing/portfolio/dist`.
+
+After deployment verify 28 migrations, services, all website hosts/assets/SPA navigation, campaign
+routes, OAuth, unsubscribe routes, authenticated toggle/ranges, persisted deadlines, populated
+projection zero drift, self-check and backup catalogs. Record disk/RAM/load/container/cache usage
+read-only; cleanup requires its own instruction. Leave campaigns paused for operator review.
+Rollback retains toggle/range/deadline columns, stop facts and history; restore the saved Caddyfile
+only after validating it. Old application code uses the retained fixed/legacy pacing columns.
+
 **2026-10-07 production spacing deployment:** operator-authorized release `a6489a9` is pushed and
 deployed. All 26 migrations, routes/services/caching, 113-enrollment zero drift, self-check,
 validated pre/post backups and authenticated interval controls pass. Campaign 3 remains active;

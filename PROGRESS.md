@@ -4,6 +4,21 @@
 
 **Legend:** `[ ]` not started · `[~]` in progress · `[x]` done · `[!]` blocked (note why in the log)
 
+**2026-10-07 signature, randomized spacing and direct domain hosting — local implementation complete:**
+
+- [x] Address inclusion toggle initially off, saved address retained, conditional validation and
+  matching text/HTML/previews with the requested role and sending-domain placement.
+- [x] Editable minimum/maximum range, defaults 4–7, persisted atomic accepted-send deadlines,
+  locked edits and restart/failure/cap/window/downtime coverage at 20/25 per mailbox.
+- [x] Shared portfolio serving on both outreach domains and their www hosts, validated Caddy
+  configuration and local route/asset/SPA/app/OAuth/unsubscribe rehearsal.
+- [x] Repository, locked golden, mock/real browser, build/migration gates, populated zero drift,
+  self-check and validated backup restore with matching saved settings and deadlines.
+
+See docs/17 for exact evidence. Production remains at the last verified `a6489a9`; no deployment,
+VPS/DNS/Caddy mutation, production setting/cap/campaign edit, enrollment or send occurred.
+Deployment remains separately authorized and requires fresh paused-state/backups/watermark checks.
+
 **2026-10-07 separately authorized spacing deployment:** [x] `a6489a9` pushed/deployed;
 26 migrations, public routes/caching, healthy services, 113-enrollment zero drift, self-check,
 validated pre/post backups and authenticated mailbox controls pass. Campaign 3 remains active;

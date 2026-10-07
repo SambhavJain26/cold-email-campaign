@@ -1,5 +1,11 @@
 # Database Schema — Full DDL
 
+> **Migrations 0026/0027:** persisted `include_postal_address` defaults false; retained addresses
+> are validated only when visible. The prior default role becomes Property Management Automation
+> Specialist. Mailboxes gain a constrained minimum/maximum range (4–7 by default) and a persisted
+> next-send deadline committed with accepted-send facts. Old fixed intervals remain stored.
+> Down migrations preserve operator values/deadlines, and reapply never redraws existing deadlines.
+
 > **Migrations 0022–0024:** event/enrollment enums add `outreach_stopped` / `STOPPED`;
 > `settings.incoming_stop_since` is a persistent non-null deployment cutoff defaulting to now();
 > compliance signature role/address defaults and operator configuration adopt the requested
@@ -346,6 +352,9 @@ CREATE TABLE mailboxes (
   auth_type      text NOT NULL DEFAULT 'app_password',
   daily_cap      int  NOT NULL DEFAULT 30,
   send_interval_minutes int CHECK (send_interval_minutes BETWEEN 1 AND 1440), -- 0025; NULL preserves legacy pacing
+  send_interval_min_minutes int DEFAULT 4, -- 0027; nullable pair supports legacy/rollback configuration
+  send_interval_max_minutes int DEFAULT 7, -- pair constrained to 1..1440 with min < max
+  next_allowed_send_at timestamptz,        -- drawn once, committed atomically with accepted send
   send_window    jsonb NOT NULL DEFAULT '{"days":[1,2,3,4,5],"start":"08:00","end":"17:00"}',
                  -- evaluated in RECIPIENT tz (docs/06 §4)
   status         mailbox_status NOT NULL DEFAULT 'ok',
@@ -420,6 +429,7 @@ CREATE TABLE settings (
 CREATE TABLE compliance_settings (
   id int PRIMARY KEY CHECK (id = 1),
   physical_address text NOT NULL DEFAULT '',
+  include_postal_address boolean NOT NULL DEFAULT false, -- 0026; address retained when hidden
   optout_text text NOT NULL DEFAULT E'Don''t want future emails? Reply STOP and I''ll remove you immediately.',
   from_name_rules text,
   updated_at timestamptz NOT NULL DEFAULT now()

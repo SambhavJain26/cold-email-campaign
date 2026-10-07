@@ -48,11 +48,16 @@ Shapes below in TS notation. `Metric = { numerator: number, denominator: number 
 | POST `/mailboxes/:id/oauth/google/disconnect` | → `Mailbox` — best-effort Google revoke, deletes the sealed refresh credential, clears in-memory access, and returns the mailbox to `setup_required`. Use the start endpoint again to reconnect. |
 | GET `/mailboxes/volume?days=30` | → `{items: {mailbox_id, series: {date, sends}[]}[], imbalance: boolean}` (metric #5) |
 
-Mailbox responses include nullable `send_interval_minutes`. Create/patch accept an optional integer
+Mailbox responses include nullable `send_interval_min_minutes`, `send_interval_max_minutes`, and
+`next_allowed_send_at`, plus the retained legacy `send_interval_minutes`. New mailboxes default to
+4–7. Range create/patch requires both integer values from 1 to 1440, minimum strictly below maximum.
+Do not combine range fields with the legacy interval. Edits lock the mailbox and draw one deadline
+anchored to its last accepted send, unless the range is unchanged. No history means no deadline.
+Daily cap/window changes preserve pacing. The old create/patch interval accepts an optional integer
 from 1 to 1440: the minimum gap between accepted sends for that mailbox, independent of its cap and
-window, without jitter. Omitting it preserves existing pacing; explicit null is rejected. Existing
-mailboxes remain unset through migration 0025, while the Add mailbox form defaults to five minutes.
-Saving an interval refreshes the all-role scheduler to minute checks; no send or counter reset occurs.
+window, without jitter. Omitting spacing on PATCH preserves it; explicit null is rejected. Migration
+0027 gives existing mailboxes the 4–7 range without erasing their old fixed interval. Saving a range
+refreshes the all-role scheduler to minute checks; no send or counter reset occurs.
 
 ## Leads & imports
 | | |
@@ -143,7 +148,7 @@ never activates, enrolls, or sends. Request and response schemas are unchanged.
 | | |
 |---|---|
 | GET/PUT `/settings` | full `settings` row. PUT validates ranges; `delivery_confirm_hours` is immutable after the first `sent` event so replay cannot drift (finding 24). |
-| GET/PUT `/compliance` | `{email_format, physical_address, optout_text, signature_name, signature_role_line, unsubscribe_base_url}` — `email_format` is `plain_text` (default) or `minimal_html`. Signature fields are required trimmed single lines, with maximum lengths 100 and 160. PUT with empty address → 422 (sends would halt). `unsubscribe_base_url` is `''` (text opt-out), a fixed `https://` origin, or `https://unsubscribe.{sender_domain}`. The placeholder resolves from the mailbox From domain before `/u/<token>` is appended. |
+| GET/PUT `/compliance` | `{email_format, physical_address, include_postal_address, optout_text, signature_name, signature_role_line, unsubscribe_base_url}` — `email_format` is `plain_text` (default) or `minimal_html`; `include_postal_address` defaults false. Omission on an older client's PUT preserves the saved toggle. Signature fields are required trimmed single lines, maximum lengths 100 and 160. Empty address → 422 only when inclusion is enabled. Hidden addresses remain saved; the domain moves below the role. `unsubscribe_base_url` configures headers only: blank, fixed `https://` origin, or `https://unsubscribe.{sender_domain}` resolved from the sending mailbox. |
 | GET `/alerts?unacked=true` · POST `/alerts/:id/ack` | `Alert = {id, kind, severity, payload, created_at, acknowledged_at}` — feeds banners: `catchup_backlog` → downtime panel; `mailbox_*` → failure panels |
 | GET `/health` | → `{ok, db, version}` (unauthenticated) |
 | GET `/u/:token` | **Not under `/api/v1`.** Unauthenticated, no CSRF, and never unsubscribes. A valid active token shows `Confirm, and I won’t send you any more emails.`; a valid token for an already-unsubscribed enrollment shows the completed state with no form. Unknown tokens remain generic (no enumeration oracle). |
