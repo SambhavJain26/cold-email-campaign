@@ -15,6 +15,8 @@ direct alias hosting is prepared in `deploy/spaceship/host-Caddyfile.fragment` a
 
 ## Document map
 
+Approved local implementation specification: [Incoming review and Unibox redesign](24-incoming-review-unibox-redesign-plan.md).
+
 | # | File | What it covers | Read before starting |
 |---|------|----------------|----------------------|
 | 00 | this file | Map + reading order + glossary | — |

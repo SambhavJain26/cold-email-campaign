@@ -4,6 +4,9 @@
 
 **Legend:** `[ ]` not started · `[~]` in progress · `[x]` done · `[!]` blocked (note why in the log)
 
+**2026-10-08 incoming review/Unibox redesign:** [~] local implementation authorized; durable
+specification and stage checklist in docs/24. No push/deployment/live mutation/send authorized.
+
 **2026-10-08 IST separately authorized signature/range/alias deployment:** [x] `cd83228` pushed
 and deployed; all 28 migrations, healthy services/public routes/direct website aliases pass.
 Address inclusion is off; four mailboxes use 4–7 minute ranges at unchanged 20/day caps.

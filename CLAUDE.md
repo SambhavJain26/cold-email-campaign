@@ -8,6 +8,17 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Current operating boundary
 
+- **2026-10-08 incoming review/Unibox redesign — local implementation authorized:** follow
+  `docs/24-incoming-review-unibox-redesign-plan.md`. Prospectively replace automatic terminal
+  human/company reply stopping with review holds and mandatory clear-opt-out suppression.
+  Continue/Stop/Delay are campaign actions; Suppress is permanent globally, including manual
+  mistakes. Retain minimal suppression during erasure. Preserve legacy event interpretation and
+  blocked histories; restore eligible legacy enrollments only explicitly, to review hold first.
+  This supersedes conflicting historical reply/disposition/removable-suppression scope below.
+  Implementation and local verification only: no push, deployment, production mutation,
+  historical-message replay, restoration, enrollment, resume or outbound send is authorized.
+  Checklist status is in docs/24; update docs/17 only for verified outcomes.
+
 - **2026-10-08 IST signature/range/alias deployment:** separately authorized, pushed/deployed at
   `cd83228` on `canary`. All 28 migrations, healthy services, direct website aliases,
   app/OAuth/unsubscribe routes, 187-enrollment zero drift/self-check and validated pre/post backups

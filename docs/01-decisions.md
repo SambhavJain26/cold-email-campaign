@@ -1,5 +1,16 @@
 # Decision Register
 
+## Incoming human-review redesign (2026-10-08; authorized local implementation)
+
+The approved specification in docs/24 supersedes pre-real-domain AA–AC, operator-workflow BB,
+Decision U and conflicting October 6 company stopping **for new intake only**. New matched
+responses hold for operator review unless conservative new-text opt-out detection mandates
+permanent global suppression. Human authorship confirmation is metric-only; Continue/Stop/Delay
+are separate campaign decisions. Suppression is permanent and survives erasure as a minimal
+normalized-address block. Old events retain their meaning, with explicit audited restoration to
+review hold for eligible STOPPED/REPLIED histories. Review visibility and removable incoming
+content are independent. No implementation/deployment verification is implied by this decision.
+
 > **Current decision overlay (migration 0019):** sequence steps, not tiers, choose Template or
 > Personalized Copy; current tiers are A/B/Untiered; Nurture is a separate outreach status; all
 > sends are scheduler-only. [Docs/22](22-personalized-copy-two-tier.md) supersedes conflicting
