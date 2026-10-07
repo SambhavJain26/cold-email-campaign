@@ -20,6 +20,13 @@ A previously cached permanent redirect is the likely explanation, not a confirme
 operator's Gmail browser. A private-window test can confirm whether that browser's stored state
 is responsible. No email was sent, campaign resumed or immutable message changed.
 
+Subsequent operator clarification: typing the exact HTTP URL in the same browser also stays on
+pmops, while clicking Gmail's blue link reaches the main domain. This weakens the general cached
+HTTP-redirect hypothesis; it is not an established diagnosis. The remaining investigation must
+inspect the actual Gmail click path. The operator was asked to open that message in the in-app
+browser; no Gmail tab is currently exposed to the browser tools. Do not claim the email-click issue
+resolved solely because direct domain navigation passes.
+
 ## 2026-10-08 IST authorized signature/range/alias production deployment
 
 The operator explicitly authorized deployment. Fresh prechecks found clean production `a6489a9`,
