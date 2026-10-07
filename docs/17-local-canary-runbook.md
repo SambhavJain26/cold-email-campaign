@@ -23,9 +23,19 @@ is responsible. No email was sent, campaign resumed or immutable message changed
 Subsequent operator clarification: typing the exact HTTP URL in the same browser also stays on
 pmops, while clicking Gmail's blue link reaches the main domain. This weakens the general cached
 HTTP-redirect hypothesis; it is not an established diagnosis. The remaining investigation must
-inspect the actual Gmail click path. The operator was asked to open that message in the in-app
-browser; no Gmail tab is currently exposed to the browser tools. Do not claim the email-click issue
-resolved solely because direct domain navigation passes.
+inspect the actual Gmail click path. After the operator opened Gmail, the visible Amnon message's
+signature anchor was inspected: its destination and Google's redirect query both point to
+`http://sambhavpmops.com`. Clicking that actual anchor opened the website at
+`https://sambhavpmops.com/`, retaining the hostname. The operator reports both Amnon and Sean
+messages redirect only in their separate Chrome browser, and neither redirects in the in-app
+browser. That Chrome profile is not exposed to the available browser tools.
+
+Chromium's cross-site navigation cache partitioning makes a cached redirect compatible with the
+different direct-navigation result, but it remains an unconfirmed explanation. The next operator
+test is clearing only Chrome's cached images/files, then reloading Gmail and clicking again.
+No provider/server change is justified by the verified results. The operator's Chrome issue remains
+unresolved; do not claim it fixed based on the successful in-app click. No mail or live app state
+was changed during this diagnosis.
 
 ## 2026-10-08 IST authorized signature/range/alias production deployment
 
