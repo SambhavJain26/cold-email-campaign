@@ -8,6 +8,12 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Current operating boundary
 
+- **2026-10-07 read-only send diagnosis:** Campaign 3 is active after operator actions,
+  automatic enrollment off. October 6 sent 19/19/18/18: 24-minute base pacing plus 20% jitter
+  and five-minute ticks exhausted the window. Six Ready, unsuppressed Step 1 leads remain due;
+  five incoming-mail stops affect already-contacted leads. Watermarks are 422 events / 148 sent.
+  No agent campaign/settings/enrollment/send change or pacing fix occurred. See docs/17.
+
 - **2026-10-06 four-part deployment:** separately authorized, pushed and deployed at `b721684`
   on `canary`. All 25 migrations, services/routes/version caching, 93-enrollment zero drift,
   self-check and validated pre/post backup catalogs pass. Production Ready-copy rendering verifies

@@ -1,5 +1,27 @@
 # Local canary runbook (B8.3-local) — two-week validation on throwaway Gmail
 
+## 2026-10-07 read-only 74-of-80 send diagnosis
+
+The operator asked why the October 6 mailbox-local day sent 19/19/18/18 instead of 20 each.
+Authenticated Mailboxes and read-only production SQL confirm all four mailboxes are healthy,
+20/day with no resume cap, New York weekdays 09:00–17:00. Scheduler is five minutes and jitter
+20%. The eight-hour window yields a nominal 24-minute gap, randomized 19.2–28.8 minutes and
+reevaluated every tick. Actual average gaps were **26.11/26.39/27.65/27.65 minutes**. All first
+sends were 13:00:07 UTC; last sends 20:50–20:55 UTC. A window-closed alert at 21:00:09 UTC and
+23 pacing-delay episodes explain the shortfall. No error/provider/auth/copy-block alert is recorded.
+This is a pacing/tick capacity limitation: 20 is a ceiling, not a guaranteed daily throughput.
+
+Campaign 3 is now **active**, automatic enrollment off, following operator actions after the
+deployment snapshot. Its 80 October 5 enrollments plus 20 October 6 enrollments total 100:
+20 sent on October 5, 74 on October 6, and **six remain ACTIVE at Step 1**, enrollment/lead IDs
+108–113, due, unsuppressed, not erased or snoozed, with Ready Step 1 copies and zero copy blockers.
+These openers have no assigned mailbox until accepted sending. Five contacted leads are STOPPED
+after incoming mail; all had already sent Step 1 and do not explain the six unsent openers.
+The next window opens October 7 **18:30 IST**, subject to unchanged eligibility/runtime state.
+Watermarks are **422 events / max ID 422 / 148 sent messages**. No campaign, setting, copy,
+enrollment, scheduler tick or outbound send was changed/triggered by the agent. No pacing fix
+or deployment was performed; any implementation is a separate task.
+
 ## 2026-10-06 authorized VPS build-cache cleanup
 
 After the deployment assessment below, the operator explicitly requested reclaiming the cache.
