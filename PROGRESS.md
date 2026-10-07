@@ -4,6 +4,13 @@
 
 **Legend:** `[ ]` not started · `[~]` in progress · `[x]` done · `[!]` blocked (note why in the log)
 
+**2026-10-08 IST separately authorized signature/range/alias deployment:** [x] `cd83228` pushed
+and deployed; all 28 migrations, healthy services/public routes/direct website aliases pass.
+Address inclusion is off; four mailboxes use 4–7 minute ranges at unchanged 20/day caps.
+Campaigns remain paused, watermarks 506/158 unchanged. Populated 187-enrollment zero drift,
+self-check and validated backups pass. Authenticated mailbox controls pass without saving.
+VPS usage and cache-cleanup opportunity are in docs/17; no cleanup/resume/send occurred.
+
 **2026-10-07 signature, randomized spacing and direct domain hosting — local implementation complete:**
 
 - [x] Address inclusion toggle initially off, saved address retained, conditional validation and

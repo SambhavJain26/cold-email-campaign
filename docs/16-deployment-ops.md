@@ -1,5 +1,11 @@
 # Deployment & Operations
 
+**2026-10-08 IST production release:** operator-authorized `cd83228` is deployed with 28 migrations,
+address inclusion off, 4–7 mailbox ranges and direct website serving on outreach/www domains.
+Services, HTTPS/app/OAuth/unsubscribe routes, 187-enrollment zero drift, self-check and validated
+backups pass. Campaigns paused, caps 20/day, watermarks 506/158 unchanged. Authenticated mailbox
+controls pass after operator sign-in. No cleanup/resume/send occurred. See docs/17.
+
 **Signature/range/alias release rollout boundary:** migrations 0026/0027 start postal-address
 inclusion off, update the previous default role, and give existing mailboxes 4–7 minute ranges.
 This candidate requires a separately authorized deployment. Before rollout, verify all outreach

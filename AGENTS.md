@@ -19,6 +19,16 @@ call planned work implemented.
 
 ## Current operating boundary
 
+- **2026-10-08 IST signature/range/alias deployment:** separately authorized, pushed/deployed at
+  `cd83228` on `canary`. All 28 migrations, healthy services, direct website aliases,
+  app/OAuth/unsubscribe routes, 187-enrollment zero drift/self-check and validated pre/post backups
+  pass. Address inclusion is off; saved address retained and role wording updated. Four healthy
+  mailboxes use 4–7 minute ranges and minute checks, still 20/day. Campaigns 2/3 remain paused,
+  automatic enrollment off; watermarks remain 506 events / 158 sends. Authenticated mailbox
+  range/edit controls pass after operator sign-in without saving settings. No CSV operation,
+  cap/window edit, resume, enrollment or send occurred. VPS disk is 42% used, 14 GiB available;
+  about 935 MB build cache is reported reclaimable. No cleanup performed. See docs/17.
+
 - **2026-10-07 signature/range/alias update — local only:** operator-authorized implementation
   starts Include postal address off, retains the saved address and uses the requested role/domain
   layout. Mailboxes use editable 4–7 minute ranges, with one persisted random deadline committed
@@ -399,7 +409,7 @@ temporary rollback/canary environment.
 - App: `/opt/email-campaign`; stack: `docker-compose.spaceship.yml` with `.env.prod`
 - Public UI: `https://sambhavpmtech.com/email-campaign/`
 - Internal gateway: `127.0.0.1:18080`; host Caddy is the only public 80/443 listener
-- Deployed application release: `canary` at `a6489a9`
+- Deployed application release: `canary` at `cd83228`
 
 The repository is private and the VPS currently has no GitHub deploy credential. Until a read-only
 deploy key is deliberately installed, transfer a reviewed `git bundle`, fetch the pinned branch

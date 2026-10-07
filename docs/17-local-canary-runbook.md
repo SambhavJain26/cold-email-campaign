@@ -1,5 +1,54 @@
 # Local canary runbook (B8.3-local) — two-week validation on throwaway Gmail
 
+## 2026-10-08 IST authorized signature/range/alias production deployment
+
+The operator explicitly authorized deployment. Fresh prechecks found clean production `a6489a9`,
+Campaigns 2/3 paused, Campaign 1 archived, automatic enrollment off, and four healthy mailboxes
+at 20/day with no resume cap and unchanged New York weekday 09:00–17:00 windows. Watermarks were
+**506 events / max ID 506 / 158 sent messages**. Pre-deployment replay checked **187 enrollments —
+zero diffs**, with clean self-check. No campaign pause/resume was performed.
+
+`origin/canary` was pushed to `cd83228`. Reviewed incremental bundle SHA-256
+`dd78b18e3de706599296d5476636d6297626ab285fd4067b774804fa54d2e4d1` matched on the VPS, which
+fast-forwarded to `cd8322821f16ec0a6e4790af6964a1d6e81b74bd`. Compose build/up succeeded.
+All **28 migrations** are applied. Address inclusion is false; the saved postal address is retained
+and role is **Property Management Automation Specialist**. Mailboxes 1–4 now use **4–7**; previous
+last-send timestamps remain `2026-10-07T16:00:29.103Z`. Migration deadlines are anchored there with
+delays **321/321/309/339 seconds**, within bounds. Scheduler cron is `* * * * *`; poll and automatic
+enrollment schedules are unchanged. Caps remain 20/day.
+
+Previous Caddy configuration is preserved at
+`/etc/caddy/Caddyfile.before-signature-alias-20261007-183058`. The main-domain block was kept
+byte-for-byte. The complete merged Caddyfile validated, was atomically installed and reloaded;
+Caddy is active. Public HTTPS passes for main/www and both outreach/www hosts: identical website
+HTML, direct 200 without redirects, cached assets and SPA navigation. Alias hostnames remain.
+Application/settings/mailboxes/campaigns/login return 200/no-store; bare app redirects 308;
+authenticated API rejects requests without a session and OAuth routes resolve. Both unsubscribe
+roots return 404 and non-mutating invalid-token GETs return generic 200. No DNS/mail record changed.
+Served application version is `e61ea8e8-49f8-4655-b294-23dd5c582b5c`.
+
+App/database are healthy; gateway/backup running. Post-deployment replay checks **187 enrollments —
+zero diffs**, self-check clean. Pre-backup `coldemail-20261007-183058.dump` is **2,240,092 bytes**;
+post-backup `coldemail-20261007-183315.dump` is **2,241,303 bytes**. Both pass **342-line** catalogs.
+Policy cutoff remains `2026-10-06T06:41:30.403034Z`. Campaign states, auto-enrollment, caps/windows
+and **506/158** watermarks remain unchanged; deployment emitted no mail.
+
+At 18:33 UTC, VPS root disk is **42% used**, **9.6 GiB used / 14 GiB available** on 24 GiB.
+RAM is **690 / 1,968 MiB used**, **1,277 MiB available**; swap **108 / 2,047 MiB**.
+Post-build load is **1.39 / 0.58 / 0.28**. App uses about 180 MiB, database 53 MiB, gateway
+33 MiB and backup 2 MiB, with low sampled CPU. Docker reports **1.936 GB** build cache and
+**935.4 MB reclaimable**. Cleanup is possible under a separate instruction; none was performed.
+Running images and database/backup volumes are retained.
+
+After operator sign-in, authenticated Mailboxes shows four healthy connected mailboxes with
+**4–7 min**, 20/day each and total capacity 80. Edit verifies minimum 4, maximum 7, cap 20,
+unchanged windows and eligibility guidance. The dialog was closed without saving.
+Settings → Compliance verifies the address toggle off, retained postal address, requested role,
+adjacent four-line preview with the domain below the role, and disabled Save (no changes).
+The Mailboxes tab is left open for the operator.
+No CSV operation, cap increase, enrollment, campaign resume or outbound mail occurred.
+Leave both campaigns paused for operator review and resumption.
+
 ## 2026-10-07 signature controls, randomized spacing and website aliases — verified locally
 
 The operator-authorized three-part update is implemented on `canary`. Settings → Sender signature
