@@ -1,5 +1,14 @@
 # Add these sites to /etc/caddy/Caddyfile. The existing sambhavbuilds.com site
 # stays unchanged and remains the portfolio origin.
+(outreachWebsite) {
+	root * /var/www/sambhavbuilds/dist
+	encode gzip zstd
+	@assets path /assets/*
+	header @assets Cache-Control "public, max-age=2592000, immutable"
+	try_files {path} /index.html
+	file_server
+}
+
 sambhavpmtech.com {
 	@emailAppRoot path /email-campaign
 	redir @emailAppRoot /email-campaign/ 308
@@ -10,18 +19,20 @@ sambhavpmtech.com {
 	}
 
 	handle {
-		redir https://sambhavbuilds.com/ 308
+		import outreachWebsite
 	}
 }
 
 www.sambhavpmtech.com {
 	@emailApp path /email-campaign /email-campaign/*
 	redir @emailApp https://sambhavpmtech.com{uri} 308
-	redir https://sambhavbuilds.com/ 308
+	handle {
+		import outreachWebsite
+	}
 }
 
 sambhavpmops.com, www.sambhavpmops.com {
-	redir https://sambhavbuilds.com/ 308
+	import outreachWebsite
 }
 
 unsubscribe.sambhavpmtech.com, unsubscribe.sambhavpmops.com {
