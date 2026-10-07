@@ -48,6 +48,12 @@ Shapes below in TS notation. `Metric = { numerator: number, denominator: number 
 | POST `/mailboxes/:id/oauth/google/disconnect` | → `Mailbox` — best-effort Google revoke, deletes the sealed refresh credential, clears in-memory access, and returns the mailbox to `setup_required`. Use the start endpoint again to reconnect. |
 | GET `/mailboxes/volume?days=30` | → `{items: {mailbox_id, series: {date, sends}[]}[], imbalance: boolean}` (metric #5) |
 
+Mailbox responses include nullable `send_interval_minutes`. Create/patch accept an optional integer
+from 1 to 1440: the minimum gap between accepted sends for that mailbox, independent of its cap and
+window, without jitter. Omitting it preserves existing pacing; explicit null is rejected. Existing
+mailboxes remain unset through migration 0025, while the Add mailbox form defaults to five minutes.
+Saving an interval refreshes the all-role scheduler to minute checks; no send or counter reset occurs.
+
 ## Leads & imports
 | | |
 |---|---|

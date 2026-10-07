@@ -8,6 +8,15 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Current operating boundary
 
+- **2026-10-07 fixed mailbox spacing — local only:** operator-authorized implementation adds
+  **Time between emails (minutes)** per mailbox, independent of its window/cap and without jitter.
+  Migration 0025 preserves existing pacing until an interval is saved and retains values on rollback.
+  Four mailboxes at four minutes reach 20/25 each in focused scenarios, with caps, carry-forward,
+  downtime and restart checks. Repository/browser/golden gates, populated zero drift/self-check
+  and backup restore are verified in docs/17. An existing draft-review sign-off regression was
+  also corrected without changing saved copy. No production setting, campaign, enrollment or send
+  was changed; deployment and live spacing/cap changes require separate operator authorization.
+
 - **2026-10-07 read-only send diagnosis:** Campaign 3 is active after operator actions,
   automatic enrollment off. October 6 sent 19/19/18/18: 24-minute base pacing plus 20% jitter
   and five-minute ticks exhausted the window. Six Ready, unsuppressed Step 1 leads remain due;

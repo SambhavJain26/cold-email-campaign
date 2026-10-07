@@ -1,5 +1,49 @@
 # Local canary runbook (B8.3-local) — two-week validation on throwaway Gmail
 
+## 2026-10-07 operator-controlled mailbox spacing — verified locally
+
+The operator rejected spreading sends across the window and requested a directly editable gap.
+Mailboxes → Edit now offers **Time between emails (minutes)**, from 1 to 1440, with a table column
+showing the saved value. Fixed spacing is independent of the daily cap/window and ignores jitter.
+The form shows minimum batch duration and warns when the configured gap cannot fit the cap into
+the window. Four-minute spacing takes at least 76 minutes for 20 messages or 96 for 25, measured
+from the first send; checks/processing can make the actual gap longer. Follow-ups keep their mailbox,
+and existing suppression, reply locks, retry snapshots, daily/resume caps and windows remain enforced.
+
+Migration 0025 adds nullable `send_interval_minutes`, with database/API integer bounds. Existing
+mailboxes retain legacy pacing until the operator saves an interval; unrelated edits leave it unset.
+New mailbox forms default to five minutes. The scheduler checks every minute when any fixed interval
+is configured; all-role create/edit refreshes the cron immediately and restart restores it. Separate
+API/worker installations must restart the worker after editing spacing. Poll and auto-enrollment
+cadences are unchanged. Rollback keeps the additive column and operator values; no ledger changes.
+
+Verification passes: typecheck, lint, formatting; unit/web **458**; API **147**; GreenMail **29**;
+locked golden **47 without regeneration**; mailbox browser flows **6**; real-backend browser **2**;
+real-API `/email-campaign/` production build. Focused fixed-spacing/migration/jobs checks pass **14**.
+Full integration checked **185** tests: **184 passed**, with one existing imported-draft prefill
+regression. Rendering removed the original sign-off before returning editable copy. Commit
+`6302dfc` preserves the exact saved draft body in prefill; the complete affected suite then passes
+**7/7**, including immutable source and sent-draft event linkage. No fixture expectations were weakened.
+
+Fixed-spacing scenarios prove four mailboxes reach **80/100 accepted mock sends** at four-minute
+intervals, stop at **20/25 each**, and carry remaining openers to the next allowed day. Interval edits
+measure from the last recorded accepted send; downtime does not burst and resume caps remain enforced.
+Job smoke verifies minute cron after editing and after stop/start. Migration apply/down/apply retains
+four-minute values, rejects invalid values and preserves the existing incoming-stop cutoff/history.
+
+The disposable database is seeded with **five event-backed enrollments**: projection dry run reports
+**zero diffs**, self-check clean. Both test mailboxes are set to four minutes for backup verification.
+`backups/mailbox-spacing-20261007.dump` is **111,935 bytes**, with a **274-line** valid catalog.
+It restores into the newly created disposable `coldemail_spacing_restore_20261007` database; both
+intervals remain four minutes, five-enrollment dry run has zero diffs, and self-check is clean.
+The dump and scratch database are retained locally. No production operation or outbound send occurred.
+
+Implementation is on `canary`, not deployed or pushed. Production remains `b721684`; the earlier
+read-only diagnosis below records Campaign 3 active after operator actions. Deployment needs separate
+authorization, fresh live-state/watermark checks and a validated backup. Saving production intervals,
+raising caps, enrollment and campaign resume remain separate operational actions. The proposed slot
+approach was discarded before this implementation; it is not part of the candidate.
+
 ## 2026-10-07 read-only 74-of-80 send diagnosis
 
 The operator asked why the October 6 mailbox-local day sent 19/19/18/18 instead of 20 each.

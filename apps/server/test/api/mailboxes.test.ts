@@ -71,6 +71,23 @@ describe('B6.2 mailboxes', () => {
   });
 
   it('PATCH updates a subset; password re-seal is optional', async () => {
+    const wm = await eventWatermark(h.pool);
+    for (const value of [0, -1, 1.5, 1441, null]) {
+      const invalid = await h.inject({
+        method: 'PATCH',
+        url: '/api/v1/mailboxes/1',
+        payload: { send_interval_minutes: value },
+      });
+      expect(invalid.statusCode).toBe(400);
+    }
+    const spaced = await h.inject({
+      method: 'PATCH',
+      url: '/api/v1/mailboxes/1',
+      payload: { send_interval_minutes: 4 },
+    });
+    expect(spaced.statusCode).toBe(200);
+    expect(spaced.json()).toMatchObject({ send_interval_minutes: 4, daily_cap: 30 });
+    await expectNoNewEvents(h.pool, wm);
     const res = await h.inject({
       method: 'PATCH',
       url: '/api/v1/mailboxes/1',
@@ -78,6 +95,7 @@ describe('B6.2 mailboxes', () => {
     });
     expect(res.statusCode).toBe(200);
     expect(res.json().daily_cap).toBe(40);
+    expect(res.json().send_interval_minutes).toBe(4);
     const sealed = await getMailboxSecret(h.services.db, 1);
     expect(await unsealSecret(sealed!, h.config.SECRET_KEY)).toBe('rotated-password');
 

@@ -19,6 +19,7 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
+import { Field, FieldDescription, FieldError, FieldLabel } from '@/components/ui/field';
 import { Label } from '@/components/ui/label';
 import { Checkbox } from '@/components/ui/checkbox';
 import { useCreateMailbox, usePatchMailbox, useTestConnection } from '@/api/mutations/mailboxes';
@@ -40,6 +41,7 @@ const formSchema = z
     imap_host: z.string(),
     imap_port: z.number().int().min(1).max(65535),
     daily_cap: z.number().int().min(1),
+    send_interval_minutes: z.number().int().min(1).max(1440).nullable(),
     password: z.string(),
     timezone: ianaTimezoneSchema,
     send_window: sendWindowSchema,
@@ -87,6 +89,15 @@ export function MailboxDialog({
   });
   const selectedDays = useWatch({ control, name: 'send_window.days' }) ?? [];
   const authType = useWatch({ control, name: 'auth_type' }) ?? 'google_oauth';
+  const interval = useWatch({ control, name: 'send_interval_minutes' });
+  const dailyCap = useWatch({ control, name: 'daily_cap' });
+  const sendWindow = useWatch({ control, name: 'send_window' });
+  const minutesOf = (value: string) => {
+    const [hours, minutes] = value.split(':').map(Number);
+    return hours! * 60 + minutes!;
+  };
+  const duration = interval && dailyCap ? (dailyCap - 1) * interval : null;
+  const windowLength = sendWindow ? minutesOf(sendWindow.end) - minutesOf(sendWindow.start) : 0;
 
   // Stale test results are cleared in handleOpenChange (an event handler) —
   // setState inside this effect trips the react-hooks compiler rule.
@@ -103,6 +114,7 @@ export function MailboxDialog({
             imap_host: mailbox.imap_host,
             imap_port: mailbox.imap_port,
             daily_cap: mailbox.daily_cap,
+            send_interval_minutes: mailbox.send_interval_minutes ?? null,
             timezone: mailbox.timezone,
             send_window: mailbox.send_window,
             poll_folders: mailbox.poll_folders,
@@ -117,6 +129,7 @@ export function MailboxDialog({
             imap_host: 'imap.gmail.com',
             imap_port: 993,
             daily_cap: 30,
+            send_interval_minutes: 5,
             timezone: settings.data?.default_timezone ?? 'UTC',
             send_window: { days: [1, 2, 3, 4, 5], start: '08:00', end: '17:00' },
             poll_folders: ['INBOX', '[Gmail]/Spam'],
@@ -131,12 +144,18 @@ export function MailboxDialog({
   };
 
   const onSubmit = (values: FormValues) => {
+    if (mailbox?.send_interval_minutes != null && values.send_interval_minutes === null) {
+      setError('send_interval_minutes', { message: 'Enter the minimum gap in minutes' });
+      return;
+    }
     if (!editing && values.auth_type === 'app_password' && values.password.length === 0) {
       setError('password', { message: 'App password is required' });
       return;
     }
+    const { send_interval_minutes, ...otherValues } = values;
     const body: CreateMailboxBody = {
-      ...values,
+      ...otherValues,
+      ...(send_interval_minutes !== null && { send_interval_minutes }),
       ...(values.auth_type === 'google_oauth' && { password: undefined }),
     } as CreateMailboxBody;
     if (editing) {
@@ -234,6 +253,46 @@ export function MailboxDialog({
                 'password',
               )}
             {field('daily_cap', 'Daily cap', 'number')}
+            <Field data-invalid={Boolean(errors.send_interval_minutes)}>
+              <FieldLabel htmlFor="mb-send-interval">Time between emails (minutes)</FieldLabel>
+              <Controller
+                name="send_interval_minutes"
+                control={control}
+                render={({ field }) => (
+                  <Input
+                    id="mb-send-interval"
+                    type="number"
+                    min={1}
+                    max={1440}
+                    step={1}
+                    placeholder="Set minutes"
+                    value={field.value ?? ''}
+                    onBlur={field.onBlur}
+                    ref={field.ref}
+                    aria-invalid={Boolean(errors.send_interval_minutes)}
+                    onChange={(event) =>
+                      field.onChange(event.target.value === '' ? null : Number(event.target.value))
+                    }
+                  />
+                )}
+              />
+              <FieldDescription>
+                Minimum gap for this mailbox. Emails may finish before the window ends. The daily
+                cap and send window still apply. Fixed spacing is not randomized.
+                {duration !== null &&
+                  ` ${dailyCap} emails take at least ${duration} minutes from the first send.`}
+                {mailbox?.send_interval_minutes == null &&
+                  interval == null &&
+                  ' Enter minutes to replace the current automatic spacing.'}
+              </FieldDescription>
+              {duration !== null && duration >= windowLength && (
+                <FieldDescription>
+                  This gap cannot fit the daily cap inside the window. Remaining emails carry
+                  forward.
+                </FieldDescription>
+              )}
+              <FieldError errors={[errors.send_interval_minutes]} />
+            </Field>
             <div className="space-y-1">
               <Label>Polled folders</Label>
               <Controller

@@ -14,6 +14,7 @@ export interface NewMailbox {
   imapPort?: number;
   authType?: 'app_password' | 'google_oauth';
   dailyCap?: number;
+  sendIntervalMinutes?: number;
   sendWindow?: MailboxRow['sendWindow'];
   timezone?: string;
   /** Folders to poll (0012). Omitted → the column default, INBOX only. */
@@ -69,6 +70,7 @@ export async function patchMailbox(
       | 'lastSuccessfulPollAt'
       | 'lastPollUid'
       | 'dailyCap'
+      | 'sendIntervalMinutes'
       | 'sendWindow'
       | 'displayName'
       | 'fromAddress'

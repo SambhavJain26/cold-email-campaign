@@ -54,6 +54,7 @@ function toMailboxDto(row: MailboxRow, stats: MailboxStats, oauthConnected: bool
     imap_host: row.imapHost,
     imap_port: row.imapPort,
     daily_cap: row.dailyCap,
+    send_interval_minutes: row.sendIntervalMinutes,
     effective_cap: row.resumeCap ?? row.dailyCap,
     send_window: row.sendWindow,
     timezone: row.timezone,
@@ -78,6 +79,9 @@ function patchColumns(body: PatchMailboxBody) {
     ...(body.imap_host !== undefined && { imapHost: body.imap_host }),
     ...(body.imap_port !== undefined && { imapPort: body.imap_port }),
     ...(body.daily_cap !== undefined && { dailyCap: body.daily_cap }),
+    ...(body.send_interval_minutes !== undefined && {
+      sendIntervalMinutes: body.send_interval_minutes,
+    }),
     ...(body.send_window !== undefined && { sendWindow: body.send_window }),
     ...(body.timezone !== undefined && { timezone: body.timezone }),
     ...(body.poll_folders !== undefined && { pollFolders: body.poll_folders }),
@@ -321,6 +325,7 @@ export async function mailboxesRoutes(app: FastifyInstance, services: AppService
           imapPort: b.imap_port,
           authType,
           dailyCap: b.daily_cap,
+          sendIntervalMinutes: b.send_interval_minutes,
           sendWindow: b.send_window,
           timezone: b.timezone,
           pollFolders,
@@ -339,6 +344,7 @@ export async function mailboxesRoutes(app: FastifyInstance, services: AppService
         // callback stores a valid refresh credential.
         await jobs.registerMailboxPoll(row.id);
       }
+      await jobs.refreshSendSchedule();
       return dtoOf(row);
     },
   );
@@ -392,6 +398,7 @@ export async function mailboxesRoutes(app: FastifyInstance, services: AppService
         const sealed = await sealSecret(req.body.password, config.SECRET_KEY);
         await upsertMailboxSecret(db, req.params.id, sealed, clock.now());
       }
+      if (req.body.send_interval_minutes !== undefined) await jobs.refreshSendSchedule();
       return dtoOf(await requireMailbox(req.params.id));
     },
   );

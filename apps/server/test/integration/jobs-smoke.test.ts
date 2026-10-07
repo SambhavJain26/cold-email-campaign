@@ -84,6 +84,18 @@ describe('pg-boss wiring smoke (B3.16)', () => {
   }, 30_000);
 
   it('registers a runtime-added mailbox once, and is inert before start()', async () => {
+    await pool.query('UPDATE mailboxes SET send_interval_minutes=4 WHERE id=1');
+    await jobs.refreshSendSchedule();
+    expect(
+      (await pool.query("SELECT cron FROM pgboss.schedule WHERE name='scheduler-tick'")).rows[0]
+        .cron,
+    ).toBe('* * * * *');
+    await jobs.stop();
+    await jobs.start();
+    expect(
+      (await pool.query("SELECT cron FROM pgboss.schedule WHERE name='scheduler-tick'")).rows[0]
+        .cron,
+    ).toBe('* * * * *');
     // The B6.2 routes call this when a mailbox is created or recovers from
     // auth_failed — twice must not attach a second worker to the same queue
     // (that would double-poll the mailbox).

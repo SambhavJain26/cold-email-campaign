@@ -4,6 +4,13 @@
 
 **Legend:** `[ ]` not started · `[~]` in progress · `[x]` done · `[!]` blocked (note why in the log)
 
+**2026-10-07 fixed mailbox spacing — local implementation complete:** [x] editable minimum gap,
+independent caps/windows, minute checks, preserved existing configuration and rollback values.
+Four mailboxes reach 20/25 each at four-minute intervals; serial regression/browser/golden checks,
+five-enrollment zero drift/self-check and populated backup restore pass. The existing draft-review
+source-text regression is corrected. See docs/17 for exact results. No deployment or production
+spacing/cap/campaign/enrollment/send change occurred; operational actions require separate approval.
+
 **2026-10-06 separately authorized deployment:** [x] `b721684` pushed/deployed; all 25 migrations,
 routes/services/caching, 93-enrollment zero drift, self-check and validated pre/post backups pass.
 Campaigns remain paused, auto-enrollment off, watermarks unchanged at 245 events / 74 sent.

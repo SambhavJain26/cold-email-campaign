@@ -13,7 +13,7 @@ import { runSelfCheckJob, runRebuildCompareJob } from './integrity';
 import type { ConfirmDeliveryJob, JobPort, SequenceProvider } from '../scheduler/types';
 import type { AlertSink } from '../alerts/types';
 import { getSettings } from '../db/repos/settingsRepo';
-import { listMailboxesByStatus } from '../db/repos/mailboxesRepo';
+import { listMailboxes, listMailboxesByStatus } from '../db/repos/mailboxesRepo';
 import type { AutoEnrollmentService } from '../services/autoEnrollment';
 
 export interface JobsDeps {
@@ -65,7 +65,7 @@ export class Jobs implements JobPort {
     await boss.work(TICK_QUEUE, async () => {
       await scheduler.tick();
     });
-    await boss.schedule(TICK_QUEUE, tickCron, undefined, { retryLimit: 1 });
+    await this.refreshSendSchedule();
 
     // This cron only checks whether the current application-local date has
     // been claimed. The service's durable date claim makes the actual
@@ -131,6 +131,17 @@ export class Jobs implements JobPort {
     for (const mb of boxes) {
       await this.registerMailboxPoll(mb.id, pollCron);
     }
+  }
+
+  /** Fixed intervals require minute checks; reload after a mailbox edit. */
+  async refreshSendSchedule(): Promise<void> {
+    if (!this.boss) return;
+    const settings = await getSettings(this.deps.db);
+    const boxes = await listMailboxes(this.deps.db);
+    const cron = boxes.some((mb) => mb.sendIntervalMinutes !== null)
+      ? '* * * * *'
+      : `*/${Math.min(59, Math.max(1, settings.schedulerTickMinutes))} * * * *`;
+    await this.boss.schedule(TICK_QUEUE, cron, undefined, { retryLimit: 1 });
   }
 
   /**

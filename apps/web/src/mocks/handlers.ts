@@ -341,6 +341,7 @@ export const handlers: RequestHandler[] = [
         imap_host: body.auth_type === 'google_oauth' ? 'imap.gmail.com' : body.imap_host!,
         imap_port: body.imap_port ?? 993,
         daily_cap: body.daily_cap ?? 30,
+        send_interval_minutes: body.send_interval_minutes ?? null,
         effective_cap: body.daily_cap ?? 30,
         send_window: body.send_window ?? { days: [1, 2, 3, 4, 5], start: '08:00', end: '17:00' },
         timezone: body.timezone ?? 'America/New_York',

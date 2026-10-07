@@ -38,6 +38,21 @@ function oauthMailbox(id: number, connected: boolean): MailboxDto {
 }
 
 describe('Google OAuth mailbox UI', () => {
+  it('lets the operator set fixed spacing and warns when the cap cannot fit the window', async () => {
+    const user = userEvent.setup({ pointerEventsCheck: 0 });
+    const mailbox = { ...oauthMailbox(1, true), daily_cap: 25, send_interval_minutes: 4 };
+    render(
+      <QueryClientProvider client={client()}>
+        <MailboxDialog open mailbox={mailbox} onOpenChange={() => {}} />
+      </QueryClientProvider>,
+    );
+    const interval = screen.getByLabelText('Time between emails (minutes)');
+    expect(interval).toHaveValue(4);
+    expect(screen.getByText(/25 emails take at least 96 minutes/)).toBeInTheDocument();
+    await user.clear(interval);
+    await user.type(interval, '30');
+    expect(screen.getByText(/cannot fit the daily cap/)).toBeInTheDocument();
+  });
   it('defaults new Workspace mailboxes to OAuth and retains app password as fallback', async () => {
     const user = userEvent.setup({ pointerEventsCheck: 0 });
     render(

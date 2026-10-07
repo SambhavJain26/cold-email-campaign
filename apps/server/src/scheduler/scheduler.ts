@@ -228,7 +228,10 @@ export class Scheduler {
         mb.id,
         startOfLocalDay(now, mb.timezone || settings.defaultTimezone),
       );
-      const gap = minGapMs(mb.sendWindow, capToday) * jitterFactor(rng, settings.sendJitterPct);
+      const gap =
+        mb.sendIntervalMinutes !== null
+          ? mb.sendIntervalMinutes * 60_000
+          : minGapMs(mb.sendWindow, capToday) * jitterFactor(rng, settings.sendJitterPct);
       const remaining = Math.max(0, capToday - sentToday);
       budgets.set(mb.id, {
         id: mb.id,

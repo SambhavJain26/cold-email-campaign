@@ -67,6 +67,7 @@ describe('migration runner', () => {
   });
 
   it('four-part rollback preserves the policy cutoff and copy-update history', async () => {
+    const rollbackNames = names.slice(names.indexOf('0022_incoming_outreach_stop'));
     const cutoff = (await pool.query('SELECT incoming_stop_since FROM settings WHERE id=1')).rows[0]
       .incoming_stop_since;
     const importId = (
@@ -74,7 +75,9 @@ describe('migration runner', () => {
         "INSERT INTO imports (filename, rows_total, counts, copy_update) VALUES ('history.csv',0,'{}','{\"campaign_id\":1}') RETURNING id",
       )
     ).rows[0].id;
-    expect(await migrateDown(pool, MIGRATIONS_DIR, 3)).toEqual(names.slice(-3).reverse());
+    expect(await migrateDown(pool, MIGRATIONS_DIR, rollbackNames.length)).toEqual(
+      [...rollbackNames].reverse(),
+    );
     expect(
       (await pool.query('SELECT incoming_stop_since FROM settings WHERE id=1')).rows[0]
         .incoming_stop_since,
@@ -83,7 +86,7 @@ describe('migration runner', () => {
       (await pool.query('SELECT copy_update FROM imports WHERE id=$1', [importId])).rows[0]
         .copy_update,
     ).toEqual({ campaign_id: 1 });
-    expect(await migrateUp(pool, MIGRATIONS_DIR)).toEqual(names.slice(-3));
+    expect(await migrateUp(pool, MIGRATIONS_DIR)).toEqual(rollbackNames);
     expect(
       (await pool.query('SELECT incoming_stop_since FROM settings WHERE id=1')).rows[0]
         .incoming_stop_since,
@@ -103,6 +106,31 @@ describe('migration runner', () => {
       signature_role_line: 'PM Systems & Automation Specialist',
       physical_address: '17, Radhaswami Nagar, Jaipur 302020, IN',
     });
+    await resetCoreTables(pool);
+  });
+
+  it('preserves operator intervals on rollback/reapply and rejects invalid intervals', async () => {
+    await resetCoreTables(pool);
+    const row = await pool.query(
+      "INSERT INTO mailboxes (display_name,from_address,smtp_host,imap_host) VALUES ('Interval','interval@test.dev','smtp.test.dev','imap.test.dev') RETURNING id,send_interval_minutes",
+    );
+    expect(row.rows[0].send_interval_minutes).toBeNull();
+    await pool.query('UPDATE mailboxes SET send_interval_minutes=4 WHERE id=$1', [row.rows[0].id]);
+    for (const invalid of [0, -1, 1441]) {
+      await expect(
+        pool.query('UPDATE mailboxes SET send_interval_minutes=$1', [invalid]),
+      ).rejects.toThrow();
+    }
+    expect(await migrateDown(pool, MIGRATIONS_DIR, 1)).toEqual(['0025_mailbox_send_interval']);
+    expect(
+      (await pool.query('SELECT send_interval_minutes FROM mailboxes')).rows[0]
+        .send_interval_minutes,
+    ).toBe(4);
+    expect(await migrateUp(pool, MIGRATIONS_DIR)).toEqual(['0025_mailbox_send_interval']);
+    expect(
+      (await pool.query('SELECT send_interval_minutes FROM mailboxes')).rows[0]
+        .send_interval_minutes,
+    ).toBe(4);
     await resetCoreTables(pool);
   });
 

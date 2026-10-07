@@ -5,7 +5,7 @@
 > threading, transport, confirmation, retry, and event pipeline. Missing copy holds only the
 > affected enrollment and never falls back. See [docs/22](22-personalized-copy-two-tier.md).
 
-Implements spec Part 7 + Part 11, walkthrough Stages 5, 8. Lives in `apps/server/src/scheduler/`. Runs as pg-boss cron job `scheduler-tick` every `settings.scheduler_tick_minutes` (default 5). All time via `Clock`; all sends via `MailTransport`. The tick is **idempotent and crash-safe**: it holds a pg advisory lock (`pg_try_advisory_lock`) so overlapping ticks can't double-send; every send is committed (event appended) before the next is attempted.
+Implements spec Part 7 + Part 11, walkthrough Stages 5, 8. Lives in `apps/server/src/scheduler/`. Runs as pg-boss cron job `scheduler-tick` every minute when a mailbox has a fixed send interval, otherwise every `settings.scheduler_tick_minutes` (default 5). All time via `Clock`; all sends via `MailTransport`. The tick is **idempotent and crash-safe**: it holds a pg advisory lock (`pg_try_advisory_lock`) so overlapping ticks can't double-send; every send is committed (event appended) before the next is attempted.
 
 ---
 
@@ -24,7 +24,7 @@ tick(now = clock.now()):
   for mb in mailboxes where status = 'ok':
     mb.sentToday   = countSentEventsSince(mb, localMidnight(mb, now))
     mb.capToday    = mb.resume_cap ?? mb.daily_cap
-    mb.paceReady   = now - mb.last_send_at >= minGap(mb) ± jitter    // §2
+    mb.paceReady   = now - mb.last_send_at >= configuredGapOrLegacyPacing(mb) // §2
     mb.budget      = (mb.capToday - mb.sentToday) if mb.paceReady else 0
 
   // C. select due work, oldest-first  (never-burst = just this ordering + budgets)
@@ -52,12 +52,34 @@ Rules encoded above, stated plainly:
 
 ## 2. Pacing (decision P)
 
+### Operator-controlled fixed interval (migration 0025)
+
+Mailboxes → Edit → **Time between emails (minutes)** sets a per-mailbox minimum gap, from 1 to
+1440 minutes, independently of the cap and window. With a four-minute interval, 20 messages take
+at least 76 minutes from the first send; 25 take at least 96 minutes. Fixed intervals do not use
+jitter or spread messages across the window. Remaining work carries forward when capped or when
+the window closes. Follow-ups retain their assigned mailbox and all reply/suppression guards.
+
+The gap is measured from the last accepted send, including after interval edits, retries, restarts
+and downtime. One accepted send per mailbox per tick remains enforced. When any mailbox has a
+fixed interval, the scheduler checks every minute; create/edit refreshes its cron immediately
+and boot restores it. Poll cadence and auto-enrollment cadence are unchanged. Minute checks and
+processing delays can make an actual gap longer than configured, never shorter. A separate
+API/worker deployment must restart its worker after a spacing edit to refresh its schedule.
+
+Existing mailboxes have a nullable additive column and retain automatic pacing until the operator
+sets an interval. Unrelated edits preserve that state. New mailbox forms default to five minutes;
+API clients omitting the field retain backward-compatible automatic pacing. Rollback preserves
+operator values. The following historical automatic calculation applies only to unset intervals:
+
 ```
 minGap(mb) = windowMinutes(mb.send_window) / mb.capToday          // 540/30 = 18 min
 jitter     = uniform(-settings.send_jitter_pct%, +settings.send_jitter_pct%)   // seeded PRNG in tests
 ```
 
-A mailbox sends at most one message per elapsed `minGap ± jitter`, so 30 sends spread across the whole window — humanlike spacing, and bursting is structurally impossible even after downtime.
+With an unset interval, the window and cap determine the legacy pacing target. Tick rounding and
+jitter can reduce daily throughput below that cap. Fixed intervals above let the operator control
+spacing directly while retaining the same cap and no-burst safeguards.
 
 ## 3. Opener rotation (`pickMailbox`)
 

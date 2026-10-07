@@ -1,5 +1,13 @@
 # Deployment & Operations
 
+**2026-10-07 local spacing candidate:** migration 0025 adds a nullable mailbox interval and leaves
+existing production pacing unchanged until an operator saves a value. Verified locally; not deployed.
+Deploy only with separate authorization, fresh campaign/watermark checks and a validated backup.
+Check migration 0025, routes/services, projections, self-check, backup catalogs and authenticated
+mailbox controls afterward. Do not set spacing, raise caps, enroll or resume as part of deployment.
+All-role saves refresh scheduler cron; separate API/worker installations need a worker restart.
+Rollback retains operator intervals. See [verification evidence](17-local-canary-runbook.md).
+
 **2026-10-06 production deployment:** operator-authorized four-part release `b721684` is pushed
 and deployed. All 25 migrations, public routes/caching, services, 93-enrollment zero drift,
 self-check and validated pre/post backups pass. Campaigns 2/3 remain paused; automatic enrollment

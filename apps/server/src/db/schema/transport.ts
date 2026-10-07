@@ -38,6 +38,7 @@ export const mailboxes = pgTable('mailboxes', {
   imapPort: integer('imap_port').notNull().default(993),
   authType: text('auth_type').notNull().default('app_password'),
   dailyCap: integer('daily_cap').notNull().default(30),
+  sendIntervalMinutes: integer('send_interval_minutes'),
   sendWindow: jsonb('send_window')
     .$type<SendWindow>()
     .notNull()

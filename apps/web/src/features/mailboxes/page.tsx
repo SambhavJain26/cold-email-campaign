@@ -81,6 +81,12 @@ export default function MailboxesPage() {
       cell: (mailbox) => `${mailbox.sent_today}/${mailbox.effective_cap}`,
     },
     {
+      key: 'send-interval',
+      header: 'Send interval',
+      cell: (mailbox) =>
+        mailbox.send_interval_minutes != null ? `${mailbox.send_interval_minutes} min` : 'Not set',
+    },
+    {
       key: 'average',
       header: '7-day avg',
       align: 'right',

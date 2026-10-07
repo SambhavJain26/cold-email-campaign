@@ -345,6 +345,7 @@ CREATE TABLE mailboxes (
   imap_host      text NOT NULL,  imap_port int NOT NULL DEFAULT 993,
   auth_type      text NOT NULL DEFAULT 'app_password',
   daily_cap      int  NOT NULL DEFAULT 30,
+  send_interval_minutes int CHECK (send_interval_minutes BETWEEN 1 AND 1440), -- 0025; NULL preserves legacy pacing
   send_window    jsonb NOT NULL DEFAULT '{"days":[1,2,3,4,5],"start":"08:00","end":"17:00"}',
                  -- evaluated in RECIPIENT tz (docs/06 §4)
   status         mailbox_status NOT NULL DEFAULT 'ok',

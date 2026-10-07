@@ -157,7 +157,11 @@ export function RulesTab({
           <CardTitle className="text-sm">Timing</CardTitle>
         </CardHeader>
         <CardContent className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-          {num('scheduler_tick_minutes', 'Scheduler tick (min)', 'How often the send loop runs.')}
+          {num(
+            'scheduler_tick_minutes',
+            'Scheduler tick (min)',
+            'Automatic-spacing cadence. Fixed mailbox intervals are checked every minute.',
+          )}
           {num('poll_interval_minutes', 'IMAP poll (min)', 'Reply/bounce detection cadence.')}
           {num('stale_poll_hours', 'Stale poll (h)', 'No successful poll for this long → flagged.')}
           {num(
@@ -165,7 +169,11 @@ export function RulesTab({
             'Delivery confirm (h)',
             'sent → delivered after this long with no bounce (decision N).',
           )}
-          {num('send_jitter_pct', 'Send jitter %', 'Randomness around the pace gap.')}
+          {num(
+            'send_jitter_pct',
+            'Send jitter %',
+            'Applies to automatic spacing only. Fixed mailbox intervals are not randomized.',
+          )}
           {num('soft_retry_max', 'Soft-bounce retries', 'Attempts before treating as hard.')}
           {num('cold_storage_rest_days', 'Cold-storage rest (days)', 'Wait before recycling.')}
           <div className="space-y-1">

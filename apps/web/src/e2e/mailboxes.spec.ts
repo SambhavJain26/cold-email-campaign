@@ -15,6 +15,23 @@ test('table shows all mailboxes with chips and the capacity total', async ({ pag
   await expect(page.getByTestId('volume-chart')).toBeVisible();
 });
 
+test('fixed spacing persists through editing and cap changes', async ({ page }) => {
+  await login(page);
+  await page.getByRole('link', { name: 'Mailboxes' }).click();
+  const row = page.getByRole('row').filter({ hasText: 'sales1@coldmail-domain1.com' });
+  await row.getByRole('button', { name: 'Edit', exact: true }).click();
+  const dialog = page.getByRole('dialog');
+  await dialog.getByLabel('Time between emails (minutes)').fill('4');
+  await dialog.getByLabel('Daily cap').fill('25');
+  await dialog.getByRole('button', { name: 'Save changes' }).click();
+  await expect(dialog).not.toBeVisible();
+  await expect(row.getByText('4 min', { exact: true })).toBeVisible();
+  await row.getByRole('button', { name: 'Edit', exact: true }).click();
+  await expect(dialog.getByLabel('Time between emails (minutes)')).toHaveValue('4');
+  await expect(dialog.getByLabel('Daily cap')).toHaveValue('25');
+  await expect(dialog.getByText(/25 emails take at least 96 minutes/)).toBeVisible();
+});
+
 test('add mailbox: dialog validates, saves, and the totals move', async ({ page }) => {
   await login(page);
   await page.getByRole('link', { name: 'Mailboxes' }).click();
