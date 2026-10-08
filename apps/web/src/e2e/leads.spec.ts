@@ -88,26 +88,11 @@ test('lead detail: timeline renders, edits save', async ({ page }) => {
   await expect(page.getByText('Lead updated')).toBeVisible();
 });
 
-test('suppressed lead: typed-confirm removal (decision U)', async ({ page }) => {
+test('suppression is permanent and has no ordinary removal control', async ({ page }) => {
   await login(page);
   await page.getByRole('link', { name: 'Leads' }).click();
-
   await page.getByLabel('Suppressed only').click();
   await page.getByRole('table').getByRole('row').nth(1).click();
-
-  const banner = page.getByTestId('suppression-banner');
-  await expect(banner).toContainText('opted out');
-  await banner.getByText('Remove suppression').click();
-
-  const confirm = page.getByRole('button', { name: 'Remove suppression' });
-  await expect(confirm).toBeDisabled();
-  await page.getByLabel(/to confirm/).fill('not-the-email');
-  await expect(confirm).toBeDisabled();
-
-  const email = await page.locator('main p.text-sm.text-muted-foreground').first().textContent();
-  await page.getByLabel(/to confirm/).fill(email!.trim());
-  await confirm.click();
-
-  await expect(page.getByText('Suppression removed')).toBeVisible();
-  await expect(banner).not.toBeVisible();
+  await expect(page.getByTestId('suppression-banner')).toContainText('permanent');
+  await expect(page.getByRole('button', { name: 'Remove suppression' })).toHaveCount(0);
 });

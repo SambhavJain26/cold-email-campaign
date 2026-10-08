@@ -1,10 +1,10 @@
 // F2.8 — mailboxes: table + add + failure panels render + actions (docs/15 F2).
 import { expect, test } from '@playwright/test';
-import { enableFailureFixtures, login } from './helpers';
+import { enableFailureFixtures, login, navigate } from './helpers';
 
 test('table shows all mailboxes with chips and the capacity total', async ({ page }) => {
   await login(page);
-  await page.getByRole('link', { name: 'Mailboxes' }).click();
+  await navigate(page, 'Mailboxes');
 
   // Addresses also appear in the chart legend — scope to the table.
   const table = page.getByRole('table');
@@ -17,7 +17,7 @@ test('table shows all mailboxes with chips and the capacity total', async ({ pag
 
 test('randomized spacing persists through editing and cap changes', async ({ page }) => {
   await login(page);
-  await page.getByRole('link', { name: 'Mailboxes' }).click();
+  await navigate(page, 'Mailboxes');
   const row = page.getByRole('row').filter({ hasText: 'sales1@coldmail-domain1.com' });
   await row.getByRole('button', { name: 'Edit', exact: true }).click();
   const dialog = page.getByRole('dialog');
@@ -36,7 +36,7 @@ test('randomized spacing persists through editing and cap changes', async ({ pag
 
 test('add mailbox: dialog validates, saves, and the totals move', async ({ page }) => {
   await login(page);
-  await page.getByRole('link', { name: 'Mailboxes' }).click();
+  await navigate(page, 'Mailboxes');
   await page.getByRole('button', { name: 'Add Mailbox' }).click();
 
   // Empty submit → shared-schema validation errors, nothing saved.
@@ -59,7 +59,7 @@ test('add mailbox: dialog validates, saves, and the totals move', async ({ page 
 
 test('edit dialog test-connection shows the inline result', async ({ page }) => {
   await login(page);
-  await page.getByRole('link', { name: 'Mailboxes' }).click();
+  await navigate(page, 'Mailboxes');
   await page.getByRole('button', { name: 'Edit' }).first().click();
   await page.getByRole('button', { name: 'Test Connection' }).click();
   await expect(page.getByTestId('test-result')).toContainText('✅ SMTP OK · ✅ IMAP OK');
@@ -68,7 +68,7 @@ test('edit dialog test-connection shows the inline result', async ({ page }) => 
 test('auth_failed panel reconnects with a new app password', async ({ page }) => {
   await enableFailureFixtures(page);
   await login(page);
-  await page.getByRole('link', { name: 'Mailboxes' }).click();
+  await navigate(page, 'Mailboxes');
 
   const panel = page.getByTestId('auth-failed-3');
   await expect(panel).toBeVisible();
@@ -86,7 +86,7 @@ test('auth_failed panel reconnects with a new app password', async ({ page }) =>
 test('auto_paused panel resumes at 50%', async ({ page }) => {
   await enableFailureFixtures(page);
   await login(page);
-  await page.getByRole('link', { name: 'Mailboxes' }).click();
+  await navigate(page, 'Mailboxes');
 
   const panel = page.getByTestId('auto-paused-4');
   await expect(panel).toBeVisible();

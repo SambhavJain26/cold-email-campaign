@@ -1,3 +1,4 @@
+import { navigate } from '../src/e2e/helpers';
 import { expect, test } from '@playwright/test';
 import { login } from './helpers';
 
@@ -8,7 +9,7 @@ test('real signature toggle and randomized mailbox range persist without sending
   const complianceResponse = await page.request.get('/api/v1/compliance');
   expect(complianceResponse.ok()).toBe(true);
   const original = await complianceResponse.json();
-  await page.getByRole('link', { name: 'Settings' }).click();
+  await navigate(page, 'Settings');
   await page.getByRole('tab', { name: 'Compliance' }).click();
   const toggle = page.getByRole('switch', { name: 'Include postal address' });
   if (await toggle.isChecked()) await toggle.click();
@@ -31,7 +32,7 @@ test('real signature toggle and randomized mailbox range persist without sending
   );
   // Discard this unsaved switch change before visiting Mailboxes.
   page.once('dialog', (dialog) => dialog.accept());
-  await page.getByRole('link', { name: 'Mailboxes' }).click();
+  await navigate(page, 'Mailboxes');
   await page.getByRole('button', { name: 'Add Mailbox' }).click();
   await expect(page.getByLabel('Minimum minutes')).toHaveValue('4');
   await expect(page.getByLabel('Maximum minutes')).toHaveValue('7');

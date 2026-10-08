@@ -1,11 +1,11 @@
 // F8.1/F8.2 — System: the reply-detection debug view (4-bucket classifier) and
 // the job-status panel with the rebuild dry-run dialog (docs/15 F8).
 import { expect, test } from '@playwright/test';
-import { login } from './helpers';
+import { login, navigate } from './helpers';
 
 test('reply-detection shows all four classifier buckets and filters', async ({ page }) => {
   await login(page);
-  await page.getByRole('link', { name: 'System' }).click();
+  await navigate(page, 'System');
 
   // A human reply, an OOO auto-reply, a DSN bounce, and an unmatched stray.
   await expect(page.getByTestId('incoming-row-100')).toContainText('human');
@@ -34,7 +34,7 @@ test('reply-detection shows all four classifier buckets and filters', async ({ p
 
 test('job status shows transport, pollers, and a clean rebuild dry-run', async ({ page }) => {
   await login(page);
-  await page.getByRole('link', { name: 'System' }).click();
+  await navigate(page, 'System');
 
   await expect(page.getByTestId('transport-mode')).toHaveText('MOCK');
   await expect(page.getByTestId('last-tick')).not.toBeEmpty();

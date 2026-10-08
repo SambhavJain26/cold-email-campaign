@@ -1,7 +1,7 @@
 // F4.5 — sequences: list, build the walkthrough sequence (24 variations),
 // fatal link-in-step-1 → fix → save, and the 422 sequence_invalid mapping.
 import { expect, test, type Page } from '@playwright/test';
-import { login } from './helpers';
+import { login, navigate } from './helpers';
 
 const SUBJECT = '{{RANDOM|Quick question|Quick note}} about {{company}}'; // 2 variations
 
@@ -40,7 +40,7 @@ test('preview scopes and pages all 100 pooled and enrolled campaign leads', asyn
       })),
     );
   });
-  await page.getByRole('link', { name: 'Sequences', exact: true }).click();
+  await navigate(page, 'Sequences');
   await page.getByRole('link', { name: 'Real Estate Outreach v2', exact: true }).click();
   await page.getByTestId('step-card-1').getByRole('button', { name: 'Preview' }).first().click();
   const panel = page.getByTestId('preview-panel');
@@ -89,12 +89,12 @@ test('list shows the fixture sequence with its steps, waits and stop conditions'
   page,
 }) => {
   await login(page);
-  await page.getByRole('link', { name: 'Sequences' }).click();
+  await navigate(page, 'Sequences');
 
   const row = page.getByTestId('sequence-row-1');
   await expect(row).toContainText('Real Estate Outreach v2');
   await expect(row).toContainText('0 / 3 / 4 / 5 days');
-  await expect(row).toContainText('reply');
+  await expect(row).toContainText('review hold');
   await expect(row).toContainText('hard bounce');
   await expect(row).toContainText('STOP');
 
@@ -105,7 +105,7 @@ test('list shows the fixture sequence with its steps, waits and stop conditions'
 
 test('build a sequence: 24 variations, fatal link in step 1, fix, save', async ({ page }) => {
   await login(page);
-  await page.getByRole('link', { name: 'Sequences' }).click();
+  await navigate(page, 'Sequences');
   await page.getByRole('button', { name: 'New Sequence' }).click();
   await expect(page).toHaveURL(/\/sequences\/new$/);
 

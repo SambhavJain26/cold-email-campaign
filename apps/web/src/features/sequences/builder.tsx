@@ -220,10 +220,10 @@ export function SequenceBuilder({ sequence }: { sequence?: SequenceDto }) {
           </Button>
 
           <section className="space-y-2 rounded-lg border border-border p-4">
-            <h2 className="text-sm font-semibold">Stop conditions</h2>
+            <h2 className="text-sm font-semibold">Incoming response safety</h2>
             <p className="text-xs text-muted-foreground">
-              Every human reply permanently stops this sequence. This safety rule cannot be
-              disabled.
+              Matched incoming responses hold outreach for human review. Clear opt-outs permanently
+              suppress the address across campaigns. Review holds never expire.
             </p>
           </section>
         </div>

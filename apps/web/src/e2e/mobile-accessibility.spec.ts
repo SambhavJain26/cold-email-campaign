@@ -1,6 +1,6 @@
 import AxeBuilder from '@axe-core/playwright';
 import { expect, test, type Page } from '@playwright/test';
-import { login } from './helpers';
+import { login, navigate } from './helpers';
 
 const WIDTHS = [320, 375, 390, 430, 768] as const;
 
@@ -58,7 +58,7 @@ for (const width of WIDTHS) {
       await page.getByRole('link', { name: 'Leads' }).click();
       await expect(page.getByRole('table')).toBeVisible();
       await expectNoHorizontalOverflow(page);
-      await page.getByRole('link', { name: 'Analytics' }).click();
+      await navigate(page, 'Analytics');
       await expectNoHorizontalOverflow(page);
     }
   });

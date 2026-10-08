@@ -1,5 +1,23 @@
 # Frontend Architecture — React SPA
 
+## Unibox and navigation candidate (2026-10-08; local only)
+
+Desktop navigation is a compact top bar: Overview/Leads/Campaigns/Unibox, extra wide-screen
+destinations, and More for secondary destinations. The accessible mobile sheet, transport,
+alerts, session/logout, update banner, Overview selector and dirty-form protections remain.
+Local Unibox controls live below navigation.
+
+The Unibox list groups lead + campaign and searches name/email/company. Its selected reader uses
+backend state, not an automatic-response caption. History metadata loads separately from the
+selected full message body. Text preserves paragraphs; quotations collapse. DOMPurify's narrow
+allowlist plus sandbox/CSP removes active content, remote images, fonts, media and CSS fetches.
+Attachments are not stored. Under 1024px the reader opens as a dedicated view with Back navigation.
+
+Confirmations freeze the reviewed row/message revision, hold IDs and explicit reviewed message
+IDs; stale backend state returns a conflict. Acknowledge is immediate with Undo and changes
+visibility only. Alerts use a bounded scrolling feed and Clear all notifications acknowledges
+only its captured through-ID; history and newer alerts remain.
+
 Stack locked in decision S: React 18 + Vite + TS + Tailwind + shadcn/ui + TanStack Query v5 + React Router v6 + react-hook-form/zod + Recharts + lucide-react + MSW. Lives in `apps/web/`.
 
 ---

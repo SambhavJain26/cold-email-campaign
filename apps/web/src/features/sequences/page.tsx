@@ -75,12 +75,12 @@ export default function SequencesPage() {
     },
     {
       key: 'stops',
-      header: 'Stop conditions',
+      header: 'Response safety',
       cell: (sequence) => (
         <div className="flex flex-wrap justify-end gap-1 md:justify-start">
           {sequence.stop_on_reply && (
             <Badge variant="secondary" className="text-[10px]">
-              reply
+              review hold
             </Badge>
           )}
           <Badge variant="secondary" className="text-[10px]">

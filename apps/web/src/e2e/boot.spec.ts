@@ -1,5 +1,6 @@
 // F0 gate spec: boots in mock mode; login-guarded shell (docs/15 F0.7).
 import { expect, test } from '@playwright/test';
+import { navigate } from './helpers';
 
 // Each test gets a fresh browser context, so the sessionStorage-backed mock
 // session always starts logged out — no explicit reset needed.
@@ -30,7 +31,8 @@ test('login lands on Overview inside the shell with all nav entries', async ({ p
     'Settings',
     'System',
   ]) {
-    await expect(page.getByRole('link', { name: entry })).toBeVisible();
+    await navigate(page, entry);
+    await expect(page.getByRole('heading', { name: entry, exact: true })).toBeVisible();
   }
 });
 

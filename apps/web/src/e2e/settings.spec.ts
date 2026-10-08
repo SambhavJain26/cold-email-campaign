@@ -1,10 +1,10 @@
 // F2.8 — settings: rules save, dirty guard, compliance block, account (docs/15 F2).
 import { expect, test } from '@playwright/test';
-import { login } from './helpers';
+import { login, navigate } from './helpers';
 
 test('rules tab saves the full row and clears the dirty flag', async ({ page }) => {
   await login(page);
-  await page.getByRole('link', { name: 'Settings' }).click();
+  await navigate(page, 'Settings');
 
   const pct = page.getByLabel('Hard-bounce % threshold');
   await expect(pct).toHaveValue('5');
@@ -21,7 +21,7 @@ test('settings tabs have no stray vertical scrollbar and timezone wheel scrolls 
   page,
 }) => {
   await login(page);
-  await page.getByRole('link', { name: 'Settings' }).click();
+  await navigate(page, 'Settings');
 
   const tabsOverflow = page.getByRole('tablist').locator('..');
   await expect
@@ -41,7 +41,7 @@ test('settings tabs have no stray vertical scrollbar and timezone wheel scrolls 
 
 test('dirty-state guard blocks tab switch until confirmed', async ({ page }) => {
   await login(page);
-  await page.getByRole('link', { name: 'Settings' }).click();
+  await navigate(page, 'Settings');
   await page.getByLabel('Hard-bounce % threshold').fill('9');
 
   // Dismiss the confirm → stay on Rules.
@@ -57,7 +57,7 @@ test('dirty-state guard blocks tab switch until confirmed', async ({ page }) => 
 
 test('compliance: empty address blocks saving with the explanation', async ({ page }) => {
   await login(page);
-  await page.getByRole('link', { name: 'Settings' }).click();
+  await navigate(page, 'Settings');
   await page.getByRole('tab', { name: 'Compliance' }).click();
 
   await expect(page.getByRole('switch', { name: 'Include postal address' })).not.toBeChecked();
@@ -97,7 +97,7 @@ test('compliance: empty address blocks saving with the explanation', async ({ pa
 
 test('account tab changes the password', async ({ page }) => {
   await login(page);
-  await page.getByRole('link', { name: 'Settings' }).click();
+  await navigate(page, 'Settings');
   await page.getByRole('tab', { name: 'Account' }).click();
 
   // The email also lives in the top bar — scope to the tab content.

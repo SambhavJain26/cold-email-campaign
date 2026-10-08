@@ -1,13 +1,14 @@
-import { Bell } from 'lucide-react';
+import { Bell, CheckCheck } from 'lucide-react';
+import { toast } from 'sonner';
+import { Link } from 'react-router-dom';
 import type { AlertDto } from '@coldemail/shared';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
-import { ScrollArea } from '@/components/ui/scroll-area';
 import { cn } from '@/lib/utils';
 import { formatRelativeTime } from '@/lib/format';
 import { useAlerts } from '@/api/queries/alerts';
-import { useAckAlert } from '@/api/mutations/alerts';
+import { useAckAlert, useAckAllAlerts } from '@/api/mutations/alerts';
 
 /** Per-kind rendering (docs/15 F1.3): each alert kind gets a human line built
  *  from its payload; unknown kinds fall back to the kind slug. */
@@ -64,6 +65,7 @@ const SEVERITY_DOT: Record<AlertDto['severity'], string> = {
 export function AlertsBell() {
   const { data } = useAlerts(true); // unacked, 30s poll
   const ack = useAckAlert();
+  const clear = useAckAllAlerts();
   const alerts = data?.items ?? [];
 
   return (
@@ -77,22 +79,41 @@ export function AlertsBell() {
               variant="destructive"
               data-testid="alerts-count"
             >
-              {alerts.length}
+              {data?.total ?? alerts.length}
             </Badge>
           )}
         </Button>
       </PopoverTrigger>
       <PopoverContent align="end" className="w-[min(24rem,calc(100vw-1rem))] p-0">
-        <div className="border-b border-border px-3 py-2 text-sm font-medium">Alerts</div>
+        <div className="flex items-center justify-between gap-2 border-b border-border px-4 py-3">
+          <div>
+            <p className="text-sm font-semibold">Notifications</p>
+            <p className="text-xs text-muted-foreground">{data?.total ?? alerts.length} waiting</p>
+          </div>
+          <Button
+            size="sm"
+            variant="ghost"
+            disabled={!alerts.length || clear.isPending || data?.ack_through_id === undefined}
+            onClick={() =>
+              clear.mutate(data!.ack_through_id!, {
+                onSuccess: () => toast.success('Notifications cleared. Alert history retained.'),
+                onError: (error) => toast.error(error.message),
+              })
+            }
+          >
+            <CheckCheck className="size-4" />
+            {clear.isPending ? 'Clearing…' : 'Clear all notifications'}
+          </Button>
+        </div>
         {alerts.length === 0 ? (
           <p className="p-4 text-sm text-muted-foreground">Nothing needs attention.</p>
         ) : (
-          <ScrollArea className="max-h-96">
+          <div className="max-h-[min(24rem,60dvh)] overflow-y-auto overscroll-contain">
             <ul className="divide-y divide-border">
               {alerts.map((alert) => {
                 const { title, detail } = describe(alert);
                 return (
-                  <li key={alert.id} className="flex items-start gap-2 px-3 py-2">
+                  <li key={alert.id} className="flex items-start gap-3 px-4 py-3">
                     <span
                       className={cn(
                         'mt-1.5 size-2 shrink-0 rounded-full',
@@ -111,17 +132,22 @@ export function AlertsBell() {
                       variant="ghost"
                       size="sm"
                       className="shrink-0 text-xs"
-                      disabled={ack.isPending}
+                      disabled={ack.isPending || clear.isPending}
                       onClick={() => ack.mutate(alert.id)}
                     >
-                      Ack
+                      Clear
                     </Button>
                   </li>
                 );
               })}
             </ul>
-          </ScrollArea>
+          </div>
         )}
+        <div className="border-t border-border px-4 py-2">
+          <Link to="/system" className="text-xs text-muted-foreground underline underline-offset-4">
+            View alert history in System
+          </Link>
+        </div>
       </PopoverContent>
     </Popover>
   );

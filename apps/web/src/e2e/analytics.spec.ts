@@ -1,16 +1,16 @@
 // F7.6 — analytics 13a–13d against the golden fixtures, plus cold storage and
 // the recycle hash guard (docs/15 F7).
 import { expect, test, type Page } from '@playwright/test';
-import { login } from './helpers';
+import { login, navigate } from './helpers';
 
 async function openTab(page: Page, name: string) {
-  await page.getByRole('link', { name: 'Analytics' }).click();
+  await navigate(page, 'Analytics');
   await page.getByRole('tab', { name }).click();
 }
 
 test('13a variants: the golden split, winner on meetings, deactivate flow', async ({ page }) => {
   await login(page);
-  await page.getByRole('link', { name: 'Analytics' }).click();
+  await navigate(page, 'Analytics');
 
   await expect(page.getByTestId('variant-row-A')).toContainText('443');
   await expect(page.getByRole('region', { name: 'Eventual outcome' })).toContainText('10');
@@ -87,7 +87,7 @@ test('13d health: sparklines with thresholds and the watch-rule status', async (
 
 test('cold storage previews multi-source exclusions before confirmation', async ({ page }) => {
   await login(page);
-  await page.getByRole('link', { name: 'Cold Storage', exact: true }).click();
+  await navigate(page, 'Cold Storage');
   await expect(page.getByLabel('Cold Storage source campaign')).toContainText('Golden Pass 1');
   await page.getByLabel('Cold Storage source campaign').click();
   await page.getByRole('option', { name: 'Manual Send Fixture' }).click();
@@ -103,7 +103,7 @@ test('cold storage previews multi-source exclusions before confirmation', async 
   await page.getByRole('button', { name: 'Create campaign' }).click();
   await expect(page).toHaveURL(/\/campaigns\/\d+$/);
 
-  await page.getByRole('link', { name: 'Cold Storage', exact: true }).click();
+  await navigate(page, 'Cold Storage');
   await page.getByRole('button', { name: 'Recycle into campaign…' }).click();
   await page.getByText('Manual Send Fixture', { exact: true }).click();
   await page.getByLabel('Target campaign (draft only)').click();
@@ -121,7 +121,7 @@ test('recycling into a campaign with a new sequence succeeds', async ({ page }) 
   await login(page);
 
   // A genuinely different message for pass 2.
-  await page.getByRole('link', { name: 'Sequences' }).click();
+  await navigate(page, 'Sequences');
   await page.getByRole('button', { name: 'New Sequence' }).click();
   await page.getByLabel('Sequence name').fill('Listing automation angle');
   const step1 = page.getByTestId('step-card-1');
@@ -139,7 +139,7 @@ test('recycling into a campaign with a new sequence succeeds', async ({ page }) 
   await page.getByRole('option', { name: /Listing automation angle/ }).click();
   await page.getByRole('button', { name: 'Create campaign' }).click();
 
-  await page.getByRole('link', { name: 'Cold Storage', exact: true }).click();
+  await navigate(page, 'Cold Storage');
   await page.getByRole('button', { name: 'Recycle into campaign…' }).click();
   await page.getByText('Manual Send Fixture', { exact: true }).click();
   await page.getByLabel('Target campaign (draft only)').click();

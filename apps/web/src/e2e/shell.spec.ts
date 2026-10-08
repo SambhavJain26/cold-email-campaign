@@ -1,3 +1,4 @@
+import { navigate } from './helpers';
 // F1.5 — login → navigate all (still-empty) screens; shell behaviors.
 import { expect, test, type Page } from '@playwright/test';
 
@@ -25,7 +26,7 @@ const SCREENS = [
 test('every nav entry reaches its screen inside the shell', async ({ page }) => {
   await login(page);
   for (const [label, url] of SCREENS) {
-    await page.getByRole('link', { name: label }).click();
+    await navigate(page, label);
     await expect(page).toHaveURL(url);
     await expect(page.getByRole('heading', { name: label })).toBeVisible();
   }
@@ -37,7 +38,7 @@ test('the shared campaign selector is scoped to Overview', async ({ page }) => {
   await page.getByRole('option', { name: /Golden Pass 1/ }).click();
   await expect(page).toHaveURL(/\?campaign=1$/);
 
-  await page.getByRole('link', { name: 'Analytics' }).click();
+  await navigate(page, 'Analytics');
   await expect(page).toHaveURL(/\/analytics$/);
   await expect(page.getByRole('combobox', { name: 'Campaign', exact: true })).toHaveCount(0);
   await expect(page.getByRole('combobox', { name: 'Analytics campaign' })).toContainText(
@@ -74,7 +75,7 @@ test('alerts bell: failure fixtures show a badge; ack decrements it', async ({ p
   await expect(popover.getByText('Mailbox 3 authentication failed')).toBeVisible();
   await expect(popover.getByText(/never bursts/)).toBeVisible(); // catch-up copy
 
-  await page.getByRole('button', { name: 'Ack' }).first().click();
+  await page.getByRole('button', { name: 'Clear', exact: true }).first().click();
   await expect(badge).toHaveText('2');
 });
 
@@ -85,4 +86,18 @@ test('logout returns to /login and the guard holds', async ({ page }) => {
 
   await page.goto('/unibox');
   await expect(page).toHaveURL(/\/login$/);
+});
+
+test('Clear all notifications hides the current feed and preserves alert history', async ({
+  page,
+}) => {
+  await page.addInitScript(() => localStorage.setItem('mock:failures', '1'));
+  await login(page);
+  await page.getByRole('button', { name: 'Alerts', exact: true }).click();
+  await page.screenshot({ path: test.info().outputPath('notifications.png'), fullPage: true });
+  await page.getByRole('button', { name: 'Clear all notifications', exact: true }).click();
+  await expect(page.getByText('Nothing needs attention.')).toBeVisible();
+  await expect(page.getByTestId('alerts-count')).toHaveCount(0);
+  await page.getByRole('link', { name: 'View alert history in System' }).click();
+  await expect(page.getByRole('heading', { name: 'System', exact: true })).toBeVisible();
 });

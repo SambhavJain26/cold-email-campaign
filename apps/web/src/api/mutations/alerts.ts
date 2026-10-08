@@ -10,3 +10,14 @@ export function useAckAlert() {
     onSuccess: () => void qc.invalidateQueries({ queryKey: ['alerts'] }),
   });
 }
+export function useAckAllAlerts() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (throughId: number) =>
+      apiFetch('/alerts/ack-all', okResponseSchema, {
+        method: 'POST',
+        body: { through_id: throughId },
+      }),
+    onSuccess: () => void qc.invalidateQueries({ queryKey: ['alerts'] }),
+  });
+}

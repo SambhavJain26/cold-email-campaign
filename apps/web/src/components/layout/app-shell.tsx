@@ -25,6 +25,13 @@ import { TopBar } from './top-bar';
 import { TransportChip } from './transport-chip';
 import { AlertsBell } from './alerts-bell';
 import { UpdateAvailableBanner } from './update-available-banner';
+import { Button } from '@/components/ui/button';
+import {
+  DropdownMenu,
+  DropdownMenuTrigger,
+  DropdownMenuContent,
+  DropdownMenuItem,
+} from '@/components/ui/dropdown-menu';
 
 /** The walkthrough's 9 entries + System, with their docs/11 §2 glyphs. */
 const NAV: Array<{ to: string; icon: LucideIcon; label: string }> = [
@@ -69,6 +76,68 @@ function PrimaryNavigation({ onNavigate }: { onNavigate?: () => void }) {
   );
 }
 
+function DesktopNavigation() {
+  const location = useLocation();
+  const primary = ['/overview', '/leads', '/campaigns', '/unibox'];
+  const wide = ['/mailboxes', '/sequences', '/analytics'];
+  const secondary = NAV.filter((entry) => !primary.includes(entry.to));
+  return (
+    <nav aria-label="Primary" className="hidden min-w-0 items-center gap-1 md:flex">
+      <span className="mr-2 shrink-0 text-sm font-semibold">Cold Email</span>
+      {primary.concat(wide).map((path) => {
+        const entry = NAV.find((item) => item.to === path)!;
+        return (
+          <NavLink
+            key={path}
+            to={path}
+            className={({ isActive }) =>
+              cn(
+                'min-h-9 items-center rounded-md px-2 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
+                wide.includes(path) ? 'hidden 2xl:flex' : 'flex',
+                isActive
+                  ? 'bg-muted font-medium'
+                  : 'text-muted-foreground hover:bg-muted hover:text-foreground',
+              )
+            }
+          >
+            {entry.label}
+          </NavLink>
+        );
+      })}
+      <DropdownMenu>
+        <DropdownMenuTrigger asChild>
+          <Button
+            variant="ghost"
+            size="sm"
+            aria-label="More navigation"
+            className={
+              secondary.some((entry) => location.pathname.startsWith(entry.to))
+                ? 'font-semibold'
+                : ''
+            }
+          >
+            More
+          </Button>
+        </DropdownMenuTrigger>
+        <DropdownMenuContent align="start">
+          {secondary.map((entry) => (
+            <DropdownMenuItem
+              key={entry.to}
+              asChild
+              className={wide.includes(entry.to) ? '2xl:hidden' : ''}
+            >
+              <NavLink to={entry.to}>
+                <entry.icon className="size-4" />
+                {entry.label}
+              </NavLink>
+            </DropdownMenuItem>
+          ))}
+        </DropdownMenuContent>
+      </DropdownMenu>
+    </nav>
+  );
+}
+
 export function AppShell() {
   const [navigationOpen, setNavigationOpen] = useState(false);
   const navigationTriggerRef = useRef<HTMLButtonElement>(null);
@@ -88,12 +157,6 @@ export function AppShell() {
       >
         Skip to main content
       </a>
-      <aside className="hidden h-[100dvh] w-52 shrink-0 flex-col border-r border-border bg-sidebar md:flex">
-        <p className="shrink-0 px-4 py-4 text-sm font-semibold text-sidebar-foreground">
-          Cold Email
-        </p>
-        <PrimaryNavigation />
-      </aside>
       <Sheet open={navigationOpen} onOpenChange={setNavigation}>
         <SheetContent
           side="left"
@@ -116,6 +179,7 @@ export function AppShell() {
       </Sheet>
       <div className="flex min-w-0 flex-1 flex-col overflow-hidden">
         <TopBar
+          desktopNavigation={<DesktopNavigation />}
           onOpenNavigation={() => setNavigation(true)}
           navigationTriggerRef={navigationTriggerRef}
         />
