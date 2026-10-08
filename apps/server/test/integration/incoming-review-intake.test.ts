@@ -113,6 +113,16 @@ it('in-thread automation has independent labels and no human reply fact', async 
 });
 it('company-address suggestions do not create holds; reference conflicts stay needs linking', async () => {
   await ingestIncoming(db, store, message({ from: 'other@company.example' }), now);
+  const metadata = await readMessage(db, 1);
+  expect(metadata?.capture_status).toBe('unavailable');
+  expect(metadata?.body_text).toBeNull();
+  expect(metadata?.body_html).toBeNull();
+  expect(metadata?.new_text).toBeNull();
+  expect(metadata?.quoted_text).toBeNull();
+  expect(metadata?.snippet).toBeNull();
+  expect(
+    (await ingestIncoming(db, store, message({ from: 'other@company.example' }), now)).duplicate,
+  ).toBe(true);
   expect((await needsLinking(db, 1, 50)).total).toBe(1);
   expect(
     (await pool.query('SELECT review_hold_ids FROM enrollments')).rows.every(

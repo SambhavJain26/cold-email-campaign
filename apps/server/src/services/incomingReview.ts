@@ -133,7 +133,17 @@ export async function ingestIncoming(
       snippet: null,
       bodyText: null,
     });
-    await saveContent(tx, id, m, extracted.newText, extracted.quotedText);
+    // Keep only identity metadata for unrelated mailbox traffic; the operator's
+    // Unibox is limited to confidently matched lead conversations.
+    await saveContent(
+      tx,
+      id,
+      !bounce && !match.leadId
+        ? { ...m, bodyText: '', bodyHtml: undefined, contentStatus: 'unavailable' }
+        : m,
+      !bounce && !match.leadId ? '' : extracted.newText,
+      !bounce && !match.leadId ? '' : extracted.quotedText,
+    );
     await recordLocation(tx, m, id);
     const events: DomainEvent[] = legacyBounce?.events ?? [];
     if (!bounce && match.leadId) {

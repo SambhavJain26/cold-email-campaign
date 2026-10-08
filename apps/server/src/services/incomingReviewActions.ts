@@ -19,6 +19,8 @@ import { listByEnrollments } from '../db/repos/eventsRepo';
 import { getCampaign } from '../db/repos/campaignsRepo';
 import { loadSequenceDef } from '../db/repos/sequencesRepo';
 import { stepOf } from '../domain/sequence';
+import { findSentByMessageIds } from '../db/repos/sentMessagesRepo';
+import { getManualDraft } from '../db/repos/manualDraftsRepo';
 import { buildEvent, type DomainEvent } from '../domain/events';
 import {
   listRows,
@@ -109,7 +111,6 @@ export async function applyReviewAction(
       if (suppressed || e.currentState === 'UNSUBSCRIBED' || e.currentState === 'BOUNCED')
         conflict('This address is permanently protected from outreach.');
       if (body.action === 'correct_stop' || body.action === 'restore_legacy') {
-        if (!body.reason) validation('A correction reason is required.');
         if (!['STOPPED', 'REPLIED'].includes(e.currentState))
           conflict('Only a stopped or legacy replied sequence can be restored to review.');
         if (body.action === 'correct_stop' && !e.manualStopEventId)
@@ -130,23 +131,56 @@ export async function applyReviewAction(
             manualStop.attributes.sequence_fingerprint !== sequenceFingerprint(seq!))
         )
           conflict('The sequence changed after Stop. A compatible checkpoint cannot be verified.');
-        if (
-          body.action === 'restore_legacy' &&
-          history
-            .filter((fact) => fact.type === 'sent')
-            .some(
-              (fact) =>
-                fact.type === 'sent' &&
-                !stepOf(seq!, fact.stepNo)?.variants.some(
-                  (variant) =>
-                    variant.id === fact.attributes.variant_id &&
-                    variant.contentHash === fact.attributes.content_hash,
-                ),
-            )
-        )
-          conflict(
-            'The historical sent steps cannot be verified against the current sequence. Restoration is blocked.',
+        if (body.action === 'restore_legacy') {
+          const sends = history.filter((fact) => fact.type === 'sent');
+          const snapshots = await findSentByMessageIds(
+            tx,
+            sends.map((fact) => fact.messageId),
           );
+          for (const fact of sends) {
+            const priorStep = stepOf(seq!, fact.stepNo);
+            if (fact.attributes.content_source === 'personalized') {
+              const saved = snapshots.get(fact.messageId);
+              const copy = fact.attributes.personalized_copy_id
+                ? await getManualDraft(tx, fact.attributes.personalized_copy_id)
+                : undefined;
+              if (
+                priorStep?.contentSource !== 'personalized' ||
+                !saved ||
+                saved.enrollmentId !== e.id ||
+                saved.leadId !== e.leadId ||
+                saved.mailboxId !== fact.mailboxId ||
+                saved.stepNo !== fact.stepNo ||
+                saved.contentSource !== 'personalized' ||
+                saved.contentHash !== fact.attributes.content_hash ||
+                saved.personalizedCopyId !== fact.attributes.personalized_copy_id ||
+                !saved.renderedSubject?.trim() ||
+                !saved.renderedBodyText?.trim() ||
+                (saved.emailFormat !== 'plain_text' && !saved.renderedBodyHtml?.trim()) ||
+                !copy ||
+                copy.leadId !== e.leadId ||
+                copy.campaignId !== e.campaignId ||
+                copy.stepNo !== fact.stepNo ||
+                copy.sequenceStepId !== priorStep.id ||
+                copy.status !== 'sent' ||
+                copy.contentHash !== fact.attributes.content_hash
+              )
+                conflict(
+                  'The saved personalized email cannot be verified against this sequence. Nothing was restored.',
+                );
+            } else if (
+              priorStep?.contentSource === 'personalized' ||
+              !priorStep?.variants.some(
+                (variant) =>
+                  variant.id === fact.attributes.variant_id &&
+                  variant.contentHash === fact.attributes.content_hash,
+              )
+            )
+              conflict(
+                'The previously sent template no longer matches this sequence. Nothing was restored.',
+              );
+          }
+        }
         const siblings = await targetsForLead(tx, e.leadId);
         if (siblings.some((s) => s.id !== e.id && ['NEW', 'ACTIVE'].includes(s.current_state)))
           conflict(
@@ -185,7 +219,11 @@ export async function applyReviewAction(
               ...ids,
               attributes: {
                 blocker_event_ids: blockers,
-                reason: body.reason,
+                reason:
+                  body.reason ??
+                  (body.action === 'correct_stop'
+                    ? 'Operator confirmed correction of manual Stop.'
+                    : 'Operator confirmed restoration of legacy stop or reply.'),
                 resume_due_at: due.toISOString(),
                 operation_id: body.operation_id,
               },

@@ -282,9 +282,7 @@ it('Stop is campaign-specific; correction returns to review and keeps the checkp
   expect((await action(1, { action: 'stop' })).statusCode).toBe(200);
   expect((await action(2, { action: 'stop' })).statusCode).toBe(200);
   expect((await h.pool.query('SELECT * FROM suppressions')).rows).toHaveLength(0);
-  expect(
-    (await action(1, { action: 'correct_stop', reason: 'Clicked the wrong action.' })).statusCode,
-  ).toBe(200);
+  expect((await action(1, { action: 'correct_stop' })).statusCode).toBe(200);
   const row = (await rows()).find((r) => r.campaign_id === 1)!;
   expect(row.sending_state).toBe('held');
   expect(row.next_step).toBe(2);
@@ -517,7 +515,6 @@ it('legacy restoration is explicit, preserves the remaining step and restores on
   expect((await rows()).find((r) => r.campaign_id === 1)?.sending_state).toBe('stopped');
   const restore = await action(1, {
     action: 'restore_legacy',
-    reason: 'Reviewed the old away response. It was a temporary absence.',
   });
   expect(restore.statusCode).toBe(200);
   expect((await rows()).find((r) => r.campaign_id === 1)?.sending_state).toBe('held');
@@ -531,6 +528,103 @@ it('legacy restoration is explicit, preserves the remaining step and restores on
     ),
   ).toBe(1);
   expect(Number((await h.pool.query('SELECT count(*) FROM sent_messages')).rows[0].count)).toBe(1);
+});
+it.each([
+  ['valid saved copy', null, 200],
+  ['missing saved text', 'UPDATE sent_messages SET rendered_body_text=NULL', 409],
+  ['changed copy hash', "UPDATE campaign_personalized_copies SET content_hash='changed'", 409],
+  [
+    'changed step source',
+    "UPDATE sequence_steps SET content_source='template' WHERE step_no=1",
+    409,
+  ],
+  ['wrong snapshot copy', 'UPDATE sent_messages SET personalized_copy_id=NULL', 409],
+] as const)('personalized legacy restoration: %s', async (_label, breakEvidence, expected) => {
+  await h.reset();
+  await seedMailboxes(h.pool, 1);
+  await h.pool.query("INSERT INTO sequences(name) VALUES('Personalized')");
+  await h.pool.query(
+    "INSERT INTO sequence_steps(sequence_id,step_no,wait_days,in_thread,content_source) VALUES(1,1,0,false,'personalized'),(1,2,3,true,'personalized')",
+  );
+  await h.pool.query("INSERT INTO leads(email,tier) VALUES('lead@company.example','B')");
+  await h.pool.query("INSERT INTO campaigns(name,status,sequence_id) VALUES('Primary','paused',1)");
+  await h.pool.query(
+    "INSERT INTO enrollments(lead_id,campaign_id,personalization_mode,enrolled_at,assigned_mailbox_id) VALUES(1,1,'template_auto',now(),1)",
+  );
+  await h.pool.query(
+    "INSERT INTO campaign_personalized_copies(lead_id,campaign_id,step_no,sequence_step_id,subject,body,content_hash,status) VALUES(1,1,1,1,'Personal hello','Saved personal copy','personal-hash','sent')",
+  );
+  const sentAt = new Date(h.clock.now().getTime() - 86400000);
+  await h.services.store.append([
+    buildEvent.enrolled({ leadId: 1, campaignId: 1, enrollmentId: 1, occurredAt: sentAt }),
+    buildEvent.sent({
+      leadId: 1,
+      campaignId: 1,
+      enrollmentId: 1,
+      mailboxId: 1,
+      occurredAt: sentAt,
+      stepNo: 1,
+      messageId: '<personal@app.example>',
+      attributes: {
+        content_hash: 'personal-hash',
+        content_source: 'personalized',
+        personalized_copy_id: 1,
+      },
+    }),
+    buildEvent.outreachStopped({
+      leadId: 1,
+      campaignId: 1,
+      enrollmentId: 1,
+      occurredAt: h.clock.now(),
+      reason: 'Legacy incoming stop',
+      attributes: {
+        sender: 'lead@company.example',
+        matching_method: 'exact_address',
+        incoming_message_id: 1,
+        company_domain: null,
+      },
+    }),
+  ]);
+  await h.pool.query(
+    "INSERT INTO sent_messages(message_id,enrollment_id,lead_id,mailbox_id,step_no,content_hash,rendered_subject,rendered_body_text,email_format,content_source,personalized_copy_id,sent_at) VALUES('<personal@app.example>',1,1,1,1,'personal-hash','Personal hello','Immutable personal body','plain_text','personalized',1,$1)",
+    [sentAt],
+  );
+  await ingestIncoming(h.services.db, h.services.store, incoming(), h.clock.now());
+  if (breakEvidence) await h.pool.query(breakEvidence);
+  const sentBefore = (await h.pool.query('SELECT * FROM sent_messages')).rows;
+  const result = await action(1, { action: 'restore_legacy' });
+  expect(result.statusCode, result.body).toBe(expected);
+  expect((await rows())[0]?.sending_state).toBe(expected === 200 ? 'held' : 'stopped');
+  expect(
+    (await h.pool.query('SELECT current_step_no FROM enrollments WHERE id=1')).rows[0]
+      .current_step_no,
+  ).toBe(2);
+  expect((await h.pool.query('SELECT * FROM sent_messages')).rows).toEqual(sentBefore);
+  expect(
+    Number(
+      (await h.pool.query("SELECT count(*) FROM events WHERE type='outreach_stopped'")).rows[0]
+        .count,
+    ),
+  ).toBe(1);
+  if (expected === 200) {
+    expect(
+      (
+        await h.pool.query(
+          "SELECT attributes->>'reason' AS reason FROM events WHERE type='sequence_restored'",
+        )
+      ).rows[0].reason,
+    ).toContain('Operator confirmed');
+    const until = new Date(h.clock.now().getTime() + 7 * 86400000);
+    until.setUTCSeconds(0, 0);
+    const delay = await action(1, {
+      action: 'delay',
+      until: until.toISOString(),
+      timezone: 'UTC',
+      local_time: until.toISOString().slice(0, 16),
+    });
+    expect(delay.statusCode, delay.body).toBe(200);
+    expect((await rows())[0]?.sending_state).toBe('delayed');
+  }
 });
 it('linking a terminal enrollment preserves its history without an unresolvable pool hold', async () => {
   await action(1, { action: 'stop' });
