@@ -75,11 +75,32 @@ test('Stop is campaign-specific; correction returns to review', async ({ page })
   await page.getByRole('button', { name: 'Confirm Stop sequence' }).click();
   await expect(page.getByRole('button', { name: 'Restore to review', exact: true })).toBeVisible();
   await page.getByRole('button', { name: 'Restore to review', exact: true }).click();
-  await page.getByLabel('Correction reason').fill('Wrong action selected');
-  await page.getByRole('button', { name: 'Confirm Correct Stop' }).click();
+  await expect(page.getByLabel('Correction reason')).toHaveCount(0);
+  await page.getByRole('button', { name: 'Confirm', exact: true }).click();
   await expect(page.getByRole('region', { name: 'Message reader' })).toContainText(
     'Held for review',
   );
+});
+test('reader keeps sending actions clear and removes unrelated queues', async ({ page }) => {
+  await reader(page);
+  for (const name of [
+    'Needs linking',
+    'Unmatched emails',
+    'Reminders',
+    'My reminders',
+    'Remind me',
+    'Add reminder',
+    'Review or correct association',
+    'Check or change linked lead',
+  ]) {
+    await expect(page.getByRole('button', { name, exact: true })).toHaveCount(0);
+  }
+  await page.getByText('Email details', { exact: true }).click();
+  await expect(page.getByLabel('Who wrote this email?')).toBeVisible();
+  await expect(
+    page.getByText('This choice does not change when emails are sent.', { exact: false }),
+  ).toBeVisible();
+  await page.screenshot({ path: test.info().outputPath('simplified-unibox.png'), fullPage: true });
 });
 test('Suppression has typed confirmation and ordinary Continue remains unavailable', async ({
   page,
@@ -119,9 +140,7 @@ test('HTML reader executes no scripts and loads no remote resources', async ({ p
   expect(external).toEqual([]);
   expect(await page.evaluate(() => 'emailScriptRan' in window)).toBe(false);
 });
-test('campaign search and company-address linking do not hide unmatched messages', async ({
-  page,
-}) => {
+test('campaign search stays focused on matched leads', async ({ page }) => {
   await reader(page);
   await page.getByLabel('Search leads').fill('missing-address');
   await expect(page.getByText('No leads in this view.', { exact: false })).toBeVisible();
@@ -129,15 +148,6 @@ test('campaign search and company-address linking do not hide unmatched messages
   await expect(
     page.getByRole('button', { name: 'Open Alex Rivera in Golden Pass 1' }),
   ).toBeVisible();
-  await page.getByRole('button', { name: 'Needs linking', exact: true }).click();
-  await page.getByRole('button', { name: /other@apex.example/ }).click();
-  await expect(page.getByText('Association needs review.', { exact: false })).toBeVisible();
-  await page.getByRole('button', { name: 'Mark unrelated', exact: true }).click();
-  await expect(
-    page.getByText('Marked unrelated. No outreach state', { exact: false }),
-  ).toBeVisible();
-  await page.getByRole('button', { name: '✓ Acknowledge', exact: true }).click();
-  await expect(page.getByText('Acknowledged', { exact: true }).first()).toBeVisible();
 });
 test('phone reader is a dedicated usable view with Back navigation', async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 760 });
@@ -149,17 +159,6 @@ test('phone reader is a dedicated usable view with Back navigation', async ({ pa
   await page.getByRole('button', { name: 'Cancel', exact: true }).click();
   await page.getByRole('button', { name: '← Back to leads' }).click();
   await expect(page.getByRole('region', { name: 'Lead review list' })).toBeVisible();
-});
-test('operator reminder is independent of the review hold', async ({ page }) => {
-  await reader(page);
-  await page.getByRole('button', { name: 'Add reminder', exact: true }).click();
-  await page.getByLabel('Reminder due date').fill('2026-12-01');
-  await page.getByLabel('Reminder note').fill('Review manually next month');
-  await page.getByRole('button', { name: 'Save reminder' }).click();
-  await expect(page.getByText('Reminder saved. Outreach state unchanged.')).toBeVisible();
-  await expect(page.getByRole('region', { name: 'Message reader' })).toContainText(
-    'Held for review',
-  );
 });
 test('Personalized Copy saves a lead source and exposes no direct-send action', async ({
   page,

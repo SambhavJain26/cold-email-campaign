@@ -21,9 +21,7 @@ import { apiFetch } from '@/api/client';
 import { formatDateTime } from '@/lib/format';
 import { SafeMessage } from './safe-message';
 import { ReviewActions } from './review-actions';
-import { LinkMessage } from './review-link';
 import { RecoverContent } from './recover-content';
-import { ReviewReminder } from './review-reminder';
 
 export function sendingLabel(row: IncomingReviewRow): string {
   switch (row.sending_state) {
@@ -311,59 +309,23 @@ export function ReviewReader({
               Acknowledgement changes visibility only. It does not continue, stop, suppress, delay
               or delete.
             </p>
-            <div className="space-y-2">
-              <label htmlFor="authorship-picker" className="text-sm font-medium">
-                Confirm authorship for analytics
-              </label>
-              <Select
-                value={selected.authorship}
-                disabled={
-                  mutation.isPending ||
-                  (selected.primary_enrollment_id === null &&
-                    !selected.history.some((h) => h.kind === 'linked'))
-                }
-                onValueChange={(authorship) =>
-                  mutation.mutate(
-                    {
-                      path: `/unibox/messages/${selected.id}/authorship`,
-                      result: 'message',
-                      body: {
-                        operation_id: crypto.randomUUID(),
-                        expected_revision: selected.revision,
-                        authorship,
-                      },
-                    },
-                    { onError: (error) => toast.error(error.message) },
-                  )
-                }
-              >
-                <SelectTrigger id="authorship-picker" className="w-full sm:w-56">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="human">Human</SelectItem>
-                  <SelectItem value="automatic">Automatic</SelectItem>
-                  <SelectItem value="unsure">Unsure</SelectItem>
-                </SelectContent>
-              </Select>
-              <p className="text-xs text-muted-foreground">
-                No automation detected does not verify human authorship. Linking and acknowledgement
-                do not create human-reply credit.
+            <details className="space-y-3">
+              <summary className="cursor-pointer text-sm font-medium">Email details</summary>
+              <p className="text-sm text-muted-foreground">
+                Optional: decide whether this counts as a human reply.
               </p>
-            </div>
-            <LinkMessage message={selected} initialCampaignId={row.campaign_id} />
-            {row.enrollment_id === selected.primary_enrollment_id && (
-              <ReviewReminder messageId={selected.id} />
-            )}
-            {selected.authorship === 'human' && (
               <div className="space-y-2">
-                <label htmlFor="sentiment-picker" className="text-sm font-medium">
-                  Confirmed reply sentiment
+                <label htmlFor="authorship-picker" className="text-sm font-medium">
+                  Who wrote this email?
                 </label>
                 <Select
-                  value={selected.sentiment ?? 'none'}
-                  disabled={mutation.isPending}
-                  onValueChange={(sentiment) =>
+                  value={selected.authorship}
+                  disabled={
+                    mutation.isPending ||
+                    (selected.primary_enrollment_id === null &&
+                      !selected.history.some((h) => h.kind === 'linked'))
+                  }
+                  onValueChange={(authorship) =>
                     mutation.mutate(
                       {
                         path: `/unibox/messages/${selected.id}/authorship`,
@@ -371,55 +333,93 @@ export function ReviewReader({
                         body: {
                           operation_id: crypto.randomUUID(),
                           expected_revision: selected.revision,
-                          authorship: 'human',
-                          sentiment: sentiment === 'none' ? null : sentiment,
+                          authorship,
                         },
                       },
                       { onError: (error) => toast.error(error.message) },
                     )
                   }
                 >
-                  <SelectTrigger id="sentiment-picker" className="w-full sm:w-56">
+                  <SelectTrigger id="authorship-picker" className="w-full sm:w-56">
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="none">Not tagged</SelectItem>
-                    <SelectItem value="positive">Positive</SelectItem>
-                    <SelectItem value="neutral">Neutral</SelectItem>
-                    <SelectItem value="negative">Negative</SelectItem>
+                    <SelectItem value="human">A person</SelectItem>
+                    <SelectItem value="automatic">An automatic response</SelectItem>
+                    <SelectItem value="unsure">Not sure</SelectItem>
                   </SelectContent>
                 </Select>
-                {row.enrollment_id === selected.primary_enrollment_id && row.enrollment_id && (
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    onClick={() =>
+                <p className="text-xs text-muted-foreground">
+                  Choose “A person” to count this in human-reply statistics. This choice does not
+                  change when emails are sent.
+                </p>
+              </div>
+              {selected.authorship === 'human' && (
+                <div className="space-y-2">
+                  <label htmlFor="sentiment-picker" className="text-sm font-medium">
+                    Confirmed reply sentiment
+                  </label>
+                  <Select
+                    value={selected.sentiment ?? 'none'}
+                    disabled={mutation.isPending}
+                    onValueChange={(sentiment) =>
                       mutation.mutate(
-                        { path: `/enrollments/${row.enrollment_id}/meeting-booked`, body: {} },
                         {
-                          onSuccess: () =>
-                            toast.success('Meeting recorded. Outreach state unchanged.'),
-                          onError: (error) => toast.error(error.message),
+                          path: `/unibox/messages/${selected.id}/authorship`,
+                          result: 'message',
+                          body: {
+                            operation_id: crypto.randomUUID(),
+                            expected_revision: selected.revision,
+                            authorship: 'human',
+                            sentiment: sentiment === 'none' ? null : sentiment,
+                          },
                         },
+                        { onError: (error) => toast.error(error.message) },
                       )
                     }
                   >
-                    Record meeting booked
-                  </Button>
-                )}
-              </div>
-            )}
-            <details>
-              <summary className="cursor-pointer text-sm text-muted-foreground">
-                Message activity
-              </summary>
-              <ol className="mt-3 space-y-2">
-                {selected.history.map((h) => (
-                  <li key={h.id} className="text-xs">
-                    {formatDateTime(h.occurred_at)} · {h.kind.replaceAll('_', ' ')}
-                  </li>
-                ))}
-              </ol>
+                    <SelectTrigger id="sentiment-picker" className="w-full sm:w-56">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="none">Not tagged</SelectItem>
+                      <SelectItem value="positive">Positive</SelectItem>
+                      <SelectItem value="neutral">Neutral</SelectItem>
+                      <SelectItem value="negative">Negative</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  {row.enrollment_id === selected.primary_enrollment_id && row.enrollment_id && (
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() =>
+                        mutation.mutate(
+                          { path: `/enrollments/${row.enrollment_id}/meeting-booked`, body: {} },
+                          {
+                            onSuccess: () =>
+                              toast.success('Meeting recorded. Outreach state unchanged.'),
+                            onError: (error) => toast.error(error.message),
+                          },
+                        )
+                      }
+                    >
+                      Record meeting booked
+                    </Button>
+                  )}
+                </div>
+              )}
+              <details>
+                <summary className="cursor-pointer text-sm text-muted-foreground">
+                  Message activity
+                </summary>
+                <ol className="mt-3 space-y-2">
+                  {selected.history.map((h) => (
+                    <li key={h.id} className="text-xs">
+                      {formatDateTime(h.occurred_at)} · {h.kind.replaceAll('_', ' ')}
+                    </li>
+                  ))}
+                </ol>
+              </details>
             </details>
           </article>
         </>

@@ -8,7 +8,6 @@ import {
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Textarea } from '@/components/ui/textarea';
 import {
   Dialog,
   DialogContent,
@@ -39,9 +38,9 @@ const EXPLANATION: Record<Action, string> = {
   delay:
     'Preserve sequence progress and saved retry bodies. Resume eligibility is no earlier than this continuation time and the existing due time. Campaign status, caps, windows and suppression still apply.',
   correct_stop:
-    'Append a correction of the manual Stop. Restore the saved checkpoint to Held for review. A second confirmed Continue or Delay action is required.',
+    'Return this stopped sequence to Held for review, keeping its progress. Then choose Continue or Delay. This confirmation does not send an email.',
   restore_legacy:
-    'Review the historical stop or reply reason before restoring. The backend verifies a safe remaining step and checkpoint. Restoration returns to Held for review; it does not send or continue automatically.',
+    'Return this previously stopped sequence to Held for review, keeping the next unsent email. Then choose Continue or Delay. This confirmation does not send an email.',
   delete:
     'Permanently remove this message’s stored text, HTML, quotations and preview from the application. The mailbox copy, sent history, sending state and suppression remain.',
 };
@@ -62,7 +61,6 @@ export function ReviewActions({
 }) {
   const [action, setAction] = useState<Action | null>(null);
   const [confirm, setConfirm] = useState('');
-  const [reason, setReason] = useState('');
   const [localTime, setLocalTime] = useState('');
   const [zone, setZone] = useState(Intl.DateTimeFormat().resolvedOptions().timeZone);
   const mutation = useIncomingMutation();
@@ -95,9 +93,7 @@ export function ReviewActions({
       ? confirm !== (snapshot?.row.email ?? row.email)
       : action === 'delay'
         ? !resolution.instant || new Date(resolution.instant) <= new Date()
-        : action === 'restore_legacy' || action === 'correct_stop'
-          ? !reason.trim()
-          : false;
+        : false;
   const open = (next: Action) => {
     setSnapshot({
       row,
@@ -107,7 +103,6 @@ export function ReviewActions({
       history: [...history],
     });
     setConfirm('');
-    setReason('');
     mutation.reset();
     setAction(next);
   };
@@ -136,7 +131,6 @@ export function ReviewActions({
                 ...(action === 'delay'
                   ? { until: resolution.instant, timezone: zone, local_time: localTime }
                   : {}),
-                ...(reason ? { reason } : {}),
               },
             }
           : action === 'continue'
@@ -228,6 +222,12 @@ export function ReviewActions({
           </Button>
         )}
       </div>
+      {row.sending_state === 'stopped' && (
+        <p className="text-sm text-muted-foreground">
+          This sequence is stopped. Restore to review first, then choose Continue or Delay.
+          Restoration keeps your progress and does not send an email.
+        </p>
+      )}
       {row.sending_state === 'held' && (
         <p className="text-xs text-muted-foreground">
           Review the relevant messages before Continue or Delay. Acknowledge is available after an
@@ -343,20 +343,14 @@ export function ReviewActions({
                 {snapshot?.row.assigned_mailbox_id
                   ? `Mailbox ${snapshot.row.assigned_mailbox_id}`
                   : 'Not assigned'}
-                . Saved checkpoint:{' '}
+                . Next follow-up eligible from:{' '}
                 {snapshot?.row.resume_due_at || snapshot?.row.next_send_at
                   ? new Date(
                       snapshot.row.resume_due_at || snapshot.row.next_send_at!,
                     ).toLocaleString()
-                  : 'Reconstructed from accepted sends and retry history if safe'}
+                  : 'Calculated from the last email sent'}
                 .
               </p>
-              <Label htmlFor="restore-reason">Correction reason</Label>
-              <Textarea
-                id="restore-reason"
-                value={reason}
-                onChange={(event) => setReason(event.target.value)}
-              />
               <p className="text-xs text-muted-foreground">
                 Historical events remain intact. Suppressed and bounced addresses cannot be
                 restored.
@@ -377,7 +371,11 @@ export function ReviewActions({
               disabled={invalid || mutation.isPending}
               onClick={submit}
             >
-              {mutation.isPending ? 'Confirming…' : `Confirm ${action ? LABEL[action] : ''}`}
+              {mutation.isPending
+                ? 'Confirming…'
+                : action === 'correct_stop' || action === 'restore_legacy'
+                  ? 'Confirm'
+                  : `Confirm ${action ? LABEL[action] : ''}`}
             </Button>
           </DialogFooter>
         </DialogContent>
