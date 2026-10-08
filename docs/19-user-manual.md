@@ -1,8 +1,9 @@
 # Cold Email Campaign — Complete User Manual
 
-## Incoming review candidate: operator workflow (2026-10-08; local only)
+## Incoming review: operator workflow (2026-10-08)
 
-These controls are implemented in the local candidate; they are not yet on the live release.
+The core controls are deployed. The personalized-restoration and plain-language UI follow-up
+is locally implemented and verified, pending separate deployment.
 The older reply/disposition/unsuppression sections below describe historical behavior.
 
 Open Unibox, choose All campaigns or one campaign, and search a lead's name, email or company.
@@ -23,9 +24,15 @@ an outreach decision first. All/Acknowledged keeps them searchable; Return to re
 visibility only. New incoming messages are never covered by an older acknowledgement.
 Human/Automatic/Unsure confirmation controls new reply metrics, separately from all sending actions.
 
-Needs linking surfaces fresh/conflicting messages; company matches are suggestions, not automatic
-stops. Search a campaign's enrolled/pool leads to confirm a link, or mark unrelated traffic.
-Relinking never silently releases earlier holds. Delete stored content removes only application
+The operator's follow-up removes Reminders and Needs linking from Unibox, leaving Needs review,
+All and Acknowledged. Reminder/link-correction buttons are removed from the reader. Unmatched
+mailbox traffic has no new body, HTML or preview saved; minimal identity metadata prevents duplicate
+processing. Existing records remain intact. Email details contains the optional “Who wrote this
+email?” control for reply statistics. Delay controls automated follow-up scheduling.
+Restoration and accidental Stop correction require a simple Confirm, without a reason field.
+Personalized restoration checks the saved sent message and matching campaign copy, not a
+template variant. It returns to Held for review and preserves the next unsent step.
+Legacy relinking never silently releases earlier holds. Delete stored content removes only application
 text/HTML/preview, retaining mailbox copies, identifiers, audit, suppression and sending history.
 Eligible acknowledged content defaults to cleanup after 30 days, configurable or disabled;
 unresolved linking and relevant holds prevent cleanup. Existing backups can retain old content.

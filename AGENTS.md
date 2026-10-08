@@ -19,6 +19,19 @@ call planned work implemented.
 
 ## Current operating boundary
 
+- **2026-10-08 personalized restoration and Unibox simplification — verified locally:** the
+  operator removed Reminders/Needs linking and reminder/link-correction reader controls from
+  current UI scope. New unmatched mailbox traffic retains minimal identity metadata without
+  saved body/HTML/extracted text/preview; preserve existing records and compatibility APIs.
+  Personalized restoration verifies the saved sent snapshot and campaign copy rather than
+  template variants. Restore/correct Stop uses a simple Confirm, without a user-entered reason;
+  a standard confirmation fact retains ledger compatibility. Restore only to review, never
+  automatically continue or send. Local commits `6bbbbdc`, `50e2218` and retry provenance
+  `b9aed65`; focused/full gates,
+  locked golden exactly 47 and nine-enrollment zero drift/self-check pass. See docs/17 and docs/24.
+  This follow-up is not pushed/deployed. Further rollout requires explicit approval; do not
+  restore/resume/enroll/send or delete existing records as part of it.
+
 - **2026-10-08 incoming review/Unibox deployment — verified:** operator explicitly authorized
   push/deploy and pausing Campaign 3. Application `8e65e46` is deployed on `canary`; all 33
   migrations, healthy services/public routes, authenticated Unibox/navigation/notifications,

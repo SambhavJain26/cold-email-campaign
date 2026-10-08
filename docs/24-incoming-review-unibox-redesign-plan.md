@@ -6,9 +6,19 @@ from a checked implementation item: verified evidence belongs in docs/17.
 
 ## Authorization and settled decisions
 
-**Deployment checkpoint:** the operator subsequently authorized push/deploy. Candidate `84403e4`
-is pushed, but fresh production Campaign 3 is active. Explicit pause approval is pending; do not
-restart/deploy until it is received. See docs/17 for prechecks/backups and current operating status.
+**2026-10-08 operator follow-up supersedes the original extra UI scope:** remove Reminders and
+Needs linking from Unibox and remove reminder/link-correction buttons from the reader. Keep the
+three lead views: Needs review, All and Acknowledged. Do not capture new unmatched mailbox bodies,
+HTML, extracted text or previews; retain minimal identity/location metadata for deduplication.
+Existing records, events and old compatibility APIs remain intact; no bulk deletion is authorized.
+Restoration and Stop correction use a simple Confirm with no correction-reason input.
+Personalized legacy restoration verifies saved personalized-copy/sent evidence rather than
+template variants. Reply-count confirmation remains optional under Email details with plain copy.
+This follow-up is local implementation; a fresh deployment remains separately authorized.
+
+**Deployment checkpoint:** application `8e65e46` was explicitly authorized and deployed after
+confirmed Campaign 3 pause approval. Campaigns 2/3 remain paused. See docs/17 for verified evidence.
+The personalized-restoration/usability follow-up is local work until separately deployed.
 The local-only restrictions below describe the original implementation authorization.
 
 - Work on `canary`, commit completed tasks, preserve unrelated changes.
@@ -211,7 +221,7 @@ Migrations never release existing STOPPED/REPLIED/BOUNCED/COMPLETED/UNSUBSCRIBED
 guards remain until explicit review; bounce/suppression never restorable, exhausted sequences never
 restart. Unfinished work retains schedule; new intake uses review policy.
 
-Restoration previews history/remaining step/mailbox, requires confirmation and reason, rejects
+Restoration previews history/remaining step/mailbox, requires a simple confirmation, rejects
 suppression/bounce/erasure/exhaustion/incompatible sequence/missing retries/conflicting unfinished
 enrollment, references blockers, restores to hold, then requires second Continue/Delay. Reconstruct
 legacy due timestamp from accepted send/wait/retry; unsafe reconstruction fails closed. Keep unique
@@ -283,6 +293,14 @@ verification. Estimates are not delivery commitments; live operations outside au
 
 ## Implementation checkpoint / change log
 
+- 2026-10-08 operator simplification follow-up: backend `6bbbbdc` and UI `50e2218` implement
+  the revised scope recorded at the top of this specification. Personalized restoration uses
+  saved personalized evidence, confirmation has no reason input, extra queues/buttons are
+  removed, and new unmatched bodies are not captured. Unit 413, web 71, full API 172 plus final
+  focused API 25 (including old retry provenance), intake integration 8, focused browser 11 and locked golden 47 pass.
+  Populated local nine-enrollment zero drift/self-check and real-mode subpath build pass.
+  This is a verified local follow-up; no new deployment or live lead/content action occurred.
+
 - 2026-10-08 IST deployment completed under explicit push/deploy and Campaign 3 pause approval:
   application `8e65e46`, all 33 migrations, authenticated Unibox/top navigation/notification UI,
   healthy services/routes, 187-enrollment zero drift/self-check and validated paused pre/post
@@ -311,7 +329,8 @@ verification. Estimates are not delivery commitments; live operations outside au
   explicit recontact until resolved; future enrollment still requires the existing explicit flag.
 - Manual Stop records a sequence fingerprint. Correction rejects changed sequences; historical
   restoration requires verifiable sent-step variants/hashes and otherwise fails closed. Existing
-  personalized histories lacking compatible evidence can therefore be ineligible for restoration.
+  personalized histories use their saved sent snapshot and campaign copy identifiers/hashes,
+  rather than template variant IDs. Missing/incompatible personalized evidence still blocks.
 - Message-ID is a nonunique index after migration 0032 so conflicting envelopes can surface rather
   than wedge polling. Equivalent envelopes remain canonical under the shared identity lock.
 - Primary-link corrections preserve previously confirmed authorship while moving campaign credit

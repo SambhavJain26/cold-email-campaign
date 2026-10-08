@@ -1,5 +1,59 @@
 # Local canary runbook (B8.3-local) — two-week validation on throwaway Gmail
 
+## 2026-10-08 IST personalized restoration and simpler Unibox — verified local follow-up
+
+The operator reported Debra's historical restoration failing and requested that personalized
+copy work without a correction-reason field. The old verifier compared every sent fact against
+template variants, while personalized sent facts deliberately omit variant IDs. Read-only
+production metadata confirms all eight legacy-stopped Campaign 3 enrollments (including Debra,
+143) have matching saved personalized-copy/sent evidence. No restoration or other live action
+was performed during that inspection.
+
+Backend `6bbbbdc` verifies personalized facts using exact Message-ID, enrollment/lead/mailbox/
+step, stored source, personalized-copy ID and content hash, readable immutable body, and the
+corresponding sent campaign copy bound to the current sequence step. Missing or mismatched
+evidence still blocks restoration. Template compatibility, suppression/bounce/erasure, conflicting
+unfinished enrollment and retry/checkpoint guards remain. Restoration preserves the next unsent
+step and returns only to review; a separate Continue/Delay is required. The user-entered reason
+is optional for compatibility and absent from UI; the server appends a standard confirmation
+reason to the existing event shape without rewriting past facts.
+Retry follow-up `b9aed65`: older facts that omit the copy ID use the exact saved retry message's copy ID only when
+an earlier accepted personalized fact anchors that same step/copy/hash. Missing provenance
+still blocks; historical facts are not backfilled or edited. The final expanded API suite
+covers both valid retries and missing-provenance rejection.
+
+The operator explicitly removed Reminders and Needs linking from current Unibox scope.
+UI `50e2218` has only Needs review, All and Acknowledged, removes reminder/link-correction
+reader controls, explains disabled actions on stopped sequences and uses a simple Confirm
+for restoration/correction. Optional reply-count confirmation is under Email details with
+“Who wrote this email?” and plain choices. No reminder or unmatched-list queries run from
+the simplified page. Existing records and compatibility APIs are retained, without bulk deletion.
+New unmatched traffic stores minimal identity/location metadata and unavailable content status;
+no body, HTML, extracted new/quoted text or snippet is retained. Deduplication/cursors remain
+intact. Matched lead responses, opt-outs and technical bounce handling retain their protection.
+
+Verified gates:
+
+- Typecheck, lint, formatting and diff whitespace pass.
+- Unit **413/413**, web **71/71**.
+- Full API **172/172** after restoration changes; final focused incoming-review API **25/25**
+  after the unmatched-content refinement, including personalized restoration and Delay,
+  rejected missing/mismatched evidence, no reason, preserved history/progress and no new send.
+- Final intake integration **8/8**, including no unmatched content and duplicate prevention.
+- Locked golden **47/47**, unchanged cohort and fixtures, run serially after other DB suites.
+- Final focused browser **11/11**, including no extra queues/buttons, simple correction,
+  reader/search/mobile, acknowledgement, suppression and safe HTML. Screenshot:
+  `apps/web/test-results/unibox-reader-keeps-sendin-0019f-nd-removes-unrelated-queues-chromium/simplified-unibox.png`.
+- Real-mode production web build with `/email-campaign/` passes; existing large-chunk warning remains.
+- Canonical dry-run on the separate populated local verification database checks **9 enrollments
+  — 0 diff(s)**; self-check clean.
+
+No schema migration/new event vocabulary or transport change is introduced. No push, deployment,
+live restoration/replay/content deletion/acknowledgement/enrollment/resume/send occurred.
+Production remains the separately verified release below. This follow-up needs fresh rollout
+authorization, paused-state/settings/watermark checks, preserved independent deletion manifest
+and validated pre/post backups. Never initialize over its existing manifest or resume campaigns.
+
 ## 2026-10-08 IST incoming review/Unibox — verified production deployment
 
 The operator explicitly authorized push/deploy and then pausing Campaign 3. The guarded

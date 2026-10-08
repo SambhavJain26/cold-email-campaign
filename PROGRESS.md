@@ -4,6 +4,13 @@
 
 **Legend:** `[ ]` not started · `[~]` in progress · `[x]` done · `[!]` blocked (note why in the log)
 
+**2026-10-08 operator follow-up:** [x] personalized restoration now uses saved personalized
+evidence; restoration/correction has simple Confirm without a reason. Removed Reminders,
+Needs linking and reader reminder/link controls. Unmatched bodies/HTML/previews are no longer
+captured prospectively. Local backend `6bbbbdc` and UI `50e2218` are verified; golden 47,
+unit 413, web 71, API 172/full plus 25/final focused, intake integration 8 and browser 11 pass.
+Nine-enrollment zero drift/self-check passes. Not pushed/deployed; evidence in docs/17.
+
 **2026-10-08 incoming review deployment:** [x] explicitly authorized, pushed and deployed
 application `8e65e46`. Campaign 3 was explicitly authorized to pause; Campaigns 2/3 remain paused,
 automatic enrollment off. All 33 migrations, healthy routes/services, authenticated new UI,
