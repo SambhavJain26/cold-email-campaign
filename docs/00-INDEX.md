@@ -15,9 +15,10 @@ direct alias hosting is prepared in `deploy/spaceship/host-Caddyfile.fragment` a
 
 ## Document map
 
-Approved local implementation specification: [Incoming review and Unibox redesign](24-incoming-review-unibox-redesign-plan.md).
-Its prospective review policy supersedes the older company/human stopping excerpts for the local
-candidate. Production retains the last separately deployed behavior until an authorized rollout.
+Implemented specification: [Incoming review and Unibox redesign](24-incoming-review-unibox-redesign-plan.md).
+Its prospective review policy supersedes older company/human stopping excerpts. Application
+`8e65e46` is deployed under explicit authorization; verified evidence and continuing operational
+boundaries are in docs/17. Historical terminal behavior remains preserved.
 
 | #   | File                                                                                     | What it covers                                                                                                                                                           | Read before starting                      |
 | --- | ---------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ----------------------------------------- |

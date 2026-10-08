@@ -4,9 +4,11 @@
 
 **Legend:** `[ ]` not started · `[~]` in progress · `[x]` done · `[!]` blocked (note why in the log)
 
-**2026-10-08 incoming review deployment:** [~] push/deploy authorized; candidate `84403e4`
-pushed. Fresh production Campaign 3 is active; explicit pause permission requested and pending.
-No restart or rollout yet. Pre-backup, bundle and fresh 187-enrollment zero drift are in docs/17.
+**2026-10-08 incoming review deployment:** [x] explicitly authorized, pushed and deployed
+application `8e65e46`. Campaign 3 was explicitly authorized to pause; Campaigns 2/3 remain paused,
+automatic enrollment off. All 33 migrations, healthy routes/services, authenticated new UI,
+187-enrollment zero drift/self-check and validated pre/post backups pass. Operational snapshot
+remains 649 events / 222 sends. Manifest bootstrap/restore safeguards and evidence are in docs/17.
 
 **2026-10-08 incoming review/Unibox redesign:** [x] implemented and verified locally, including
 review holds/permanent opt-outs, campaign actions, readable grouped Unibox, acknowledgement,
@@ -14,7 +16,7 @@ content retention/recovery, confirmed-human metrics, top navigation and Clear al
 All stages in docs/24 are complete; full evidence and release/restore prerequisites are in docs/17.
 Type/lint/format, unit 413, web 71, integration 208, API 167, GreenMail 31, golden exactly 47,
 mock browser 71 and real browser 4 pass; populated nine-enrollment zero drift/self-check and
-backup restore pass. Subsequent push/deploy authorization is tracked above; no deployment yet.
+backup restore pass. Subsequent authorized production deployment is verified above.
 
 **2026-10-08 IST separately authorized signature/range/alias deployment:** [x] `cd83228` pushed
 and deployed; all 28 migrations, healthy services/public routes/direct website aliases pass.

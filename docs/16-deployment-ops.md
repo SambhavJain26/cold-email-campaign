@@ -1,9 +1,12 @@
 # Deployment & Operations
 
-## Incoming review release boundary and restore requirements (local candidate)
+## Incoming review release boundary and restore requirements (deployed)
 
-This feature is not deployed. No push or production operation is authorized by local
-implementation. A future explicit rollout must coordinate API/worker/UI and migrations 0028–0032,
+Application `8e65e46` was explicitly authorized, pushed and deployed on 2026-10-08 IST,
+including a separately confirmed Campaign 3 pause. All 33 migrations, healthy services/routes,
+authenticated UI, 187-enrollment zero drift/self-check and validated pre/post backups pass.
+Campaigns 2/3 remain paused, automatic enrollment off; watermarks remain 649 events / 222 sends.
+Future explicit rollouts must coordinate API/worker/UI and migrations,
 verify paused campaigns/settings/watermarks and validated backups, and leave campaigns paused.
 Do not roll back to a binary that ignores review controls or prospective events.
 
@@ -11,7 +14,9 @@ The app has an independent incoming_deletions volume at
 /var/lib/coldemail/incoming-deletions/manifest.jsonl. Before an authorized first deployment,
 explicitly initialize an empty manifest only after verifying that no incoming-content deletion
 history exists; thereafter retain and independently back up the latest manifest. Production
-startup refuses a missing/corrupt file before starting workers or serving API content. Deletion
+startup refuses a missing/corrupt file before starting workers or serving API content. The first
+deployment explicitly bootstrapped an empty manifest after verifying the old schema had no
+deletion history; this is complete and must not be repeated as a restore shortcut. Deletion
 intents are fsynced before database tombstones commit; a failed transaction may conservatively
 remove the content on restart.
 

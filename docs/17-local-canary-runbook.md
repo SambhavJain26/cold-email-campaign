@@ -1,6 +1,60 @@
 # Local canary runbook (B8.3-local) — two-week validation on throwaway Gmail
 
-## 2026-10-08 IST incoming review push/deploy — prechecks pass, pause approval pending
+## 2026-10-08 IST incoming review/Unibox — verified production deployment
+
+The operator explicitly authorized push/deploy and then pausing Campaign 3. The guarded
+authenticated Campaigns action paused it; SQL confirmed Campaigns 2/3 paused and automatic
+enrollment off. The app stopped gracefully before the stable snapshot and backup. Production
+fast-forwarded from `cd83228` to application `8e65e46` through a verified incremental Git bundle
+(SHA-256 `dea660f8e01a7fcf8dedaaad4d579fb1ac03528ab75f721d21ebe5605d3fa6b7`).
+The coherent Linux API/worker/UI build completed with production pruning and no MSW chunk.
+All **33 migrations** applied; app/database are healthy and gateway/backup services running.
+
+Canonical rebuild dry-run checks **187 enrollments — 0 diff(s)**; self-check is clean.
+The stable pre/post/final operational snapshots match: **649 events / max ID 649 / 222 sends**,
+unchanged enrollment progress/schedules/mailbox assignments, immutable sent content, four
+suppressions, paused campaigns, automatic enrollment off, settings/signature, mailbox caps,
+windows and persisted spacing deadlines. Actual mailbox ranges remain **5–10 minutes at 20/day**,
+New York weekdays 09:00–17:00. The sent checksum excludes only the newly added null
+`conversation_root_id` column so additive schema changes do not masquerade as history changes.
+
+At cutover, all **1,916 incoming records** retain legacy policy, zero active review holds and
+zero incoming activity facts; existing cursors are preserved. Ordinary pre-cutover polling
+accounts for the increase from the initial 1,911-record precheck. No history was replayed or
+automatically recovered, and no terminal enrollment was reactivated.
+
+After confirming the old schema had no deletion history or manifest volume, the independent
+`coldemail-spaceship_incoming_deletions` volume was explicitly bootstrapped with an empty
+600-permission manifest. Production startup validates it before API/workers. Backup mounts
+it read-only and the latest independent manifest copy is present (zero bytes at this cutover).
+Retain this volume and latest manifest for every restore; do not silently bootstrap on restore.
+
+Validated custom-format backups:
+
+| Checkpoint | Dump | Bytes | Catalog lines |
+| --- | --- | --- | --- |
+| Stable paused pre-deploy | coldemail-20261008-100518.dump | 2,484,556 | 342 |
+| Post-deploy | coldemail-20261008-100750.dump | 2,565,737 | 372 |
+
+Health reports API/database healthy. App, Unibox, Campaigns, version and portfolio/outreach/www
+routes pass; the new Unibox API requires authentication. App HTML and version JSON use
+`Cache-Control: no-store`. Served build ID is `9a3b079f-6f9b-4c57-a1c2-bfe619bf8533`.
+Authenticated replay verifies compact top navigation, grouped Unibox, campaign/search controls,
+actual legacy Stopped/Suppressed states, Campaign paused in the reader, independent automation
+and relationship labels, honest legacy-preview warning and guarded disabled Continue. The new
+bounded notification menu displays **Clear all notifications** and retains all eight existing
+notifications; none was cleared. UI screenshots are in ignored
+`backups/incoming-review-deploy-20261008/deployed-unibox.png` and `deployed-notifications.png`.
+
+No content recovery/deletion, acknowledgement, authorship/link/action decision, restoration,
+enrollment, resume or outbound send occurred. Host Caddy/DNS and campaign/mailbox configuration
+were preserved apart from the explicitly authorized campaign pause. VPS disk is 45% used,
+13 GiB available; no cleanup occurred. Previously documented six runtime dependency advisories
+remain separate. The full local gate and populated restore evidence below remains applicable.
+Leave campaigns paused; resume and prospect operations require separate explicit authorization.
+Rollback must understand review events/holds and preserve deletion tombstones/manifests.
+
+## 2026-10-08 IST incoming review predeployment checkpoint — resolved by deployment above
 
 The operator authorized push and deployment of the verified redesign. GitHub `origin/canary`
 advanced from `2d9bc29` to candidate `84403e4`. Production remains clean at `cd83228`; no source
@@ -24,8 +78,9 @@ with production pruning and its entrypoint shell syntax passes; runtime audit re
 previously documented advisories. VPS disk has 14 GiB free (42% used); no cleanup occurred.
 
 An explicit pause decision was requested because AGENTS.md forbids implicitly pausing an active
-campaign. **Permission has not arrived. Do not infer approval from elapsed time or deploy while
-this prerequisite remains unresolved.** If authorized, pause only Campaign 3 through its guarded
+campaign. At this historical checkpoint permission was pending; it subsequently arrived and the
+verified deployment above resolves the prerequisite. The reviewed procedure was to pause only
+Campaign 3 through its guarded
 application action, capture a new stable snapshot/backup, verify no deletion history before
 bootstrapping the empty independent manifest, fast-forward/build/deploy coherently, run migration,
 route/health/UI, populated drift/self-check and post-backup checks, and leave campaigns paused.

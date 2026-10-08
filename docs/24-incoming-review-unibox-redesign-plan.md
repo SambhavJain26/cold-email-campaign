@@ -283,6 +283,16 @@ verification. Estimates are not delivery commitments; live operations outside au
 
 ## Implementation checkpoint / change log
 
+- 2026-10-08 IST deployment completed under explicit push/deploy and Campaign 3 pause approval:
+  application `8e65e46`, all 33 migrations, authenticated Unibox/top navigation/notification UI,
+  healthy services/routes, 187-enrollment zero drift/self-check and validated paused pre/post
+  backups pass. Campaigns 2/3 remain paused, automatic enrollment off. Operational snapshots
+  remain 649 events / 222 sends with unchanged progress, history, suppression and mailbox
+  settings. The independent manifest was initialized only after a no-deletion-history check.
+  No restoration/replay/recovery, review action, acknowledgement, notification clearing,
+  enrollment, resume or outbound send occurred. This supersedes the undeployed checkpoint
+  below; complete evidence and restore/rollback boundaries are in docs/17 and docs/16.
+
 - Continue after a fresh response preserves an existing delay. Capacity reservations exclude
   held, horizon-delayed and suppressed work. Campaign progress includes permanently suppressed
   unfinished enrollments in a separate outcome bucket without rewriting lifecycle history.

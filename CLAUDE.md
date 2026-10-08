@@ -8,13 +8,16 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Current operating boundary
 
-- **2026-10-08 incoming review push/deploy authorization — awaiting explicit campaign pause:**
-  operator authorized pushing and deploying the verified candidate `84403e4`; `origin/canary`
-  is pushed. Fresh production is still `cd83228`, with Campaign 3 active, Campaign 2 paused,
-  automatic enrollment off, and 649 events / 222 sends. Pause permission for Campaign 3 is
-  pending; do not pause implicitly or restart/deploy while that prerequisite is unresolved.
-  Validated pre-backup and source bundle are recorded in docs/17. Resume/enrollment/outbound
-  sends remain separately gated. Preserve actual 5–10 minute ranges and 20/day mailbox caps.
+- **2026-10-08 incoming review/Unibox deployment — verified:** operator explicitly authorized
+  push/deploy and pausing Campaign 3. Application `8e65e46` is deployed on `canary`; all 33
+  migrations, healthy services/public routes, authenticated Unibox/navigation/notifications,
+  187-enrollment zero drift/self-check and validated paused pre/post backups pass. Campaigns 2/3
+  remain paused, automatic enrollment off; operational snapshot remains 649 events / 222 sends.
+  Existing enrollment progress, sent/retry history, four suppressions, caps/windows and actual
+  5–10 minute mailbox ranges are unchanged. Independent deletion manifest was safely initialized
+  only after verifying no previous deletion history. No historical recovery/replay/restoration,
+  acknowledgement, notification clearing, enrollment, resume or outbound send occurred.
+  Preserve manifest/restore safeguards and use only review-aware rollback code. See docs/17.
 
 - **2026-10-08 incoming review/Unibox redesign — locally implemented and verified:** follow
   `docs/24-incoming-review-unibox-redesign-plan.md`. Prospectively replace automatic terminal
@@ -25,8 +28,8 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
   This supersedes conflicting historical reply/disposition/removable-suppression scope below.
   Original implementation scope was local only. The later push/deploy authorization above
   supersedes that boundary; historical replay/restoration/enrollment/resume/send remain gated.
-  All stages in docs/24 and local gates are complete; docs/17 records evidence. Production retains
-  the separately deployed release below. Deployment requires the manifest/bootstrap/restore
+  All stages in docs/24 and local gates are complete; docs/17 records evidence. Production uses
+  the review release above. Deployment requires the manifest/bootstrap/restore
   safeguards in docs/16 and review-aware rollback code; no old ignoring-holds binary is safe.
 
 - **2026-10-08 IST signature/range/alias deployment:** separately authorized, pushed/deployed at
