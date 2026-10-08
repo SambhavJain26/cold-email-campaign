@@ -1,5 +1,21 @@
 # Local canary runbook (B8.3-local) — two-week validation on throwaway Gmail
 
+## 2026-10-08 IST operator Delay verification — read-only
+
+At 11:49 UTC (17:19 IST), a read-only production transaction verified the operator's Campaign 3
+actions. Debra (enrollment 143) is delayed until October 12, 18:40 IST; Daniel (123) until
+October 14, 18:30 IST; Brett (44) until October 14, 19:30 IST. All retain next unsent step 2,
+their assigned mailbox, empty review holds and no address suppression. Delay facts match the
+stored deadlines. Repeated Debra confirmations retain the same deadline, not additional sends.
+The operator also restored/continued enrollments 43 and 103. Campaign 3 remains paused with
+automatic enrollment off: 169 ACTIVE, three STOPPED, two BOUNCED; no unresolved review holds.
+Four mailboxes remain healthy at 20/day with 5–10 minute spacing and New York weekday windows.
+Sent history is still 222, latest send October 7 20:54:20 UTC. Canonical dry-run checks 187
+enrollments with zero drift; self-check clean. Scheduler selection and final pre-send checks
+enforce delay timestamps and review holds. No agent resume, restoration, delay, enrollment or
+send occurred. Resuming is an operator action and makes other eligible leads sendable under
+normal scheduling; the three delayed leads remain ineligible until their deadlines.
+
 ## 2026-10-08 IST personalized restoration follow-up — verified deployment
 
 The operator explicitly authorized pushing and deploying the verified follow-up. Production
