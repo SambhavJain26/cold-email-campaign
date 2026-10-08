@@ -141,19 +141,31 @@ export async function applyReviewAction(
             const priorStep = stepOf(seq!, fact.stepNo);
             if (fact.attributes.content_source === 'personalized') {
               const saved = snapshots.get(fact.messageId);
-              const copy = fact.attributes.personalized_copy_id
-                ? await getManualDraft(tx, fact.attributes.personalized_copy_id)
-                : undefined;
+              const copyId = fact.attributes.personalized_copy_id ?? saved?.personalizedCopyId;
+              // Older retry facts omit the copy ID, but their exact saved message
+              // retains it. Require an earlier accepted fact anchoring that copy.
+              const anchored =
+                fact.attributes.personalized_copy_id ||
+                sends.some(
+                  (prior) =>
+                    prior.stepNo === fact.stepNo &&
+                    prior.occurredAt <= fact.occurredAt &&
+                    prior.attributes.content_source === 'personalized' &&
+                    prior.attributes.personalized_copy_id === copyId &&
+                    prior.attributes.content_hash === fact.attributes.content_hash,
+                );
+              const copy = copyId ? await getManualDraft(tx, copyId) : undefined;
               if (
                 priorStep?.contentSource !== 'personalized' ||
                 !saved ||
+                !anchored ||
                 saved.enrollmentId !== e.id ||
                 saved.leadId !== e.leadId ||
                 saved.mailboxId !== fact.mailboxId ||
                 saved.stepNo !== fact.stepNo ||
                 saved.contentSource !== 'personalized' ||
                 saved.contentHash !== fact.attributes.content_hash ||
-                saved.personalizedCopyId !== fact.attributes.personalized_copy_id ||
+                saved.personalizedCopyId !== copyId ||
                 !saved.renderedSubject?.trim() ||
                 !saved.renderedBodyText?.trim() ||
                 (saved.emailFormat !== 'plain_text' && !saved.renderedBodyHtml?.trim()) ||
