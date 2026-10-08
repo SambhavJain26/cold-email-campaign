@@ -759,6 +759,7 @@ export async function campaignsRoutes(app: FastifyInstance, services: AppService
         REPLIED: { positive: repliedPositive, neutral: replied - repliedPositive },
         COMPLETED: count('COMPLETED'),
         STOPPED: count('STOPPED'),
+        ...(count('SUPPRESSED') ? { SUPPRESSED: count('SUPPRESSED') } : {}),
         ACTIVE: count('ACTIVE'),
         NEW: count('NEW'),
         total: rows.reduce((a, x) => a + x.n, 0),

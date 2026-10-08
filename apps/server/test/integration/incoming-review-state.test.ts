@@ -7,6 +7,7 @@ import { EventStore } from '../../src/services/eventStore';
 import { buildEvent } from '../../src/domain/events';
 import { rebuildProjections } from '../../src/services/rebuildProjections';
 import { listDue } from '../../src/db/repos/enrollmentsRepo';
+import { selfCheckViolations } from '../../src/db/repos/metricsRepo';
 import { TEST_DATABASE_URL, resetCoreTables, MIGRATIONS_DIR } from '../helpers/db';
 
 let db: Db;
@@ -81,6 +82,24 @@ it('suppression does not depend on the old disable setting', async () => {
   } finally {
     await pool.query('UPDATE settings SET suppress_unsubs=true');
   }
+});
+
+it('self-check detects missing hold facts and terminal enrollments retaining holds', async () => {
+  const [hold] = await store.append([
+    buildEvent.reviewRequired({ ...ids, attributes: { incoming_message_id: 9 } }),
+  ]);
+  expect(await selfCheckViolations(db, null)).toEqual([]);
+  await pool.query('UPDATE enrollments SET review_hold_ids=ARRAY[99999999]::bigint[] WHERE id=1');
+  expect((await selfCheckViolations(db, null)).map((item) => item.rule)).toContain(
+    'review hold references a missing or incompatible fact',
+  );
+  await pool.query(
+    "UPDATE enrollments SET current_state='STOPPED',review_hold_ids=ARRAY[$1]::bigint[] WHERE id=1",
+    [hold],
+  );
+  expect((await selfCheckViolations(db, null)).map((item) => item.rule)).toContain(
+    'terminal enrollment retains a review hold',
+  );
 });
 
 it('migration rollback/reapply preserves control facts and append-only activity', async () => {

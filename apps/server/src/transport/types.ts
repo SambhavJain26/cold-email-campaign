@@ -47,10 +47,13 @@ export interface IncomingMessage {
   mailboxId: number;
   /** Which folder it was fetched from (0012). 'INBOX' unless configured. */
   folder: string;
+  uidValidity?: string;
   from: string;
   subject: string;
   headers: Record<string, string>; // lowercased header names
   bodyText: string;
+  bodyHtml?: string;
+  contentStatus?: 'captured' | 'oversized' | 'unavailable';
   messageId?: string;
   inReplyTo?: string;
   references?: string[];
@@ -117,7 +120,7 @@ export interface MailboxConnection extends MailboxVerifyConfig {
    * with UID **strictly greater** than the mark FOR THAT FOLDER; a single
    * mailbox-wide number cannot express this, because IMAP UIDs are per-folder.
    */
-  folders: { name: string; lastPollUid: number }[];
+  folders: { name: string; lastPollUid: number; uidValidity?: string | null }[];
 }
 
 export interface MailboxConnectionProvider {
@@ -130,6 +133,14 @@ export interface OAuthAccessTokenProvider {
 }
 
 export interface MailTransport {
+  /** Explicit, content-only PEEK recovery. Never called by polling or migration. */
+  recoverIncoming?(input: {
+    mailboxId: number;
+    messageId: string;
+    from: string | null;
+    subject: string | null;
+    receivedAt: Date | null;
+  }): Promise<IncomingMessage>;
   /** Sending side — used by the scheduler (docs/06 §5). */
   send(msg: OutboundMessage): Promise<SendResult>;
   /** Receiving side — used by the poller; returns messages with UID > high-water mark (docs/07 §1). */

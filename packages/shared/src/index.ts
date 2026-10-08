@@ -4,5 +4,6 @@
 export * from './domain/index';
 export * from './api/index';
 export * from './api/incomingReview';
+export * from './api/localTime';
 
 export const SHARED_PACKAGE_NAME = '@coldemail/shared';

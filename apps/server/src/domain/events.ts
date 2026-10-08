@@ -134,13 +134,13 @@ const outreachStopped_ = base.extend({
 
 const reviewRequired_ = base.extend({
   type: z.literal('incoming_review_required'),
-  enrollmentId: id,
-  campaignId: id,
+  enrollmentId: id.optional(),
+  campaignId: id.optional(),
   attributes: z.object({ incoming_message_id: id }),
 });
 const reviewDecided_ = base.extend({
   type: z.literal('outreach_review_decided'),
-  enrollmentId: id,
+  enrollmentId: id.optional(),
   campaignId: id,
   attributes: z.object({
     action: z.enum(['continue', 'delay']),
@@ -156,6 +156,7 @@ const sequenceStopped_ = base.extend({
   attributes: z.object({
     hold_event_ids: z.array(id),
     resume_due_at: z.string().datetime().nullable(),
+    sequence_fingerprint: z.string().optional(),
     operation_id: z.string().min(1),
   }),
 });

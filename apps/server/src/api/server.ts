@@ -16,6 +16,7 @@ import { importsRoutes } from './imports';
 import { sequencesRoutes } from './sequences';
 import { campaignsRoutes } from './campaigns';
 import { uniboxRoutes } from './unibox';
+import { incomingReviewRoutes } from './incomingReview';
 import { analyticsRoutes } from './analytics';
 import { systemRoutes } from './system';
 import { publicUnsubscribeRoutes } from './publicUnsubscribe';
@@ -72,6 +73,7 @@ export function buildServer({ logger, services }: ServerDeps): FastifyInstance {
       await sequencesRoutes(api, services);
       await campaignsRoutes(api, services);
       await uniboxRoutes(api, services);
+      await incomingReviewRoutes(api, services);
       await analyticsRoutes(api, services);
       await systemRoutes(api, services);
     },

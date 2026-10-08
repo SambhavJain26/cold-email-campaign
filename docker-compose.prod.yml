@@ -71,10 +71,12 @@ services:
       GOOGLE_OAUTH_CLIENT_ID: ${GOOGLE_OAUTH_CLIENT_ID:-}
       GOOGLE_OAUTH_CLIENT_SECRET: ${GOOGLE_OAUTH_CLIENT_SECRET:-}
       BACKUP_DIR: /var/backups/coldemail
+      INCOMING_DELETION_MANIFEST_PATH: /var/lib/coldemail/incoming-deletions/manifest.jsonl
       ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
       ALERT_WEBHOOK_URL: ${ALERT_WEBHOOK_URL:-}
     volumes:
       - backups:/var/backups/coldemail:ro # read newest dump for the self-check freshness probe
+      - incoming_deletions:/var/lib/coldemail/incoming-deletions
     expose:
       - '3001'
 
@@ -109,11 +111,14 @@ services:
     environment:
       DATABASE_URL: postgres://${POSTGRES_USER:-coldemail}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB:-coldemail}
       BACKUP_DIR: /var/backups/coldemail
+      INCOMING_DELETION_MANIFEST_PATH: /var/lib/coldemail/incoming-deletions/manifest.jsonl
     volumes:
       - backups:/var/backups/coldemail
+      - incoming_deletions:/var/lib/coldemail/incoming-deletions:ro
 
 volumes:
   pgdata:
   caddy_data:
   caddy_config:
   backups:
+  incoming_deletions:

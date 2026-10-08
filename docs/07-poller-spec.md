@@ -1,5 +1,29 @@
 # Poller Spec — IMAP Fetch, Classification, Threading, STOP Detection, Idempotency
 
+## Prospective human-review intake (2026-10-08; local candidate)
+
+Production intake uses review policy; the historical terminal/company policy is selectable only
+through an internal test harness to preserve the locked 47-test golden cohort. No migration or
+startup fetches/replays old messages. New responses use references when unambiguous, otherwise an
+exact contacted sender address with an accepted send before receipt. All unfinished enrollments
+for that confidently identified address are held, including unsent siblings. Domains/subdomains
+only supply manually reviewed candidate searches. Conflicting references/identity and unmatched
+mail remain needs-linking, rather than disappearing through an enrollment inner join.
+
+Intake commits message identity, removable full content, associations, holds or permanent clear
+opt-out suppression, audit facts and folder cursor atomically. Equivalent Message-ID/envelope
+copies add locations without reprocessing or restoring deleted text. Conflicting envelopes remain
+visible. Folder epochs are recorded; changed UIDVALIDITY refuses automatic replay and requires
+an explicitly authorized reconciliation.
+
+MailParser streams attachment parts away except bounded delivery-status data, captures complete
+text/HTML and converts HTML-only content to text. The combined decoded limit is 5 MiB; oversized
+or unconvertible content is explicitly unavailable, never presented as complete truncation.
+Opt-outs inspect extracted new text across the full body, excluding identified history/signatures;
+uncertain extraction holds for review. Automated detection is independent of thread relationship
+and never selects a continuation outcome. DSNs retain hard-bounce/limited-soft-retry protection.
+Selected IMAP recovery uses PEEK and verifies identity; it is content-only and explicitly invoked.
+
 ## 2026-10-06 incoming-company stopping policy
 
 Migration 0022 persists `settings.incoming_stop_since` at application time. Only newly ingested
@@ -33,7 +57,7 @@ poll(mailboxId, now = clock.now()):
   msgs = transport.fetchNew(mailboxId)          // UIDs > mailboxes.last_poll_uid
   for m in msgs (UID ascending):
     if exists incoming_messages(mailbox_id, m.uid): continue        // idempotency (ledger)
-    if m.messageId and exists incoming_messages(message_id = m.messageId): 
+    if m.messageId and exists incoming_messages(message_id = m.messageId):
         record as duplicate (classification of original, resulting_event_ids=[]); continue
     result = classify(m)                        // §2
     tx {
@@ -117,7 +141,7 @@ if match:
 
 Precedence in the reducer makes the terminal state UNSUBSCRIBED; suppression side effect fires in the same transaction (docs/04 §3). The Unibox still shows the reply with "auto-unsubscribed ✓" (walkthrough Stage 6, Tom Fisher card); the operator may still re-tag sentiment (appends `sentiment_tagged`) — the suppression stands regardless.
 
-`tag_only` mode: skip this block entirely; unsubscribe fires only from a manual Negative-tag action *if* the operator also clicks "unsubscribe" (separate button — tagging alone never suppresses).
+`tag_only` mode: skip this block entirely; unsubscribe fires only from a manual Negative-tag action _if_ the operator also clicks "unsubscribe" (separate button — tagging alone never suppresses).
 
 ## 3.1 Operator outcomes and reminders
 
@@ -136,15 +160,15 @@ enrollments.
   `References` to that conversation's prior Message-IDs in order. They reuse the nearest preceding
   new-conversation step's exact sent subject prefixed `Re: `. A later new-conversation step resets
   both the subject anchor and References boundary.
-- Inbound matching checks `In-Reply-To` first, then walks `References` newest→oldest; first hit in `sent_messages` wins. This matches replies to *any* step of the thread.
+- Inbound matching checks `In-Reply-To` first, then walks `References` newest→oldest; first hit in `sent_messages` wins. This matches replies to _any_ step of the thread.
 
 ## 5. Failure states (spec Part 9)
 
-| Detection | Action |
-|-----------|--------|
-| IMAP auth error (permanent) on poll | mailbox `auth_failed`, pause sends, alert, redistribution per docs/06 §6 |
-| Poll failing transiently | retries; `last_successful_poll_at` ages → scheduler flips `imap_stale` at `stale_poll_hours`, pauses sends (replies might be sitting undetected → sequences must not keep firing), alert. Auto-recovers on next successful poll |
-| Parse crash on one message | that message logged `unrelated` with `attributes.parse_error`; poll continues (one poison message never wedges the mailbox) |
+| Detection                           | Action                                                                                                                                                                                                                          |
+| ----------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| IMAP auth error (permanent) on poll | mailbox `auth_failed`, pause sends, alert, redistribution per docs/06 §6                                                                                                                                                        |
+| Poll failing transiently            | retries; `last_successful_poll_at` ages → scheduler flips `imap_stale` at `stale_poll_hours`, pauses sends (replies might be sitting undetected → sequences must not keep firing), alert. Auto-recovers on next successful poll |
+| Parse crash on one message          | that message logged `unrelated` with `attributes.parse_error`; poll continues (one poison message never wedges the mailbox)                                                                                                     |
 
 ## 6. MockTransport obligations (what B3's mock must produce — plan §3.3)
 
@@ -158,4 +182,4 @@ The mock's scenario script drives synthetic inbound traffic **with real header s
 
 ## 7. Tests (B3)
 
-Classifier unit tests over the fixture corpus (every bucket × every provider fixture); STOP matcher positive/negative cases ("STOP", "please remove me", vs "we should stop losing leads" — **note:** naive `stop` matching would false-positive here, so when the only match is the bare word "stop" the matcher requires the keyword in the first 300 chars *and* unquoted text ≤ 40 words *and* "stop" sitting in a standalone clause of ≤ 4 words ("STOP", "Please stop." — never mid-sentence; the ≤40-words rule alone would still false-positive on the short example above); longer texts require a stronger phrase); idempotency (same UID twice, same Message-ID from two mailboxes); soft→retry→recover→delivered; soft×3 → BOUNCED; late reply after COMPLETED upgrades to REPLIED; reply after UNSUBSCRIBED logs event, state unchanged; unmatched DSN logged not crashed; poison message isolation.
+Classifier unit tests over the fixture corpus (every bucket × every provider fixture); STOP matcher positive/negative cases ("STOP", "please remove me", vs "we should stop losing leads" — **note:** naive `stop` matching would false-positive here, so when the only match is the bare word "stop" the matcher requires the keyword in the first 300 chars _and_ unquoted text ≤ 40 words _and_ "stop" sitting in a standalone clause of ≤ 4 words ("STOP", "Please stop." — never mid-sentence; the ≤40-words rule alone would still false-positive on the short example above); longer texts require a stronger phrase); idempotency (same UID twice, same Message-ID from two mailboxes); soft→retry→recover→delivered; soft×3 → BOUNCED; late reply after COMPLETED upgrades to REPLIED; reply after UNSUBSCRIBED logs event, state unchanged; unmatched DSN logged not crashed; poison message isolation.

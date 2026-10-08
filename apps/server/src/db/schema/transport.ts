@@ -10,7 +10,6 @@ import {
   primaryKey,
   text,
   timestamp,
-  uniqueIndex,
 } from 'drizzle-orm/pg-core';
 import { sql } from 'drizzle-orm';
 import { enrollments } from './core';
@@ -122,6 +121,7 @@ export const sentMessages = pgTable(
     contentHash: text('content_hash').notNull(),
     renderedSubject: text('rendered_subject'),
     renderedBodyText: text('rendered_body_text'),
+    conversationRootId: text('conversation_root_id'),
     renderedBodyHtml: text('rendered_body_html'),
     emailFormat: text('email_format')
       .$type<'plain_text' | 'minimal_html'>()
@@ -170,7 +170,7 @@ export const incomingMessages = pgTable(
   },
   (t) => [
     index('im_class').on(t.classification, sql`${t.processedAt} DESC`),
-    uniqueIndex('im_msgid')
+    index('im_msgid')
       .on(t.messageId)
       .where(sql`${t.messageId} IS NOT NULL`),
   ],

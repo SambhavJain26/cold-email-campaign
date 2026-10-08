@@ -490,8 +490,7 @@ export async function anonymizeLeadPii(
         subject: null,
         snippet: null,
         bodyText: null,
-        messageId: null,
-        inReplyTo: null,
+        // Keep deduplication identifiers so erased/deleted content cannot be re-ingested.
       })
       .where(inArray(incomingMessages.matchedEnrollmentId, input.enrollmentIds));
   }
@@ -560,10 +559,12 @@ export async function recontactStatusByLeadIds(
   if (leadIds.length === 0) return new Map();
   const result = await db.execute(sql`
     SELECT l.id AS lead_id,
-      EXISTS (SELECT 1 FROM events os WHERE os.lead_id=l.id AND os.type='outreach_stopped') AS has_stop,
+      EXISTS (SELECT 1 FROM events os WHERE os.lead_id=l.id AND os.type='outreach_stopped'
+        AND NOT EXISTS(SELECT 1 FROM events restored WHERE restored.type='sequence_restored' AND restored.lead_id=l.id
+          AND restored.attributes->'blocker_event_ids' @> jsonb_build_array(os.id))) AS has_stop,
       EXISTS (
         SELECT 1 FROM events hr
-        WHERE hr.lead_id = l.id AND hr.type = 'human_reply'
+        WHERE hr.lead_id = l.id AND hr.type IN ('human_reply','incoming_review_required','sequence_stopped')
       ) AS has_reply,
       EXISTS (
         SELECT 1 FROM events hr
@@ -573,7 +574,12 @@ export async function recontactStatusByLeadIds(
             WHERE rd.type = 'reply_dispositioned'
               AND (rd.attributes->>'reply_event_id')::bigint = hr.id
           )
-      ) AS has_undispositioned_reply,
+          AND NOT EXISTS(SELECT 1 FROM events restored WHERE restored.type='sequence_restored' AND restored.lead_id=l.id
+            AND restored.attributes->'blocker_event_ids' @> jsonb_build_array(hr.id))
+      ) OR EXISTS(SELECT 1 FROM events held WHERE held.lead_id=l.id AND held.type='incoming_review_required' AND held.enrollment_id IS NULL
+        AND NOT EXISTS(SELECT 1 FROM events decided WHERE decided.lead_id=l.id AND decided.type='outreach_review_decided'
+          AND decided.attributes->'hold_event_ids' @> jsonb_build_array(held.id))) OR EXISTS(SELECT 1 FROM enrollments held WHERE held.lead_id=l.id AND cardinality(held.review_hold_ids)>0)
+      AS has_undispositioned_reply,
       (
         SELECT max((latest.attributes->>'recontact_after')::timestamptz)
         FROM events hr
@@ -644,7 +650,7 @@ export async function selectEligibleLeads(
           WHERE e.lead_id = ${leads.id} AND e.campaign_id = ${campaignId})
         AND NOT EXISTS (
           SELECT 1 FROM events hr
-          WHERE hr.lead_id = ${leads.id} AND hr.type IN ('human_reply','outreach_stopped'))
+          WHERE hr.lead_id = ${leads.id} AND hr.type IN ('human_reply','outreach_stopped','incoming_review_required','sequence_stopped'))
         AND ${hashGuard}`,
     )
     .orderBy(
@@ -699,7 +705,7 @@ export async function poolAllocationCandidates(
        )
        AND NOT EXISTS (
          SELECT 1 FROM events hr
-          WHERE hr.lead_id = l.id AND hr.type = 'human_reply'
+          WHERE hr.lead_id = l.id AND hr.type IN ('human_reply','outreach_stopped','incoming_review_required','sequence_stopped')
        )
      ORDER BY CASE l.tier WHEN 'A' THEN 1 WHEN 'B' THEN 2 ELSE 3 END,
               l.created_at, l.id

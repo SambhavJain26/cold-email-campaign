@@ -36,7 +36,8 @@ import {
   poolSummary,
 } from '../db/repos/campaignPoolRepo';
 import { poolEligibility } from './campaignPools';
-import { acquireEnrollmentCapacityLock } from '../db/repos/locksRepo';
+import { acquireEnrollmentCapacityLock, lockLead } from '../db/repos/locksRepo';
+import { suppressedAmong } from '../db/repos/suppressionsRepo';
 import { campaignPersonalizedCopyReadiness } from '../db/repos/manualDraftsRepo';
 
 export interface EnrollmentDeps {
@@ -289,6 +290,7 @@ export async function enrollByIds(
     const seq = await deps.sequences.sequenceFor(campaignId);
 
     const unique = [...new Set(leadIds)];
+    for (const id of unique.slice().sort((a, b) => a - b)) await lockLead(tx, id);
     const poolRows =
       campaign.leadSelectionMode === 'pool'
         ? await availablePoolRowsForLeadIds(tx, campaignId, unique)
@@ -330,7 +332,15 @@ export async function enrollByIds(
       else eligible.push({ id: lead.id, tier: lead.tier });
     }
 
-    const result = await enrollLeadsInTransaction(deps, tx, campaignId, eligible, now, poolRows);
+    const result = await enrollLeadsInTransaction(
+      deps,
+      tx,
+      campaignId,
+      eligible,
+      now,
+      poolRows,
+      opts.allowRecontact ?? false,
+    );
     result.skipped.push(
       ...[...skippedCounts.entries()].map(([reason, count]) => ({ reason, count })),
     );
@@ -346,9 +356,49 @@ export async function enrollLeadsInTransaction(
   eligible: EligibleLead[],
   now: Date,
   poolIdsByLead: ReadonlyMap<number, number> = new Map(),
+  allowRecontact = false,
 ): Promise<EnrollResult> {
   const { store } = deps;
   if (eligible.length === 0) return { enrolled: 0, leadIds: [], enrollmentIds: [], skipped: [] };
+  for (const id of eligible.map((l) => l.id).sort((a, b) => a - b)) await lockLead(tx, id);
+  const current = await leadsByIds(
+    tx,
+    eligible.map((l) => l.id),
+  );
+  const blockedAddresses = await suppressedAmong(
+    tx,
+    current.map((l) => l.email),
+  );
+  const recontact = await recontactStatusByLeadIds(
+    tx,
+    eligible.map((l) => l.id),
+  );
+  const active = await activeEnrollmentLeadIds(
+    tx,
+    eligible.map((l) => l.id),
+  );
+  const before = eligible.length;
+  eligible = eligible.filter((l) => {
+    const row = current.find((r) => r.id === l.id);
+    const status = recontact.get(l.id);
+    return (
+      !!row &&
+      !row.isSuppressed &&
+      !blockedAddresses.has(row.email) &&
+      !active.has(l.id) &&
+      !status?.hasStop &&
+      !(status?.hasReply && !allowRecontact) &&
+      !status?.hasUndispositionedReply &&
+      !(status?.blockedUntil && status.blockedUntil > now)
+    );
+  });
+  if (!eligible.length)
+    return {
+      enrolled: 0,
+      leadIds: [],
+      enrollmentIds: [],
+      skipped: [{ reason: 'eligibility_changed', count: before }],
+    };
 
   const modeFor = (tier: CurrentLeadTier | null) =>
     tier === 'A' ? 'template_researched' : 'template_auto';
@@ -392,7 +442,10 @@ export async function enrollLeadsInTransaction(
     enrolled: eligible.length,
     leadIds: eligible.map((l) => l.id),
     enrollmentIds,
-    skipped: [],
+    skipped:
+      before > eligible.length
+        ? [{ reason: 'eligibility_changed', count: before - eligible.length }]
+        : [],
   };
 }
 

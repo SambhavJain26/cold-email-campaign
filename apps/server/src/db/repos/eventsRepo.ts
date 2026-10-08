@@ -6,6 +6,12 @@ import { events, leads } from '../schema';
 import { parseDomainEvent, type DomainEvent } from '../../domain/events';
 
 export type EventRow = typeof events.$inferSelect;
+export async function leadOnlySuppressionFacts(db: DbLike): Promise<DomainEvent[]> {
+  const rows = await db.select().from(events)
+    .where(sql`${events.enrollmentId} IS NULL AND ${events.type}='address_suppressed'
+    AND EXISTS(SELECT 1 FROM leads l WHERE l.id=${events.leadId} AND NOT l.is_erased)`);
+  return rows.map(rowToDomainEvent);
+}
 
 /** DomainEvent → insert row (snake_case columns handled by drizzle defs). */
 function toRow(e: DomainEvent): typeof events.$inferInsert {

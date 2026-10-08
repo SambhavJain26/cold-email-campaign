@@ -14,6 +14,7 @@ import { VirtualClock } from '../../src/clock/virtual';
 import { SmtpImapTransport } from '../../src/transport/smtpImap/smtpImapTransport';
 import { StaticSequenceProvider } from '../../src/scheduler/staticSequenceProvider';
 import { runConfirmDelivery } from '../../src/scheduler/confirmDelivery';
+import { buildEvent } from '../../src/domain/events';
 import { sealSecret } from '../../src/secrets/seal';
 import { rebuildProjections } from '../../src/services/rebuildProjections';
 import { loadCampaignShapes } from '../../src/services/campaignShapes';
@@ -109,6 +110,14 @@ describe('live pipeline over SmtpImapTransport (B8.1)', () => {
          VALUES ($1, $2, 'ACTIVE', 'template_auto', $3, $3)`,
         [lead.id, CAMPAIGN_ID, clock.now()],
       );
+      await services.store.append([
+        buildEvent.enrolled({
+          leadId: lead.id,
+          campaignId: CAMPAIGN_ID,
+          enrollmentId: lead.id,
+          occurredAt: clock.now(),
+        }),
+      ]);
     }
     await pool.query(
       `UPDATE settings SET send_jitter_pct = 0, optout_detection = 'auto' WHERE id = 1`,
@@ -135,7 +144,14 @@ describe('live pipeline over SmtpImapTransport (B8.1)', () => {
     expect(sent).toBe(3);
 
     const events = await pool.query(`SELECT type, lead_id FROM events ORDER BY id`);
-    expect(events.rows.map((r: { type: string }) => r.type)).toEqual(['sent', 'sent', 'sent']);
+    expect(events.rows.map((r: { type: string }) => r.type)).toEqual([
+      'enrolled',
+      'enrolled',
+      'enrolled',
+      'sent',
+      'sent',
+      'sent',
+    ]);
 
     const stored = await pool.query(
       `SELECT sm.message_id, l.email FROM sent_messages sm JOIN leads l ON l.id = sm.lead_id ORDER BY sm.sent_at`,
@@ -165,7 +181,7 @@ describe('live pipeline over SmtpImapTransport (B8.1)', () => {
     expect(delivered.rows[0].n).toBe(3);
   });
 
-  it('a real reply over IMAP is classified human_reply and stops the sequence', async () => {
+  it('a real reply over IMAP creates a review hold and captures full content', async () => {
     const ourId = await messageIdFor(REPLY_LEAD.id);
     await deliver({
       as: LEAD,
@@ -180,8 +196,15 @@ describe('live pipeline over SmtpImapTransport (B8.1)', () => {
     expect(result).toMatchObject({ polled: true, processed: 1, byClass: { human_reply: 1 } });
 
     const enrollment = await stateOf(REPLY_LEAD.id);
-    expect(enrollment.current_state).toBe('REPLIED');
-    expect(enrollment.next_send_at).toBeNull(); // the sequence stopped
+    expect(enrollment.current_state).toBe('ACTIVE');
+    expect(enrollment.next_send_at).not.toBeNull();
+    expect(
+      (
+        await pool.query('SELECT review_hold_ids FROM enrollments WHERE lead_id=$1', [
+          REPLY_LEAD.id,
+        ])
+      ).rows[0].review_hold_ids,
+    ).toHaveLength(1);
 
     const row = await pool.query(
       `SELECT classification, matched_enrollment_id, message_id, in_reply_to, array_length(resulting_event_ids, 1) AS events
@@ -217,7 +240,7 @@ describe('live pipeline over SmtpImapTransport (B8.1)', () => {
 
     await services.poller.poll(MAILBOX_ID);
 
-    expect((await stateOf(STOP_LEAD.id)).current_state).toBe('UNSUBSCRIBED');
+    expect((await stateOf(STOP_LEAD.id)).current_state).toBe('ACTIVE');
     const suppression = await pool.query(
       `SELECT email, reason FROM suppressions WHERE email = $1`,
       [STOP_LEAD.email],
@@ -262,8 +285,8 @@ describe('live pipeline over SmtpImapTransport (B8.1)', () => {
     expect(byType).toMatchObject({
       sent: 3,
       delivered: 3,
-      human_reply: 2,
-      unsubscribe: 1,
+      incoming_review_required: 1,
+      address_suppressed: 1,
       hard_bounce: 1,
     });
 

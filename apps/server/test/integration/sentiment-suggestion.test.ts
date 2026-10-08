@@ -27,6 +27,7 @@ describe('sentiment suggestion (decision E)', () => {
 
   const pollerWith = (suggester?: SentimentSuggester): Poller =>
     new Poller({
+      incomingPolicy: 'legacy',
       db,
       store: new EventStore(db),
       transport: mock,

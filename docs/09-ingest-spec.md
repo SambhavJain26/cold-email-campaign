@@ -1,5 +1,18 @@
 # Ingest Spec — CSV Import, Hygiene, Tiering, Suppression, Recycling
 
+## Recontact and permanent protection (2026-10-08; local candidate)
+
+Historical company-mail stops retain their broad guard unless exact blockers receive an explicit
+eligible restoration fact. Human reply/response/manual Stop history requires explicit recontact
+for a different campaign. Automatic pool allocation, count enrollment and recycling cannot
+silently reuse those histories. Explicit force/allow-recontact cannot bypass suppression or
+unresolved holds. Eligibility is rechecked under shared lead locks before enrollment commits.
+
+Global suppression is permanent; ordinary removal returns 410. Lead erasure retains the minimum
+normalized suppression address and incoming identifiers needed for deduplication. It removes
+application-held incoming content through the same durable deletion manifest before redaction.
+Existing immutable event excerpts and backups are not promised erased.
+
 ## 2026-10-06 campaign copy update mode
 
 After CSV upload, choose Import leads or Update existing campaign copy. Update mode requires a
@@ -31,16 +44,16 @@ Implements walkthrough Stages 1–2 + 9, plan Stage 5. Lives in `apps/server/src
 
 Parsed with `csv-parse` (streaming, BOM-tolerant, `,`/`;`/tab auto-detect). Header row required; header matching is case-insensitive with alias map:
 
-| Canonical field | Accepted headers |
-|---|---|
-| `email` (required) | email, e-mail, email_address, work_email |
-| `first_name` | first_name, firstname, first, given_name |
-| `last_name` | last_name, lastname, last, surname |
-| `company` | company, company_name, business, brokerage |
-| `website` | website, url, domain, site |
-| `city` / `state` / `phone` / `notes` | same + obvious aliases |
-| `manual_subject` / `manual_body` | special paired Step-1 draft columns; both required |
-| anything else | preserved into `custom_fields` under its lowercase_snake_case header (usable as merge tags) |
+| Canonical field                      | Accepted headers                                                                            |
+| ------------------------------------ | ------------------------------------------------------------------------------------------- |
+| `email` (required)                   | email, e-mail, email_address, work_email                                                    |
+| `first_name`                         | first_name, firstname, first, given_name                                                    |
+| `last_name`                          | last_name, lastname, last, surname                                                          |
+| `company`                            | company, company_name, business, brokerage                                                  |
+| `website`                            | website, url, domain, site                                                                  |
+| `city` / `state` / `phone` / `notes` | same + obvious aliases                                                                      |
+| `manual_subject` / `manual_body`     | special paired Step-1 draft columns; both required                                          |
+| anything else                        | preserved into `custom_fields` under its lowercase_snake_case header (usable as merge tags) |
 
 File limits: ≤ 10 MB, ≤ 50,000 rows; reject otherwise with `import_too_large`.
 
@@ -48,14 +61,14 @@ File limits: ≤ 10 MB, ≤ 50,000 rows; reject otherwise with `import_too_large
 
 Per row, in order — **first matching flag wins**, later checks skipped:
 
-| Order | Flag | Rule |
-|---|---|---|
-| 1 | `invalid` | fails syntactic check: one `@`, non-empty local part, domain has ≥1 dot, no spaces, total ≤ 254 chars, TLD ≥ 2 alpha. (No MX/SMTP verification in-app — external verification is an explicit non-goal; the auto-pause rule is the runtime backstop.) |
-| 2 | `role_based` | local part ∈ {info, sales, admin, administrator, support, contact, contactus, office, hello, team, billing, hr, careers, jobs, marketing, press, media, help, enquiries, inquiries, mail, postmaster, webmaster, noreply, no-reply, donotreply, abuse, security, privacy, legal, accounts, accounting, frontdesk, reception} |
-| 3 | `duplicate` | normalized email seen earlier in this file (first occurrence kept) **or** already exists in `leads` |
-| 4 | `suppressed` | normalized email ∈ `suppressions` — **compliance-critical: shown in preview and always dropped, even under "Import all"** |
-| 5 | `missing_first_name` | first_name empty — **importable** (fallback merge tags), counted separately in the preview |
-| 6 | `ok` | — |
+| Order | Flag                 | Rule                                                                                                                                                                                                                                                                                                                         |
+| ----- | -------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 1     | `invalid`            | fails syntactic check: one `@`, non-empty local part, domain has ≥1 dot, no spaces, total ≤ 254 chars, TLD ≥ 2 alpha. (No MX/SMTP verification in-app — external verification is an explicit non-goal; the auto-pause rule is the runtime backstop.)                                                                         |
+| 2     | `role_based`         | local part ∈ {info, sales, admin, administrator, support, contact, contactus, office, hello, team, billing, hr, careers, jobs, marketing, press, media, help, enquiries, inquiries, mail, postmaster, webmaster, noreply, no-reply, donotreply, abuse, security, privacy, legal, accounts, accounting, frontdesk, reception} |
+| 3     | `duplicate`          | normalized email seen earlier in this file (first occurrence kept) **or** already exists in `leads`                                                                                                                                                                                                                          |
+| 4     | `suppressed`         | normalized email ∈ `suppressions` — **compliance-critical: shown in preview and always dropped, even under "Import all"**                                                                                                                                                                                                    |
+| 5     | `missing_first_name` | first_name empty — **importable** (fallback merge tags), counted separately in the preview                                                                                                                                                                                                                                   |
+| 6     | `ok`                 | —                                                                                                                                                                                                                                                                                                                            |
 
 Preview response = counts per flag + 20 sample rows per flag (walkthrough Stage 1 panel). Preview rows persist in `import_rows` so commit is exact even if the operator commits later.
 
@@ -64,7 +77,7 @@ Preview response = counts per flag + 20 sample rows per flag (walkthrough Stage 
 `POST /imports/:id/commit { mode, draft_campaign_id?, replace_existing_drafts?, allocations? }`
 
 - `drop_flagged`: insert rows flagged `ok` + `missing_first_name`.
-- `import_all`: additionally insert `role_based` + `invalid`-lite… **No.** `invalid` and `suppressed` are *never* imported under either mode (undeliverable / illegal); `import_all` only additionally admits `role_based`. The preview labels the buttons accordingly ("Import 885" vs "Import 945 incl. role-based").
+- `import_all`: additionally insert `role_based` + `invalid`-lite… **No.** `invalid` and `suppressed` are _never_ imported under either mode (undeliverable / illegal); `import_all` only additionally admits `role_based`. The preview labels the buttons accordingly ("Import 885" vs "Import 945 incl. role-based").
 - Inserted leads: `tier = NULL` (untiered, decision R), `import_id` set, `custom_fields` populated. `import_rows.lead_id` backfilled. Fixture test locks the walkthrough split: 1,000 → 60 role + 40 invalid + 15 dup → 885 committed with 82 missing-name among them.
 - When paired manual-draft columns are detected, commit requires one target campaign. Drafts are
   Step 1 only, start `needs_review`, and never enroll/activate/send. Existing unsuppressed leads may
@@ -115,7 +128,7 @@ Removal (false positives only): decision U — typed-confirmation, audit alert.
 ## 6. Cold storage & recycling (walkthrough Stage 9, plan Stage 5)
 
 - **Cold storage view** = query: enrollments `COMPLETED`, lead not suppressed; per lead: earliest-recycle date = `terminal_at + settings.cold_storage_rest_days` (default 60).
-- **Recycle action:** preview then commit two or more source campaigns into one *draft* target.
+- **Recycle action:** preview then commit two or more source campaigns into one _draft_ target.
   Leads are deduplicated across sources; confirmation recomputes rest, nurture, suppression,
   recontact, existing-target, and content-hash checks before inserting anything. The legacy
   single-source request remains accepted. Old enrollments stay COMPLETED and historical events are

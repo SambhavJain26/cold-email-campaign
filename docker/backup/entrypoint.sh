@@ -8,8 +8,8 @@ set -eu
 BACKUP_DIR="${BACKUP_DIR:-/var/backups/coldemail}"
 mkdir -p "$BACKUP_DIR"
 
-printf '30 2 * * * DATABASE_URL="%s" BACKUP_DIR="%s" /usr/local/bin/backup.sh >> /var/log/backup.log 2>&1\n' \
-  "$DATABASE_URL" "$BACKUP_DIR" > /etc/crontabs/root
+printf '30 2 * * * DATABASE_URL="%s" BACKUP_DIR="%s" INCOMING_DELETION_MANIFEST_PATH="%s" /usr/local/bin/backup.sh >> /var/log/backup.log 2>&1\n' \
+  "$DATABASE_URL" "$BACKUP_DIR" "${INCOMING_DELETION_MANIFEST_PATH:-}" > /etc/crontabs/root
 touch /var/log/backup.log
 echo "backup sidecar: nightly 02:30 UTC → $BACKUP_DIR"
 

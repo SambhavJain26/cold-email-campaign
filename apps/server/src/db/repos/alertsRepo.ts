@@ -1,4 +1,4 @@
-import { desc, eq, isNull, sql } from 'drizzle-orm';
+import { and, desc, eq, isNull, lte, sql } from 'drizzle-orm';
 import type { AlertSeverity } from '@coldemail/shared';
 import type { DbLike } from '../client';
 import { alerts } from '../schema';
@@ -28,8 +28,13 @@ export async function listUnacked(db: DbLike, limit = 50): Promise<AlertRow[]> {
 export async function listAlerts(
   db: DbLike,
   opts: { unacked: boolean; page: number; perPage: number },
-): Promise<{ items: AlertRow[]; total: number }> {
-  const where = opts.unacked ? isNull(alerts.acknowledgedAt) : undefined;
+): Promise<{ items: AlertRow[]; total: number; ackThroughId: number }> {
+  const latest = await db.select({ id: sql<number>`COALESCE(max(id),0)::int` }).from(alerts);
+  const ackThroughId = latest[0]?.id ?? 0;
+  const where = and(
+    lte(alerts.id, ackThroughId),
+    opts.unacked ? isNull(alerts.acknowledgedAt) : undefined,
+  );
   const items = await db
     .select()
     .from(alerts)
@@ -41,7 +46,7 @@ export async function listAlerts(
     .select({ n: sql<number>`count(*)::int` })
     .from(alerts)
     .where(where);
-  return { items, total: totals[0]?.n ?? 0 };
+  return { items, total: totals[0]?.n ?? 0, ackThroughId };
 }
 
 export async function getAlert(db: DbLike, id: number): Promise<AlertRow | undefined> {
@@ -51,6 +56,13 @@ export async function getAlert(db: DbLike, id: number): Promise<AlertRow | undef
 
 export async function acknowledgeAlert(db: DbLike, id: number, at: Date): Promise<void> {
   await db.update(alerts).set({ acknowledgedAt: at }).where(eq(alerts.id, id));
+}
+/** Clear the displayed feed snapshot, preserving history and newer notifications. */
+export async function acknowledgeAllAlerts(db: DbLike, throughId: number, at: Date): Promise<void> {
+  await db
+    .update(alerts)
+    .set({ acknowledgedAt: at })
+    .where(and(isNull(alerts.acknowledgedAt), lte(alerts.id, throughId)));
 }
 
 /** Replace operator-visible payloads containing erased direct PII with lineage only. */

@@ -47,6 +47,7 @@ describe('classifier over the fixture corpus (B3.11)', () => {
     clock = new VirtualClock('2026-01-20T15:00:00Z');
     mock = new MockTransport(clock);
     poller = new Poller({
+      incomingPolicy: 'legacy',
       db,
       store: new EventStore(db),
       transport: mock,

@@ -10,11 +10,16 @@ import { mailboxPollCursors } from '../schema';
 export interface PollCursor {
   folder: string;
   lastPollUid: number;
+  uidValidity: string | null;
 }
 
 export async function listCursors(db: DbLike, mailboxId: number): Promise<PollCursor[]> {
   const rows = await db
-    .select({ folder: mailboxPollCursors.folder, lastPollUid: mailboxPollCursors.lastPollUid })
+    .select({
+      folder: mailboxPollCursors.folder,
+      lastPollUid: mailboxPollCursors.lastPollUid,
+      uidValidity: mailboxPollCursors.uidValidity,
+    })
     .from(mailboxPollCursors)
     .where(eq(mailboxPollCursors.mailboxId, mailboxId));
   return rows;
@@ -29,10 +34,11 @@ export async function setCursor(
   mailboxId: number,
   folder: string,
   lastPollUid: number,
+  uidValidity?: string,
 ): Promise<void> {
   await db
     .insert(mailboxPollCursors)
-    .values({ mailboxId, folder, lastPollUid })
+    .values({ mailboxId, folder, lastPollUid, uidValidity })
     .onConflictDoUpdate({
       target: [mailboxPollCursors.mailboxId, mailboxPollCursors.folder],
       // GREATEST, not assignment: enforced in SQL rather than relying on the
@@ -40,6 +46,7 @@ export async function setCursor(
       // silently re-deliver every message after the mark.
       set: {
         lastPollUid: sql`GREATEST(${mailboxPollCursors.lastPollUid}, excluded.last_poll_uid)`,
+        ...(uidValidity !== undefined ? { uidValidity } : {}),
       },
     });
 }

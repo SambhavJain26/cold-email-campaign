@@ -29,6 +29,7 @@ export const envSchema = z
     NODE_ENV: z.enum(['development', 'test', 'production']).default('production'),
     LOG_LEVEL: z.enum(['fatal', 'error', 'warn', 'info', 'debug', 'trace']).default('info'),
     BACKUP_DIR: z.string().default('/var/backups/coldemail'),
+    INCOMING_DELETION_MANIFEST_PATH: z.string().default('backups/incoming-deletions.jsonl'),
     /** Canonical browser-visible application URL, including any deployment subpath. */
     PUBLIC_APP_URL: z.url().default('http://localhost:5173'),
     /** Test-only (B6.12): VirtualClock + inline jobs + POST /system/advance-clock. */

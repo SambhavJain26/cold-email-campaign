@@ -39,6 +39,12 @@ echo "drill: 2/5 recreating scratch DB $SCRATCH_DB"
 psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -c "DROP DATABASE IF EXISTS $SCRATCH_DB WITH (FORCE)"
 psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -c "CREATE DATABASE $SCRATCH_DB"
 pg_restore --no-owner --no-privileges -d "$SCRATCH_URL" "$DUMP"
+if [ -n "${INCOMING_DELETION_MANIFEST_PATH:-}" ]; then
+  DATABASE_URL="$SCRATCH_URL" npx --prefix "$REPO_ROOT" tsx "$REPO_ROOT/apps/server/src/services/incomingDeletionCli.ts"
+else
+  echo "drill: latest INCOMING_DELETION_MANIFEST_PATH is required before serving restored incoming content" >&2
+  exit 1
+fi
 
 echo "drill: 3/5 rebuild-projections (recover projections from the restored log)"
 DATABASE_URL="$SCRATCH_URL" npm --prefix "$REPO_ROOT" run -w @coldemail/server rebuild-projections

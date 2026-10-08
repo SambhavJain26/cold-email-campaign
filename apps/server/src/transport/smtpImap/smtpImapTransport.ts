@@ -17,6 +17,7 @@
 // Reads are non-destructive: `source` fetches use BODY.PEEK, so \Seen is not
 // set and the app never deletes or moves anything (docs/07 §1).
 import nodemailer, { type Transporter } from 'nodemailer';
+import { createHash } from 'node:crypto';
 import { ImapFlow } from 'imapflow';
 import {
   TransportAuthError,
@@ -153,6 +154,12 @@ export class SmtpImapTransport implements MailTransport {
         }
         try {
           const highWater = folder.lastPollUid;
+          const epoch = client.mailbox ? String(client.mailbox.uidValidity) : undefined;
+          if ('uidValidity' in folder && folder.uidValidity && folder.uidValidity !== epoch) {
+            throw new Error(
+              `IMAP UIDVALIDITY changed for folder ${folder.name}; cursor requires explicit reconciliation`,
+            );
+          }
           for await (const m of client.fetch(
             { uid: `${highWater + 1}:*` },
             { uid: true, source: true, internalDate: true },
@@ -166,6 +173,7 @@ export class SmtpImapTransport implements MailTransport {
                 uid: m.uid,
                 mailboxId,
                 folder: folder.name,
+                uidValidity: epoch,
                 // imapflow types INTERNALDATE loosely (string | Date).
                 ...(m.internalDate && { internalDate: new Date(m.internalDate) }),
               }),
@@ -198,6 +206,82 @@ export class SmtpImapTransport implements MailTransport {
       }
     } catch (err) {
       throw this.imapError(err);
+    } finally {
+      await client.logout().catch(() => client.close());
+    }
+  }
+
+  async recoverIncoming(input: {
+    mailboxId: number;
+    messageId: string;
+    from: string | null;
+    subject: string | null;
+    receivedAt: Date | null;
+  }): Promise<IncomingMessage> {
+    const conn = await this.opts.connections.load(input.mailboxId);
+    if (!conn) throw new Error('Mailbox connection unavailable.');
+    const client = this.imapClient(conn);
+    const found: IncomingMessage[] = [];
+    try {
+      await client.connect();
+      for (const folder of conn.folders.length ? conn.folders : [{ name: 'INBOX' }]) {
+        const lock = await client.getMailboxLock(folder.name);
+        try {
+          const uids = await client.search(
+            { header: { 'message-id': input.messageId } },
+            { uid: true },
+          );
+          if (!uids || !uids.length) continue;
+          if (uids.length > 100)
+            throw new Error('Message identity is ambiguous; recovery refused.');
+          for await (const raw of client.fetch(
+            uids,
+            { source: true, internalDate: true, uid: true },
+            { uid: true },
+          )) {
+            if (!raw.source) continue;
+            const message = await toIncomingMessage(raw.source, {
+              uid: raw.uid,
+              mailboxId: input.mailboxId,
+              folder: folder.name,
+              uidValidity: client.mailbox ? String(client.mailbox.uidValidity) : undefined,
+              ...(raw.internalDate && { internalDate: new Date(raw.internalDate) }),
+            });
+            if (
+              message.messageId !== input.messageId ||
+              (input.from && message.from !== input.from) ||
+              (input.subject !== null && message.subject !== input.subject) ||
+              (input.receivedAt &&
+                Math.abs(message.receivedAt.getTime() - input.receivedAt.getTime()) > 600000)
+            )
+              throw new Error('Recovered envelope does not match the stored identity.');
+            found.push(message);
+          }
+        } finally {
+          lock.release();
+        }
+      }
+      if (!found.length) throw new Error('Message no longer available in configured folders.');
+      const fingerprints = new Set(
+        found.map((message) =>
+          createHash('sha256')
+            .update(
+              JSON.stringify([
+                message.from,
+                message.subject,
+                message.bodyText,
+                message.bodyHtml,
+                message.contentStatus,
+              ]),
+            )
+            .digest('hex'),
+        ),
+      );
+      if (fingerprints.size !== 1)
+        throw new Error('Conflicting copies share this Message-ID; recovery refused.');
+      return found[0]!;
+    } catch (error) {
+      throw this.imapError(error);
     } finally {
       await client.logout().catch(() => client.close());
     }

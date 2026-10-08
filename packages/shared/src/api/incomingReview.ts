@@ -18,6 +18,9 @@ export const incomingRowSchema = z
   .object({
     lead_id: z.number(),
     enrollment_id: z.number().nullable(),
+    assigned_mailbox_id: z.number().nullable(),
+    next_send_at: isoDateTime.nullable(),
+    resume_due_at: isoDateTime.nullable(),
     campaign_id: z.number(),
     name: z.string(),
     email: z.string(),
@@ -26,6 +29,7 @@ export const incomingRowSchema = z
     campaign_status: z.string(),
     sending_state: sendingStateSchema,
     lifecycle: z.string(),
+    stop_origin: z.enum(['manual', 'legacy']).nullable(),
     delayed_until: isoDateTime.nullable(),
     next_step: z.number().nullable(),
     revision: z.number(),
@@ -53,6 +57,7 @@ export const incomingMessageSchema = z
     automation: automationSchema,
     relationship: relationshipSchema,
     authorship: authorshipSchema,
+    sentiment: z.enum(['positive', 'neutral', 'negative']).nullable(),
     policy_version: z.string(),
     revision: z.number(),
     linking_status: z.string(),
@@ -85,7 +90,16 @@ export const incomingMessageSchema = z
 export type IncomingReviewMessage = z.infer<typeof incomingMessageSchema>;
 export const incomingMessageListSchema = listOf(incomingMessageSchema);
 export const incomingContextSchema = z.object({
+  row: incomingRowSchema.nullable(),
   messages: z.array(incomingMessageSchema),
+  history: z.array(
+    z.object({
+      id: z.number(),
+      kind: z.string(),
+      occurred_at: isoDateTime,
+      attributes: z.record(z.string(), z.unknown()),
+    }),
+  ),
   sent: z.array(
     z.object({
       message_id: z.string(),
@@ -105,8 +119,10 @@ export const reviewActionSchema = reviewMutationSchema
   .extend({
     action: z.enum(['continue', 'delay', 'stop', 'correct_stop', 'restore_legacy', 'suppress']),
     hold_ids: z.array(z.number().int().positive()).default([]),
+    reviewed_message_ids: z.array(z.number().int().positive()).default([]),
     until: isoDateTime.optional(),
     timezone: z.string().optional(),
+    local_time: z.string().optional(),
     reason: z.string().trim().min(1).max(1000).optional(),
     confirm: z.string().optional(),
   })
@@ -131,6 +147,7 @@ export const incomingAckSchema = z
           id: z.number().int().positive(),
           expected_revision: z.number().int().min(0),
           campaign_id: z.number().int().positive().optional(),
+          lead_id: z.number().int().positive().optional(),
         }),
       )
       .min(1)

@@ -41,7 +41,6 @@ import {
   type LeadRow,
 } from '../db/repos/leadsRepo';
 import { listRowsByLead, type EventRow } from '../db/repos/eventsRepo';
-import { removeSuppression } from '../db/repos/suppressionsRepo';
 import { redactAlertsContaining } from '../db/repos/alertsRepo';
 import { listForLead } from '../db/repos/enrollmentsRepo';
 import { getCampaign } from '../db/repos/campaignsRepo';
@@ -51,6 +50,8 @@ import { bulkTier } from '../services/tiering';
 import { createSingleLead } from '../ingest/service';
 import { AppError } from './errors';
 import type { ZodTypeProvider } from './plugins/zodCompilers';
+import { messageIdsForLead, readMessage } from '../db/repos/incomingReviewRepo';
+import { deleteStoredContent } from '../services/incomingContent';
 import {
   clearPersonalizedCopyBlockersForLeadStep,
   createOrReplaceCampaignPersonalizedCopy,
@@ -469,11 +470,11 @@ export async function leadsRoutes(app: FastifyInstance, services: AppServices): 
       if (req.body.confirm.trim().toLowerCase() !== email) {
         throw new AppError('validation', 400, 'confirm must equal the email being removed');
       }
-      const removed = await removeSuppression(db, email, clock.now());
-      if (!removed) throw AppError.notFound('suppression');
-      // decision U: audit-logged as an alert row
-      await insertAlert(db, 'suppression_removed', 'warning', { email });
-      return { ok: true } as const;
+      throw new AppError(
+        'conflict',
+        410,
+        'Suppression is permanent. Address blocks cannot be removed.',
+      );
     },
   );
 
@@ -497,6 +498,13 @@ export async function leadsRoutes(app: FastifyInstance, services: AppServices): 
       const active = enrollmentsForLead.filter(
         (e) => e.currentState === 'ACTIVE' || e.currentState === 'NEW',
       );
+      await store.append([
+        buildEvent.addressSuppressed({
+          leadId: lead.id,
+          occurredAt: now,
+          attributes: { rule: 'manual', operation_id: `erase:${lead.id}` },
+        }),
+      ]);
       if (active.length > 0) {
         await store.append(
           active.map((e) =>
@@ -511,7 +519,18 @@ export async function leadsRoutes(app: FastifyInstance, services: AppServices): 
           ),
         );
       }
-      await removeSuppression(db, lead.email, now).catch(() => undefined);
+      // Retain the minimum address block, including when the lead PII is erased.
+      for (const id of await messageIdsForLead(db, lead.id)) {
+        const message = await readMessage(db, id);
+        if (message)
+          await deleteStoredContent(
+            db,
+            id,
+            { operation_id: `erase:${lead.id}:${id}`, expected_revision: message.revision },
+            now,
+            services.config.INCOMING_DELETION_MANIFEST_PATH,
+          );
+      }
       const ids = enrollmentsForLead.map((e) => e.id);
       // Alert payloads are operator-visible.  Any payload containing the old
       // address is replaced by a non-identifying lineage reference.

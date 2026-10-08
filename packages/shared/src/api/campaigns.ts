@@ -286,6 +286,7 @@ export const outcomesResponseSchema = z
     REPLIED: z.object({ positive: z.number().int(), neutral: z.number().int() }).strict(),
     COMPLETED: z.number().int(),
     STOPPED: z.number().int().default(0),
+    SUPPRESSED: z.number().int().optional(),
     ACTIVE: z.number().int(),
     NEW: z.number().int(),
     total: z.number().int(),

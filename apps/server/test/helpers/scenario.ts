@@ -27,6 +27,7 @@ import { enroll as enrollService } from '../../src/services/enrollment';
 import { TEST_DATABASE_URL, resetCoreTables } from './db';
 
 export interface ScenarioConfig {
+  incomingPolicy?: 'legacy' | 'review';
   mailboxes: number;
   dailyCap?: number;
   sendWindow?: SendWindow;
@@ -150,6 +151,8 @@ export class Scenario {
       alerts: this.alerts,
     });
     this.poller = new Poller({
+      // Locked historical cohorts retain their approved pre-review policy.
+      incomingPolicy: cfg.incomingPolicy ?? 'legacy',
       db: this.db,
       store: this.store,
       transport: this.mock,

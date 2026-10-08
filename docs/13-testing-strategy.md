@@ -1,5 +1,30 @@
 # Testing Strategy — Fixtures, Scenario Runner, Golden Cohort, Gates
 
+## Incoming review release gate
+
+Run database suites serially. Preserve exactly the locked 47 golden tests and their fixtures:
+the internal scenario harness explicitly selects the historical policy, while production uses
+review policy. New intake/scheduler/API suites exercise review holds, separate/threaded automation,
+conservative opt-outs, exact-address sibling holds, company suggestions without automatic action,
+stale decisions, Stop correction, historical compatibility, permanent suppression, acknowledgement,
+retention, linking/authorship credit and content-only recovery. GreenMail verifies PEEK and UIDVALIDITY.
+
+Mock browser coverage includes grouped reading, independent labels, confirmations, acknowledgement
+Undo, deletion, linking, mobile, safe HTML, navigation and Clear all notifications. Real-backend
+browser coverage still uses a local MockTransport and virtual clock; no real prospect sends.
+
+`npx tsx apps/server/test/ops/incoming-review-drill.ts seed` creates only the hard-coded local
+`coldemail_review_verification` database. It refuses nonempty/nonfixture records; `--reset` is
+limited to that synthetic cohort. It calls no transport. `migration` proves preservation down/apply
+for 0028–0032 over populated facts/control/content. Use the canonical rebuild CLI with its explicit
+local database URL; zero checked enrollments is insufficient.
+
+Dump this populated database with custom-format pg_dump, validate its catalog, delete content
+after the dump with drill mode `delete`, restore into `coldemail_review_restore`, and run the
+deletion CLI against the latest independent manifest before serving any restored content.
+Mode `verify-deleted --restored`, canonical rebuild/dry-run and self-check validate retained audit,
+sent snapshots, suppression and deletion. Evidence and exact counts belong in docs/17 after passing.
+
 > **Migration 0019 gate:** preserve the locked 47-test historical golden cohort while adding
 > current A/B lead fixtures, personalized-step scheduler/blocker/retry coverage, 1,000-row
 > 100/100/800 binding, exact campaign membership filtering/bulk actions, migration
@@ -12,14 +37,14 @@ Implements plan §5. Test code layout: `apps/server/test/{unit,integration,fixtu
 
 ## 1. Layers & where they run
 
-| Layer | Tooling | Scope | Runs |
-|---|---|---|---|
-| Unit | Vitest | domain reducer, metrics SQL (against test DB), render, classifier, hygiene, tz, pacing math | every commit |
-| Integration | Vitest + scenario runner | real scheduler+poller+eventStore over MockTransport+VirtualClock+test Postgres | every commit |
-| API | Vitest + `fastify.inject` | every endpoint over seeded golden DB | every commit |
-| E2E | Playwright | web ⇄ real backend (MockTransport) | pre-merge for F stages; full walkthrough replay at milestones |
-| Mail | Vitest + GreenMail container | `SmtpImapTransport` against a REAL SMTP+IMAP server; plus a full scheduler+poller run over it | every commit (B8.1) |
-| Live canary | manual + script | B8.3+ only — real providers (Gmail/Outlook quirks), not business rules | B8 |
+| Layer       | Tooling                      | Scope                                                                                         | Runs                                                          |
+| ----------- | ---------------------------- | --------------------------------------------------------------------------------------------- | ------------------------------------------------------------- |
+| Unit        | Vitest                       | domain reducer, metrics SQL (against test DB), render, classifier, hygiene, tz, pacing math   | every commit                                                  |
+| Integration | Vitest + scenario runner     | real scheduler+poller+eventStore over MockTransport+VirtualClock+test Postgres                | every commit                                                  |
+| API         | Vitest + `fastify.inject`    | every endpoint over seeded golden DB                                                          | every commit                                                  |
+| E2E         | Playwright                   | web ⇄ real backend (MockTransport)                                                            | pre-merge for F stages; full walkthrough replay at milestones |
+| Mail        | Vitest + GreenMail container | `SmtpImapTransport` against a REAL SMTP+IMAP server; plus a full scheduler+poller run over it | every commit (B8.1)                                           |
+| Live canary | manual + script              | B8.3+ only — real providers (Gmail/Outlook quirks), not business rules                        | B8                                                            |
 
 Test DB: dockerized Postgres, one schema per worker (`vitest` globalSetup runs migrations; each file gets a transaction-rollback or truncate isolation helper `withTestDb`).
 
@@ -34,7 +59,7 @@ Test DB: dockerized Postgres, one schema per worker (`vitest` globalSetup runs m
 ## 3. The golden cohort at three levels (plan §5.2 — the flagship regression)
 
 1. **L1 (B1):** load `events.jsonl` → fold reducer → assert terminals 40/18/47/780, Σ=885; rebuild-projections equivalence.
-2. **L2 (B2):** metric functions over that log → assert *every* Part-10 & §13 number: 8.3 / 3.2 / 4.6 / 2.0% / 17 / 2.0-per-100; variant table (13a), step table (13b: 867/612/540/498 delivered, 15/9/1/3 positives), tier table (13c: 255/447/165 contacted, 13/3/1 meetings), Day-34 partial (6.7 / 3.0 / 2.0 at 600 contacted).
+2. **L2 (B2):** metric functions over that log → assert _every_ Part-10 & §13 number: 8.3 / 3.2 / 4.6 / 2.0% / 17 / 2.0-per-100; variant table (13a), step table (13b: 867/612/540/498 delivered, 15/9/1/3 positives), tier table (13c: 255/447/165 contacted, 13/3/1 meetings), Day-34 partial (6.7 / 3.0 / 2.0 at 600 contacted).
 3. **L3 (B3):** run `golden/scenario.ts` through real scheduler+poller over ~49 virtual days → assert the same, plus: no send outside windows, no cap violation on any mailbox-day, threading integrity invariant, every send ≥ minGap×0.8 apart per mailbox.
 
 Any red here after any change = the math stopped closing. These tests are marked `@golden` and must never be skipped.
@@ -45,13 +70,13 @@ Any red here after any change = the math stopped closing. These tests are marked
 const s = await scenario({ mailboxes: 4, dailyCap: 30, sequence: fourStep, startDay: 'Mon' });
 s.importLeads(885, { tiers: { A: 260, B: 455, C: 120, nurture: 50 } });
 s.enroll({ count: 20, tier: 'A' });
-s.onSend('L0042', { outcome: 'hard_bounce', dsn: '5.1.1' });          // scripted per-lead outcomes
+s.onSend('L0042', { outcome: 'hard_bounce', dsn: '5.1.1' }); // scripted per-lead outcomes
 s.onSend('L0007', { outcome: 'soft_bounce_then_deliver', retries: 1 });
 s.replyAfter('L0101', { days: 2, text: 'Yeah we have this problem…' });
-s.replyAfter('L0300', { days: 1, text: 'Remove me.' });               // exercises STOP auto-detect
+s.replyAfter('L0300', { days: 1, text: 'Remove me.' }); // exercises STOP auto-detect
 s.oooAfter('L0150', { days: 0 });
-await s.advanceDays(3);                                               // VirtualClock jump; ticks+polls run at
-                                                                      //   configured intervals along the way
+await s.advanceDays(3); // VirtualClock jump; ticks+polls run at
+//   configured intervals along the way
 s.expectEnrollment('L0300', { state: 'UNSUBSCRIBED' });
 s.expectMailboxSends('mb1', { day: 3, atMost: 30 });
 s.expectMetric('replyRate', { num: 2, den: 60 });

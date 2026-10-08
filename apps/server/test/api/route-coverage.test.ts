@@ -12,6 +12,24 @@ import { testConfig } from './helpers/app';
 
 /** The contract manifest (docs/10) — METHOD + path of every v1 route. */
 const CONTRACT_ROUTES = [
+  'GET /api/v1/unibox/rows',
+  'GET /api/v1/unibox/rows/:id/messages',
+  'GET /api/v1/unibox/lead-messages',
+  'GET /api/v1/unibox/messages/:id',
+  'GET /api/v1/unibox/needs-linking',
+  'GET /api/v1/unibox/link-candidates',
+  'GET /api/v1/unibox/retention',
+  'PUT /api/v1/unibox/retention',
+  'POST /api/v1/unibox/rows/:id/action',
+  'POST /api/v1/unibox/lead-action',
+  'POST /api/v1/unibox/messages/:id/link',
+  'POST /api/v1/unibox/messages/:id/unrelated',
+  'POST /api/v1/unibox/messages/:id/authorship',
+  'POST /api/v1/unibox/messages/:id/suppress-address',
+  'POST /api/v1/unibox/messages/:id/recover-content',
+  'POST /api/v1/unibox/acknowledgements',
+  'DELETE /api/v1/unibox/messages/:id/content',
+  'POST /api/v1/alerts/ack-all',
   'GET /health',
   // Public unsubscribe (docs/16 §8) — deliberately outside /api/v1 so it
   // inherits neither the session plugin nor the CSRF check.

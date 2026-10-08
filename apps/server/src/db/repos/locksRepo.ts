@@ -16,7 +16,8 @@ export async function lockEnrollment(db: DbLike, enrollmentId: number): Promise<
   await db.execute(sql`SELECT pg_advisory_xact_lock(1, ${enrollmentId})`);
 }
 
-/** Lock order: rebuild, capacity (when enrolling), sorted leads, sorted enrollments, mailbox rows.
+/** Lock order: rebuild, capacity (when enrolling), campaign rows (if needed), identity locks,
+ * sorted leads, sorted enrollments, message rows, mailbox rows.
  * Address uniqueness makes the lead lock the shared inbound/outbound identity lock.
  */
 export async function lockLead(db: DbLike, leadId: number): Promise<void> {
@@ -25,5 +26,6 @@ export async function lockLead(db: DbLike, leadId: number): Promise<void> {
 
 /** Serializes manual and automatic capacity reservation across campaigns. */
 export async function acquireEnrollmentCapacityLock(db: DbLike): Promise<void> {
+  await acquireRebuildLockShared(db);
   await db.execute(sql`SELECT pg_advisory_xact_lock(3, 0)`);
 }

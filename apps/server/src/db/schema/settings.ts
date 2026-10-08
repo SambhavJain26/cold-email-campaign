@@ -1,5 +1,6 @@
 // Mirrors 0002_seed.up.sql (docs/03 §3). Single-row tables (id = 1).
 import { boolean, integer, numeric, pgTable, text, timestamp } from 'drizzle-orm/pg-core';
+import { sql } from 'drizzle-orm';
 
 const tz = (name: string) => timestamp(name, { withTimezone: true, mode: 'date' });
 
@@ -32,6 +33,9 @@ export const settings = pgTable('settings', {
   updatedAt: tz('updated_at').notNull().defaultNow(),
   incomingStopSince: tz('incoming_stop_since').notNull().defaultNow(),
   incomingContentRetentionDays: integer('incoming_content_retention_days').default(30),
+  incomingIdentityEpoch: text('incoming_identity_epoch')
+    .notNull()
+    .default(sql`gen_random_uuid()::text`),
 });
 
 export const complianceSettings = pgTable('compliance_settings', {

@@ -5,6 +5,7 @@ import { CapacityExceededError } from '../../services/enrollment';
 import { FatalChecksError, MailboxUnhealthyError } from '../../services/manualCompose';
 import { AppError, toEnvelope } from '../errors';
 import { RequestValidationError } from './zodCompilers';
+import { IncomingReviewError } from '../../services/incomingReviewActions';
 
 /**
  * Central error mapping (docs/02 §6): AppError → its envelope; zod request
@@ -15,6 +16,10 @@ import { RequestValidationError } from './zodCompilers';
  */
 export function registerErrorHandling(app: FastifyInstance): void {
   app.setErrorHandler((err: unknown, req, reply) => {
+    if (err instanceof IncomingReviewError)
+      return reply
+        .status(err.code === 'not_found' ? 404 : err.code === 'validation' ? 400 : 409)
+        .send(toEnvelope(err.code, err.message));
     if (err instanceof AppError) {
       return reply.status(err.statusCode).send(toEnvelope(err.code, err.message, err.details));
     }

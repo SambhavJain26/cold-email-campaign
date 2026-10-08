@@ -4,7 +4,6 @@
 // manual-send → sent on an existing active manual enrollment.
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { getById } from '../../src/db/repos/enrollmentsRepo';
-import { getLeadByEmail } from '../../src/db/repos/leadsRepo';
 import { seedMailboxes } from '../helpers/db';
 import { createApiHarness, type ApiHarness } from './helpers/app';
 import { eventWatermark, expectAppended, expectNoNewEvents } from './helpers/events';
@@ -227,87 +226,50 @@ describe('B6.7 unibox + B6.8 manual-sends', () => {
     ).toBe(409);
   });
 
-  it('reply disposition is append-only, idempotent, and clears the review queue', async () => {
+  it('retired dispositions cannot silently suppress or release legacy replies', async () => {
     const wm = await eventWatermark(h.pool);
-    const res = await h.inject({
-      method: 'POST',
-      url: '/api/v1/unibox/1/disposition',
-      payload: { disposition: 'interested' },
-    });
-    expect(res.statusCode).toBe(200);
-    expect(res.json()).toMatchObject({ disposition: 'interested', recontact_after: null });
-    await expectAppended(h.pool, wm, { reply_dispositioned: 1 });
-
-    const retryWatermark = await eventWatermark(h.pool);
-    const retry = await h.inject({
-      method: 'POST',
-      url: '/api/v1/unibox/1/disposition',
-      payload: { disposition: 'interested' },
-    });
-    expect(retry.statusCode).toBe(200);
-    await expectNoNewEvents(h.pool, retryWatermark);
-
-    const unhandled = (
-      await h.inject({ method: 'GET', url: '/api/v1/unibox?unhandled=true' })
-    ).json();
-    expect(unhandled.total).toBe(0);
-
-    const pastNotNow = await h.inject({
-      method: 'POST',
-      url: '/api/v1/unibox/1/disposition',
-      payload: { disposition: 'not_now', recontact_after: '2020-01-01T00:00:00.000Z' },
-    });
-    expect(pastNotNow.statusCode).toBe(400);
+    for (const disposition of [
+      'interested',
+      'not_now',
+      'not_interested',
+      'wrong_person',
+      'explicit_unsubscribe',
+    ]) {
+      const response = await h.inject({
+        method: 'POST',
+        url: '/api/v1/unibox/1/disposition',
+        payload: { disposition },
+      });
+      expect(response.statusCode).toBe(410);
+    }
+    await expectNoNewEvents(h.pool, wm);
+    expect((await getById(h.services.db, 1))!.currentState).toBe('REPLIED');
   });
 
-  it('meeting-booked appends its milestone event; state unchanged', async () => {
+  it('manual reminders remain independent of outreach and completion does not send', async () => {
     const wm = await eventWatermark(h.pool);
-    const res = await h.inject({ method: 'POST', url: '/api/v1/enrollments/1/meeting-booked' });
-    expect(res.statusCode).toBe(200);
-    await expectAppended(h.pool, wm, { meeting_booked: 1 });
-    const e = await getById(h.services.db, 1);
-    expect(e!.currentState).toBe('REPLIED'); // milestone flag, not a state
-    expect(e!.meetingBooked).toBe(true);
-    const item = (await h.inject({ method: 'GET', url: '/api/v1/unibox' })).json().items[0];
-    expect(item.meeting_booked).toBe(true);
-  });
-
-  it('Not now creates a reminder; completing it neither sends nor authorizes contact', async () => {
-    const wm = await eventWatermark(h.pool);
-    const disposition = await h.inject({
+    const created = await h.inject({
       method: 'POST',
-      url: '/api/v1/unibox/1/disposition',
-      payload: { disposition: 'not_now', recontact_after: '2099-02-03' },
+      url: '/api/v1/unibox/1/reminders',
+      payload: { due_date: '2099-02-03', note: 'Operator follow-up' },
     });
-    expect(disposition.statusCode, disposition.body).toBe(200);
-    expect(disposition.json().recontact_after).toBe('2099-02-03');
-    await expectAppended(h.pool, wm, { reply_dispositioned: 1 });
-
-    const reminders = (
-      await h.inject({ method: 'GET', url: '/api/v1/reminders?view=upcoming' })
+    expect(created.statusCode).toBe(200);
+    const list = (
+      await h.inject({ method: 'GET', url: '/api/v1/reminders?view=all&status=open' })
     ).json();
-    expect(reminders.open_count).toBe(1);
-    expect(reminders.items[0]).toMatchObject({
-      enrollment_id: 1,
-      incoming_message_id: 1,
-      due_date: '2099-02-03',
-      source: 'not_now',
-      status: 'open',
-    });
-
-    const completeWm = await eventWatermark(h.pool);
+    expect(list.items).toHaveLength(1);
+    expect(list.items[0].note).toBe('Operator follow-up');
     expect(
       (
         await h.inject({
           method: 'PATCH',
-          url: `/api/v1/reminders/${reminders.items[0].id}`,
+          url: `/api/v1/reminders/${list.items[0].id}`,
           payload: { status: 'done' },
         })
       ).statusCode,
     ).toBe(200);
-    await expectNoNewEvents(h.pool, completeWm);
-    const refreshed = (await h.inject({ method: 'GET', url: '/api/v1/unibox/1' })).json();
-    expect(refreshed.recontact_after).toBe('2099-02-03');
+    await expectNoNewEvents(h.pool, wm);
+    expect((await getById(h.services.db, 1))!.currentState).toBe('REPLIED');
   });
 
   it('reply snooze is refused; reminders replace it without appending an event', async () => {
@@ -318,21 +280,18 @@ describe('B6.7 unibox + B6.8 manual-sends', () => {
       url: '/api/v1/enrollments/1/snooze',
       payload: { until },
     });
-    expect(res.statusCode).toBe(409);
+    expect(res.statusCode).toBe(410);
     expect((await getById(h.services.db, 1))!.snoozedUntil).toBeNull();
     await expectNoNewEvents(h.pool, wm);
   });
 
-  it('manual unsubscribe appends unsubscribe(manual); suppression side effect fires', async () => {
+  it('legacy unsubscribe route requires the explicit permanent-suppression confirmation', async () => {
     const wm = await eventWatermark(h.pool);
-    const res = await h.inject({ method: 'POST', url: '/api/v1/enrollments/1/unsubscribe' });
-    expect(res.statusCode).toBe(200);
-    await expectAppended(h.pool, wm, { unsubscribe: 1 });
-    const e = await getById(h.services.db, 1);
-    expect(e!.currentState).toBe('UNSUBSCRIBED');
-    const lead = await getLeadByEmail(h.services.db, 'rita@reply.dev');
-    expect(lead!.isSuppressed).toBe(true);
-    expect(lead!.suppressionReason).toBe('unsubscribed');
+    expect(
+      (await h.inject({ method: 'POST', url: '/api/v1/enrollments/1/unsubscribe' })).statusCode,
+    ).toBe(410);
+    await expectNoNewEvents(h.pool, wm);
+    expect((await getById(h.services.db, 1))!.currentState).toBe('REPLIED');
   });
 
   it('manual-send is permanently retired in favor of sequence-only personalized copy', async () => {

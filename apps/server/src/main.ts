@@ -5,11 +5,17 @@ import { createLogger } from './config/logger';
 import { compose } from './composition';
 import { buildServer } from './api/server';
 import { ensureOperator } from './services/operatorAuth';
+import { reapplyDeletionManifest } from './services/incomingContent';
 
 async function main(): Promise<void> {
   const config = loadConfig();
   const logger = createLogger(config);
   const services = compose(config);
+  await reapplyDeletionManifest(
+    services.db,
+    config.INCOMING_DELETION_MANIFEST_PATH,
+    config.NODE_ENV === 'production',
+  );
 
   // First-boot operator seed (decision I) — idempotent, before the API serves.
   await ensureOperator(services.db, config);

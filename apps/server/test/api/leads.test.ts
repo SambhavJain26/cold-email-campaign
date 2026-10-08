@@ -135,44 +135,22 @@ describe('B6.3 leads', () => {
     await expectNoNewEvents(h.pool, wm); // bulk-tier: none (traceability)
   });
 
-  it('DELETE /suppressions/:email — typed confirm, audit alert, projection cleared', async () => {
+  it('retired unsuppression cannot remove permanent protection', async () => {
     await suppressLead(h.services.db, 2, 'manual', h.clock.now());
-    expect((await getLeadById(h.services.db, 2))!.isSuppressed).toBe(true);
-
-    const wrong = await h.inject({
-      method: 'DELETE',
-      url: '/api/v1/suppressions/bob@bravo.dev',
-      payload: { confirm: 'nope@bravo.dev' },
-    });
-    expect(wrong.statusCode).toBe(400);
-
     const wm = await eventWatermark(h.pool);
-    const ok = await h.inject({
-      method: 'DELETE',
-      url: '/api/v1/suppressions/bob@bravo.dev',
-      payload: { confirm: 'bob@bravo.dev' },
-    });
-    expect(ok.statusCode).toBe(200);
-    const lead = await getLeadById(h.services.db, 2);
-    expect(lead!.isSuppressed).toBe(false);
-    expect(lead!.suppressionReason).toBeNull();
-    await expectNoNewEvents(h.pool, wm); // removal is alert-audited, not event-logged
-
-    const alerts = (await h.inject({ method: 'GET', url: '/api/v1/alerts?unacked=true' })).json();
+    for (const confirm of ['nope@bravo.dev', 'bob@bravo.dev']) {
+      const response = await h.inject({
+        method: 'DELETE',
+        url: '/api/v1/suppressions/bob@bravo.dev',
+        payload: { confirm },
+      });
+      expect(response.statusCode).toBe(confirm === 'bob@bravo.dev' ? 410 : 400);
+    }
+    expect((await getLeadById(h.services.db, 2))!.isSuppressed).toBe(true);
     expect(
-      alerts.items.some(
-        (a: { kind: string; payload: { email?: string } }) =>
-          a.kind === 'suppression_removed' && a.payload.email === 'bob@bravo.dev',
-      ),
-    ).toBe(true);
-
-    // no longer suppressed → 404 on repeat
-    const again = await h.inject({
-      method: 'DELETE',
-      url: '/api/v1/suppressions/bob@bravo.dev',
-      payload: { confirm: 'bob@bravo.dev' },
-    });
-    expect(again.statusCode).toBe(404);
+      (await h.pool.query("SELECT email FROM suppressions WHERE email='bob@bravo.dev'")).rows,
+    ).toHaveLength(1);
+    await expectNoNewEvents(h.pool, wm);
   });
 
   it('POST /leads/:id/erase irreversibly redacts PII and stops an active enrollment', async () => {
@@ -256,7 +234,7 @@ describe('B6.3 leads', () => {
       SELECT attributes FROM events WHERE enrollment_id = 2 AND type = 'unsubscribe'`);
     expect(eraseEvent.rows[0].attributes).toEqual({ data_erasure: true });
     expect((await h.pool.query(`SELECT 1 FROM suppressions WHERE lead_id = 4`)).rows).toHaveLength(
-      0,
+      1,
     );
     const alert = await h.pool.query(`SELECT payload FROM alerts WHERE kind = 'operator_note'`);
     expect(alert.rows[0].payload).toEqual({ lead_id: 4 });

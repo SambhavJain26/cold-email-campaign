@@ -101,7 +101,7 @@ export async function campaignCounts(db: DbLike, campaignId: number): Promise<Ca
       (SELECT count(DISTINCT ev.lead_id)::int FROM events ev
         WHERE ev.campaign_id = ${campaignId} AND ev.type = 'sent'
           AND EXISTS (SELECT 1 FROM ${leads} l WHERE l.id = ev.lead_id AND NOT l.is_erased)) AS contacted,
-      (SELECT count(DISTINCT ev.lead_id)::int FROM events ev
+      (SELECT count(DISTINCT ev.lead_id)::int FROM metric_events_at() ev
         WHERE ev.campaign_id = ${campaignId}
           AND ev.type IN ('delivered', 'human_reply', 'unsubscribe')
           AND EXISTS (SELECT 1 FROM ${leads} l WHERE l.id = ev.lead_id AND NOT l.is_erased)) AS delivery_confirmed,
@@ -109,20 +109,22 @@ export async function campaignCounts(db: DbLike, campaignId: number): Promise<Ca
         WHERE sent.campaign_id = ${campaignId} AND sent.type = 'sent'
           AND EXISTS (SELECT 1 FROM ${leads} l WHERE l.id = sent.lead_id AND NOT l.is_erased)
           AND NOT EXISTS (
-            SELECT 1 FROM events resolved
+            SELECT 1 FROM metric_events_at() resolved
             WHERE resolved.campaign_id = sent.campaign_id
               AND resolved.lead_id = sent.lead_id
               AND resolved.type IN ('delivered', 'hard_bounce', 'human_reply', 'unsubscribe')
           )) AS pending_delivery_confirmation,
       (SELECT count(*)::int FROM enrollments e JOIN ${leads} l ON l.id = e.lead_id AND NOT l.is_erased
         WHERE e.campaign_id = ${campaignId}
-          AND e.current_state IN ('REPLIED', 'BOUNCED', 'UNSUBSCRIBED', 'COMPLETED', 'STOPPED')) AS finished,
+          AND (e.current_state IN ('REPLIED', 'BOUNCED', 'UNSUBSCRIBED', 'COMPLETED', 'STOPPED')
+            OR l.is_suppressed OR EXISTS (SELECT 1 FROM suppressions s WHERE s.email=l.email))) AS finished,
       (SELECT count(*)::int
         FROM enrollments e
         JOIN ${leads} l ON l.id = e.lead_id AND NOT l.is_erased
         JOIN ${campaigns} c ON c.id = e.campaign_id
         WHERE e.campaign_id = ${campaignId}
           AND e.current_state = 'ACTIVE'
+          AND NOT l.is_suppressed AND NOT EXISTS (SELECT 1 FROM suppressions s WHERE s.email=l.email)
           AND e.next_send_at IS NULL
           AND c.sequence_id IS NOT NULL
           AND e.current_step_no > (
@@ -132,6 +134,7 @@ export async function campaignCounts(db: DbLike, campaignId: number): Promise<Ca
       (SELECT count(*)::int FROM enrollments e JOIN ${leads} l ON l.id = e.lead_id AND NOT l.is_erased
         WHERE e.campaign_id = ${campaignId}
           AND e.personalization_mode = 'human_written'
+          AND NOT l.is_suppressed AND NOT EXISTS (SELECT 1 FROM suppressions s WHERE s.email=l.email)
           AND e.current_state IN ('NEW', 'ACTIVE')) AS manual_only`);
   const row = res.rows[0] as {
     enrolled: number;
@@ -276,7 +279,10 @@ export async function outcomeCounts(
   campaignId: number,
 ): Promise<Array<{ state: string; sentiment: string | null; n: number }>> {
   const res = await db.execute(sql`
-    SELECT current_state AS state, best_reply_sentiment AS sentiment, count(*)::int AS n
+    SELECT CASE WHEN current_state IN ('NEW','ACTIVE') AND
+      (l.is_suppressed OR EXISTS (SELECT 1 FROM suppressions s WHERE s.email=l.email))
+      THEN 'SUPPRESSED' ELSE current_state::text END AS state,
+      best_reply_sentiment AS sentiment, count(*)::int AS n
     FROM enrollments e JOIN ${leads} l ON l.id = e.lead_id AND NOT l.is_erased
     WHERE e.campaign_id = ${campaignId} GROUP BY 1, 2`);
   return res.rows as Array<{ state: string; sentiment: string | null; n: number }>;

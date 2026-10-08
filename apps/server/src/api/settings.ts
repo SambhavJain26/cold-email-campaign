@@ -100,6 +100,13 @@ export async function settingsRoutes(app: FastifyInstance, services: AppServices
     '/settings',
     { schema: { body: putSettingsBodySchema, response: { 200: settingsResponseSchema } } },
     async (req) => {
+      if (req.body.suppress_unsubs === false || req.body.optout_detection === 'tag_only') {
+        throw new AppError(
+          'validation',
+          400,
+          'Explicit opt-out protection is mandatory and cannot be disabled.',
+        );
+      }
       const current = await getSettings(db);
       if (
         req.body.delivery_confirm_hours !== current.deliveryConfirmHours &&

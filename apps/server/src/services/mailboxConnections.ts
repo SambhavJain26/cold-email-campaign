@@ -60,11 +60,13 @@ export class DbMailboxConnectionProvider implements MailboxConnectionProvider {
   private async foldersFor(
     mailboxId: number,
     configured: string[],
-  ): Promise<{ name: string; lastPollUid: number }[]> {
-    const cursors = new Map(
-      (await listCursors(this.deps.db, mailboxId)).map((c) => [c.folder, c.lastPollUid]),
-    );
+  ): Promise<{ name: string; lastPollUid: number; uidValidity?: string | null }[]> {
+    const cursors = new Map((await listCursors(this.deps.db, mailboxId)).map((c) => [c.folder, c]));
     const names = configured.length > 0 ? configured : ['INBOX'];
-    return names.map((name) => ({ name, lastPollUid: cursors.get(name) ?? 0 }));
+    return names.map((name) => ({
+      name,
+      lastPollUid: cursors.get(name)?.lastPollUid ?? 0,
+      uidValidity: cursors.get(name)?.uidValidity ?? null,
+    }));
   }
 }

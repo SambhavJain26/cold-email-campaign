@@ -162,6 +162,10 @@ export async function countFollowupsDue(db: DbLike, before: Date): Promise<numbe
         isNotNull(enrollments.assignedMailboxId), // assigned at first send ⇒ ≥1 sent
         lt(enrollments.nextSendAt, before),
         eq(leads.isErased, false),
+        eq(leads.isSuppressed, false),
+        sql`cardinality(${enrollments.reviewHoldIds}) = 0`,
+        or(isNull(enrollments.delayedUntil), lt(enrollments.delayedUntil, before)),
+        sql`NOT EXISTS (SELECT 1 FROM suppressions s WHERE s.email = ${leads.email})`,
       ),
     );
   return rows[0]?.n ?? 0;
@@ -177,6 +181,9 @@ export async function countPendingOpenersDue(db: DbLike, before: Date): Promise<
      WHERE e.current_state = 'ACTIVE'
        AND e.assigned_mailbox_id IS NULL
        AND e.current_step_no = 1
+       AND cardinality(e.review_hold_ids) = 0
+       AND (e.delayed_until IS NULL OR e.delayed_until < ${before})
+       AND NOT EXISTS (SELECT 1 FROM suppressions s WHERE s.email = l.email)
        AND e.next_send_at < ${before}`);
   return Number((result.rows[0] as { n?: number } | undefined)?.n ?? 0);
 }

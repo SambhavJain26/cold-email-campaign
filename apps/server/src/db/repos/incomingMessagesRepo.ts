@@ -225,6 +225,10 @@ export async function existsByUid(db: DbLike, mailboxId: number, uid: number): P
 }
 
 /** Idempotency check 2: same inbound Message-ID seen via another mailbox/UID. */
+export async function allByMessageId(db: DbLike, messageId: string): Promise<IncomingMessageRow[]> {
+  return db.select().from(incomingMessages).where(eq(incomingMessages.messageId, messageId));
+}
+
 export async function findByMessageId(
   db: DbLike,
   messageId: string,

@@ -18,7 +18,14 @@ describe('incoming company stops', () => {
   const clock = new VirtualClock('2026-10-06T12:00:00Z');
   const transport = new MockTransport(clock);
   const store = new EventStore(db);
-  const poller = new Poller({ db, store, clock, transport, alerts: new CapturingAlerts() });
+  const poller = new Poller({
+    db,
+    store,
+    clock,
+    transport,
+    alerts: new CapturingAlerts(),
+    incomingPolicy: 'legacy',
+  });
   beforeAll(async () => {
     await resetCoreTables(pool);
     await seedMailboxes(pool, 1);

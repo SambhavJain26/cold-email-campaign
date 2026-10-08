@@ -21,6 +21,12 @@ DUMP="$BACKUP_DIR/coldemail-$STAMP.dump"
 
 # -Fc = custom format; restore with `pg_restore -d <db>`.
 pg_dump -Fc --no-owner --no-privileges "$DATABASE_URL" -f "$DUMP"
+if [ -n "${INCOMING_DELETION_MANIFEST_PATH:-}" ]; then
+  # Keep the independent live manifest volume; a dump-time copy alone cannot
+  # protect a restore from deletions that occurred AFTER that dump.
+  cp "$INCOMING_DELETION_MANIFEST_PATH" "$BACKUP_DIR/incoming-deletions.latest.jsonl.tmp"
+  mv "$BACKUP_DIR/incoming-deletions.latest.jsonl.tmp" "$BACKUP_DIR/incoming-deletions.latest.jsonl"
+fi
 echo "backup: wrote $DUMP ($(wc -c < "$DUMP") bytes)"
 
 # Sunday (ISO weekday 7) → keep a weekly copy.

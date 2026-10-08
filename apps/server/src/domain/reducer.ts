@@ -53,7 +53,12 @@ function toTerminal(s: EnrollmentSnapshot, t: TerminalState, at: Date): Enrollme
   // Precedence (spec Part 3): an incoming terminal only wins if its priority
   // is >= the current terminal's. terminalAt keeps the FIRST terminal time.
   if (isTerminal(s.state) && TERMINAL_PRIORITY[t] < TERMINAL_PRIORITY[s.state]) return s;
-  return { ...s, state: t, terminalAt: isTerminal(s.state) ? s.terminalAt : at };
+  return {
+    ...s,
+    state: t,
+    terminalAt: isTerminal(s.state) ? s.terminalAt : at,
+    ...(s.reviewHoldIds !== undefined ? { reviewHoldIds: [] } : {}),
+  };
 }
 
 function bumpSentiment(s: EnrollmentSnapshot, replyEventId: number, sentiment: Sentiment | null) {
@@ -86,7 +91,7 @@ export function applyEvent(
             delayedUntil:
               e.attributes.action === 'delay' && e.attributes.until
                 ? new Date(e.attributes.until)
-                : null,
+                : (s.delayedUntil ?? null),
             reviewRevision: e.id!,
           };
     case 'sequence_stopped':
@@ -113,7 +118,11 @@ export function applyEvent(
             delayedUntil: null,
           };
     case 'incoming_authorship_confirmed':
-      return bumpSentiment(s, -e.attributes.incoming_message_id, e.attributes.authorship === 'human' ? e.sentiment : null);
+      return bumpSentiment(
+        s,
+        -e.attributes.incoming_message_id,
+        e.attributes.authorship === 'human' ? e.sentiment : null,
+      );
     case 'address_suppressed':
       return { ...s, reviewHoldIds: [], reviewRevision: e.id! };
     case 'enrolled':

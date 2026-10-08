@@ -72,6 +72,7 @@ import {
   type PersonalizedCopyBlockerReason,
 } from '../db/repos/manualDraftsRepo';
 import type { RenderedMessage } from '../render/types';
+import { sendAuthorized, lockSendingCampaign } from '../db/repos/sendAuthorizationRepo';
 
 const SCHEDULER_LOCK = [2, 0] as const; // advisory keyspace: (2,0) = tick
 
@@ -621,106 +622,133 @@ export class Scheduler {
     // enrollment lock EventStore uses for inbound poller appends.  A reply that
     // gets the lock first turns the projection terminal and this sends nothing.
     let acceptedAt = now;
-    const result = await store.withEnrollmentLock(e.id, async (tx) => {
-      const current = await getEnrollmentById(tx, e.id);
-      if (!current || current.currentState !== 'ACTIVE') return null;
-      // Range edits and sends share this row lock. Recheck the persisted deadline
-      // and cap after locking, so an edit or concurrent manual send cannot race.
-      const mailbox = await lockMailbox(tx, mb.id);
-      if (!mailbox || mailbox.status !== 'ok') return null;
-      if (mailbox.sendIntervalMinMinutes !== null) {
-        if (mailbox.nextAllowedSendAt !== null && now < mailbox.nextAllowedSendAt) return null;
-        const sentToday = await countSentSince(tx, mb.id, startOfLocalDay(now, mailbox.timezone));
-        if (sentToday >= (mailbox.resumeCap ?? mailbox.dailyCap)) return null;
+    const result = await store.withEnrollmentLock(
+      e.id,
+      async (tx) => {
+        const current = await getEnrollmentById(tx, e.id);
+        if (
+          !current ||
+          current.currentState !== 'ACTIVE' ||
+          current.reviewHoldIds.length > 0 ||
+          (current.delayedUntil && current.delayedUntil > now) ||
+          (current.snoozedUntil && current.snoozedUntil > now) ||
+          !current.nextSendAt ||
+          current.nextSendAt > now ||
+          current.currentStepNo !== e.currentStepNo ||
+          current.nextSendAt.getTime() !== e.nextSendAt.getTime() ||
+          (e.reviewRevision !== undefined && current.reviewRevision !== e.reviewRevision) ||
+          (current.assignedMailboxId !== null && current.assignedMailboxId !== mb.id) ||
+          !(await sendAuthorized(tx, e.leadId, e.campaignId))
+        )
+          return null;
+        // Range edits and sends share this row lock. Recheck the persisted deadline
+        // and cap after locking, so an edit or concurrent manual send cannot race.
+        const mailbox = await lockMailbox(tx, mb.id);
+        if (!mailbox || mailbox.status !== 'ok') return null;
+        const countToday = await countSentSince(tx, mb.id, startOfLocalDay(now, mailbox.timezone));
+        if (countToday >= (mailbox.resumeCap ?? mailbox.dailyCap)) return null;
         if (
           settings.enforceSendWindow &&
           !insideWindow(mailbox.sendWindow, now, resolveTimezone(e.leadState, mailbox.timezone))
         )
           return null;
-      }
-      const delivery = await transport.send(msg);
-      if (!delivery.accepted) return delivery;
-      acceptedAt = this.deps.clock.now();
+        if (mailbox.sendIntervalMinMinutes !== null) {
+          if (mailbox.nextAllowedSendAt !== null && now < mailbox.nextAllowedSendAt) return null;
+          const sentToday = await countSentSince(tx, mb.id, startOfLocalDay(now, mailbox.timezone));
+          if (sentToday >= (mailbox.resumeCap ?? mailbox.dailyCap)) return null;
+          if (
+            settings.enforceSendWindow &&
+            !insideWindow(mailbox.sendWindow, now, resolveTimezone(e.leadState, mailbox.timezone))
+          )
+            return null;
+        }
+        const delivery = await transport.send(msg);
+        if (!delivery.accepted) return delivery;
+        acceptedAt = this.deps.clock.now();
 
-      const nextStep = stepOf(seq, stepNo + 1);
-      const nextSendAt = nextStep
-        ? new Date(acceptedAt.getTime() + nextStep.waitDays * 86_400_000)
-        : null;
-      await store.appendUnderEnrollmentLock(
-        tx,
-        e.id,
-        [
-          buildEvent.sent({
-            leadId: e.leadId,
-            enrollmentId: e.id,
-            campaignId: e.campaignId,
-            occurredAt: acceptedAt,
-            stepNo,
-            mailboxId: mb.id,
-            messageId,
-            attributes: {
-              content_hash: rendered.contentHash,
-              ...(!personalized && { variant_id: variant!.id }),
-              content_source: personalized ? 'personalized' : 'template',
-              ...(personalizedCopy && { personalized_copy_id: personalizedCopy.id }),
-            },
-          }),
-        ],
-        {
-          patches: [
-            {
-              enrollmentId: e.id,
-              nextSendAt,
-              // fixed at FIRST send; every later step threads from this mailbox
-              assignedMailboxId: e.assignedMailboxId ?? mb.id,
-            },
-          ],
-          txWork: async (lockedTx, eventIds) => {
-            await patchMailbox(lockedTx, mb.id, {
-              lastSendAt: acceptedAt,
-              nextAllowedSendAt:
-                mailbox.sendIntervalMinMinutes !== null && mailbox.sendIntervalMaxMinutes !== null
-                  ? nextAllowedSendAt(
-                      acceptedAt,
-                      mailbox.sendIntervalMinMinutes,
-                      mailbox.sendIntervalMaxMinutes,
-                      this.deps.rng,
-                    )
-                  : null,
-            });
-            await insertSentMessage(lockedTx, {
-              messageId,
-              enrollmentId: e.id,
+        const nextStep = stepOf(seq, stepNo + 1);
+        const nextSendAt = nextStep
+          ? new Date(acceptedAt.getTime() + nextStep.waitDays * 86_400_000)
+          : null;
+        await store.appendUnderEnrollmentLock(
+          tx,
+          e.id,
+          [
+            buildEvent.sent({
               leadId: e.leadId,
-              mailboxId: mb.id,
+              enrollmentId: e.id,
+              campaignId: e.campaignId,
+              occurredAt: acceptedAt,
               stepNo,
-              contentHash: rendered.contentHash,
-              renderedSubject: rendered.subject,
-              renderedBodyText: rendered.bodyText,
-              renderedBodyHtml: rendered.bodyHtml,
-              emailFormat:
-                rendered.emailFormat ?? (rendered.bodyHtml ? 'minimal_html' : 'plain_text'),
-              contentSource: personalized ? 'personalized' : 'template',
-              personalizedCopyId: personalizedCopy?.id ?? retrySnapshot?.personalizedCopyId ?? null,
-              sentAt: acceptedAt,
-            });
-            if (personalizedCopy) {
-              await markManualDraftSent(
-                lockedTx,
-                personalizedCopy.id,
+              mailboxId: mb.id,
+              messageId,
+              attributes: {
+                content_hash: rendered.contentHash,
+                ...(!personalized && { variant_id: variant!.id }),
+                content_source: personalized ? 'personalized' : 'template',
+                ...(personalizedCopy && { personalized_copy_id: personalizedCopy.id }),
+              },
+            }),
+          ],
+          {
+            patches: [
+              {
+                enrollmentId: e.id,
+                nextSendAt,
+                // fixed at FIRST send; every later step threads from this mailbox
+                assignedMailboxId: e.assignedMailboxId ?? mb.id,
+              },
+            ],
+            txWork: async (lockedTx, eventIds) => {
+              await patchMailbox(lockedTx, mb.id, {
+                lastSendAt: acceptedAt,
+                nextAllowedSendAt:
+                  mailbox.sendIntervalMinMinutes !== null && mailbox.sendIntervalMaxMinutes !== null
+                    ? nextAllowedSendAt(
+                        acceptedAt,
+                        mailbox.sendIntervalMinMinutes,
+                        mailbox.sendIntervalMaxMinutes,
+                        this.deps.rng,
+                      )
+                    : null,
+              });
+              await insertSentMessage(lockedTx, {
                 messageId,
-                eventIds[0]!,
-                acceptedAt,
-              );
-            }
-            if (opts.acceptedTxWork) {
-              await opts.acceptedTxWork(lockedTx, eventIds[0]!, messageId);
-            }
+                enrollmentId: e.id,
+                leadId: e.leadId,
+                mailboxId: mb.id,
+                stepNo,
+                contentHash: rendered.contentHash,
+                renderedSubject: rendered.subject,
+                conversationRootId: references?.[0] ?? messageId,
+                renderedBodyText: rendered.bodyText,
+                renderedBodyHtml: rendered.bodyHtml,
+                emailFormat:
+                  rendered.emailFormat ?? (rendered.bodyHtml ? 'minimal_html' : 'plain_text'),
+                contentSource: personalized ? 'personalized' : 'template',
+                personalizedCopyId:
+                  personalizedCopy?.id ?? retrySnapshot?.personalizedCopyId ?? null,
+                sentAt: acceptedAt,
+              });
+              if (personalizedCopy) {
+                await markManualDraftSent(
+                  lockedTx,
+                  personalizedCopy.id,
+                  messageId,
+                  eventIds[0]!,
+                  acceptedAt,
+                );
+              }
+              if (opts.acceptedTxWork) {
+                await opts.acceptedTxWork(lockedTx, eventIds[0]!, messageId);
+              }
+            },
           },
-        },
-      );
-      return delivery;
-    });
+        );
+        return delivery;
+      },
+      (tx) => lockSendingCampaign(tx, e.campaignId),
+    );
     if (result === null) return 'no_step';
 
     if (result.accepted) {

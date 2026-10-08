@@ -161,6 +161,7 @@ export function compose(config: Config, overrides: ComposeOverrides = {}): AppSe
     alerts,
     autoEnrollment,
     backupDir: config.BACKUP_DIR,
+    incomingDeletionManifestPath: config.INCOMING_DELETION_MANIFEST_PATH,
   });
 
   // SIMULATED_CLOCK forbids smtp_imap (env superRefine), so transport is the

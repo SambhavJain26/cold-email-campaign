@@ -9,6 +9,7 @@
 //   bad credentials produce TransportAuthError (IMAP) and a mailbox-scoped
 //   permanent failure (SMTP).
 import { beforeAll, beforeEach, describe, expect, it } from 'vitest';
+import { ImapFlow } from 'imapflow';
 import { SmtpImapTransport } from '../../src/transport/smtpImap/smtpImapTransport';
 import { TransportAuthError, type IncomingMessage } from '../../src/transport/types';
 import {
@@ -16,6 +17,7 @@ import {
   DAEMON,
   LEAD,
   SECOND,
+  GREENMAIL,
   StaticConnections,
   connectionFor,
   deliver,
@@ -45,6 +47,62 @@ describe('SmtpImapTransport over a real server (B8.1)', () => {
   });
 
   // ── verify (Test Connection / health) ──────────────────────────────────────
+  it('selected content recovery uses PEEK and rejects mismatched envelope identity', async () => {
+    const messageId = '<recovery@lead.test>';
+    await deliver({
+      as: LEAD,
+      to: CANARY.address,
+      messageId,
+      subject: 'Recover paragraphs',
+      text: 'Hello.\n\nCheck next week.',
+    });
+    const recovered = await transport.recoverIncoming({
+      mailboxId: CANARY_ID,
+      messageId,
+      from: LEAD.address,
+      subject: 'Recover paragraphs',
+      receivedAt: null,
+    });
+    expect(recovered.bodyText).toContain('\n\n');
+    expect(recovered.contentStatus).toBe('captured');
+    await expect(
+      transport.recoverIncoming({
+        mailboxId: CANARY_ID,
+        messageId,
+        from: 'different@lead.test',
+        subject: 'Recover paragraphs',
+        receivedAt: null,
+      }),
+    ).rejects.toThrow(/envelope/);
+    const client = new ImapFlow({
+      host: GREENMAIL.host,
+      port: GREENMAIL.imapPort,
+      secure: false,
+      auth: { user: CANARY.address, pass: CANARY.password },
+      logger: false,
+    });
+    await client.connect();
+    try {
+      const lock = await client.getMailboxLock('INBOX');
+      try {
+        const stored = await client.fetchOne(String(recovered.uid), { flags: true }, { uid: true });
+        expect(stored && stored.flags?.has('\\Seen')).toBe(false);
+      } finally {
+        lock.release();
+      }
+    } finally {
+      await client.logout();
+    }
+  });
+
+  it('changed UIDVALIDITY refuses automatic folder replay', async () => {
+    await deliver({ as: LEAD, to: CANARY.address, text: 'A separate response' });
+    connections.set(CANARY_ID, {
+      ...connectionFor(CANARY),
+      folders: [{ name: 'INBOX', lastPollUid: 1, uidValidity: 'impossible-epoch' }],
+    });
+    await expect(transport.fetchNew(CANARY_ID)).rejects.toThrow(/UIDVALIDITY/);
+  });
 
   it('verify: a real SMTP + IMAP round-trip on good credentials', async () => {
     const result = await transport.verify(connectionFor(CANARY));

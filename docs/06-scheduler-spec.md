@@ -1,5 +1,26 @@
 # Scheduler Spec — Tick, Pacing, Rotation, Capacity, Catch-up, Auto-pause
 
+## Review/delay/send serialization (2026-10-08; local candidate)
+
+Held responses never expire. Continue releases only reviewed hold IDs and preserves sequence
+progress; Delay additionally imposes a future timestamp. Neither action calls transport.send.
+A new response creates a separate hold that an earlier decision cannot release.
+Continue also preserves a previously chosen delay. Held work, delays beyond the capacity horizon,
+and suppressed addresses do not reserve opener or follow-up capacity.
+
+Before SMTP, the shared campaign/lead/enrollment decision rechecks lifecycle, review hold,
+delay/snooze/due time, current step, selected schedule, mailbox assignment, global suppression,
+campaign authorization, mailbox health, cap, window and pacing. Lock order is rebuild, capacity
+when enrolling, campaign rows when needed, incoming identity, sorted leads/enrollments, then
+message/mailbox rows. Accepted sends retain accurate immutable history; an already accepted send
+cannot be recalled, and unpolled mail cannot yet hold a sequence.
+
+Send only the next eligible step and derive its successor due time from actual acceptance, never
+from a missed historical deadline. Saved retry bodies remain intact. Historical stop/reply
+guards remain until explicit eligible restoration; restoration returns to review, never running.
+Automatic allocation and force cannot bypass suppression or unresolved review. Future enrollment
+after reviewed response/Stop still requires explicit recontact.
+
 > **Migration 0019 overlay:** template steps retain the renderer; personalized steps load a ready
 > campaign-step copy and then use the same footer, checks, suppression/reply lock, pacing, windows,
 > threading, transport, confirmation, retry, and event pipeline. Missing copy holds only the
@@ -47,7 +68,7 @@ tick(now = clock.now()):
 Rules encoded above, stated plainly:
 
 - **Follow-ups always outrank new openers** — not by an explicit priority flag but because enrolled leads' `next_send_at` predates any enrollment the operator makes today, and enrollment itself is capacity-gated (§7).
-- **A follow-up whose fixed mailbox is at cap/paused waits** (rolls forward). It is *never* rerouted (walkthrough Stage 7: rerouting breaks In-Reply-To threading).
+- **A follow-up whose fixed mailbox is at cap/paused waits** (rolls forward). It is _never_ rerouted (walkthrough Stage 7: rerouting breaks In-Reply-To threading).
 - **Catch-up after downtime needs no special mode:** overdue rows are simply very old `next_send_at`s; oldest-first + budgets drain them at normal cap over days (spec Part 7's never-burst). If, at tick end, overdue-count > today's total remaining budget, emit one `catchup_backlog` alert (drives the walkthrough's "Scheduler Resumed After Downtime" panel; deduped to once per downtime episode).
 
 ## 2. Pacing (decision P)
@@ -108,7 +129,7 @@ Among mailboxes with `status='ok'` and `budget > 0`: pick lowest `sentToday / ca
 ## 4. Send windows & time zones (spec Part 7, decision X)
 
 - `resolveTimezone(lead)`: `lead.state` → IANA zone via static US map (CT/MT split states mapped to their majority zone, documented in `scheduler/tzmap.ts`); null/unknown → `settings.default_timezone`. **Unknown never means send-now** — the default window still applies.
-- `insideWindow(window, now, tz)`: convert `now` to `tz`; check day-of-week ∈ `window.days` and `start ≤ localTime < end`. Windows are the *mailbox's* configured hours evaluated in the *recipient's* zone (walkthrough Stage 0: "8:00–17:00 (recip.)").
+- `insideWindow(window, now, tz)`: convert `now` to `tz`; check day-of-week ∈ `window.days` and `start ≤ localTime < end`. Windows are the _mailbox's_ configured hours evaluated in the _recipient's_ zone (walkthrough Stage 0: "8:00–17:00 (recip.)").
 - Daily caps reset at **mailbox-local midnight** — implemented as "count sent events since local midnight," so there is no reset cron and no drift (plan §4.2).
 
 ## 5. `sendOne` — the send transaction

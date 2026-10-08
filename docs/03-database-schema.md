@@ -1,5 +1,29 @@
 # Database Schema — Full DDL
 
+## Incoming review candidate (2026-10-08; local only)
+
+Migrations 0028–0032 add prospective control fields, content storage and analytics without
+reactivating historical enrollments. Earlier human/company stop descriptions below explain
+legacy records; the current policy is specified in [docs/24](24-incoming-review-unibox-redesign-plan.md).
+
+Enrollment projections retain review hold event IDs, control revision, delay deadline, saved
+continuation due time and manual Stop event ID. Incoming records retain policy version,
+independent automation/relationship labels, primary enrollment, linking status, revision and
+content-deletion tombstone. Delivery locations use mailbox + folder + UIDVALIDITY + UID.
+Message-ID is indexed without uniqueness: equivalent envelopes deduplicate under an identity
+lock; conflicting envelopes remain separate needs-linking records.
+
+Removable incoming_message_content holds text, HTML, new text, quotations and snippet, with
+captured/legacy_preview/oversized/unavailable/deleted status. incoming_message_links preserves
+lead/campaign associations and acknowledgement dates. incoming_message_activity is append-only,
+including unmatched-message decisions. Neither audit ledger stores full bodies.
+
+Migration 0029 adds a workspace identity epoch for deletion manifests and immutable sent
+conversation roots. metric_events_at(cutoff) exposes existing historical events plus the latest
+confirmed-human facts, with primary association appropriate to the cutoff. Preservation-only
+down migrations retain vocabulary, controls, content tombstones and audit records; old binaries
+that ignore holds are unsafe rollback targets. SQL migration files remain the exact DDL authority.
+
 > **Migrations 0026/0027:** persisted `include_postal_address` defaults false; retained addresses
 > are validated only when visible. The prior default role becomes Property Management Automation
 > Specialist. Mailboxes gain a constrained minimum/maximum range (4–7 by default) and a persisted
@@ -75,14 +99,14 @@ CREATE UNIQUE INDEX ev_sent_message_id ON events (message_id) WHERE type = 'sent
 
 Per-type required `attributes` keys (validated in `domain/events.ts`, not by the DB):
 
-| type | attributes |
-|------|-----------|
-| `sent` | `content_hash` (decision Q), `variant_id?`, `subject_rendered_hash?` |
-| `soft_bounce` | `retry_no` (1-based) |
-| `human_reply` | `incoming_message_id` (FK-ish to incoming_messages.id) |
-| `sentiment_tagged` | `reply_event_id`, `tagged_by: 'human'` |
-| `unsubscribe` | `matched_keyword?` (when source=reply) |
-| `meeting_booked` | — |
+| type               | attributes                                                           |
+| ------------------ | -------------------------------------------------------------------- |
+| `sent`             | `content_hash` (decision Q), `variant_id?`, `subject_rendered_hash?` |
+| `soft_bounce`      | `retry_no` (1-based)                                                 |
+| `human_reply`      | `incoming_message_id` (FK-ish to incoming_messages.id)               |
+| `sentiment_tagged` | `reply_event_id`, `tagged_by: 'human'`                               |
+| `unsubscribe`      | `matched_keyword?` (when source=reply)                               |
+| `meeting_booked`   | —                                                                    |
 
 ### `leads`
 
@@ -484,7 +508,7 @@ GRANT  INSERT, SELECT ON events TO app_rw;
 
 ## 6. Migration policy
 
-- Migrations are **hand-authored paired SQL files** (`NNNN_name.up.sql` / `NNNN_name.down.sql`) in `apps/server/src/db/migrations/`, executed by the in-repo runner (`src/db/migrate.ts`, tracked in `schema_migrations`), committed to git, applied on boot (prod) and by `npm run db:migrate` / `db:rollback` / `db:status`. drizzle-kit is generation-assist only (diff SQL from schema defs into gitignored `drizzle-kit-out/`, hand-copied in) — it cannot execute or roll back migrations. *(Changed at B0.4: drizzle-kit has no down-migration support, and this doc requires tested downs; hand-written DDL also fits the trigger/grant-heavy schema.)*
+- Migrations are **hand-authored paired SQL files** (`NNNN_name.up.sql` / `NNNN_name.down.sql`) in `apps/server/src/db/migrations/`, executed by the in-repo runner (`src/db/migrate.ts`, tracked in `schema_migrations`), committed to git, applied on boot (prod) and by `npm run db:migrate` / `db:rollback` / `db:status`. drizzle-kit is generation-assist only (diff SQL from schema defs into gitignored `drizzle-kit-out/`, hand-copied in) — it cannot execute or roll back migrations. _(Changed at B0.4: drizzle-kit has no down-migration support, and this doc requires tested downs; hand-written DDL also fits the trigger/grant-heavy schema.)_
 - Numbered migrations continue through `0010_unsubscribe`, `0011_guardrails`,
   `0012_poll_folders`, `0013_reply_safety`, `0014_google_oauth`, `0015_operational_workflows`,
   `0016_personalization_ramp`, `0017_multi_source_recycling`, and

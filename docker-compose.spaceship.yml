@@ -48,10 +48,12 @@ services:
       NODE_ENV: production
       LOG_LEVEL: ${LOG_LEVEL:-info}
       BACKUP_DIR: /var/backups/coldemail
+      INCOMING_DELETION_MANIFEST_PATH: /var/lib/coldemail/incoming-deletions/manifest.jsonl
       ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
       ALERT_WEBHOOK_URL: ${ALERT_WEBHOOK_URL:-}
     volumes:
       - backups:/var/backups/coldemail:ro
+      - incoming_deletions:/var/lib/coldemail/incoming-deletions
     expose:
       - '3001'
     healthcheck:
@@ -93,9 +95,12 @@ services:
     environment:
       DATABASE_URL: postgres://${POSTGRES_USER:-coldemail}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB:-coldemail}
       BACKUP_DIR: /var/backups/coldemail
+      INCOMING_DELETION_MANIFEST_PATH: /var/lib/coldemail/incoming-deletions/manifest.jsonl
     volumes:
       - backups:/var/backups/coldemail
+      - incoming_deletions:/var/lib/coldemail/incoming-deletions:ro
 
 volumes:
   pgdata:
   backups:
+  incoming_deletions:

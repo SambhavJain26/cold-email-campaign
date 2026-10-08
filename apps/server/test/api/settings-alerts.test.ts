@@ -183,6 +183,27 @@ describe('B6.11 alerts', () => {
     await h.close();
   });
 
+  it('clear all acknowledges the feed snapshot and retains newer alerts and history', async () => {
+    const feed = (await h.inject({ method: 'GET', url: '/api/v1/alerts?unacked=true' })).json();
+    const later = await insertAlert(h.services.db, 'new_attention', 'warning', {});
+    expect(
+      (
+        await h.inject({
+          method: 'POST',
+          url: '/api/v1/alerts/ack-all',
+          payload: { through_id: feed.ack_through_id },
+        })
+      ).statusCode,
+    ).toBe(200);
+    const current = (await h.inject({ method: 'GET', url: '/api/v1/alerts?unacked=true' })).json();
+    expect(current.items.map((a: { id: number }) => a.id)).toEqual([later.id]);
+    const all = (await h.inject({ method: 'GET', url: '/api/v1/alerts' })).json();
+    expect(all.total).toBe(3);
+    // Reset visibility for the following single-alert contract scenarios.
+    await h.pool.query('DELETE FROM alerts WHERE id=$1', [later.id]);
+    await h.pool.query('UPDATE alerts SET acknowledged_at=NULL');
+  });
+
   it('GET /alerts lists newest-first with pagination envelope', async () => {
     const res = await h.inject({ method: 'GET', url: '/api/v1/alerts' });
     expect(res.statusCode).toBe(200);

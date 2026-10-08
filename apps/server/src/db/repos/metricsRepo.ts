@@ -11,6 +11,16 @@ export interface MetricScope {
   asOf?: Date | null;
 }
 
+/** Legacy replies and explicitly confirmed primary-campaign human responses. */
+export async function hasConfirmedHumanReply(db: DbLike, enrollmentId: number): Promise<boolean> {
+  const result = await db.execute(sql`SELECT 1 FROM metric_events_at()
+    WHERE type='human_reply' AND enrollment_id=${enrollmentId} LIMIT 1`);
+  return result.rows.length > 0;
+}
+function metricEvents(scope: MetricScope): SQL {
+  return sql`metric_events_at(${scope.asOf ?? null}::timestamptz)`;
+}
+
 function evFilter(alias: string, scope: MetricScope): SQL {
   const parts: SQL[] = [
     sql` AND EXISTS (SELECT 1 FROM ${leads} l WHERE l.id = ${sql.raw(alias)}.lead_id AND NOT l.is_erased)`,
@@ -36,13 +46,13 @@ function replySentimentCte(scope: MetricScope): SQL {
     reply_sentiment AS (
       SELECT hr.id, hr.lead_id, hr.enrollment_id, hr.campaign_id, hr.step_no, hr.occurred_at,
              COALESCE(
-               (SELECT st.sentiment FROM events st
+               (SELECT st.sentiment FROM ${metricEvents(scope)} st
                  WHERE st.type = 'sentiment_tagged'
                    AND (st.attributes->>'reply_event_id')::bigint = hr.id
                    ${scope.asOf != null ? sql`AND st.occurred_at <= ${scope.asOf}` : sql``}
                  ORDER BY st.id DESC LIMIT 1),
                hr.sentiment) AS sentiment
-      FROM events hr
+      FROM ${metricEvents(scope)} hr
       WHERE hr.type = 'human_reply'${evFilter('hr', scope)}
     )`;
 }
@@ -51,7 +61,7 @@ const distinctLeads = async (db: DbLike, type: string, scope: MetricScope): Prom
   (
     await one<{ n: number }>(
       db,
-      sql`SELECT count(DISTINCT e.lead_id)::int n FROM events e
+      sql`SELECT count(DISTINCT e.lead_id)::int n FROM ${metricEvents(scope)} e
           WHERE e.type = ${type}${evFilter('e', scope)}`,
     )
   ).n;
@@ -63,17 +73,17 @@ export async function countContacted(db: DbLike, scope: MetricScope): Promise<nu
 export const countDeliveryConfirmed = (db: DbLike, scope: MetricScope) =>
   one<{ n: number }>(
     db,
-    sql`SELECT count(DISTINCT e.lead_id)::int n FROM events e
+    sql`SELECT count(DISTINCT e.lead_id)::int n FROM ${metricEvents(scope)} e
         WHERE e.type IN ('delivered', 'human_reply', 'unsubscribe')${evFilter('e', scope)}`,
   ).then((row) => row.n);
 export const countPendingDeliveryConfirmation = (db: DbLike, scope: MetricScope) =>
   one<{ n: number }>(
     db,
     sql`SELECT count(DISTINCT sent.lead_id)::int n
-        FROM events sent
+        FROM ${metricEvents(scope)} sent
         WHERE sent.type = 'sent'${evFilter('sent', scope)}
           AND NOT EXISTS (
-            SELECT 1 FROM events resolved
+            SELECT 1 FROM ${metricEvents(scope)} resolved
             WHERE resolved.lead_id = sent.lead_id
               AND resolved.campaign_id = sent.campaign_id
               AND resolved.type IN ('delivered', 'hard_bounce', 'human_reply', 'unsubscribe')
@@ -95,7 +105,7 @@ export async function countEvents(
   return (
     await one<{ n: number }>(
       db,
-      sql`SELECT count(*)::int n FROM events e WHERE e.type = ${type}${evFilter('e', scope)}`,
+      sql`SELECT count(*)::int n FROM ${metricEvents(scope)} e WHERE e.type = ${type}${evFilter('e', scope)}`,
     )
   ).n;
 }
@@ -136,19 +146,19 @@ export async function stepStats(db: DbLike, scope: MetricScope): Promise<StepSta
   return all<StepStatsRow>(
     db,
     sql`WITH ${replySentimentCte(scope)},
-      s AS (SELECT e.step_no, count(DISTINCT e.lead_id)::int sent FROM events e
+      s AS (SELECT e.step_no, count(DISTINCT e.lead_id)::int sent FROM ${metricEvents(scope)} e
             WHERE e.type = 'sent'${evFilter('e', scope)} GROUP BY e.step_no),
-      d AS (SELECT e.step_no, count(DISTINCT e.lead_id)::int delivered FROM events e
+      d AS (SELECT e.step_no, count(DISTINCT e.lead_id)::int delivered FROM ${metricEvents(scope)} e
             WHERE e.type IN ('delivered', 'human_reply', 'unsubscribe')${evFilter('e', scope)} GROUP BY e.step_no),
       p AS (SELECT e.step_no,
                    count(DISTINCT e.lead_id) FILTER (WHERE NOT EXISTS (
-                     SELECT 1 FROM events resolved
+                     SELECT 1 FROM ${metricEvents(scope)} resolved
                      WHERE resolved.enrollment_id = e.enrollment_id
                        AND resolved.type IN ('delivered', 'hard_bounce', 'human_reply', 'unsubscribe')
                        AND (resolved.step_no = e.step_no OR resolved.type = 'hard_bounce')
                        ${scope.asOf != null ? sql`AND resolved.occurred_at <= ${scope.asOf}` : sql``}
                    ))::int pending
-            FROM events e WHERE e.type = 'sent'${evFilter('e', scope)} GROUP BY e.step_no),
+            FROM ${metricEvents(scope)} e WHERE e.type = 'sent'${evFilter('e', scope)} GROUP BY e.step_no),
       r AS (SELECT step_no, count(DISTINCT lead_id)::int repliers,
                    count(DISTINCT lead_id) FILTER (WHERE sentiment = 'positive')::int positive_repliers
             FROM reply_sentiment GROUP BY step_no)
@@ -177,19 +187,19 @@ export async function tierStats(db: DbLike, scope: MetricScope): Promise<TierSta
     db,
     sql`WITH ${replySentimentCte(scope)},
       c AS (SELECT en.enrolled_tier tier, count(DISTINCT e.lead_id)::int contacted
-            FROM events e JOIN enrollments en ON en.id = e.enrollment_id
+            FROM ${metricEvents(scope)} e JOIN enrollments en ON en.id = e.enrollment_id
             WHERE e.type = 'sent'${evFilter('e', scope)} GROUP BY 1),
       d AS (SELECT en.enrolled_tier tier, count(DISTINCT e.lead_id)::int delivered
-            FROM events e JOIN enrollments en ON en.id = e.enrollment_id
+            FROM ${metricEvents(scope)} e JOIN enrollments en ON en.id = e.enrollment_id
             WHERE e.type IN ('delivered', 'human_reply', 'unsubscribe')${evFilter('e', scope)} GROUP BY 1),
       resolved AS (SELECT en.enrolled_tier tier, count(DISTINCT e.lead_id)::int resolved
-            FROM events e JOIN enrollments en ON en.id = e.enrollment_id
+            FROM ${metricEvents(scope)} e JOIN enrollments en ON en.id = e.enrollment_id
             WHERE e.type IN ('delivered', 'hard_bounce', 'human_reply', 'unsubscribe')${evFilter('e', scope)} GROUP BY 1),
       r AS (SELECT en.enrolled_tier tier, count(DISTINCT rs.lead_id)::int repliers,
                    count(DISTINCT rs.lead_id) FILTER (WHERE rs.sentiment = 'positive')::int positive_repliers
             FROM reply_sentiment rs JOIN enrollments en ON en.id = rs.enrollment_id GROUP BY 1),
       m AS (SELECT en.enrolled_tier tier, count(*)::int meetings
-            FROM events e JOIN enrollments en ON en.id = e.enrollment_id
+            FROM ${metricEvents(scope)} e JOIN enrollments en ON en.id = e.enrollment_id
             WHERE e.type = 'meeting_booked'${evFilter('e', scope)} GROUP BY 1),
       md AS (SELECT enrolled_tier tier,
                     mode() WITHIN GROUP (ORDER BY personalization_mode)::text AS mode
@@ -243,12 +253,12 @@ export async function variantStats(
                (e.attributes->>'variant_id')::bigint variant_id,
                min(e.occurred_at) first_sent_at,
                count(*)::int sent
-        FROM events e
+        FROM ${metricEvents(scope)} e
         WHERE e.type = 'sent' AND e.step_no = ${stepNo}${evFilter('e', scope)}
         GROUP BY e.enrollment_id, e.lead_id, (e.attributes->>'variant_id')::bigint),
       delivered AS (
         SELECT DISTINCT c.enrollment_id, c.variant_id
-        FROM cohort c JOIN events e ON e.enrollment_id = c.enrollment_id
+        FROM cohort c JOIN ${metricEvents(scope)} e ON e.enrollment_id = c.enrollment_id
         WHERE e.type = 'delivered' AND e.step_no = ${stepNo}
           AND e.occurred_at >= c.first_sent_at${evFilter('e', scope)}),
       direct_reply AS (
@@ -265,7 +275,7 @@ export async function variantStats(
         GROUP BY c.enrollment_id, c.variant_id),
       meeting AS (
         SELECT DISTINCT c.enrollment_id, c.variant_id
-        FROM cohort c JOIN events e ON e.enrollment_id = c.enrollment_id
+        FROM cohort c JOIN ${metricEvents(scope)} e ON e.enrollment_id = c.enrollment_id
         WHERE e.type = 'meeting_booked' AND e.occurred_at >= c.first_sent_at${evFilter('e', scope)})
       SELECT c.variant_id,
              sum(c.sent)::int sent,
@@ -311,7 +321,7 @@ export async function dailySeries(
            count(*) FILTER (WHERE e.type = 'human_reply')::int replies,
            count(*) FILTER (WHERE e.type = 'hard_bounce')::int hard_bounces,
            count(*) FILTER (WHERE e.type = 'unsubscribe')::int unsubscribes
-        FROM events e
+        FROM ${metricEvents(scope)} e
         WHERE e.occurred_at >= ${from} AND e.occurred_at <= ${to}
           AND EXISTS (SELECT 1 FROM ${leads} l WHERE l.id = e.lead_id AND NOT l.is_erased)
           ${scope.campaignId != null ? sql`AND e.campaign_id = ${scope.campaignId}` : sql``}
@@ -330,7 +340,7 @@ export async function tierCEngagedCount(db: DbLike, scope: MetricScope): Promise
         JOIN ${leads} l ON l.id = e.lead_id AND NOT l.is_erased
         WHERE e.enrolled_tier = 'C'
           ${scope.campaignId != null ? sql`AND e.campaign_id = ${scope.campaignId}` : sql``}
-          AND EXISTS (SELECT 1 FROM events hr
+          AND EXISTS (SELECT 1 FROM ${metricEvents(scope)} hr
                        WHERE hr.type = 'human_reply' AND hr.enrollment_id = e.id
                        ${scope.asOf != null ? sql`AND hr.occurred_at <= ${scope.asOf}` : sql``})`,
   );
@@ -349,7 +359,7 @@ export async function mailboxVolume(db: DbLike, from: Date, to: Date): Promise<M
     sql`SELECT e.mailbox_id::int,
            to_char(e.occurred_at AT TIME ZONE mb.timezone, 'YYYY-MM-DD') AS day,
            count(*)::int sends
-        FROM events e
+        FROM ${metricEvents({})} e
         JOIN ${mailboxes} mb ON mb.id = e.mailbox_id
         WHERE e.type = 'sent' AND e.mailbox_id IS NOT NULL
           AND EXISTS (SELECT 1 FROM ${leads} l WHERE l.id = e.lead_id AND NOT l.is_erased)
@@ -373,14 +383,25 @@ export async function selfCheckViolations(
   const enrFilter = c != null ? sql`AND en.campaign_id = ${c}` : sql``;
   const checks: [string, SQL][] = [
     [
+      'terminal enrollment retains a review hold',
+      sql`SELECT count(*)::int n FROM enrollments en WHERE en.current_state NOT IN('NEW','ACTIVE') AND cardinality(en.review_hold_ids)>0 ${enrFilter}`,
+    ],
+    [
+      'review hold references a missing or incompatible fact',
+      sql`SELECT count(*)::int n FROM enrollments en CROSS JOIN LATERAL unnest(en.review_hold_ids) h(id) LEFT JOIN events fact ON fact.id=h.id
+        WHERE (fact.id IS NULL OR fact.enrollment_id IS DISTINCT FROM en.id OR fact.type NOT IN('incoming_review_required','sequence_restored')) ${enrFilter}`,
+    ],
+    [
       'STOPPED without outreach_stopped event',
       sql`SELECT count(*)::int n FROM enrollments en WHERE en.current_state='STOPPED' ${enrFilter}
-        AND NOT EXISTS (SELECT 1 FROM events e WHERE e.enrollment_id=en.id AND e.type='outreach_stopped')`,
+        AND NOT EXISTS (SELECT 1 FROM events e WHERE e.enrollment_id=en.id AND e.type IN('outreach_stopped','sequence_stopped'))`,
     ],
     [
       'outreach_stopped enrollment remains sendable',
       sql`SELECT count(DISTINCT en.id)::int n FROM enrollments en JOIN events e ON e.enrollment_id=en.id AND e.type='outreach_stopped'
-        WHERE en.current_state IN ('NEW','ACTIVE') ${enrFilter}`,
+        WHERE en.current_state IN ('NEW','ACTIVE') ${enrFilter}
+          AND NOT EXISTS(SELECT 1 FROM events r WHERE r.type='sequence_restored' AND r.enrollment_id=en.id
+            AND r.attributes->'blocker_event_ids' @> jsonb_build_array(e.id))`,
     ],
     [
       'enrollment count != enrolled events',
@@ -421,12 +442,13 @@ export async function selfCheckViolations(
       sql`SELECT count(*)::int n FROM enrollments en
           WHERE en.meeting_booked ${enrFilter}
             AND NOT EXISTS (SELECT 1 FROM events e
-              WHERE e.enrollment_id = en.id AND e.type = 'human_reply')`,
+              WHERE e.enrollment_id = en.id AND (e.type = 'human_reply' OR
+                (e.type='incoming_authorship_confirmed' AND e.attributes->>'authorship'='human')))`,
     ],
     [
       'terminal suppression event without suppressed lead',
       sql`SELECT count(DISTINCT l.id)::int n FROM leads l
-          JOIN events e ON e.lead_id = l.id AND e.type IN ('unsubscribe', 'hard_bounce')
+          JOIN events e ON e.lead_id = l.id AND e.type IN ('unsubscribe', 'hard_bounce','address_suppressed')
            WHERE NOT l.is_erased AND (NOT l.is_suppressed
               OR NOT EXISTS (SELECT 1 FROM suppressions s WHERE s.email = l.email))`,
     ],

@@ -15,6 +15,7 @@ import type { AlertSink } from '../alerts/types';
 import { getSettings } from '../db/repos/settingsRepo';
 import { listMailboxes, listMailboxesByStatus } from '../db/repos/mailboxesRepo';
 import type { AutoEnrollmentService } from '../services/autoEnrollment';
+import { cleanAcknowledgedContent } from '../services/incomingContent';
 
 export interface JobsDeps {
   connectionString: string;
@@ -28,6 +29,7 @@ export interface JobsDeps {
   autoEnrollment: AutoEnrollmentService;
   /** config.BACKUP_DIR — the daily self-check flags a missing/stale dump. */
   backupDir?: string;
+  incomingDeletionManifestPath?: string;
 }
 
 const TICK_QUEUE = 'scheduler-tick';
@@ -55,6 +57,18 @@ export class Jobs implements JobPort {
     this.boss = boss;
 
     const settings = await getSettings(db);
+    await boss.createQueue('incoming-content-retention');
+    await boss.work('incoming-content-retention', async () => {
+      await cleanAcknowledgedContent(
+        db,
+        this.deps.clock.now(),
+        this.deps.incomingDeletionManifestPath ?? 'backups/incoming-deletions.jsonl',
+      );
+    });
+    await boss.schedule('incoming-content-retention', '17 * * * *', undefined, {
+      retryLimit: 3,
+      retryBackoff: true,
+    });
     const tickCron = `*/${Math.min(59, Math.max(1, settings.schedulerTickMinutes))} * * * *`;
     const pollEvery = Math.min(59, Math.max(1, settings.pollIntervalMinutes));
     // Offset polling from the scheduler whenever the interval permits. The

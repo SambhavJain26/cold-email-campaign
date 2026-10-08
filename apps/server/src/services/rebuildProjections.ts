@@ -2,7 +2,7 @@
 // enrollment projection. Disaster recovery and correctness audit in one —
 // --dry-run diffs derived state against stored state without writing.
 import type { Db } from '../db/client';
-import { listByEnrollments } from '../db/repos/eventsRepo';
+import { listByEnrollments, leadOnlySuppressionFacts } from '../db/repos/eventsRepo';
 import { listAll, writeProjection } from '../db/repos/enrollmentsRepo';
 import { suppressLead } from '../db/repos/suppressionsRepo';
 import { acquireRebuildLockExclusive } from '../db/repos/locksRepo';
@@ -80,6 +80,9 @@ function diffSnapshot(
 export async function rebuildProjections(db: Db, opts: RebuildOptions): Promise<RebuildResult> {
   return db.transaction(async (tx) => {
     await acquireRebuildLockExclusive(tx); // blocks concurrent appends
+    if (!opts.dryRun)
+      for (const event of await leadOnlySuppressionFacts(tx))
+        await suppressLead(tx, event.leadId, 'unsubscribed', event.occurredAt);
 
     const rows = await listAll(tx, opts.campaignId ?? null);
     const byEnrollment = await listByEnrollments(

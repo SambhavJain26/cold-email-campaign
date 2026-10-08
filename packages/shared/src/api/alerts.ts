@@ -22,4 +22,9 @@ export const alertsQuerySchema = pageQuerySchema.extend({
     .transform((v) => v === 'true'),
 });
 
-export const alertsListResponseSchema = listOf(alertSchema);
+export const alertsListResponseSchema = listOf(alertSchema).extend({
+  ack_through_id: z.number().int().nonnegative().optional(),
+});
+export const acknowledgeAllAlertsSchema = z
+  .object({ through_id: z.number().int().nonnegative() })
+  .strict();

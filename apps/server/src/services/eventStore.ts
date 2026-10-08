@@ -59,7 +59,7 @@ export class EventStore {
     const campaign = await getCampaign(db, campaignId);
     const sequence = campaign?.sequenceId ? await loadSequenceDef(db, campaign.sequenceId) : null;
     return {
-      lastStepNo: Number.POSITIVE_INFINITY,
+      lastStepNo: sequence?.steps.at(-1)?.stepNo ?? Number.POSITIVE_INFINITY,
       softRetryMax,
       stopOnReply: sequence?.stopOnReply ?? true,
     };
@@ -70,9 +70,14 @@ export class EventStore {
    * same enrollment.  Cron offsets reduce contention; this lock is the actual
    * correctness guarantee.
    */
-  async withEnrollmentLock<T>(enrollmentId: number, work: (tx: Tx) => Promise<T>): Promise<T> {
+  async withEnrollmentLock<T>(
+    enrollmentId: number,
+    work: (tx: Tx) => Promise<T>,
+    beforeLead?: (tx: Tx) => Promise<void>,
+  ): Promise<T> {
     return this.db.transaction(async (tx) => {
       await acquireRebuildLockShared(tx);
+      await beforeLead?.(tx);
       const enrollment = await getById(tx, enrollmentId);
       if (!enrollment) throw new Error(`enrollment ${enrollmentId} not found`);
       await lockLead(tx, enrollment.leadId);
@@ -140,10 +145,25 @@ export class EventStore {
       const history = byEnrollment.get(eid) ?? [];
       const campaignId = history[0]?.campaignId;
       if (campaignId === undefined) throw new Error(`enrollment ${eid} has no campaign history`);
-      const snapshot = foldEvents(
-        history,
-        await this.shapeForCampaign(tx, campaignId, settings.softRetryMax),
-      );
+      const shape = await this.shapeForCampaign(tx, campaignId, settings.softRetryMax);
+      let snapshot = foldEvents(history, shape);
+      const lastSentAt =
+        history.filter((event) => event.type === 'sent').at(-1)?.occurredAt ?? null;
+      const latestAt = history.at(-1)?.occurredAt;
+      if (
+        latestAt &&
+        shouldComplete(
+          snapshot,
+          shape,
+          lastSentAt,
+          latestAt,
+          settings.deliveryConfirmHours * 3600000,
+        )
+      )
+        snapshot = completeSnapshot(
+          snapshot,
+          new Date(lastSentAt!.getTime() + settings.deliveryConfirmHours * 3600000),
+        );
       await writeProjection(tx, eid, snapshot);
       if (snapshot.state !== 'NEW' && snapshot.state !== 'ACTIVE') terminalIds.add(eid);
     }
@@ -198,10 +218,18 @@ export class EventStore {
     const campaignId = history[0]?.campaignId;
     if (campaignId === undefined)
       throw new Error(`enrollment ${enrollmentId} has no campaign history`);
-    const snapshot = foldEvents(
-      history,
-      await this.shapeForCampaign(tx, campaignId, settings.softRetryMax),
-    );
+    const shape = await this.shapeForCampaign(tx, campaignId, settings.softRetryMax);
+    let snapshot = foldEvents(history, shape);
+    const lastSentAt = history.filter((event) => event.type === 'sent').at(-1)?.occurredAt ?? null;
+    const latestAt = history.at(-1)?.occurredAt;
+    if (
+      latestAt &&
+      shouldComplete(snapshot, shape, lastSentAt, latestAt, settings.deliveryConfirmHours * 3600000)
+    )
+      snapshot = completeSnapshot(
+        snapshot,
+        new Date(lastSentAt!.getTime() + settings.deliveryConfirmHours * 3600000),
+      );
     await writeProjection(tx, enrollmentId, snapshot);
     const terminal = snapshot.state !== 'NEW' && snapshot.state !== 'ACTIVE';
     for (const p of opts.patches ?? []) {

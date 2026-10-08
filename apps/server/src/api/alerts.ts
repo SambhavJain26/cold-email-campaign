@@ -6,9 +6,16 @@ import {
   idParamSchema,
   okResponseSchema,
   type AlertDto,
+  acknowledgeAllAlertsSchema,
 } from '@coldemail/shared';
 import type { AppServices } from '../composition';
-import { acknowledgeAlert, getAlert, listAlerts, type AlertRow } from '../db/repos/alertsRepo';
+import {
+  acknowledgeAlert,
+  acknowledgeAllAlerts,
+  getAlert,
+  listAlerts,
+  type AlertRow,
+} from '../db/repos/alertsRepo';
 import { AppError } from './errors';
 import type { ZodTypeProvider } from './plugins/zodCompilers';
 
@@ -32,8 +39,20 @@ export async function alertsRoutes(app: FastifyInstance, services: AppServices):
     { schema: { querystring: alertsQuerySchema, response: { 200: alertsListResponseSchema } } },
     async (req) => {
       const { page, per_page, unacked } = req.query;
-      const { items, total } = await listAlerts(db, { unacked, page, perPage: per_page });
-      return { items: items.map(toAlertDto), total, page, per_page };
+      const { items, total, ackThroughId } = await listAlerts(db, {
+        unacked,
+        page,
+        perPage: per_page,
+      });
+      return { items: items.map(toAlertDto), total, page, per_page, ack_through_id: ackThroughId };
+    },
+  );
+  r.post(
+    '/alerts/ack-all',
+    { schema: { body: acknowledgeAllAlertsSchema, response: { 200: okResponseSchema } } },
+    async (req) => {
+      await acknowledgeAllAlerts(db, req.body.through_id, clock.now());
+      return { ok: true } as const;
     },
   );
 

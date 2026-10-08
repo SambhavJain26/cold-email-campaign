@@ -3,7 +3,7 @@
 // header-based only (In-Reply-To, then References newest→oldest against
 // sent_messages) — NEVER subject-line matching (spec Part 6).
 import type { IncomingClass, Sentiment } from '@coldemail/shared';
-import type { Db } from '../db/client';
+import type { DbLike } from '../db/client';
 import type { IncomingMessage } from '../transport/types';
 import type { SettingsRow } from '../db/repos/settingsRepo';
 import type { SchedulingPatch } from '../services/eventStore';
@@ -44,7 +44,7 @@ export interface ClassificationResult {
 }
 
 export async function classify(
-  db: Db,
+  db: DbLike,
   m: IncomingMessage,
   ctx: ClassifyContext,
 ): Promise<ClassificationResult> {
@@ -156,7 +156,7 @@ async function suggestSentiment(
 
 /** Threading walk (docs/07 §4): In-Reply-To first, then References newest→oldest. */
 async function matchThread(
-  db: Db,
+  db: DbLike,
   m: IncomingMessage,
 ): Promise<{ enrollment: EnrollmentRow; stepNo: number } | null> {
   const candidates: string[] = [];
@@ -176,7 +176,7 @@ async function matchThread(
 }
 
 async function classifyBounce(
-  db: Db,
+  db: DbLike,
   m: IncomingMessage,
   ctx: ClassifyContext,
 ): Promise<Omit<ClassificationResult, 'snippet'>> {

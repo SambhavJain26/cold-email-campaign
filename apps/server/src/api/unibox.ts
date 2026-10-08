@@ -1,18 +1,14 @@
 // Unibox + enrollment actions (B6.7/B6.8, docs/10 §Unibox).
 // Sentiment tagging appends `sentiment_tagged` (decision M — never an UPDATE);
-// manual unsubscribe appends `unsubscribe(source=manual)` whose suppression
-// side effect fires inside the eventStore chokepoint; snooze is a scheduling
-// patch, deliberately NO event (docs/10 traceability).
+// Legacy sending mutations are retired in favor of confirmed review actions.
 import type { FastifyInstance } from 'fastify';
 import {
   idParamSchema,
   createReminderBodySchema,
-  dispositionReplyBodySchema,
   okResponseSchema,
   patchReminderBodySchema,
   reminderListResponseSchema,
   reminderQuerySchema,
-  snoozeBodySchema,
   tagSentimentBodySchema,
   uniboxDetailResponseSchema,
   uniboxItemSchema,
@@ -22,22 +18,20 @@ import {
 } from '@coldemail/shared';
 import type { AppServices } from '../composition';
 import { getUniboxRow, listUnibox, type UniboxRow } from '../db/repos/incomingMessagesRepo';
-import { getById, patchScheduling } from '../db/repos/enrollmentsRepo';
+import { getById } from '../db/repos/enrollmentsRepo';
 import { listThreadMessageIds } from '../db/repos/sentMessagesRepo';
 import { buildEvent } from '../domain/events';
-import type { DomainEvent } from '../domain/events';
 import { AppError } from './errors';
 import type { ZodTypeProvider } from './plugins/zodCompilers';
 import {
   createReminder,
-  dismissNotNowReminder,
   getReminder,
   listReminders,
   patchReminder,
-  upsertNotNowReminder,
   type ReminderListRow,
 } from '../db/repos/remindersRepo';
 import { getSettings } from '../db/repos/settingsRepo';
+import { hasConfirmedHumanReply } from '../db/repos/metricsRepo';
 
 function calendarDateInZone(at: Date, timeZone: string): string {
   const parts = new Intl.DateTimeFormat('en-US', {
@@ -254,85 +248,13 @@ export async function uniboxRoutes(app: FastifyInstance, services: AppServices):
     },
   );
 
-  r.post(
-    '/unibox/:id/disposition',
-    {
-      schema: {
-        params: idParamSchema,
-        body: dispositionReplyBodySchema,
-        response: { 200: uniboxItemSchema },
-      },
-    },
-    async (req) => {
-      const row = await getUniboxRow(db, req.params.id);
-      if (!row) throw AppError.notFound('unibox item');
-      if (row.replyEventId === null) {
-        throw new AppError('conflict', 409, 'only human replies can be dispositioned');
-      }
-      const recontactAfter = req.body.recontact_after ?? null;
-      const storedRecontactAfter = row.recontactAfter?.slice(0, 10) ?? null;
-      const now = clock.now();
-      const settings = await getSettings(db);
-      if (
-        recontactAfter !== null &&
-        recontactAfter <= calendarDateInZone(now, settings.defaultTimezone)
-      ) {
-        throw new AppError('validation', 400, 'recontact_after must be a future calendar date');
-      }
-      if (
-        row.disposition === req.body.disposition &&
-        storedRecontactAfter === recontactAfter &&
-        req.body.disposition !== 'not_now'
-      ) {
-        return toUniboxItemDto(row);
-      }
-
-      const events: DomainEvent[] = [
-        buildEvent.replyDispositioned({
-          leadId: row.leadId,
-          enrollmentId: row.enrollmentId,
-          campaignId: row.campaignId,
-          occurredAt: clock.now(),
-          attributes: {
-            reply_event_id: row.replyEventId,
-            incoming_message_id: row.incomingMessageId,
-            disposition: req.body.disposition,
-            ...(recontactAfter === null ? {} : { recontact_after: recontactAfter }),
-            dispositioned_by: 'human',
-          },
-        }),
-      ];
-      const suppressive = ['not_interested', 'wrong_person', 'explicit_unsubscribe'].includes(
-        req.body.disposition,
-      );
-      if (!row.leadSuppressed && suppressive) {
-        events.push(
-          buildEvent.unsubscribe({
-            leadId: row.leadId,
-            enrollmentId: row.enrollmentId,
-            campaignId: row.campaignId,
-            source: 'manual',
-            occurredAt: clock.now(),
-          }),
-        );
-      }
-      await store.append(events, {
-        txWork: async (tx) => {
-          if (req.body.disposition === 'not_now') {
-            await upsertNotNowReminder(tx, {
-              enrollmentId: row.enrollmentId,
-              incomingMessageId: row.incomingMessageId,
-              dueDate: recontactAfter!,
-              at: now,
-            });
-          } else {
-            await dismissNotNowReminder(tx, row.incomingMessageId, now);
-          }
-        },
-      });
-      return toUniboxItemDto((await getUniboxRow(db, req.params.id))!);
-    },
-  );
+  r.post('/unibox/:id/disposition', { schema: { params: idParamSchema } }, async () => {
+    throw new AppError(
+      'conflict',
+      410,
+      'Reply dispositions are retired. Use explicit Continue, Stop sequence, Suppress address, or Delay.',
+    );
+  });
 
   r.get(
     '/enrollments/:id/manual-compose-prefill',
@@ -374,60 +296,43 @@ export async function uniboxRoutes(app: FastifyInstance, services: AppServices):
     async (req) => {
       const e = await getById(db, req.params.id);
       if (!e) throw AppError.notFound('enrollment');
-      await store.append([
-        buildEvent.meetingBooked({
-          leadId: e.leadId,
-          enrollmentId: e.id,
-          campaignId: e.campaignId,
-          occurredAt: clock.now(),
-        }),
-      ]);
+      await store.withEnrollmentLock(e.id, async (tx) => {
+        const current = await getById(tx, e.id);
+        if (current?.meetingBooked) return;
+        if (!(await hasConfirmedHumanReply(tx, e.id)))
+          throw new AppError(
+            'conflict',
+            409,
+            'Confirm a human response attributed to this campaign before recording a meeting.',
+          );
+        await store.appendUnderEnrollmentLock(tx, e.id, [
+          buildEvent.meetingBooked({
+            leadId: e.leadId,
+            enrollmentId: e.id,
+            campaignId: e.campaignId,
+            occurredAt: clock.now(),
+          }),
+        ]);
+      });
       return { ok: true } as const;
     },
   );
 
-  r.post(
-    '/enrollments/:id/snooze',
-    {
-      schema: {
-        params: idParamSchema,
-        body: snoozeBodySchema,
-        response: { 200: okResponseSchema },
-      },
-    },
-    async (req) => {
-      const e = await getById(db, req.params.id);
-      if (!e) throw AppError.notFound('enrollment');
-      if (e.currentState !== 'ACTIVE') {
-        throw new AppError(
-          'conflict',
-          409,
-          'Snooze is retained only for active legacy scheduling; use a reminder for replies',
-        );
-      }
-      await patchScheduling(db, e.id, { snoozedUntil: new Date(req.body.until) });
-      return { ok: true } as const;
-    },
-  );
+  r.post('/enrollments/:id/snooze', { schema: { params: idParamSchema } }, async () => {
+    throw new AppError(
+      'conflict',
+      410,
+      'Legacy snooze is retired. Use the audited Delay action with the current review revision.',
+    );
+  });
 
-  r.post(
-    '/enrollments/:id/unsubscribe',
-    { schema: { params: idParamSchema, response: { 200: okResponseSchema } } },
-    async (req) => {
-      const e = await getById(db, req.params.id);
-      if (!e) throw AppError.notFound('enrollment');
-      await store.append([
-        buildEvent.unsubscribe({
-          leadId: e.leadId,
-          enrollmentId: e.id,
-          campaignId: e.campaignId,
-          source: 'manual',
-          occurredAt: clock.now(),
-        }),
-      ]);
-      return { ok: true } as const;
-    },
-  );
+  r.post('/enrollments/:id/unsubscribe', { schema: { params: idParamSchema } }, async () => {
+    throw new AppError(
+      'conflict',
+      410,
+      'Use the confirmed Suppress address action. Suppression is permanent across campaigns.',
+    );
+  });
 
   r.post('/manual-sends', {}, async () => {
     throw new AppError(

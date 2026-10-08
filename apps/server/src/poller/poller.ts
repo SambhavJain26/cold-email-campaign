@@ -20,6 +20,7 @@ import {
 import { classify, type ClassificationResult } from './classifier';
 import { incomingStops } from './companyStop';
 import type { SentimentSuggester } from '../sentiment/types';
+import { ingestIncoming } from '../services/incomingReview';
 
 export interface PollerDeps {
   db: Db;
@@ -29,6 +30,8 @@ export interface PollerDeps {
   alerts: AlertSink;
   /** Decision E: absent unless ANTHROPIC_API_KEY is set — suggestion stays null. */
   sentiment?: SentimentSuggester;
+  /** Internal historical harness only. Production composition always uses review. */
+  incomingPolicy?: 'legacy' | 'review';
 }
 
 export interface PollResult {
@@ -79,6 +82,18 @@ export class Poller {
     }
 
     for (const m of msgs) {
+      if (this.deps.incomingPolicy !== 'legacy') {
+        const processed = await ingestIncoming(db, this.deps.store, m, now);
+        if (processed.duplicate) result.duplicates += 1;
+        else {
+          result.processed += 1;
+          result.byClass[processed.classification] =
+            (result.byClass[processed.classification] ?? 0) + 1;
+        }
+        if (processed.bounceMailbox)
+          await evaluateAutoPause({ db, alerts }, processed.bounceMailbox, now);
+        continue;
+      }
       // Idempotency 1: (mailbox, UID) already in the ledger.
       if (await existsByUid(db, mailboxId, m.uid)) continue;
 
@@ -86,8 +101,8 @@ export class Poller {
       // mailbox) — record as duplicate of the original, no events.
       const original = m.messageId ? await findByMessageId(db, m.messageId) : undefined;
       if (original) {
-        // The unique im_msgid index belongs to the ORIGINAL row — the
-        // duplicate record carries message_id NULL and points at nothing.
+        // Preserve the historical harness's duplicate record shape;
+        // production canonical identity/location handling lives in ingestIncoming.
         await this.recordOnly(
           { ...m, messageId: undefined },
           now,
