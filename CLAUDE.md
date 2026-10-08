@@ -8,6 +8,14 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Current operating boundary
 
+- **2026-10-08 incoming review push/deploy authorization — awaiting explicit campaign pause:**
+  operator authorized pushing and deploying the verified candidate `84403e4`; `origin/canary`
+  is pushed. Fresh production is still `cd83228`, with Campaign 3 active, Campaign 2 paused,
+  automatic enrollment off, and 649 events / 222 sends. Pause permission for Campaign 3 is
+  pending; do not pause implicitly or restart/deploy while that prerequisite is unresolved.
+  Validated pre-backup and source bundle are recorded in docs/17. Resume/enrollment/outbound
+  sends remain separately gated. Preserve actual 5–10 minute ranges and 20/day mailbox caps.
+
 - **2026-10-08 incoming review/Unibox redesign — locally implemented and verified:** follow
   `docs/24-incoming-review-unibox-redesign-plan.md`. Prospectively replace automatic terminal
   human/company reply stopping with review holds and mandatory clear-opt-out suppression.
@@ -15,8 +23,8 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
   mistakes. Retain minimal suppression during erasure. Preserve legacy event interpretation and
   blocked histories; restore eligible legacy enrollments only explicitly, to review hold first.
   This supersedes conflicting historical reply/disposition/removable-suppression scope below.
-  Implementation and local verification only: no push, deployment, production mutation,
-  historical-message replay, restoration, enrollment, resume or outbound send is authorized.
+  Original implementation scope was local only. The later push/deploy authorization above
+  supersedes that boundary; historical replay/restoration/enrollment/resume/send remain gated.
   All stages in docs/24 and local gates are complete; docs/17 records evidence. Production retains
   the separately deployed release below. Deployment requires the manifest/bootstrap/restore
   safeguards in docs/16 and review-aware rollback code; no old ignoring-holds binary is safe.

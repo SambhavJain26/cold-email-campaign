@@ -1,5 +1,36 @@
 # Local canary runbook (B8.3-local) — two-week validation on throwaway Gmail
 
+## 2026-10-08 IST incoming review push/deploy — prechecks pass, pause approval pending
+
+The operator authorized push and deployment of the verified redesign. GitHub `origin/canary`
+advanced from `2d9bc29` to candidate `84403e4`. Production remains clean at `cd83228`; no source
+fast-forward, service restart, migration or manifest initialization has occurred yet.
+
+Fresh prechecks contradict the previous deployment-time paused snapshot: Campaign 3 is active,
+Campaign 2 paused and Campaign 1 archived; automatic enrollment is off. There are **649 events /
+max ID 649 / 222 sent messages**, 187 enrollments (164 ACTIVE, 8 STOPPED, 10 COMPLETED,
+2 BOUNCED, 3 UNSUBSCRIBED), 1,911 incoming records and four suppressions. All four mailboxes are
+healthy at **20/day, 5–10 minute ranges**, unchanged New York weekday 09:00–17:00 windows.
+Canonical replay checks **187 enrollments — 0 diff(s)**; self-check is clean; 28 migrations
+are applied. New incoming content/activity/location tables and manifest volume do not yet exist.
+These checks do not initialize cursors, fetch history, change sending state or send mail.
+
+Fresh backup `coldemail-20261008-094214.dump` is **2,479,266 bytes** and passes its **342-line**
+pg_restore catalog. Reviewed candidate bundle is staged at `/tmp/incoming-review-20261008.bundle`,
+with matching local/VPS SHA-256
+`1cfedf24d058e0a88afad99388f10258432792e403279b5d72b530c551a23b02`.
+It requires production base `cd83228` and pins `84403e4`. The Linux app image additionally builds
+with production pruning and its entrypoint shell syntax passes; runtime audit remains the six
+previously documented advisories. VPS disk has 14 GiB free (42% used); no cleanup occurred.
+
+An explicit pause decision was requested because AGENTS.md forbids implicitly pausing an active
+campaign. **Permission has not arrived. Do not infer approval from elapsed time or deploy while
+this prerequisite remains unresolved.** If authorized, pause only Campaign 3 through its guarded
+application action, capture a new stable snapshot/backup, verify no deletion history before
+bootstrapping the empty independent manifest, fast-forward/build/deploy coherently, run migration,
+route/health/UI, populated drift/self-check and post-backup checks, and leave campaigns paused.
+Preserve actual mailbox settings and legacy stops; do not restore/replay/enroll/resume/send.
+
 ## 2026-10-08 IST incoming review/Unibox — verified local implementation
 
 The approved specification is persisted in docs/24. The candidate prospectively holds confidently

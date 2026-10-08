@@ -6,6 +6,11 @@ from a checked implementation item: verified evidence belongs in docs/17.
 
 ## Authorization and settled decisions
 
+**Deployment checkpoint:** the operator subsequently authorized push/deploy. Candidate `84403e4`
+is pushed, but fresh production Campaign 3 is active. Explicit pause approval is pending; do not
+restart/deploy until it is received. See docs/17 for prechecks/backups and current operating status.
+The local-only restrictions below describe the original implementation authorization.
+
 - Work on `canary`, commit completed tasks, preserve unrelated changes.
 - No push, deployment, production connection/mutation, campaign resume, enrollment, outbound
   send, mailbox change, production restoration or historical-message replay is authorized.
