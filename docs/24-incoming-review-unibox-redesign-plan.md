@@ -48,19 +48,19 @@ all outreach controls. Add event-derived review holds/delay/checkpoint/revision 
 making a review hold terminal. Use STOPPED for manual sequence stops but distinguish their event
 origin from legacy company stops. Backend returns actual effective state and action availability.
 
-| Trigger/action | Result | Scheduling |
-|---|---|---|
-| Confident non-opt-out response | Held for review on unfinished affected enrollments | Preserve next step/due time/mailbox/retries |
-| Clear attributed opt-out | Permanent global Suppressed | No future outreach |
-| Continue | Resolve exactly reviewed holds in selected campaign | Next unsent step eligible normally; no immediate send |
-| Delay | Resolve reviewed holds and set deadline | Eligibility no earlier than both prior due time and deadline |
-| Delay expiry | Time barrier expires only | All campaign/safety checks remain |
-| New message | New unacknowledged review hold | Prior decisions cannot release it |
-| Stop | End selected campaign sequence without suppression | Preserve correction checkpoint |
-| Correct Stop | Append correction, return to review hold | Separate Continue/Delay required |
-| Suppress | Permanent address block across campaigns | No Continue or undo bypass |
-| Acknowledge/Undo/Return to review | Visibility only | No scheduling change |
-| Delete content | Remove app incoming text only | No state/visibility change |
+| Trigger/action                    | Result                                              | Scheduling                                                   |
+| --------------------------------- | --------------------------------------------------- | ------------------------------------------------------------ |
+| Confident non-opt-out response    | Held for review on unfinished affected enrollments  | Preserve next step/due time/mailbox/retries                  |
+| Clear attributed opt-out          | Permanent global Suppressed                         | No future outreach                                           |
+| Continue                          | Resolve exactly reviewed holds in selected campaign | Next unsent step eligible normally; no immediate send        |
+| Delay                             | Resolve reviewed holds and set deadline             | Eligibility no earlier than both prior due time and deadline |
+| Delay expiry                      | Time barrier expires only                           | All campaign/safety checks remain                            |
+| New message                       | New unacknowledged review hold                      | Prior decisions cannot release it                            |
+| Stop                              | End selected campaign sequence without suppression  | Preserve correction checkpoint                               |
+| Correct Stop                      | Append correction, return to review hold            | Separate Continue/Delay required                             |
+| Suppress                          | Permanent address block across campaigns            | No Continue or undo bypass                                   |
+| Acknowledge/Undo/Return to review | Visibility only                                     | No scheduling change                                         |
+| Delete content                    | Remove app incoming text only                       | No state/visibility change                                   |
 
 Review holds never expire. One campaign decision never releases sibling holds. Messages on
 stopped/completed/suppressed records stay reviewable without reactivation. Show lifecycle
@@ -175,19 +175,19 @@ historical meaning. Rebuild/self-check include controls/corrections/suppression 
 
 All endpoints below remain under /api/v1 with shared Zod schemas and docs/10 parity:
 
-| Endpoint | Purpose |
-|---|---|
-| GET /unibox/rows | Grouped filtered/searchable/paginated rows |
-| GET /unibox/rows/:enrollment_id/messages | Incoming and sent context |
-| GET /unibox/messages/:id | Matched/unmatched content and status |
-| GET /unibox/needs-linking | Candidates and unresolved messages |
-| POST /unibox/messages/:id/link | Link/correct without enrolling |
-| POST /unibox/messages/:id/unrelated | Resolve unrelated traffic |
-| POST /unibox/rows/:enrollment_id/action | Continue/Stop/Delay/correction/restoration |
-| POST /unibox/messages/:id/authorship | Human/Automatic/Unsure |
-| POST /unibox/acknowledgements | Explicit IDs / undo / return |
-| DELETE /unibox/messages/:id/content | Tombstone/delete incoming text |
-| POST /unibox/messages/:id/recover-content | Explicit content-only recovery |
+| Endpoint                                  | Purpose                                    |
+| ----------------------------------------- | ------------------------------------------ |
+| GET /unibox/rows                          | Grouped filtered/searchable/paginated rows |
+| GET /unibox/rows/:enrollment_id/messages  | Incoming and sent context                  |
+| GET /unibox/messages/:id                  | Matched/unmatched content and status       |
+| GET /unibox/needs-linking                 | Candidates and unresolved messages         |
+| POST /unibox/messages/:id/link            | Link/correct without enrolling             |
+| POST /unibox/messages/:id/unrelated       | Resolve unrelated traffic                  |
+| POST /unibox/rows/:enrollment_id/action   | Continue/Stop/Delay/correction/restoration |
+| POST /unibox/messages/:id/authorship      | Human/Automatic/Unsure                     |
+| POST /unibox/acknowledgements             | Explicit IDs / undo / return               |
+| DELETE /unibox/messages/:id/content       | Tombstone/delete incoming text             |
+| POST /unibox/messages/:id/recover-content | Explicit content-only recovery             |
 
 Global suppress service supports pool-only linked leads. Mutations use operation ID/revision;
 Continue/Delay precise hold IDs; conflicts return refresh requirement. Retire old suppressive
@@ -223,13 +223,13 @@ down migration drops facts/tombstones/holds/suppression.
 
 - [x] Stage 0: persisted approved spec, indexed, operating/decision boundaries reconciled.
 - [x] Stage 1: state/contracts/additive schema; transition tests, apply/down/apply, legacy parity.
-- [ ] Stage 2: scheduler locks/guards/checkpoints; deterministic race/retry/no-burst tests.
-- [ ] Stage 3: identity/capture/matching/opt-outs; header/HTML/folder/dedupe fixtures.
-- [ ] Stage 4: actions/link/ack/permanent suppression/restoration; API concurrency/idempotency.
-- [ ] Stage 5: grouped UI/reader/confirmations/responsive; components/mock/real browser/accessibility.
-- [ ] Stage 6: retention/recovery/analytics/manifest; cleanup races/no inflation/restore drill.
-- [ ] Stage 7: independently verified app-wide top navigation.
-- [ ] Stage 8: full serial gates, populated replay/self-check/backup, docs and release handoff.
+- [x] Stage 2: scheduler locks/guards/checkpoints; deterministic race/retry/no-burst tests.
+- [x] Stage 3: identity/capture/matching/opt-outs; header/HTML/folder/dedupe fixtures.
+- [x] Stage 4: actions/link/ack/permanent suppression/restoration; API concurrency/idempotency.
+- [x] Stage 5: grouped UI/reader/confirmations/responsive; components/mock/real browser/accessibility.
+- [x] Stage 6: retention/recovery/analytics/manifest; cleanup races/no inflation/restore drill.
+- [x] Stage 7: independently verified app-wide top navigation.
+- [x] Stage 8: full serial gates, populated replay/self-check/backup, docs and release handoff.
 
 ### Verified local stage outcomes
 
@@ -238,8 +238,16 @@ down migration drops facts/tombstones/holds/suppression.
   preservation-only rollback. Typecheck passes; unit 396/396; existing event-store integration
   7/7; new state integration 3/3. The populated new-state replay checks one enrollment with
   zero projection differences. Apply/down/apply retains holds and append-only activity.
-  No incoming records were replayed and no production operation occurred. Later stages and
-  the final populated CLI/backup/full serial gates remain open.
+  No incoming records were replayed and no production operation occurred. At that checkpoint,
+  later stages remained open; their final verified outcomes are recorded below.
+- 2026-10-08 IST: Stages 2–8 are implemented and verified locally. Typecheck/lint/format pass;
+  unit 413, web 71, integration 208, API 167, GreenMail 31, locked golden exactly 47, mock browser
+  71 and real-backend browser 4 all pass. Final affected UI replay also passes 18/18. Real-mode
+  production build and both Compose configurations pass. Populated migration preservation,
+  nine-enrollment zero drift/self-check and backup restore with post-dump deletion reconciliation
+  pass. Evidence, dump hash and deployment/rollback prerequisites are in docs/17 and docs/16.
+  No implementation work remains open under this specification. Push, deployment and live
+  restoration/recovery/enrollment/resume/send remain outside this authorization.
 
 Required scenarios include human away reply holds; automatic threaded/fresh labels; all exact-address
 unfinished holds; no company auto-action; conservative quotes/STOP; opt-out protection without ack;
@@ -270,5 +278,34 @@ verification. Estimates are not delivery commitments; live operations outside au
 
 ## Implementation checkpoint / change log
 
-- 2026-10-08 IST: user authorized this plan for local implementation. No implementation or
-  verification is claimed by this initial specification. Resume at Stage 0 checklist.
+- Continue after a fresh response preserves an existing delay. Capacity reservations exclude
+  held, horizon-delayed and suppressed work. Campaign progress includes permanently suppressed
+  unfinished enrollments in a separate outcome bucket without rewriting lifecycle history.
+- The reader presents the full email before outreach controls. Company suggestions recognize
+  subdomains without changing sending state. Meeting credit requires confirmed primary-campaign
+  human authorship; a link or sibling safety hold cannot produce credit.
+
+- 2026-10-08 continued local work: scheduler/intake/actions/retention/analytics/Unibox/top navigation
+  and notification clearing are implemented and all local gates above pass. The feature remains
+  undeployed; a deployment is a separate authorized operation.
+- Confirmations use the latest enrollment ledger revision, including accepted sends; context
+  metadata is separate from selected full content. Terminal lifecycle states clear active holds
+  while preserving the incoming review item and future recontact guard.
+- Pool-only links create lead/campaign review facts. Continue resolves reviewed facts without
+  enrollment; Stop/Delay are unavailable without a sequence. Unresolved review blocks force and
+  explicit recontact until resolved; future enrollment still requires the existing explicit flag.
+- Manual Stop records a sequence fingerprint. Correction rejects changed sequences; historical
+  restoration requires verifiable sent-step variants/hashes and otherwise fails closed. Existing
+  personalized histories lacking compatible evidence can therefore be ineligible for restoration.
+- Message-ID is a nonunique index after migration 0032 so conflicting envelopes can surface rather
+  than wedge polling. Equivalent envelopes remain canonical under the shared identity lock.
+- Primary-link corrections preserve previously confirmed authorship while moving campaign credit
+  through append-only facts; as-of metrics retain the association valid at their cutoff.
+- Production startup requires an existing deletion manifest. A future authorized deployment must
+  explicitly bootstrap it after confirming no previous deletion history, and retain its independent
+  volume plus latest backups. Missing/corrupt manifests must never silently initialize on restore.
+- User additionally requested a cleaner notification menu: bounded scrolling and Clear all
+  notifications acknowledge the captured through-ID, retaining history and newer notifications.
+
+- Initial 2026-10-08 IST checkpoint: user authorized this plan for local implementation; work
+  began at Stage 0. The completed checklist and final outcomes above supersede that checkpoint.

@@ -1,5 +1,85 @@
 # Local canary runbook (B8.3-local) — two-week validation on throwaway Gmail
 
+## 2026-10-08 IST incoming review/Unibox — verified local implementation
+
+The approved specification is persisted in docs/24. The candidate prospectively holds confidently
+matched responses for human review, except clear new-text opt-outs permanently suppress the address.
+Automation detection and relationship are independent labels. Exact-address responses hold all
+unfinished sibling enrollments; company/domain matches are suggestions, and uncertain messages stay
+in Needs linking. Legacy terminal events and broad historical stop guards remain intact.
+Local code commits on `canary`: `900be21` (backend), `c12deb3` (Unibox), and `72a2398`
+(navigation/notifications), following state/schema `2ef2612` and specification `bd0e396`.
+
+Continue, campaign Stop, Delay and global permanent Suppress are separate audited actions. Continue
+preserves progress, retry bodies and any prior delay. Correction/restoration returns only to review,
+with sequence/suppression/bounce/checkpoint guards and a separate subsequent Continue/Delay decision.
+Shared locks, latest ledger revisions and final send checks protect incoming/action/send races.
+Held/delayed/suppressed work does not reserve eligible capacity. Suppressed unfinished work appears
+in a separate campaign outcome bucket without rewriting lifecycle history. New human metrics and
+meeting credit require explicit primary-campaign confirmation.
+
+Unibox has campaign/search/state/mailbox filters, grouped lead/campaign rows, complete selected
+content, incoming history, immutable sent conversation context, safe isolated HTML, collapsed quotes,
+confirmations, acknowledgement/Undo, Needs linking, deletion and explicit content-only recovery.
+Acknowledgement changes visibility only and refuses unresolved holds. Retention defaults to 30 days
+after eligible acknowledgement, configurable/off. The reader puts the email before outreach controls.
+Desktop navigation is a compact top bar, with More and the existing mobile sheet. Notifications have
+bounded scrolling and **Clear all notifications**: captured through-ID acknowledgement preserves
+history and any newer notifications. No repeated notification confirmation is introduced.
+
+Final verified local gates:
+
+| Gate | Result |
+| --- | --- |
+| Typecheck, lint, formatting, diff whitespace | Pass |
+| Unit | 413/413 |
+| Web components | 71/71 |
+| Integration | 208/208, 34 files |
+| API | 167/167, 24 files, repeated after final accounting refinements |
+| Locked golden | Exactly 47/47, unchanged cohort/fixtures; historical harness policy only |
+| GreenMail | 31/31, including PEEK and UIDVALIDITY |
+| Mock browser | 71/71; final Unibox/navigation/notifications replay 18/18 |
+| Real-backend browser | 4/4, local MockTransport/virtual clock, including the new review flow |
+| Production web build | Real API mode, `/email-campaign/`, no MSW chunk |
+| Compose configuration | Production and Spaceship profiles validate with dummy local values |
+
+Database-backed suites ran serially. Initial component runs under heavy concurrent CPU load hit
+the existing 5-second UI timeout; the standalone one-worker web suite passes without changing
+timeouts. The new capacity assertion initially exposed an incomplete no-transport fixture mailbox
+assignment, which was corrected to match accepted-send scheduling. The expanded outcomes panel's
+component expectation was updated without changing golden numbers. The final full API suite passes
+after the accounting refinements. All stages in docs/24 are complete locally.
+
+The dedicated local `coldemail_review_verification` cohort contains nine event-backed enrollments:
+held, delayed, manual stop, legacy company stop, legacy reply, bounce, completion and suppressed
+histories. Migration **0028–0032 preservation down/apply** keeps all snapshotted data and facts.
+Canonical `npx tsx apps/server/src/services/rebuildCli.ts --dry-run` checks **9 enrollments —
+0 diff(s)** on source and scratch restore; an actual rebuild rewrites zero projections and both
+self-checks are clean. Eleven saved sent/retry snapshots, three suppression entries and confirmed
+metrics survive. No transport is called by this drill.
+
+Custom-format dump `backups/incoming-review-drill/verified.dump` is **145,307 bytes**, its **355-entry**
+catalog validates, and it restores into `coldemail_review_restore`. SHA-256:
+`729aea5e8996b4158213aed3639376f23c9563defdc294eeaf2294def8d5079a`.
+Content was deleted after taking that dump. Reapplying the latest independent deletion manifest
+to the older scratch restore removes the restored text before serving it. Deleted status, retained
+state/suppression/snapshots, zero drift and self-check then pass. These ignored local artifacts are
+verification evidence, not production backups.
+
+Deployment remains separately authorized. It must bootstrap an existing manifest only after
+checking that no previous deletion history exists, retain the independent volume/latest manifest,
+apply migrations coherently and use review-aware rollback code. Restores must reapply the latest
+manifest before API/workers; dump-time copies cannot protect later deletions. Existing immutable
+message-derived excerpts and expired-backup handling limit deletion to stored incoming content.
+See docs/16 for the restore/startup procedure. There is no automatic historical recovery/replay.
+
+Runtime audit still reports **six existing advisories (3 moderate, 3 high)**; dependency remediation
+is separate. The build retains its existing large-chunk warning. Neither is claimed resolved.
+Only disposable local fixtures, MockTransport and GreenMail were used. No production connection,
+settings/campaign/enrollment/mailbox mutation, restoration, replay, external send, push or deployment
+occurred. Production's last verified release remains the separately deployed `cd83228`; its prior
+paused state and 506/158 watermarks are historical facts, not a fresh live inspection.
+
 ## 2026-10-08 IST reported email-link redirect — read-only provider verification
 
 The operator reported that clicking Gmail's blue `sambhavpmops.com` signature domain reached

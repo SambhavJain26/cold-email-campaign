@@ -19,7 +19,7 @@ call planned work implemented.
 
 ## Current operating boundary
 
-- **2026-10-08 incoming review/Unibox redesign — local implementation authorized:** follow
+- **2026-10-08 incoming review/Unibox redesign — locally implemented and verified:** follow
   `docs/24-incoming-review-unibox-redesign-plan.md`. Prospectively replace automatic terminal
   human/company reply stopping with review holds and mandatory clear-opt-out suppression.
   Continue/Stop/Delay are campaign actions; Suppress is permanent globally, including manual
@@ -28,7 +28,9 @@ call planned work implemented.
   This supersedes conflicting historical reply/disposition/removable-suppression scope below.
   Implementation and local verification only: no push, deployment, production mutation,
   historical-message replay, restoration, enrollment, resume or outbound send is authorized.
-  Checklist status is in docs/24; update docs/17 only for verified outcomes.
+  All stages in docs/24 and local gates are complete; docs/17 records evidence. Production retains
+  the separately deployed release below. Deployment requires the manifest/bootstrap/restore
+  safeguards in docs/16 and review-aware rollback code; no old ignoring-holds binary is safe.
 
 - **2026-10-08 IST signature/range/alias deployment:** separately authorized, pushed/deployed at
   `cd83228` on `canary`. All 28 migrations, healthy services, direct website aliases,
