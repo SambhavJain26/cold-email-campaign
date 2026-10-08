@@ -1,5 +1,43 @@
 # Local canary runbook (B8.3-local) — two-week validation on throwaway Gmail
 
+## 2026-10-08 IST personalized restoration follow-up — verified deployment
+
+The operator explicitly authorized pushing and deploying the verified follow-up. Production
+was clean at `16ae5df`; fresh checks confirmed Campaigns 2/3 paused, Campaign 1 archived and
+automatic enrollment disabled everywhere. Pushed `canary` to application `3c90050`, transferred
+an incremental Git bundle and verified matching SHA-256
+`c8e0b928699e286234691129dbb3317d6f426c959bb5acfb3754e36bcb9f69fb`.
+Gracefully stopped the app, captured a stable operational snapshot, validated the pre-backup,
+fast-forwarded and rebuilt app/gateway/backup coherently. No schema change; all 33 migrations
+remain applied. The existing deletion manifest was retained without initialization or replacement.
+
+Verified production gates:
+
+- App/database healthy; gateway/backup running; public health, Unibox, version and portfolio/
+  outreach aliases return 200, unauthenticated Unibox API 401, unsubscribe roots 404.
+- Build ID `c9822797-114f-461b-ad44-a5bd957a923d`, served asset `index-BRTHwLvv.js`.
+- Canonical dry-run: **checked 187 enrollments — 0 diff(s)**; self-check clean.
+- Before/after operational snapshot matches exactly: **650 events / max 650 / 222 sends**,
+  enrollment progress, five suppressions, campaign status, settings/signature and four healthy
+  mailboxes at 20/day, 5–10 minute spacing, New York weekday 09:00–17:00 windows unchanged.
+- Independent manifest SHA-256 unchanged:
+  `afc33f417e4aac7f823f4d3615b1af05a56c868aa0c0232b07fa64d8de815807`.
+- Pre-backup `coldemail-20261008-112122.dump`: **2,400,012 bytes**; post-backup
+  `coldemail-20261008-112253.dump`: **2,400,480 bytes**. Both custom-format catalogs validate
+  with **372 lines**; latest independent manifest backup exists. No production restore drill ran.
+- Authenticated Unibox shows exactly Needs review, All and Acknowledged. Removed reader
+  reminder/link controls are absent; Email details is collapsed. Debra's stopped explanation
+  clearly requires Restore to review before Continue/Delay. Opened her restoration dialog:
+  next unsent step 2, Mailbox 3, **Confirm enabled**, no correction-reason input or historical
+  template error. Cancelled without restoring. Screenshot: `backups/incoming-review-followup-deployed.png`.
+- VPS disk 49% used, 12 GiB available; no cleanup performed. Existing six runtime dependency
+  findings remain separate; no dependency update was made.
+
+No lead restoration, acknowledgement, authorship update, historical recovery/replay, content
+deletion, enrollment, campaign resume or send was performed. Existing records and suppression
+remain intact. Campaigns remain paused. The local checkpoint below is historical evidence,
+superseded for rollout status by this verified deployment.
+
 ## 2026-10-08 IST personalized restoration and simpler Unibox — verified local follow-up
 
 The operator reported Debra's historical restoration failing and requested that personalized

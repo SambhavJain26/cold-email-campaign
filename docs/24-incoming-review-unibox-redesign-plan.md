@@ -14,11 +14,13 @@ Existing records, events and old compatibility APIs remain intact; no bulk delet
 Restoration and Stop correction use a simple Confirm with no correction-reason input.
 Personalized legacy restoration verifies saved personalized-copy/sent evidence rather than
 template variants. Reply-count confirmation remains optional under Email details with plain copy.
-This follow-up is local implementation; a fresh deployment remains separately authorized.
+This follow-up was separately authorized and deployed at application `3c90050`; production
+consistency, backups and authenticated UI pass as recorded in docs/17.
 
 **Deployment checkpoint:** application `8e65e46` was explicitly authorized and deployed after
 confirmed Campaign 3 pause approval. Campaigns 2/3 remain paused. See docs/17 for verified evidence.
-The personalized-restoration/usability follow-up is local work until separately deployed.
+The personalized-restoration/usability follow-up is now deployed at `3c90050` without restoring
+or resuming any lead; Campaigns 2/3 remain paused.
 The local-only restrictions below describe the original implementation authorization.
 
 - Work on `canary`, commit completed tasks, preserve unrelated changes.

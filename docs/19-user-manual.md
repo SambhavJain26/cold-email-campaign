@@ -2,8 +2,8 @@
 
 ## Incoming review: operator workflow (2026-10-08)
 
-The core controls are deployed. The personalized-restoration and plain-language UI follow-up
-is locally implemented and verified, pending separate deployment.
+The core controls and personalized-restoration/plain-language UI follow-up are deployed and
+verified at application `3c90050`.
 The older reply/disposition/unsuppression sections below describe historical behavior.
 
 Open Unibox, choose All campaigns or one campaign, and search a lead's name, email or company.

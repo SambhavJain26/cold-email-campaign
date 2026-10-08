@@ -9,7 +9,9 @@ evidence; restoration/correction has simple Confirm without a reason. Removed Re
 Needs linking and reader reminder/link controls. Unmatched bodies/HTML/previews are no longer
 captured prospectively. Local backend `6bbbbdc` and UI `50e2218` are verified; golden 47,
 unit 413, web 71, API 172/full plus 25/final focused, intake integration 8 and browser 11 pass.
-Nine-enrollment zero drift/self-check passes. Not pushed/deployed; evidence in docs/17.
+Nine-enrollment local zero drift/self-check passes. Subsequently pushed/deployed at `3c90050`
+under explicit approval; production 187-enrollment zero drift/self-check, authenticated UI,
+unchanged operational snapshot and validated pre/post backups pass. Evidence in docs/17.
 
 **2026-10-08 incoming review deployment:** [x] explicitly authorized, pushed and deployed
 application `8e65e46`. Campaign 3 was explicitly authorized to pause; Campaigns 2/3 remain paused,

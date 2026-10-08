@@ -2,7 +2,11 @@
 
 ## Incoming review release boundary and restore requirements (deployed)
 
-Application `8e65e46` was explicitly authorized, pushed and deployed on 2026-10-08 IST,
+Application `3c90050` includes the separately authorized personalized-restoration and simplified
+Unibox follow-up. Its authenticated UI, 187-enrollment zero drift/self-check, unchanged snapshot
+(650 events / 222 sends / five suppressions), manifest and validated pre/post backups pass.
+Campaigns remain paused; no live restoration or send occurred. The earlier application
+`8e65e46` was explicitly authorized, pushed and deployed on 2026-10-08 IST,
 including a separately confirmed Campaign 3 pause. All 33 migrations, healthy services/routes,
 authenticated UI, 187-enrollment zero drift/self-check and validated pre/post backups pass.
 Campaigns 2/3 remain paused, automatic enrollment off; watermarks remain 649 events / 222 sends.

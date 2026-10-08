@@ -8,6 +8,16 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Current operating boundary
 
+**2026-10-08 personalized restoration follow-up deployed:** explicit operator approval pushed
+and deployed application `3c90050` on `canary`. Campaigns 2/3 remain paused, automatic enrollment
+off. All 33 migrations, healthy services/routes, authenticated simplified Unibox and Debra's
+reason-free Confirm dialog pass. Production dry-run checks 187 enrollments with zero drift;
+self-check clean. Stable snapshot remains 650 events / 222 sends; five suppressions, enrollment
+progress, mailbox caps/windows/ranges and the independent deletion manifest are unchanged.
+No restoration, acknowledgement, content deletion, enrollment, resume or send was performed.
+See docs/17 for backup evidence. Future production actions require their own authorization.
+
+
 - **2026-10-08 personalized restoration and Unibox simplification — verified locally:** the
   operator removed Reminders/Needs linking and reminder/link-correction reader controls from
   current UI scope. New unmatched mailbox traffic retains minimal identity metadata without
@@ -18,7 +28,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
   automatically continue or send. Local commits `6bbbbdc`, `50e2218` and retry provenance
   `b9aed65`; focused/full gates,
   locked golden exactly 47 and nine-enrollment zero drift/self-check pass. See docs/17 and docs/24.
-  This follow-up is not pushed/deployed. Further rollout requires explicit approval; do not
+  This local checkpoint was subsequently deployed under explicit approval as recorded above; do not
   restore/resume/enroll/send or delete existing records as part of it.
 
 - **2026-10-08 incoming review/Unibox deployment — verified:** operator explicitly authorized
