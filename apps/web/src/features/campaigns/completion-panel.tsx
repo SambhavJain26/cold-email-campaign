@@ -13,7 +13,8 @@ export function outcomeRows(outcomes: OutcomesResponse): Array<[string, number]>
     ['Unsubscribed', outcomes.UNSUBSCRIBED],
     ['Hard bounced', outcomes.BOUNCED],
     ['Completed (no reply)', outcomes.COMPLETED],
-    ['Stopped by incoming email', outcomes.STOPPED ?? 0],
+    ['Stopped', outcomes.STOPPED ?? 0],
+    ['Suppressed address', outcomes.SUPPRESSED ?? 0],
   ];
 }
 
@@ -43,7 +44,7 @@ export function CompletionPanel({
       <div>
         <h2 className="text-sm font-semibold">Current enrollments finished</h2>
         <p className="text-xs text-muted-foreground">
-          Every current enrollment reached a terminal state, so nothing is scheduled to send. The
+          Every current enrollment finished or is permanently suppressed, so nothing can send. The
           campaign can remain active for a future imported batch.
         </p>
       </div>

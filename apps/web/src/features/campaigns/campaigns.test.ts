@@ -26,7 +26,8 @@ describe('outcomes reconciliation', () => {
       'Unsubscribed',
       'Hard bounced',
       'Completed (no reply)',
-      'Stopped by incoming email',
+      'Stopped',
+      'Suppressed address',
     ]);
   });
 

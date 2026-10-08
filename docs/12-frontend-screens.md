@@ -1,8 +1,27 @@
 # Frontend Screens — Low-Level Spec
 
+## Current Unibox candidate (2026-10-08; local only)
+
+The earlier Human/Auto card and disposition workflow below is legacy. The current candidate uses
+campaign selection, lead search, Needs review / All / Acknowledged / Needs linking, mailbox/state
+filters, and a lead list beside a message reader. All incoming messages remain accessible through
+the picker, with sender, subject, receipt/timezone, sent conversation snapshots and action history.
+
+Automation and relationship labels are independent. Human/Automatic/Unsure confirmation is
+separate from meaning and sending. Continue/Stop sequence/Suppress address/Delay and content
+deletion require consequence confirmations. Suppress requires typed email and is permanent.
+Held rows require a decision before acknowledgement; acknowledging only explicitly reviewed IDs
+offers Undo. Unmatched items can be linked through campaign lead search or marked unrelated,
+then acknowledged. A new response returns its row to review.
+
+Pool-only review can be resolved with Continue without creating an enrollment; Stop/Delay need
+an existing sequence. Future enrollment still requires explicit recontact. Completed/bounced/
+legacy-stopped records do not reactivate when a new message arrives. Restoration previews history,
+requires a reason, rejects incompatible checkpoints and returns only to a review hold.
+
 > **2026-10-07 controls:** Settings → Compliance → Sender signature adds **Include postal
 > address**, off by default. Hidden addresses remain editable/saved; the sending domain moves
-> below the role. With inclusion on, the domain follows the role with ` | ` and the address
+> below the role. With inclusion on, the domain follows the role with `|` and the address
 > follows on the next line. Empty-address validation applies only when inclusion is on.
 > Mailboxes → Edit replaces the fixed interval with **Minimum minutes / Maximum minutes**,
 > default 4–7, whole minutes 1–1440 with min < max. The table displays the saved range; the form
@@ -50,6 +69,7 @@ Three steps in a dialog: **Upload** (drag/drop CSV, client-side 10 MB check) →
 **Regions:** table — address, status chip (`🟢 ok / ⏸ paused / 🟠 auto_paused / 🔴 auth_failed / ⚠️ imap_stale / 🚫 provider_blocked`), sent today `n/cap`, 7-day avg, HARD-BNC%, last poll; footer row TOTAL DAILY CAPACITY; volume trend chart (per-mailbox lines, 30 d) + imbalance warning banner when `imbalance: true` (§11).
 **Interactions:** **+ Add Mailbox** dialog = walkthrough Stage-0 form (rhf+zod from shared schema; password field masked, never re-displayed) with **[Test Connection]** → `POST test-connection` → `✅ SMTP OK · ✅ IMAP OK · 4.2s` inline; edit (PATCH); pause/resume.
 **Failure panels (the Stage-7 pending screens, driven by `status`):**
+
 - `auth_failed` → red card: explanation, redistribution note, new-app-password input + **[Reconnect Mailbox]** → `POST reconnect`.
 - `imap_stale` → amber card: last-poll time, risk copy, **[Retry connection now]** → `POST test-connection` then refetch.
 - `auto_paused` → amber card: trigger detail from `status_reason` + the paired alert payload (both window numbers, likely cause), buttons **[Re-verify leads]** (links to Leads filtered to that mailbox's recent enrollments) and **[Resume at 50%]** → `POST resume {cap_pct:50}`.

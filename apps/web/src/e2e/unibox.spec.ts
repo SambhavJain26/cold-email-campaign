@@ -1,95 +1,166 @@
-// F6.6 — unibox: tag → overview positive rate moves, meeting booked, the STOP
-// card's auto-unsub caption, the OOO tab, thread view, tag_only unsubscribe,
-// and sequence-only Personalized Copy editing (docs/15 F6).
-import { expect, test } from '@playwright/test';
-import { login } from './helpers';
+// Prospective review policy; legacy golden fixtures remain an independent cohort.
+import { expect, test, type Page } from '@playwright/test';
+import { login, navigate } from './helpers';
 
-test('feed lists human replies with suggested tags and auto-stop caption', async ({ page }) => {
+async function reader(page: Page) {
   await login(page);
-  await page.getByRole('link', { name: 'Unibox' }).click();
-
-  const feed = page.getByTestId('unibox-feed');
-  await expect(feed).toContainText('sequence stopped after this reply');
-  // Untagged items carry the AI-assisted suggestion, greyed.
-  await expect(feed.getByText('(AI-assisted)').first()).toBeVisible();
-
-  // The STOP reply auto-unsubscribed and says so, with the double-count caveat.
-  await expect(page.getByTestId('auto-unsub-caption').first()).toContainText(
-    'counts toward reply AND unsubscribe rate',
+  await navigate(page, 'Unibox');
+  await page.getByRole('button', { name: 'Open Alex Rivera in Golden Pass 1' }).click();
+}
+async function reviewed(page: Page) {
+  await page.getByLabel('Reviewed this message').check();
+}
+async function continueSequence(page: Page) {
+  await reviewed(page);
+  await page.getByRole('button', { name: 'Continue', exact: true }).click();
+  await expect(page.getByRole('dialog')).toContainText('does not send an email');
+  await page.getByRole('button', { name: 'Confirm Continue', exact: true }).click();
+  await expect(page.getByRole('dialog')).toBeHidden();
+}
+test('grouped lead list, complete reader, independent labels and sent conversation context', async ({
+  page,
+}) => {
+  await reader(page);
+  await expect(page.getByRole('region', { name: 'Lead review list' })).toContainText(
+    '2 message(s)',
+  );
+  await expect(page.getByRole('region', { name: 'Message reader' })).toContainText(
+    'Held for review',
+  );
+  await expect(page.getByText('Automation: No automation detected', { exact: true })).toBeVisible();
+  await expect(page.getByText('Relationship: In-thread reply', { exact: true })).toBeVisible();
+  await expect(
+    page.getByText('Please check back next week.', { exact: false }).first(),
+  ).toBeVisible();
+  await page.getByText('Quoted history', { exact: false }).click();
+  await expect(page.getByText('> Previous message', { exact: false })).toBeVisible();
+  await page.getByText('Sent conversation context').click();
+  await page.getByText('Step 1 · An earlier conversation', { exact: false }).click();
+  await expect(page.getByText('Saved sent message text.')).toBeVisible();
+  await page.getByRole('region', { name: 'Message reader' }).evaluate((element) => {
+    element.scrollTop = 0;
+  });
+  await page.screenshot({ path: test.info().outputPath('unibox-desktop.png'), fullPage: true });
+});
+test('automatic separate response keeps a review hold and does not gain human credit', async ({
+  page,
+}) => {
+  await reader(page);
+  await page.getByLabel('All incoming messages (2)').click();
+  await page.getByRole('option', { name: /Automatic reply: Out of office/ }).click();
+  await expect(page.getByText('Automation: Automatic detected', { exact: true })).toBeVisible();
+  await expect(page.getByText('Relationship: Separate email', { exact: true })).toBeVisible();
+  await expect(page.getByRole('region', { name: 'Message reader' })).toContainText(
+    'Held for review',
+  );
+  await expect(page.getByText('Confirmed authorship: Unsure')).toBeVisible();
+});
+test('Continue requires reviewed messages; acknowledgement changes visibility with Undo', async ({
+  page,
+}) => {
+  await reader(page);
+  await expect(page.getByRole('button', { name: 'Continue', exact: true })).toBeDisabled();
+  await expect(page.getByRole('button', { name: /Acknowledge 0 reviewed/ })).toBeDisabled();
+  await continueSequence(page);
+  await expect(page.getByRole('region', { name: 'Message reader' })).toContainText('Running');
+  await page.getByRole('button', { name: '✓ Acknowledge 1 reviewed' }).click();
+  await expect(page.getByText('Acknowledged 1 reviewed message(s)')).toBeVisible();
+  await page.getByRole('button', { name: 'Undo', exact: true }).click();
+  await expect(page.getByText('Acknowledgement undone')).toBeVisible();
+});
+test('Stop is campaign-specific; correction returns to review', async ({ page }) => {
+  await reader(page);
+  await page.getByRole('button', { name: 'Stop sequence', exact: true }).click();
+  await expect(page.getByRole('dialog')).toContainText('does not globally suppress');
+  await page.getByRole('button', { name: 'Confirm Stop sequence' }).click();
+  await expect(page.getByRole('button', { name: 'Restore to review', exact: true })).toBeVisible();
+  await page.getByRole('button', { name: 'Restore to review', exact: true }).click();
+  await page.getByLabel('Correction reason').fill('Wrong action selected');
+  await page.getByRole('button', { name: 'Confirm Correct Stop' }).click();
+  await expect(page.getByRole('region', { name: 'Message reader' })).toContainText(
+    'Held for review',
   );
 });
-
-test('auto-reply tab explains OOO items are not replies', async ({ page }) => {
-  await login(page);
-  await page.goto('/unibox');
-
-  await page.getByRole('tab', { name: 'Auto-replies (OOO)' }).click();
-  await expect(page.getByTestId('auto-reply-caption').first()).toContainText(
-    'NOT counted as a reply. Sequence continues normally.',
+test('Suppression has typed confirmation and ordinary Continue remains unavailable', async ({
+  page,
+}) => {
+  await reader(page);
+  await page.getByRole('button', { name: 'Suppress address', exact: true }).click();
+  const confirm = page.getByRole('button', { name: 'Confirm Suppress address' });
+  await expect(confirm).toBeDisabled();
+  await page.getByLabel('Type alex@apex.example to confirm permanently').fill('alex@apex.example');
+  await confirm.click();
+  await expect(page.getByRole('region', { name: 'Message reader' })).toContainText('Suppressed');
+  await expect(page.getByRole('button', { name: 'Continue', exact: true })).toBeDisabled();
+});
+test('deleting stored content keeps metadata and outreach state', async ({ page }) => {
+  await reader(page);
+  await page.getByRole('button', { name: 'Delete stored content', exact: true }).click();
+  await expect(page.getByRole('dialog')).toContainText('mailbox copy');
+  await page.getByRole('button', { name: 'Confirm Delete stored content' }).click();
+  await expect(page.getByText('Stored content deleted', { exact: true }).first()).toBeVisible();
+  await expect(page.getByRole('region', { name: 'Message reader' })).toContainText(
+    'Held for review',
   );
-  await expect(page.getByTestId('unibox-feed')).toContainText('Out of office');
 });
-
-test('tagging positive moves the Overview positive rate', async ({ page }) => {
-  await login(page);
-  // In-app navigation only: a full page load rebuilds the MSW state from the
-  // fixtures, which would throw away the tag we are asserting on.
-  await expect(page.getByText('Positive rate').locator('..')).toContainText('3.2%');
-
-  await page.getByRole('link', { name: 'Unibox' }).click();
-  // Card 105 is untagged and carries a suggestion — confirm it as positive.
-  const card = page.getByTestId('reply-card-105');
-  await card.getByRole('button', { name: 'Tag positive' }).click();
-  // Optimistic: the confirmed tag replaces the suggestion immediately.
-  await expect(card.getByText('positive', { exact: false }).first()).toBeVisible();
-  await expect(card.getByRole('button', { name: 'Tag positive' })).toBeDisabled();
-
-  await page.getByRole('link', { name: 'Overview' }).click();
-  // 28 → 29 positives over the same 867 contacted = 3.3%.
-  await expect(page.getByText('Positive rate').locator('..')).toContainText('3.3%');
+test('HTML reader executes no scripts and loads no remote resources', async ({ page }) => {
+  const external: string[] = [];
+  page.on('request', (request) => {
+    if (request.url().includes('tracking.invalid')) external.push(request.url());
+  });
+  await reader(page);
+  await page.getByRole('button', { name: 'HTML', exact: true }).click();
+  await expect(page.locator('iframe[title="Email HTML content"]')).toBeVisible();
+  await expect(
+    page
+      .frameLocator('iframe[title="Email HTML content"]')
+      .getByText('Please check back next week.'),
+  ).toBeVisible();
+  expect(external).toEqual([]);
+  expect(await page.evaluate(() => 'emailScriptRan' in window)).toBe(false);
 });
-
-test('meeting booked hides the button and badges the card', async ({ page }) => {
-  await login(page);
-  await page.goto('/unibox');
-
-  const card = page.getByTestId('reply-card-101');
-  await card.getByRole('button', { name: 'Mark meeting booked' }).click();
-  await expect(card.getByTestId('meeting-badge')).toBeVisible();
-  await expect(card.getByRole('button', { name: 'Mark meeting booked' })).toHaveCount(0);
+test('campaign search and company-address linking do not hide unmatched messages', async ({
+  page,
+}) => {
+  await reader(page);
+  await page.getByLabel('Search leads').fill('missing-address');
+  await expect(page.getByText('No leads in this view.', { exact: false })).toBeVisible();
+  await page.getByLabel('Search leads').fill('Apex Realty');
+  await expect(
+    page.getByRole('button', { name: 'Open Alex Rivera in Golden Pass 1' }),
+  ).toBeVisible();
+  await page.getByRole('button', { name: 'Needs linking', exact: true }).click();
+  await page.getByRole('button', { name: /other@apex.example/ }).click();
+  await expect(page.getByText('Association needs review.', { exact: false })).toBeVisible();
+  await page.getByRole('button', { name: 'Mark unrelated', exact: true }).click();
+  await expect(
+    page.getByText('Marked unrelated. No outreach state', { exact: false }),
+  ).toBeVisible();
+  await page.getByRole('button', { name: '✓ Acknowledge', exact: true }).click();
+  await expect(page.getByText('Acknowledged', { exact: true }).first()).toBeVisible();
 });
-
-test('thread view shows the sent steps and the reply body', async ({ page }) => {
-  await login(page);
-  await page.goto('/unibox');
-
-  await page
-    .getByRole('button', { name: /Open thread with/ })
-    .first()
-    .click();
-  await expect(page.getByTestId('thread-steps')).toContainText('Step 1');
-  await expect(page.getByTestId('thread-body')).not.toBeEmpty();
+test('phone reader is a dedicated usable view with Back navigation', async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 760 });
+  await reader(page);
+  await expect(page.getByRole('region', { name: 'Lead review list' })).toBeHidden();
+  await page.getByRole('button', { name: 'Stop sequence', exact: true }).click();
+  const bounds = await page.getByRole('dialog').boundingBox();
+  expect(bounds!.width).toBeLessThanOrEqual(390);
+  await page.getByRole('button', { name: 'Cancel', exact: true }).click();
+  await page.getByRole('button', { name: '← Back to leads' }).click();
+  await expect(page.getByRole('region', { name: 'Lead review list' })).toBeVisible();
 });
-
-test('tag_only mode adds the explicit unsubscribe on negative cards', async ({ page }) => {
-  await login(page);
-
-  // Flip decision F's escape hatch in Settings, then the card grows the button.
-  await page.getByRole('link', { name: 'Settings' }).click();
-  await page.getByLabel('Tag only').check();
-  await page.getByRole('button', { name: 'Save rules' }).click();
-  await expect(page.getByText('Settings saved')).toBeVisible();
-
-  await page.getByRole('link', { name: 'Unibox' }).click();
-  await expect(page.getByTestId('tag-only-mode')).toBeVisible();
-
-  // Card 102 is tagged negative in the fixtures.
-  const card = page.getByTestId('reply-card-102');
-  await expect(card.getByTestId('manual-unsubscribe')).toBeVisible();
-  await card.getByTestId('manual-unsubscribe').click();
-  await expect(page.getByText('Lead unsubscribed and suppressed')).toBeVisible();
+test('operator reminder is independent of the review hold', async ({ page }) => {
+  await reader(page);
+  await page.getByRole('button', { name: 'Add reminder', exact: true }).click();
+  await page.getByLabel('Reminder due date').fill('2026-12-01');
+  await page.getByLabel('Reminder note').fill('Review manually next month');
+  await page.getByRole('button', { name: 'Save reminder' }).click();
+  await expect(page.getByText('Reminder saved. Outreach state unchanged.')).toBeVisible();
+  await expect(page.getByRole('region', { name: 'Message reader' })).toContainText(
+    'Held for review',
+  );
 });
-
 test('Personalized Copy saves a lead source and exposes no direct-send action', async ({
   page,
 }) => {
@@ -127,22 +198,4 @@ test('Personalized Copy saves a lead source and exposes no direct-send action', 
   );
   await expect(dialog.getByLabel('Subject')).toHaveValue('Step 3 stays in Beacon');
   await expect(dialog.getByRole('button', { name: /send/i })).toHaveCount(0);
-});
-
-test('Not now creates an operator reminder without restarting the sequence', async ({ page }) => {
-  await login(page);
-  await page.getByRole('link', { name: 'Unibox' }).click();
-
-  const card = page.getByTestId('reply-card-101');
-  await card.getByLabel('Reply outcome').click();
-  await page.getByRole('option', { name: 'Not now — hold until date' }).click();
-  const tomorrow = new Date(Date.now() + 2 * 86_400_000).toISOString().slice(0, 10);
-  await card.getByLabel('Do not contact before').fill(tomorrow);
-  await card.getByRole('button', { name: 'Save outcome' }).click();
-  await expect(page.getByText('Reply outcome recorded')).toBeVisible();
-
-  await page.getByRole('tab', { name: /Reminders/ }).click();
-  await expect(page.getByText(/Follow up after this lead's requested date/)).toBeVisible();
-  await page.getByRole('button', { name: 'Complete' }).click();
-  await expect(page.getByText(/Follow up after this lead's requested date/)).toBeHidden();
 });

@@ -7,7 +7,6 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Switch } from '@/components/ui/switch';
 import { usePutSettings } from '@/api/mutations/settings';
 import { TimezoneCombobox } from '@/components/shared/timezone-combobox';
@@ -36,13 +35,16 @@ export function RulesTab({
   useEffect(() => onDirtyChange(isDirty), [isDirty, onDirtyChange]);
 
   const onSubmit = (body: PutSettingsBody) =>
-    put.mutate(body, {
-      onSuccess: (saved) => {
-        toast.success('Settings saved');
-        const { updated_at: _u, ...next } = saved;
-        reset(next); // clears dirty state to the saved row
+    put.mutate(
+      { ...body, suppress_unsubs: true, optout_detection: 'auto' },
+      {
+        onSuccess: (saved) => {
+          toast.success('Settings saved');
+          const { updated_at: _u, ...next } = saved;
+          reset(next); // clears dirty state to the saved row
+        },
       },
-    });
+    );
 
   const toggle = (name: keyof PutSettingsBody, label: string, hint: string) => (
     <div className="flex items-center justify-between gap-4 py-1">
@@ -86,14 +88,12 @@ export function RulesTab({
         </CardHeader>
         <CardContent className="divide-y divide-border">
           <p className="py-1 text-xs text-muted-foreground">
-            Reply handling is configured on each sequence. Hard bounces and STOP/unsubscribe
-            requests always end sending.
+            Incoming responses hold outreach for review. Clear opt-outs are automatically and
+            permanently suppressed across campaigns. Hard-bounce protection remains active.
           </p>
-          {toggle(
-            'suppress_unsubs',
-            'Suppress unsubscribes globally',
-            'Opt-outs are blocked from every future campaign, permanently.',
-          )}
+          <p className="py-2 text-sm">
+            Global opt-out suppression is mandatory and cannot be disabled.
+          </p>
           {toggle(
             'enforce_send_window',
             'Enforce send window',
@@ -107,34 +107,10 @@ export function RulesTab({
           <CardTitle className="text-sm">Opt-out detection</CardTitle>
         </CardHeader>
         <CardContent className="space-y-2">
-          <Controller
-            name="optout_detection"
-            control={control}
-            render={({ field }) => (
-              <RadioGroup value={field.value} onValueChange={field.onChange} className="gap-3">
-                <div className="flex items-start gap-2">
-                  <RadioGroupItem value="auto" id="optout-auto" />
-                  <div>
-                    <Label htmlFor="optout-auto">Automatic (recommended)</Label>
-                    <p className="text-xs text-muted-foreground">
-                      A keyword-matched “stop” reply suppresses the lead immediately — decision F’s
-                      safe default. The Unibox card shows what happened.
-                    </p>
-                  </div>
-                </div>
-                <div className="flex items-start gap-2">
-                  <RadioGroupItem value="tag_only" id="optout-tag" />
-                  <div>
-                    <Label htmlFor="optout-tag">Tag only</Label>
-                    <p className="text-xs text-muted-foreground">
-                      Detection still flags the reply, but suppression waits for your explicit
-                      Unsubscribe click.
-                    </p>
-                  </div>
-                </div>
-              </RadioGroup>
-            )}
-          />
+          <p className="text-sm">
+            Clear requests in new message text suppress automatically. Quoted history, signatures
+            and ambiguous wording are held for your review.
+          </p>
         </CardContent>
       </Card>
 

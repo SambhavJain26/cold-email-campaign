@@ -1,3 +1,4 @@
+import { navigate } from '../src/e2e/helpers';
 // The real-backend walkthrough replay (docs/13 §5) — the M3 closer.
 //
 // Unlike the mock journey (journey.spec.ts, MSW over fixtures), this drives the
@@ -42,7 +43,7 @@ test('real backend: import → enroll → advance → reply/STOP → tag → met
   // 1 — Mailbox: add through the UI, Test Connection round-trips the real
   //     (mock) transport, then widen the send window so virtual-time sends
   //     don't depend on which weekday the clock starts on.
-  await page.getByRole('link', { name: 'Mailboxes' }).click();
+  await navigate(page, 'Mailboxes');
   await page.getByRole('button', { name: 'Add Mailbox' }).click();
   await page.getByLabel('Display name').fill('Sender One');
   await page.getByLabel('From address').fill('sender1@outreach.test');
@@ -146,20 +147,17 @@ test('real backend: import → enroll → advance → reply/STOP → tag → met
   });
   await advanceClock(page, { days: 1 });
 
-  // 7 — Unibox shows the human reply; tag it positive (real event appended).
-  //     The STOP reply auto-unsubscribed bob (keyword match, no tagging).
-  await page.getByRole('link', { name: 'Unibox' }).click();
-  const feed = page.getByTestId('unibox-feed');
-  // Select ALICE's card by her unique reply text (bob's STOP card is newer, so
-  // a `.first()` would grab the wrong one — and an untagged REPLIED lead is
-  // uncounted in the Stage-9 outcomes split, which is exactly what we're proving).
-  const aliceCard = feed
-    .locator('[data-testid^="reply-card-"]')
-    .filter({ hasText: 'set up a call' });
-  await aliceCard.getByRole('button', { name: 'Tag positive' }).click();
-  await expect(aliceCard.getByText('positive', { exact: false }).first()).toBeVisible();
-  // bob's keyword STOP auto-unsubscribed — the caption says so.
-  await expect(page.getByTestId('auto-unsub-caption').first()).toBeVisible();
+  // Confirm human authorship and sentiment separately from outreach decisions.
+  await navigate(page, 'Unibox');
+  await page.getByRole('button', { name: /Open Alice in/ }).click();
+  await expect(page.getByRole('region', { name: 'Message reader' })).toContainText('set up a call');
+  await page.getByLabel('Confirm authorship for analytics').click();
+  await page.getByRole('option', { name: 'Human', exact: true }).click();
+  await page.getByLabel('Confirmed reply sentiment').click();
+  await page.getByRole('option', { name: 'Positive', exact: true }).click();
+  await expect(page.getByLabel('Confirmed reply sentiment')).toContainText('Positive');
+  await page.getByRole('button', { name: /Open Bob in/ }).click();
+  await expect(page.getByRole('region', { name: 'Message reader' })).toContainText('Suppressed');
 
   // 8 — Overview reflects the positive tag + the STOP unsubscribe.
   await page.goto(`/overview?campaign=${camp.id}`);
@@ -178,7 +176,7 @@ test('real backend: import → enroll → advance → reply/STOP → tag → met
   await expect(page.getByTestId('outcomes-total')).toContainText('5 / 5');
 
   // 10 — System: the projection rebuild is clean — the log and the screens agree.
-  await page.getByRole('link', { name: 'System' }).click();
+  await navigate(page, 'System');
   await page.getByRole('button', { name: 'Rebuild projections (dry-run)' }).click();
   await page.getByRole('button', { name: 'Run dry run' }).click();
   await expect(page.getByTestId('rebuild-result')).toContainText('0 diffs');

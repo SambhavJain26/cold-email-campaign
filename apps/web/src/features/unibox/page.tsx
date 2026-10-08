@@ -1,8 +1,8 @@
-import { useState } from 'react';
-import { SENTIMENTS, type Sentiment } from '@coldemail/shared';
+import { useRef, useState } from 'react';
+import { toast } from 'sonner';
+import type { IncomingReviewRow } from '@coldemail/shared';
 import { Button } from '@/components/ui/button';
-import { Skeleton } from '@/components/ui/skeleton';
-import { Switch } from '@/components/ui/switch';
+import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import {
   Select,
@@ -11,301 +11,697 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { EmptyState } from '@/components/shared/empty-state';
 import { CollectionPagination } from '@/components/shared/collection-pagination';
-import { ResponsiveFilters } from '@/components/shared/responsive-filters';
-import { useReminders, useUnibox } from '@/api/queries/unibox';
-import { usePatchReminder } from '@/api/mutations/unibox';
-import { useSettings } from '@/api/queries/settings';
+import { useCampaigns } from '@/api/queries/campaigns';
 import { useMailboxes } from '@/api/queries/mailboxes';
-import { ReplyCard } from './reply-card';
-import { ThreadView } from './thread-view';
+import {
+  useIncomingRows,
+  useNeedsLinking,
+  useIncomingMessage,
+  useIncomingRetention,
+} from '@/api/queries/incoming-review';
+import { useIncomingMutation } from '@/api/mutations/incoming-review';
+import { useReminders } from '@/api/queries/unibox';
+import { usePatchReminder } from '@/api/mutations/unibox';
+import { cn } from '@/lib/utils';
+import { formatDateTime } from '@/lib/format';
+import { ReviewReader, MessageLabels, sendingLabel } from './review-reader';
+import { SafeMessage } from './safe-message';
+import { LinkMessage } from './review-link';
+import { RecoverContent } from './recover-content';
+import { apiFetch } from '@/api/client';
+import { incomingMessageSchema } from '@coldemail/shared';
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+  DialogFooter,
+} from '@/components/ui/dialog';
 
-const GLYPH: Record<Sentiment, string> = { positive: '🟢', neutral: '⚪', negative: '🔴' };
-
-/** F6.1 — Unibox feed (docs/12 §7): human / auto-reply tabs + sentiment filters. */
+type View = 'needs_review' | 'all' | 'acknowledged' | 'linking' | 'reminders';
+const VIEWS: [View, string][] = [
+  ['needs_review', 'Needs review'],
+  ['all', 'All'],
+  ['acknowledged', 'Acknowledged'],
+  ['linking', 'Needs linking'],
+  ['reminders', 'Reminders'],
+];
 export default function UniboxPage() {
-  const [view, setView] = useState<'human' | 'auto_reply' | 'reminders'>('human');
+  const [view, setView] = useState<View>('needs_review');
+  const [campaign, setCampaign] = useState('all');
+  const [search, setSearch] = useState('');
+  const [mailbox, setMailbox] = useState('all');
+  const [state, setState] = useState('all');
   const [page, setPage] = useState(1);
-  const [perPage, setPerPage] = useState(25);
-  const [reminderView, setReminderView] = useState<'due_today' | 'upcoming' | 'overdue'>(
-    'due_today',
-  );
-  const [sentiment, setSentiment] = useState<Sentiment | undefined>(undefined);
-  const [unhandledOnly, setUnhandledOnly] = useState(false);
-  const [threadId, setThreadId] = useState<number | null>(null);
-  const [mailboxId, setMailboxId] = useState<string>('all');
-
-  const settings = useSettings();
+  const [selected, setSelected] = useState<IncomingReviewRow | null>(null);
+  const [unmatchedId, setUnmatchedId] = useState<number | null>(null);
+  const [retentionOpen, setRetentionOpen] = useState(false);
+  const campaigns = useCampaigns();
   const mailboxes = useMailboxes();
-  const tagOnlyMode = settings.data?.optout_detection === 'tag_only';
-  const bucket = view === 'auto_reply' ? 'auto_reply' : 'human';
-
-  const { data, isPending, isError, refetch } = useUnibox({
-    bucket,
+  const acknowledgeRef = useRef<(() => void) | null>(null);
+  const [linkingView, setLinkingView] = useState('needs_review');
+  const rows = useIncomingRows({
+    view: view === 'acknowledged' ? 'acknowledged' : view === 'all' ? 'all' : 'needs_review',
+    campaign_id: campaign === 'all' ? undefined : Number(campaign),
+    search: search || undefined,
+    mailbox_id: mailbox === 'all' ? undefined : Number(mailbox),
+    sending_state: state === 'all' ? undefined : state,
     page,
-    per_page: perPage,
-    sentiment: view === 'human' ? sentiment : undefined,
-    unhandled: view === 'human' && unhandledOnly ? true : undefined,
-    mailbox_id: mailboxId === 'all' ? undefined : Number(mailboxId),
+    per_page: 25,
   });
-  const reminders = useReminders({ page, per_page: perPage, view: reminderView, status: 'open' });
-  const patchReminder = usePatchReminder();
-
-  const switchBucket = (next: string) => {
-    setView(next === 'auto_reply' ? 'auto_reply' : next === 'reminders' ? 'reminders' : 'human');
+  const linking = useNeedsLinking(page, view === 'linking', linkingView);
+  const active = selected
+    ? (rows.data?.items.find(
+        (r) => r.lead_id === selected.lead_id && r.campaign_id === selected.campaign_id,
+      ) ?? selected)
+    : null;
+  const selectedCampaign = active && campaigns.data?.items.find((c) => c.id === active.campaign_id);
+  const currentRow =
+    active && selectedCampaign ? { ...active, campaign_status: selectedCampaign.status } : active;
+  const changeView = (next: View) => {
+    setView(next);
     setPage(1);
-    setSentiment(undefined);
-    setUnhandledOnly(false);
+    setSelected(null);
+    setUnmatchedId(null);
   };
-
+  const busy = view === 'linking' ? linking.isPending : rows.isPending;
+  const error = view === 'linking' ? linking.error : rows.error;
+  const readerOpen = !!currentRow || unmatchedId !== null;
   return (
-    <div className="space-y-4 p-4 sm:p-6">
-      <div className="flex flex-wrap items-center justify-between gap-3">
+    <div className="flex h-full min-h-0 flex-col gap-4 p-3 sm:p-5">
+      <header className="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <h1 className="text-lg font-semibold">Unibox</h1>
-          <p className="text-xs text-muted-foreground">All campaigns</p>
+          <h1 className="text-xl font-semibold">Unibox</h1>
+          <p className="text-sm text-muted-foreground">
+            Incoming responses await your decision. Clear opt-outs remain protected automatically.
+          </p>
         </div>
-        {tagOnlyMode && (
-          <span className="text-xs text-muted-foreground" data-testid="tag-only-mode">
-            Opt-out detection is <strong>tag_only</strong> — STOP replies are tagged, never
-            auto-suppressed. Unsubscribe negatives by hand.
-          </span>
-        )}
-      </div>
-
-      <div className="space-y-3">
-        <div className="max-w-full overflow-x-auto overflow-y-hidden">
-          <div
-            className="flex min-w-max gap-1 rounded-lg bg-muted p-[3px]"
-            role="tablist"
-            aria-label="Unibox view"
+        <Button variant="ghost" size="sm" onClick={() => setRetentionOpen(true)}>
+          Content retention
+        </Button>
+      </header>
+      <div className={cn('space-y-3', readerOpen && 'hidden lg:block')}>
+        <div className="flex flex-wrap gap-2">
+          <Select
+            value={campaign}
+            onValueChange={(value) => {
+              setCampaign(value);
+              setPage(1);
+              setSelected(null);
+            }}
           >
-            <Button
-              role="tab"
-              size="sm"
-              variant={view === 'human' ? 'secondary' : 'ghost'}
-              aria-selected={view === 'human'}
-              onClick={() => switchBucket('human')}
-            >
-              Human replies
-            </Button>
-            <Button
-              role="tab"
-              size="sm"
-              variant={view === 'auto_reply' ? 'secondary' : 'ghost'}
-              aria-selected={view === 'auto_reply'}
-              onClick={() => switchBucket('auto_reply')}
-            >
-              Auto-replies (OOO)
-            </Button>
-            <Button
-              role="tab"
-              size="sm"
-              variant={view === 'reminders' ? 'secondary' : 'ghost'}
-              aria-selected={view === 'reminders'}
-              onClick={() => switchBucket('reminders')}
-            >
-              Reminders
-              {(reminders.data?.open_count ?? 0) > 0 ? ` (${reminders.data!.open_count})` : ''}
-            </Button>
-          </div>
-        </div>
-
-        {view !== 'reminders' && (
-          <ResponsiveFilters
-            title="Reply filters"
-            activeCount={
-              Number(mailboxId !== 'all') + Number(sentiment !== undefined) + Number(unhandledOnly)
-            }
-            description="Filter replies by mailbox, sentiment, and whether an outcome is still needed."
-          >
-            <Select
-              value={mailboxId}
-              onValueChange={(value) => {
-                setMailboxId(value);
-                setPage(1);
-              }}
-            >
-              <SelectTrigger size="sm" className="w-60" aria-label="Filter by mailbox">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All mailboxes</SelectItem>
-                {(mailboxes.data?.items ?? []).map((mailbox) => (
-                  <SelectItem key={mailbox.id} value={String(mailbox.id)}>
-                    {mailbox.from_address}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-
-            {view === 'human' && (
-              <>
-                <div className="flex gap-1" role="group" aria-label="Filter by sentiment">
-                  {SENTIMENTS.map((value) => (
-                    <Button
-                      key={value}
-                      variant={sentiment === value ? 'default' : 'outline'}
-                      size="xs"
-                      aria-pressed={sentiment === value}
-                      onClick={() => {
-                        setSentiment(sentiment === value ? undefined : value);
-                        setPage(1);
-                      }}
-                    >
-                      {GLYPH[value]} {value}
-                    </Button>
-                  ))}
-                </div>
-                <div className="flex items-center gap-2">
-                  <Switch
-                    id="unhandled-only"
-                    checked={unhandledOnly}
-                    onCheckedChange={(checked) => {
-                      setUnhandledOnly(checked);
-                      setPage(1);
-                    }}
-                  />
-                  <Label htmlFor="unhandled-only" className="text-xs">
-                    Needs outcome
-                  </Label>
-                </div>
-              </>
-            )}
-          </ResponsiveFilters>
-        )}
-      </div>
-
-      {view === 'reminders' && (
-        <div className="flex flex-wrap gap-1" role="group" aria-label="Reminder date filter">
-          {(['due_today', 'upcoming', 'overdue'] as const).map((value) => (
-            <Button
-              key={value}
-              size="xs"
-              variant={reminderView === value ? 'default' : 'outline'}
-              onClick={() => {
-                setReminderView(value);
-                setPage(1);
-              }}
-            >
-              {value === 'due_today' ? 'Due today' : value === 'upcoming' ? 'Upcoming' : 'Overdue'}
-            </Button>
-          ))}
-        </div>
-      )}
-
-      {view === 'reminders' ? (
-        reminders.isPending ? (
-          <Skeleton className="h-40 w-full" />
-        ) : reminders.isError ? (
-          <EmptyState
-            title="Failed to load reminders"
-            actionLabel="Retry"
-            onAction={() => reminders.refetch()}
-          />
-        ) : reminders.data.items.length === 0 ? (
-          <EmptyState title="No reminders match this date filter." />
-        ) : (
-          <div className="space-y-3">
-            {reminders.data.items.map((reminder) => (
-              <article
-                key={reminder.id}
-                className="space-y-2 rounded-lg border border-border bg-card p-4"
-              >
-                <div className="flex flex-wrap items-start justify-between gap-2">
-                  <div>
-                    <p className="text-sm font-medium">{reminder.lead.name}</p>
-                    <p className="text-xs text-muted-foreground">
-                      Due {reminder.due_date} · campaign #{reminder.campaign_id} ·{' '}
-                      {reminder.source.replace('_', ' ')}
-                    </p>
-                  </div>
-                  <div className="flex gap-1">
-                    <Button
-                      size="xs"
-                      variant="outline"
-                      disabled={patchReminder.isPending}
-                      onClick={() => patchReminder.mutate({ id: reminder.id, status: 'done' })}
-                    >
-                      Complete
-                    </Button>
-                    <Button
-                      size="xs"
-                      variant="ghost"
-                      disabled={patchReminder.isPending}
-                      onClick={() => patchReminder.mutate({ id: reminder.id, status: 'dismissed' })}
-                    >
-                      Dismiss
-                    </Button>
-                  </div>
-                </div>
-                {(reminder.note || reminder.reply_snippet) && (
-                  <p className="text-xs text-muted-foreground">
-                    {reminder.note ?? reminder.reply_snippet}
-                  </p>
-                )}
-              </article>
-            ))}
-            <CollectionPagination
-              page={reminders.data.page}
-              perPage={reminders.data.per_page}
-              total={reminders.data.total}
-              onPageChange={setPage}
-              onPerPageChange={(nextPerPage) => {
-                setPerPage(nextPerPage);
-                setPage(1);
-              }}
-              paginationLabel="Reminders pagination"
-            />
-          </div>
-        )
-      ) : isPending ? (
-        <div className="space-y-3">
-          <Skeleton className="h-24 w-full" />
-          <Skeleton className="h-24 w-full" />
-        </div>
-      ) : isError ? (
-        <EmptyState title="Failed to load replies" actionLabel="Retry" onAction={() => refetch()} />
-      ) : data.items.length === 0 ? (
-        <EmptyState
-          title={
-            view === 'human'
-              ? "No replies yet — they'll appear here the moment the poller sees them."
-              : 'No auto-replies in this window.'
-          }
-        />
-      ) : (
-        <div className="space-y-3" data-testid="unibox-feed">
-          {data.items.map((item) => (
-            <ReplyCard
-              key={item.incoming_message_id}
-              item={item}
-              bucket={bucket}
-              tagOnlyMode={tagOnlyMode}
-              onOpenThread={() => setThreadId(item.incoming_message_id)}
-            />
-          ))}
-          <CollectionPagination
-            page={data.page}
-            perPage={data.per_page}
-            total={data.total}
-            onPageChange={setPage}
-            onPerPageChange={(nextPerPage) => {
-              setPerPage(nextPerPage);
+            <SelectTrigger aria-label="Unibox campaign" className="w-full sm:w-60">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All campaigns</SelectItem>
+              {campaigns.data?.items.map((c) => (
+                <SelectItem key={c.id} value={String(c.id)}>
+                  {c.name}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          <Input
+            aria-label="Search leads"
+            placeholder="Search lead name, email or company"
+            className="w-full min-w-0 flex-1 sm:min-w-64"
+            value={search}
+            onChange={(event) => {
+              setSearch(event.target.value);
               setPage(1);
             }}
-            paginationLabel={
-              view === 'human' ? 'Human replies pagination' : 'Auto-replies pagination'
-            }
           />
+          <Select
+            value={mailbox}
+            onValueChange={(value) => {
+              setMailbox(value);
+              setPage(1);
+            }}
+          >
+            <SelectTrigger aria-label="Unibox mailbox" className="w-full sm:w-44">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All mailboxes</SelectItem>
+              {mailboxes.data?.items.map((m) => (
+                <SelectItem key={m.id} value={String(m.id)}>
+                  {m.display_name}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          <Select
+            value={state}
+            onValueChange={(value) => {
+              setState(value);
+              setPage(1);
+            }}
+          >
+            <SelectTrigger aria-label="Sending state" className="w-full sm:w-44">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All sending states</SelectItem>
+              {(
+                [
+                  'held',
+                  'running',
+                  'delayed',
+                  'stopped',
+                  'suppressed',
+                  'completed',
+                  'bounced',
+                  'not_enrolled',
+                ] as const
+              ).map((s) => (
+                <SelectItem key={s} value={s}>
+                  {s === 'held'
+                    ? 'Held for review'
+                    : s === 'not_enrolled'
+                      ? 'Not enrolled'
+                      : s === 'completed'
+                        ? 'Completed'
+                        : s[0]!.toUpperCase() + s.slice(1)}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+        <div
+          className="flex max-w-full gap-1 overflow-x-auto pb-1"
+          role="group"
+          aria-label="Unibox views"
+        >
+          {VIEWS.map(([id, label]) => (
+            <Button
+              key={id}
+              size="sm"
+              variant={view === id ? 'secondary' : 'ghost'}
+              aria-pressed={view === id}
+              onClick={() => changeView(id)}
+            >
+              {label}
+            </Button>
+          ))}
+        </div>
+        {view === 'linking' && (
+          <Select
+            value={linkingView}
+            onValueChange={(value) => {
+              setLinkingView(value);
+              setPage(1);
+            }}
+          >
+            <SelectTrigger aria-label="Unlinked message view" className="w-full sm:w-64">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="needs_review">Needs review</SelectItem>
+              <SelectItem value="all">All unlinked messages</SelectItem>
+              <SelectItem value="acknowledged">Acknowledged</SelectItem>
+            </SelectContent>
+          </Select>
+        )}
+      </div>
+      {view === 'reminders' ? (
+        <RemindersPanel />
+      ) : (
+        <div className="grid min-h-0 flex-1 overflow-hidden rounded-lg border border-border bg-card lg:grid-cols-[360px_minmax(0,1fr)]">
+          <section
+            aria-label={view === 'linking' ? 'Messages needing linking' : 'Lead review list'}
+            className={cn(
+              'min-h-0 overflow-y-auto lg:border-r lg:border-border',
+              readerOpen && 'hidden lg:block',
+            )}
+          >
+            {busy && (
+              <p role="status" className="p-5 text-sm text-muted-foreground">
+                Loading incoming messages…
+              </p>
+            )}
+            {error && (
+              <div className="space-y-2 p-5">
+                <p role="alert" className="text-sm text-destructive">
+                  {error.message}
+                </p>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => {
+                    void (view === 'linking' ? linking.refetch() : rows.refetch());
+                  }}
+                >
+                  Retry
+                </Button>
+              </div>
+            )}
+            {!busy &&
+              !error &&
+              (view === 'linking'
+                ? linking.data?.items.length === 0
+                : rows.data?.items.length === 0) && (
+                <p className="p-5 text-sm text-muted-foreground">
+                  {view === 'linking'
+                    ? 'No messages need linking.'
+                    : 'No leads in this view. Use All to find acknowledged or resolved items.'}
+                </p>
+              )}
+            {view === 'linking'
+              ? linking.data?.items.map((m) => (
+                  <button
+                    type="button"
+                    key={m.id}
+                    onClick={() => {
+                      setUnmatchedId(m.id);
+                      setSelected(null);
+                    }}
+                    className={cn(
+                      'block min-h-20 w-full space-y-1 border-b border-border p-4 text-left hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
+                      unmatchedId === m.id && 'bg-muted',
+                    )}
+                  >
+                    <p className="break-all text-sm font-medium">
+                      {m.from_address || 'Unknown sender'}
+                    </p>
+                    <p className="truncate text-sm">{m.subject || '(No subject)'}</p>
+                    <p className="text-xs text-muted-foreground">
+                      Unmatched ·{' '}
+                      {m.received_at ? formatDateTime(m.received_at) : 'Time unavailable'}
+                    </p>
+                  </button>
+                ))
+              : rows.data?.items.map((row) => (
+                  <div
+                    key={`${row.lead_id}:${row.campaign_id}`}
+                    className={cn(
+                      'flex items-start gap-1 border-b border-border p-3 hover:bg-muted',
+                      active?.lead_id === row.lead_id &&
+                        active.campaign_id === row.campaign_id &&
+                        'bg-muted',
+                    )}
+                  >
+                    <button
+                      type="button"
+                      aria-label={`Open ${row.name || row.email} in ${row.campaign_name}`}
+                      className="min-w-0 flex-1 space-y-1 rounded-md p-1 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                      onClick={() => {
+                        setSelected(row);
+                        setUnmatchedId(null);
+                      }}
+                    >
+                      <p className="truncate text-sm font-semibold">{row.name || row.email}</p>
+                      <p className="truncate text-xs text-muted-foreground">
+                        {row.email} · {row.company || 'No company'}
+                      </p>
+                      <p className="truncate text-xs text-muted-foreground">{row.campaign_name}</p>
+                      <p className="break-words text-sm">{sendingLabel(row)}</p>
+                      <p className="text-xs text-muted-foreground">
+                        {row.message_count} message(s) · {row.unacknowledged_count} unacknowledged
+                      </p>
+                      {row.latest_received_at && (
+                        <p className="text-xs text-muted-foreground">
+                          {formatDateTime(row.latest_received_at)}
+                        </p>
+                      )}
+                    </button>
+                    <Button
+                      size="icon"
+                      variant="ghost"
+                      aria-label={`Acknowledge ${row.name || row.email} in ${row.campaign_name}`}
+                      disabled={row.sending_state === 'held' || row.unacknowledged_count === 0}
+                      onClick={() => {
+                        if (
+                          active?.lead_id === row.lead_id &&
+                          active.campaign_id === row.campaign_id
+                        )
+                          acknowledgeRef.current?.();
+                        else {
+                          setSelected(row);
+                          setUnmatchedId(null);
+                          toast.info(
+                            'Review the messages in the reader before acknowledging them.',
+                          );
+                        }
+                      }}
+                    >
+                      ✓
+                    </Button>
+                  </div>
+                ))}
+            <div className="p-3">
+              <CollectionPagination
+                page={page}
+                perPage={25}
+                total={view === 'linking' ? (linking.data?.total ?? 0) : (rows.data?.total ?? 0)}
+                onPageChange={setPage}
+              />
+            </div>
+          </section>
+          {currentRow ? (
+            <ReviewReader
+              key={`${currentRow.lead_id}:${currentRow.campaign_id}`}
+              row={currentRow}
+              onBack={() => setSelected(null)}
+              acknowledgeRef={acknowledgeRef}
+            />
+          ) : unmatchedId !== null ? (
+            <UnmatchedReader id={unmatchedId} onBack={() => setUnmatchedId(null)} />
+          ) : (
+            <p className="hidden p-8 text-sm text-muted-foreground lg:block">
+              Select a lead to read every incoming message, review sent context and choose an
+              outreach action.
+            </p>
+          )}
         </div>
       )}
-
-      <ThreadView
-        incomingMessageId={threadId}
-        onOpenChange={(open) => setThreadId(open ? threadId : null)}
-      />
+      <RetentionDialog open={retentionOpen} onClose={() => setRetentionOpen(false)} />
     </div>
+  );
+}
+
+function UnmatchedReader({ id, onBack }: { id: number; onBack: () => void }) {
+  const query = useIncomingMessage(id);
+  const mutation = useIncomingMutation();
+  const [deleteOpen, setDeleteOpen] = useState(false);
+  const message = query.data;
+  const [deleteRevision, setDeleteRevision] = useState(0);
+  const acknowledge = (action: 'acknowledge' | 'return') => {
+    if (!message) return;
+    const operation = crypto.randomUUID();
+    mutation.mutate(
+      {
+        path: '/unibox/acknowledgements',
+        body: {
+          operation_id: operation,
+          action,
+          messages: [{ id, expected_revision: message.revision }],
+        },
+      },
+      {
+        onSuccess: () =>
+          toast.success(
+            action === 'return' ? 'Returned to review' : 'Acknowledged',
+            action === 'acknowledge'
+              ? {
+                  action: {
+                    label: 'Undo',
+                    onClick: () => {
+                      void apiFetch(`/unibox/messages/${id}`, incomingMessageSchema)
+                        .then((current) =>
+                          mutation.mutate(
+                            {
+                              path: '/unibox/acknowledgements',
+                              body: {
+                                operation_id: crypto.randomUUID(),
+                                action: 'undo',
+                                undo_operation_id: operation,
+                                messages: [{ id, expected_revision: current.revision }],
+                              },
+                            },
+                            {
+                              onSuccess: () => toast.success('Acknowledgement undone'),
+                              onError: (error) => toast.error(error.message),
+                            },
+                          ),
+                        )
+                        .catch((error: unknown) =>
+                          toast.error(error instanceof Error ? error.message : 'Undo failed'),
+                        );
+                    },
+                  },
+                }
+              : undefined,
+          ),
+        onError: (error) => toast.error(error.message),
+      },
+    );
+  };
+  return (
+    <section
+      aria-label="Unmatched message reader"
+      className="min-w-0 space-y-4 overflow-y-auto p-4 sm:p-6"
+    >
+      <Button size="sm" variant="ghost" className="lg:hidden" onClick={onBack}>
+        ← Back to messages
+      </Button>
+      {query.error && <p role="alert">{query.error.message}</p>}
+      {message && (
+        <>
+          <h2 className="break-words text-lg font-semibold">{message.subject || '(No subject)'}</h2>
+          <p className="break-all text-sm">From: {message.from_address || 'Unknown sender'}</p>
+          <p className="text-xs text-muted-foreground">
+            {message.received_at
+              ? `${formatDateTime(message.received_at)} (${Intl.DateTimeFormat().resolvedOptions().timeZone})`
+              : 'Time unavailable'}
+          </p>
+          <MessageLabels message={message} />
+          <p className="rounded-md bg-muted p-3 text-sm">
+            {message.linking_status === 'unrelated'
+              ? 'Marked unrelated. No outreach state or human-reply metric changed.'
+              : 'Association needs review. No company-domain guess changes outreach state.'}
+          </p>
+          <SafeMessage key={message.id} message={message} />
+          <RecoverContent message={message} />
+          <div className="flex flex-wrap gap-2">
+            <LinkMessage message={message} />
+            {message.links.length === 0 && message.linking_status === 'needs_linking' && (
+              <Button
+                size="sm"
+                variant="outline"
+                disabled={mutation.isPending}
+                onClick={() =>
+                  mutation.mutate(
+                    {
+                      path: `/unibox/messages/${id}/unrelated`,
+                      result: 'message',
+                      body: {
+                        operation_id: crypto.randomUUID(),
+                        expected_revision: message.revision,
+                      },
+                    },
+                    {
+                      onSuccess: () => toast.success('Marked unrelated'),
+                      onError: (error) => toast.error(error.message),
+                    },
+                  )
+                }
+              >
+                Mark unrelated
+              </Button>
+            )}
+            {message.linking_status === 'unrelated' && !message.acknowledged && (
+              <Button size="sm" variant="outline" onClick={() => acknowledge('acknowledge')}>
+                ✓ Acknowledge
+              </Button>
+            )}
+            {message.capture_status !== 'deleted' && (
+              <Button
+                size="sm"
+                variant="ghost"
+                onClick={() => {
+                  setDeleteRevision(message.revision);
+                  setDeleteOpen(true);
+                }}
+              >
+                Delete stored content
+              </Button>
+            )}
+            {message.linking_status === 'unrelated' && message.acknowledged && (
+              <Button size="sm" variant="ghost" onClick={() => acknowledge('return')}>
+                Return to review
+              </Button>
+            )}
+          </div>
+          <Dialog open={deleteOpen} onOpenChange={setDeleteOpen}>
+            <DialogContent>
+              <DialogHeader>
+                <DialogTitle>Delete stored content</DialogTitle>
+                <DialogDescription>
+                  Remove this message’s application-held body, HTML, quotations and preview. The
+                  original mailbox copy, identifiers, sending history and protection remain.
+                </DialogDescription>
+              </DialogHeader>
+              <p className="break-words text-sm">
+                {message.from_address} · {message.subject || '(No subject)'}
+              </p>
+              {mutation.error && (
+                <p role="alert" className="text-destructive">
+                  {mutation.error.message}
+                </p>
+              )}
+              <DialogFooter>
+                <Button variant="outline" onClick={() => setDeleteOpen(false)}>
+                  Cancel
+                </Button>
+                <Button
+                  variant="destructive"
+                  disabled={mutation.isPending}
+                  onClick={() =>
+                    mutation.mutate(
+                      {
+                        path: `/unibox/messages/${id}/content`,
+                        method: 'DELETE',
+                        result: 'message',
+                        body: {
+                          operation_id: crypto.randomUUID(),
+                          expected_revision: deleteRevision,
+                        },
+                      },
+                      {
+                        onSuccess: () => {
+                          setDeleteOpen(false);
+                          toast.success('Stored content deleted');
+                        },
+                      },
+                    )
+                  }
+                >
+                  Confirm deletion
+                </Button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
+        </>
+      )}
+    </section>
+  );
+}
+function RetentionDialog({ open, onClose }: { open: boolean; onClose: () => void }) {
+  const settings = useIncomingRetention();
+  const mutation = useIncomingMutation();
+  const [days, setDays] = useState<string | null>(null);
+  const [disabled, setDisabled] = useState<boolean | null>(null);
+  const isDisabled = disabled ?? settings.data?.days === null;
+  const value = days ?? String(settings.data?.days ?? 30);
+  return (
+    <Dialog
+      open={open}
+      onOpenChange={(value) => {
+        if (!value) onClose();
+      }}
+    >
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>Incoming content retention</DialogTitle>
+          <DialogDescription>
+            Delete eligible incoming content after acknowledgement in every associated queue.
+            Unresolved linking and relevant review holds prevent automatic cleanup. Existing backups
+            may keep content until they expire; deletion manifests protect restores.
+          </DialogDescription>
+        </DialogHeader>
+        <div className="space-y-2">
+          <Label htmlFor="retention-days">Days after eligible acknowledgement</Label>
+          <Input
+            id="retention-days"
+            type="number"
+            min={1}
+            max={3650}
+            value={value}
+            disabled={isDisabled}
+            onChange={(event) => setDays(event.target.value)}
+          />
+        </div>
+        <Button variant="outline" onClick={() => setDisabled(!isDisabled)}>
+          {isDisabled ? 'Enable automatic cleanup' : 'Disable automatic cleanup'}
+        </Button>
+        {mutation.error && <p role="alert">{mutation.error.message}</p>}
+        <DialogFooter>
+          <Button variant="outline" onClick={onClose}>
+            Cancel
+          </Button>
+          <Button
+            disabled={
+              mutation.isPending ||
+              (!isDisabled &&
+                (!Number.isInteger(Number(value)) || Number(value) < 1 || Number(value) > 3650))
+            }
+            onClick={() =>
+              mutation.mutate(
+                {
+                  path: '/unibox/retention',
+                  method: 'PUT',
+                  result: 'retention',
+                  body: { days: isDisabled ? null : Number(value) },
+                },
+                {
+                  onSuccess: () => {
+                    toast.success('Retention settings saved');
+                    onClose();
+                  },
+                },
+              )
+            }
+          >
+            Save retention
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+function RemindersPanel() {
+  const [view, setView] = useState<'due_today' | 'upcoming' | 'overdue'>('due_today');
+  const [page, setPage] = useState(1);
+  const reminders = useReminders({ page, per_page: 25, view, status: 'open' });
+  const mutation = usePatchReminder();
+  return (
+    <section className="min-h-0 space-y-3 overflow-y-auto" aria-label="Non-sending reminders">
+      <p className="text-sm text-muted-foreground">Reminders do not resume or send a sequence.</p>
+      <div className="flex flex-wrap gap-2">
+        {(['due_today', 'upcoming', 'overdue'] as const).map((value) => (
+          <Button
+            key={value}
+            size="sm"
+            variant={view === value ? 'secondary' : 'outline'}
+            onClick={() => {
+              setView(value);
+              setPage(1);
+            }}
+          >
+            {value.replaceAll('_', ' ')}
+          </Button>
+        ))}
+      </div>
+      {reminders.data?.items.map((reminder) => (
+        <article key={reminder.id} className="space-y-2 rounded-lg border border-border p-4">
+          <p className="font-medium">{reminder.lead.name}</p>
+          <p className="text-sm text-muted-foreground">
+            Due {reminder.due_date} · campaign #{reminder.campaign_id}
+          </p>
+          {reminder.note && <p className="whitespace-pre-wrap text-sm">{reminder.note}</p>}
+          <div className="flex gap-2">
+            <Button
+              size="sm"
+              variant="outline"
+              disabled={mutation.isPending}
+              onClick={() => mutation.mutate({ id: reminder.id, status: 'done' })}
+            >
+              Complete
+            </Button>
+            <Button
+              size="sm"
+              variant="ghost"
+              disabled={mutation.isPending}
+              onClick={() => mutation.mutate({ id: reminder.id, status: 'dismissed' })}
+            >
+              Dismiss
+            </Button>
+          </div>
+        </article>
+      ))}
+      {reminders.data?.items.length === 0 && (
+        <p className="text-sm text-muted-foreground">No reminders in this view.</p>
+      )}
+      <CollectionPagination
+        page={page}
+        perPage={25}
+        total={reminders.data?.total ?? 0}
+        onPageChange={setPage}
+        paginationLabel="Reminder pagination"
+      />
+    </section>
   );
 }

@@ -49,6 +49,7 @@ import {
   type UniboxItemDto,
 } from '@coldemail/shared';
 import { buildTimeline, db, persistSession, NOW } from './db';
+import { incomingReviewHandlers } from './incoming-review';
 
 const importCopySummaries = new Map<number, { genericValid: number; stepSpecificValid: number }>();
 
@@ -277,6 +278,7 @@ function mockRenderChecks(
 }
 
 export const handlers: RequestHandler[] = [
+  ...incomingReviewHandlers,
   // ── auth ──────────────────────────────────────────────────────────────────
   http.post(`${BASE}/auth/login`, async ({ request }) => {
     const body = await parseBody(request, loginBodySchema);
@@ -1959,7 +1961,10 @@ export const handlers: RequestHandler[] = [
       const items = db.alerts
         .filter((a) => (unacked ? a.acknowledged_at === null : true))
         .sort((a, b) => b.id - a.id);
-      return HttpResponse.json(paginate(items, url));
+      return HttpResponse.json({
+        ...paginate(items, url),
+        ack_through_id: Math.max(0, ...db.alerts.map((a) => a.id)),
+      });
     }),
   ),
   http.post(
@@ -1968,6 +1973,15 @@ export const handlers: RequestHandler[] = [
       const alert = db.alerts.find((a) => a.id === Number(params.id));
       if (!alert) return notFound('alert');
       alert.acknowledged_at = NOW;
+      return HttpResponse.json({ ok: true });
+    }),
+  ),
+  http.post(
+    `${BASE}/alerts/ack-all`,
+    authed(async ({ request }) => {
+      const body = (await request.json()) as { through_id: number };
+      for (const alert of db.alerts)
+        if (alert.id <= body.through_id && !alert.acknowledged_at) alert.acknowledged_at = NOW;
       return HttpResponse.json({ ok: true });
     }),
   ),

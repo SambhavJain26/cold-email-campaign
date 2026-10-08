@@ -1,5 +1,38 @@
 # Cold Email Campaign — Complete User Manual
 
+## Incoming review candidate: operator workflow (2026-10-08; local only)
+
+These controls are implemented in the local candidate; they are not yet on the live release.
+The older reply/disposition/unsuppression sections below describe historical behavior.
+
+Open Unibox, choose All campaigns or one campaign, and search a lead's name, email or company.
+Each row represents a lead within a campaign. Select it to read every incoming message and
+relevant saved sent conversation. Automation and thread relationship are separate labels.
+Incoming responses hold unfinished sequences for review; clear opt-outs permanently suppress
+the address without waiting for acknowledgement.
+
+After reading, mark the exact messages Reviewed. Continue releases selected holds under normal
+scheduling without sending immediately; Stop sequence ends this campaign only; Delay preserves
+progress until the exact confirmed timestamp/timezone; Suppress address permanently blocks all
+campaigns, including accidental suppression. A corrected Stop or eligible historical restoration
+returns to Held for review and requires another Continue/Delay. No action restarts Email 1.
+An unenrolled linked lead may have its review resolved, but no enrollment or email is created.
+
+Acknowledge removes reviewed messages from the default queue and offers Undo. Held items require
+an outreach decision first. All/Acknowledged keeps them searchable; Return to review changes
+visibility only. New incoming messages are never covered by an older acknowledgement.
+Human/Automatic/Unsure confirmation controls new reply metrics, separately from all sending actions.
+
+Needs linking surfaces fresh/conflicting messages; company matches are suggestions, not automatic
+stops. Search a campaign's enrolled/pool leads to confirm a link, or mark unrelated traffic.
+Relinking never silently releases earlier holds. Delete stored content removes only application
+text/HTML/preview, retaining mailbox copies, identifiers, audit, suppression and sending history.
+Eligible acknowledged content defaults to cleanup after 30 days, configurable or disabled;
+unresolved linking and relevant holds prevent cleanup. Existing backups can retain old content.
+
+The notification bell now has Clear all notifications and bounded scrolling. Clearing acknowledges
+the current feed snapshot, preserves alert history in System, and leaves newer alerts visible.
+
 **Audience:** a new operator using the application for the first time
 
 **Application model:** single-operator, self-hosted cold-email campaign console
@@ -159,11 +192,11 @@ does not change the stored login, and `.env.prod.example` must never contain rea
 
 ### 4.1 Lead tiers
 
-| Tier | Intended use | Normal treatment |
-|---|---|---|
-| A | Best-fit, highest-value leads | Template steps use researched observation; personalized steps use saved copy |
-| B | Broader qualified segment | Template steps use campaign Auto Observation rules; personalized steps use saved copy |
-| Untiered | Newly imported or not yet reviewed | May be reserved in a campaign pool but cannot enroll |
+| Tier     | Intended use                       | Normal treatment                                                                      |
+| -------- | ---------------------------------- | ------------------------------------------------------------------------------------- |
+| A        | Best-fit, highest-value leads      | Template steps use researched observation; personalized steps use saved copy          |
+| B        | Broader qualified segment          | Template steps use campaign Auto Observation rules; personalized steps use saved copy |
+| Untiered | Newly imported or not yet reviewed | May be reserved in a campaign pool but cannot enroll                                  |
 
 Nurture is a separate outreach status, not a tier. Nurture leads cannot enroll; restoring one from
 Nurture makes it Untiered. Tier is a prioritization and template-data decision, not consent.
@@ -172,26 +205,26 @@ historical Tier C/Nurture/human-written analytics remain accurate with a Legacy 
 
 ### 4.2 Enrollment states
 
-| State | Meaning |
-|---|---|
-| `NEW` | Enrollment exists but has not entered active sending |
-| `ACTIVE` | A step is due now or scheduled for later |
-| `REPLIED` | A human reply was detected; the sequence has stopped |
-| `BOUNCED` | A hard bounce occurred or the soft-retry limit was exceeded |
-| `UNSUBSCRIBED` | An opt-out was recorded; this has the highest terminal priority |
-| `COMPLETED` | The final step passed its delivery-confirmation window without a stronger terminal event |
+| State          | Meaning                                                                                  |
+| -------------- | ---------------------------------------------------------------------------------------- |
+| `NEW`          | Enrollment exists but has not entered active sending                                     |
+| `ACTIVE`       | A step is due now or scheduled for later                                                 |
+| `REPLIED`      | A human reply was detected; the sequence has stopped                                     |
+| `BOUNCED`      | A hard bounce occurred or the soft-retry limit was exceeded                              |
+| `UNSUBSCRIBED` | An opt-out was recorded; this has the highest terminal priority                          |
+| `COMPLETED`    | The final step passed its delivery-confirmation window without a stronger terminal event |
 
 Terminal priority is `UNSUBSCRIBED` → `BOUNCED` → `REPLIED` → `COMPLETED`. For example, a late
 unsubscribe remains an unsubscribe even if the enrollment had previously completed.
 
 ### 4.3 Campaign statuses
 
-| Status | Meaning and effect |
-|---|---|
-| `draft` | Safe construction state. Nothing sends. |
-| `active` | Enrolled due work may send on the next scheduler tick. |
-| `paused` | Future sends stop; already accepted email cannot be recalled. IMAP polling can continue. |
-| `archived` | Deliberately retired; future scheduling is stopped. |
+| Status     | Meaning and effect                                                                       |
+| ---------- | ---------------------------------------------------------------------------------------- |
+| `draft`    | Safe construction state. Nothing sends.                                                  |
+| `active`   | Enrolled due work may send on the next scheduler tick.                                   |
+| `paused`   | Future sends stop; already accepted email cannot be recalled. IMAP polling can continue. |
+| `archived` | Deliberately retired; future scheduling is stopped.                                      |
 
 Campaigns do not have a `completed` status. When every current enrollment is terminal, the UI says
 **Current enrollments finished** and shows nothing scheduled. An active campaign may remain active
@@ -199,15 +232,15 @@ so a later imported batch can be allocated and enrolled.
 
 ### 4.4 Mailbox statuses
 
-| Status | Meaning | Operator response |
-|---|---|---|
-| `ok` | Eligible to send and poll | Monitor normally |
-| `paused` | Manually paused | Resume only after confirming it is safe |
-| `auto_paused` | Bounce protection fired | Review recent leads; resume at reduced cap |
-| `setup_required` | OAuth mailbox exists but Google authorization is not connected | Choose Connect Google; the scheduler cannot select it |
-| `auth_failed` | Provider rejected credentials or OAuth authorization | Re-enter the app password or reconnect Google |
-| `imap_stale` | Replies/bounces may not be arriving | Fix IMAP/folder access before sending continues |
-| `provider_blocked` | Repeated provider throttling detected | Leave paused until the provider condition is understood |
+| Status             | Meaning                                                        | Operator response                                       |
+| ------------------ | -------------------------------------------------------------- | ------------------------------------------------------- |
+| `ok`               | Eligible to send and poll                                      | Monitor normally                                        |
+| `paused`           | Manually paused                                                | Resume only after confirming it is safe                 |
+| `auto_paused`      | Bounce protection fired                                        | Review recent leads; resume at reduced cap              |
+| `setup_required`   | OAuth mailbox exists but Google authorization is not connected | Choose Connect Google; the scheduler cannot select it   |
+| `auth_failed`      | Provider rejected credentials or OAuth authorization           | Re-enter the app password or reconnect Google           |
+| `imap_stale`       | Replies/bounces may not be arriving                            | Fix IMAP/folder access before sending continues         |
+| `provider_blocked` | Repeated provider throttling detected                          | Leave paused until the provider condition is understood |
 
 ### 4.5 Sent, delivered, and contacted
 
@@ -374,13 +407,13 @@ remaining work, or no meaningful pace.
 
 ### Metric cards
 
-| Metric | Calculation |
-|---|---|
-| Reply rate | Distinct human repliers ÷ distinct accepted-send recipients |
-| Positive rate | Distinct leads with effective positive sentiment ÷ accepted-send recipients |
-| Meetings | Count of meeting-booked events; also shown per 100 accepted recipients |
-| Hard-bounce rate | Hard bounces ÷ distinct leads sent to |
-| Unsubscribe rate | Distinct unsubscribed leads ÷ accepted-send recipients |
+| Metric           | Calculation                                                                 |
+| ---------------- | --------------------------------------------------------------------------- |
+| Reply rate       | Distinct human repliers ÷ distinct accepted-send recipients                 |
+| Positive rate    | Distinct leads with effective positive sentiment ÷ accepted-send recipients |
+| Meetings         | Count of meeting-booked events; also shown per 100 accepted recipients      |
+| Hard-bounce rate | Hard bounces ÷ distinct leads sent to                                       |
+| Unsubscribe rate | Distinct unsubscribed leads ÷ accepted-send recipients                      |
 
 Rates are event-based and may overlap. A person may reply and later unsubscribe.
 
@@ -491,14 +524,14 @@ also work, and internal quotes are doubled as `""`.
 
 Preview categories:
 
-| Category | Meaning | Import behavior |
-|---|---|---|
-| Clean | Normal importable row | Imported in either mode |
-| Missing first name | Usable with template fallbacks | Imported in either mode |
-| Role-based | Shared inbox such as info/support | Dropped by safe mode; admitted by “Import all” |
-| Invalid | Broken address syntax | Never imported |
-| Duplicate | Repeated in file or already exists | Never imported |
-| Suppressed | Prior opt-out or blocking suppression | Never imported in any mode |
+| Category           | Meaning                               | Import behavior                                |
+| ------------------ | ------------------------------------- | ---------------------------------------------- |
+| Clean              | Normal importable row                 | Imported in either mode                        |
+| Missing first name | Usable with template fallbacks        | Imported in either mode                        |
+| Role-based         | Shared inbox such as info/support     | Dropped by safe mode; admitted by “Import all” |
+| Invalid            | Broken address syntax                 | Never imported                                 |
+| Duplicate          | Repeated in file or already exists    | Never imported                                 |
+| Suppressed         | Prior opt-out or blocking suppression | Never imported in any mode                     |
 
 **Drop flagged** is the recommended mode. **Import all incl. role-based** adds only role-based
 addresses; invalid, duplicate, and suppressed rows remain excluded. Expand **samples** to inspect
@@ -844,11 +877,11 @@ subject and body.
 
 ### 10.4 Step content and tier behavior
 
-| Content/tier | Behavior |
-|---|---|
-| Personalized step | No variants; scheduler loads the ready lead/campaign/step subject and body. |
+| Content/tier           | Behavior                                                                              |
+| ---------------------- | ------------------------------------------------------------------------------------- |
+| Personalized step      | No variants; scheduler loads the ready lead/campaign/step subject and body.           |
 | Template step + Tier A | Uses `custom_observation` first, with the existing Auto Observation fallback warning. |
-| Template step + Tier B | Uses the campaign Auto Observation field/rules/default. |
+| Template step + Tier B | Uses the campaign Auto Observation field/rules/default.                               |
 
 For Auto Slot, configure one **Auto Observation field** on the draft campaign—for example `state`,
 `city`, `industry`, or another imported custom field—then add exact-match rules plus a required
@@ -862,14 +895,14 @@ uses the Auto Slot but the field, rules, or default are invalid.
 The sequence decides which steps are Template and which are Personalized. Tier controls only how a
 Template step resolves its observation; it does not decide whether a personalized email sends.
 
-| Lead group | Recommended approach | What to prepare |
-|---|---|---|
-| Any lead receiving an individual opener or later individual email | Personalized sequence step | Import or edit ready subject/body for that exact campaign step |
-| A — leads where one researched fact matters on template steps | Template step, researched behavior | Add a useful `custom_observation`; the campaign rule can serve as a warning fallback |
-| B — broader qualified segment | Template step, Auto behavior | Use reliable common fields and a campaign Auto Observation that remains truthful for the segment |
-| A distinct industry, persona, pain, offer, or language | Separate sequence and usually a separate campaign | Write a message and follow-up cadence designed for that audience; do not force unrelated groups through generic variants |
-| A copy experiment for the same audience and offer | Another active variant in the same step | Change one meaningful idea at a time so Analytics can compare variants coherently |
-| Rested completed leads receiving a genuinely new angle | New sequence in a Pass-2 campaign | Change the proposition/content enough to pass the content-hash guard; do not resend the old sequence |
+| Lead group                                                        | Recommended approach                              | What to prepare                                                                                                          |
+| ----------------------------------------------------------------- | ------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------ |
+| Any lead receiving an individual opener or later individual email | Personalized sequence step                        | Import or edit ready subject/body for that exact campaign step                                                           |
+| A — leads where one researched fact matters on template steps     | Template step, researched behavior                | Add a useful `custom_observation`; the campaign rule can serve as a warning fallback                                     |
+| B — broader qualified segment                                     | Template step, Auto behavior                      | Use reliable common fields and a campaign Auto Observation that remains truthful for the segment                         |
+| A distinct industry, persona, pain, offer, or language            | Separate sequence and usually a separate campaign | Write a message and follow-up cadence designed for that audience; do not force unrelated groups through generic variants |
+| A copy experiment for the same audience and offer                 | Another active variant in the same step           | Change one meaningful idea at a time so Analytics can compare variants coherently                                        |
+| Rested completed leads receiving a genuinely new angle            | New sequence in a Pass-2 campaign                 | Change the proposition/content enough to pass the content-hash guard; do not resend the old sequence                     |
 
 The **New campaign** dialog displays fixed Tier A = Researched and Tier B = Auto behavior. While the
 campaign remains draft, configure Auto Observation rules, sequence-variable overrides, and ramp
@@ -978,14 +1011,14 @@ raised. Create a new campaign if the other design must change after activation.
 
 New campaigns use this default schedule:
 
-| Campaign day | Maximum new enrollments |
-|---:|---:|
-| 1 | 5 |
-| 2 | 8 |
-| 3 | 10 |
-| 4 | 12 |
-| 5–7 | 15 |
-| After day 7 | Permanent daily enrollment cap, default 15 |
+| Campaign day |                    Maximum new enrollments |
+| -----------: | -----------------------------------------: |
+|            1 |                                          5 |
+|            2 |                                          8 |
+|            3 |                                         10 |
+|            4 |                                         12 |
+|          5–7 |                                         15 |
+|  After day 7 | Permanent daily enrollment cap, default 15 |
 
 Custom stages must cover every day from 1 through the final ramp day exactly once, with no gaps or
 overlaps. Global guardrails can refuse a stage cap that is too high or a schedule that ends too
@@ -1117,15 +1150,15 @@ and normally does not stop the sequence.
 
 Every human reply should receive one outcome:
 
-| Outcome | Meaning | Suppression/recontact effect |
-|---|---|---|
-| Interested | Genuine interest | Not suppressed; any later cold recontact still requires explicit acknowledgement |
-| Not interested | Declines outreach | Immediately globally suppressed |
-| Not now | Timing objection | Requires a future do-not-contact-before date; not suppressed, but blocked until then |
-| Wrong person | Recipient is not appropriate | Immediately globally suppressed |
-| Referred me | Recipient referred another person | Original sequence stays stopped; not automatically suppressed |
-| Explicit opt-out | Clear request not to be contacted | Immediately globally suppressed |
-| Other | None of the above | Not automatically suppressed; sequence remains stopped |
+| Outcome          | Meaning                           | Suppression/recontact effect                                                         |
+| ---------------- | --------------------------------- | ------------------------------------------------------------------------------------ |
+| Interested       | Genuine interest                  | Not suppressed; any later cold recontact still requires explicit acknowledgement     |
+| Not interested   | Declines outreach                 | Immediately globally suppressed                                                      |
+| Not now          | Timing objection                  | Requires a future do-not-contact-before date; not suppressed, but blocked until then |
+| Wrong person     | Recipient is not appropriate      | Immediately globally suppressed                                                      |
+| Referred me      | Recipient referred another person | Original sequence stays stopped; not automatically suppressed                        |
+| Explicit opt-out | Clear request not to be contacted | Immediately globally suppressed                                                      |
+| Other            | None of the above                 | Not automatically suppressed; sequence remains stopped                               |
 
 Saving a suppressive outcome appends both the disposition and unsubscribe/suppression facts
 atomically when needed.
@@ -1298,29 +1331,29 @@ always end sending.
 
 ### 15.3 Rules → bounce auto-pause
 
-| Setting | Meaning |
-|---|---|
-| Min sends before rules | Volume gate before percentage-based evaluation |
-| Hard-bounce % threshold | Percentage threshold over the configured window |
-| % window size | Number of recent sends used for the percentage rule |
-| Absolute bounces | Bounce count that triggers the short-window absolute rule |
-| Absolute span | Recent-send span for the absolute rule |
-| Resume cap % | Temporary percentage of normal cap after resuming |
+| Setting                 | Meaning                                                   |
+| ----------------------- | --------------------------------------------------------- |
+| Min sends before rules  | Volume gate before percentage-based evaluation            |
+| Hard-bounce % threshold | Percentage threshold over the configured window           |
+| % window size           | Number of recent sends used for the percentage rule       |
+| Absolute bounces        | Bounce count that triggers the short-window absolute rule |
+| Absolute span           | Recent-send span for the absolute rule                    |
+| Resume cap %            | Temporary percentage of normal cap after resuming         |
 
 The absolute rule can protect at low volume. Do not weaken thresholds to keep a bad list moving.
 
 ### 15.4 Rules → timing
 
-| Setting | Meaning and caution |
-|---|---|
-| Scheduler tick | How often due work is evaluated; faster ticks do not bypass pacing |
-| IMAP poll | Reply/bounce detection frequency |
-| Stale poll | Age after which missing IMAP success becomes a safety failure |
-| Delivery confirm | Delay from sent to inferred delivered when no bounce arrives |
-| Send jitter | Variation around mailbox pace gap |
-| Soft-bounce retries | Retries before the enrollment becomes bounced |
-| Cold-storage rest | Wait before a completed lead can be recycled |
-| Default timezone | Fallback when lead state cannot map to a local zone |
+| Setting             | Meaning and caution                                                |
+| ------------------- | ------------------------------------------------------------------ |
+| Scheduler tick      | How often due work is evaluated; faster ticks do not bypass pacing |
+| IMAP poll           | Reply/bounce detection frequency                                   |
+| Stale poll          | Age after which missing IMAP success becomes a safety failure      |
+| Delivery confirm    | Delay from sent to inferred delivered when no bounce arrives       |
+| Send jitter         | Variation around mailbox pace gap                                  |
+| Soft-bounce retries | Retries before the enrollment becomes bounced                      |
+| Cold-storage rest   | Wait before a completed lead can be recycled                       |
+| Default timezone    | Fallback when lead state cannot map to a local zone                |
 
 Validation ranges are: scheduler 1–60 minutes; IMAP poll 1–120 minutes; stale-poll and delivery
 confirmation 1–72 hours; soft retries 0–10; jitter 0–100%; and cold-storage rest 0 days or more.
@@ -1684,20 +1717,20 @@ Do not send real prospect mail until every applicable item is complete.
 - [x] Real sending domains are separate from the primary business domain.
 - [x] SPF is published for each sending domain.
 - [x] DKIM records are published for both Workspace domains; verify signing again with a received
-  canary message before prospect mail.
+      canary message before prospect mail.
 - [x] DMARC is published with reporting addresses for both domains.
 - [x] The production Internal Google OAuth client credentials are configured without exposing them.
 - [ ] Reply inboxes exist, are secured, and have provider app passwords/OAuth as applicable.
 - [ ] Mailboxes have completed a conservative warming period.
 - [x] The production VPS, nightly logical backup, scratch restore drill, and five-backup Spaceship
-  AutoBackup plan are ready.
+      AutoBackup plan are ready.
 - [x] Public HTTPS unsubscribe routing is configured and host-isolated; link/one-click behavior
-  still needs the separately approved owner-address canary.
+      still needs the separately approved owner-address canary.
 
 ### Application
 
 - [x] Spaceship is the production target and its transport is `LIVE`; Oracle is the paused rollback
-  canary.
+      canary.
 - [ ] Every mailbox passes SMTP and IMAP connection tests.
 - [ ] `INBOX` and provider spam/junk folders are polled.
 - [ ] Mailbox timezone, weekdays, hours, and conservative caps are correct.
@@ -1725,7 +1758,7 @@ Do not send real prospect mail until every applicable item is complete.
 - [ ] No fatal render checks remain.
 - [ ] Subjects are accurate and non-deceptive.
 - [ ] Tier effort, Auto Observation rules, variable overrides, and ramp stages are correct before
-  first activation; they cannot be edited afterward.
+      first activation; they cannot be edited afterward.
 - [ ] Tier-A manual responsibility is understood.
 - [ ] The first approved batch is deliberately small and named.
 - [ ] Someone is available to monitor Unibox, bounces, alerts, and complaints.
@@ -1760,29 +1793,29 @@ Do not send real prospect mail until every applicable item is complete.
 
 ## 23. Glossary and quick reference
 
-| Term | Definition |
-|---|---|
-| Alert acknowledgement | Marks an alert as seen; does not fix or delete it |
-| Campaign | Sequence + effort/ramp configuration + enrolled leads |
-| Contacted | Distinct lead with at least one accepted send in the campaign |
-| Content hash | Fingerprint used to prevent identical second-pass resend |
-| Disposition | Operator-recorded business outcome of a human reply |
-| Effective cap | Current mailbox cap after any temporary resume reduction |
-| Enrollment | One lead's participation in one campaign |
-| Event ledger | Immutable chronological facts used to rebuild state |
-| IMAP | Protocol used to read replies, auto-replies, and DSNs |
-| Manual compose | Retired predecessor direct-send workflow; current personalized mail uses sequence steps |
-| OOO | Out-of-office/automatic reply; does not count as human engagement |
-| Pace gap | Minimum spacing between accepted sends from one mailbox |
-| Projection | Stored state derived from the event ledger |
-| Ramp | Initial campaign limit on new enrollments per day |
-| Recontact acknowledgement | Explicit approval after reviewing prior replies; never overrides suppression |
-| Reply outcome | Interested, not interested, not now, wrong person, referred, explicit opt-out, or other |
-| SMTP | Protocol used to submit outbound email |
-| Suppression | Global prohibition against sending to an address |
-| Terminal state | Replied, bounced, unsubscribed, or completed |
-| Variant | Alternative subject/body template within a step |
-| Watch flag | Metric trend warning requiring investigation |
+| Term                      | Definition                                                                              |
+| ------------------------- | --------------------------------------------------------------------------------------- |
+| Alert acknowledgement     | Marks an alert as seen; does not fix or delete it                                       |
+| Campaign                  | Sequence + effort/ramp configuration + enrolled leads                                   |
+| Contacted                 | Distinct lead with at least one accepted send in the campaign                           |
+| Content hash              | Fingerprint used to prevent identical second-pass resend                                |
+| Disposition               | Operator-recorded business outcome of a human reply                                     |
+| Effective cap             | Current mailbox cap after any temporary resume reduction                                |
+| Enrollment                | One lead's participation in one campaign                                                |
+| Event ledger              | Immutable chronological facts used to rebuild state                                     |
+| IMAP                      | Protocol used to read replies, auto-replies, and DSNs                                   |
+| Manual compose            | Retired predecessor direct-send workflow; current personalized mail uses sequence steps |
+| OOO                       | Out-of-office/automatic reply; does not count as human engagement                       |
+| Pace gap                  | Minimum spacing between accepted sends from one mailbox                                 |
+| Projection                | Stored state derived from the event ledger                                              |
+| Ramp                      | Initial campaign limit on new enrollments per day                                       |
+| Recontact acknowledgement | Explicit approval after reviewing prior replies; never overrides suppression            |
+| Reply outcome             | Interested, not interested, not now, wrong person, referred, explicit opt-out, or other |
+| SMTP                      | Protocol used to submit outbound email                                                  |
+| Suppression               | Global prohibition against sending to an address                                        |
+| Terminal state            | Replied, bounced, unsubscribed, or completed                                            |
+| Variant                   | Alternative subject/body template within a step                                         |
+| Watch flag                | Metric trend warning requiring investigation                                            |
 
 ### Safest default decisions
 

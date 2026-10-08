@@ -21,7 +21,7 @@ import { EmptyState } from '@/components/shared/empty-state';
 import { StateBadge } from '@/components/shared/state-badge';
 import { TierBadge } from '@/components/shared/tier-badge';
 import { useLead } from '@/api/queries/leads';
-import { useEraseLead, usePatchLead, useRemoveSuppression } from '@/api/mutations/leads';
+import { useEraseLead, usePatchLead } from '@/api/mutations/leads';
 import { PersonalizedCopyEditor } from './personalized-copy-editor';
 import { Timeline } from './timeline';
 
@@ -34,9 +34,7 @@ export default function LeadDetailPage() {
   const leadId = Number(id);
   const navigate = useNavigate();
   const { data: lead, isPending, isError, refetch } = useLead(leadId);
-  const removeSuppression = useRemoveSuppression();
   const erase = useEraseLead();
-  const [confirmOpen, setConfirmOpen] = useState(false);
   const [eraseOpen, setEraseOpen] = useState(false);
 
   if (isPending) {
@@ -86,12 +84,6 @@ export default function LeadDetailPage() {
           <p className="text-destructive">
             🚫 Suppressed — this lead opted out and is excluded from every campaign, permanently.
           </p>
-          <button
-            className="min-h-11 shrink-0 text-destructive underline-offset-2 hover:underline"
-            onClick={() => setConfirmOpen(true)}
-          >
-            Remove suppression
-          </button>
         </div>
       )}
 
@@ -144,30 +136,10 @@ export default function LeadDetailPage() {
       </Card>
 
       <ConfirmTypedDialog
-        open={confirmOpen}
-        onOpenChange={setConfirmOpen}
-        title="Remove suppression"
-        description="Removing a suppression re-allows cold email to someone who opted out. Type the lead's email to confirm (decision U)."
-        expected={lead.email}
-        confirmLabel="Remove suppression"
-        pending={removeSuppression.isPending}
-        onConfirm={(typed) =>
-          removeSuppression.mutate(
-            { email: lead.email, confirm: typed },
-            {
-              onSuccess: () => {
-                toast.success('Suppression removed');
-                setConfirmOpen(false);
-              },
-            },
-          )
-        }
-      />
-      <ConfirmTypedDialog
         open={eraseOpen}
         onOpenChange={setEraseOpen}
         title="Erase this lead's personal data"
-        description="This permanently anonymizes profile, import, inbox, and matching alert data. Event lineage remains without direct PII; backup copies expire under normal retention. Type the email to continue."
+        description="Anonymize profile, import, inbox and matching alert data. Retain the minimum email-address block to prevent future outreach, message identifiers for duplicate prevention, and immutable history, which may contain legacy excerpts. Existing backups expire under normal retention. Type the email to continue."
         expected={lead.email}
         confirmLabel="Erase PII"
         pending={erase.isPending}
