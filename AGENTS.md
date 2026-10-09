@@ -19,6 +19,11 @@ call planned work implemented.
 
 ## Current operating boundary
 
+**2026-10-10 possible replies — local implementation authorized:** follow docs/26.
+Surface subject/company candidates in existing Unibox views with explicit confirmation;
+suggestions never change outreach. No push/deploy, live metadata scan, Bruce/Lori recovery/
+linking, campaign mutation or send is authorized. Preserve historical records and suppression.
+
 **2026-10-09 follow-up priority deployed:** explicitly authorized push/deploy at `76292e9` on
 `canary`, with separately authorized Campaign 3 pause. Campaigns 2/3 remain paused, automatic
 enrollment off. Healthy services/routes, authenticated priority guidance, all 33 migrations,
