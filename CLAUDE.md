@@ -15,7 +15,7 @@ public routes, production queue/summary contracts, 222-enrollment zero drift/sel
 validated pre/post backups pass. Stable post-pause snapshot remains 892 events / 346 sends;
 enrollment, sent/retry history, suppression, settings and deletion manifest match. No historical
 scan, Bruce/Lori recovery/linking, enrollment, resume or outbound mail occurred. Authenticated
-browser replay awaits operator sign-in. See docs/17. Future live operations remain separately gated.
+Unibox replay passes after operator sign-in. See docs/17. Future live operations remain separately gated.
 
 **2026-10-10 possible replies — verified locally:** source `5ba304d` on `canary`; follow docs/26.
 Subject/company candidates appear in existing Unibox views; only explicit confirmation applies

@@ -42,6 +42,13 @@ received 401 with the stored initial password; no credential was exposed or rese
 further password attempts were made. Public protection and production service-contract
 verification pass; do not claim authenticated UI coverage for this rollout yet.
 
+Authenticated replay subsequently passed after the operator signed in. Used the update
+banner's Refresh now to load the deployed build. Needs review shows 0 conversations / 0
+possible replies and fresh checks for all four mailboxes. All shows 16 existing conversations.
+Debra's loaded reader preserves her October 12, 18:40 IST delay, shows Campaign paused,
+retains independent automation/relationship labels and exposes Delay. No review checkbox,
+acknowledgement, recovery or outreach action was applied. No candidate confirmation flow
+was exercised live because historical evidence remains unscanned; local browser tests cover it.
 Existing dependency audit findings remain a separate backlog (build reports six runtime
 findings); no dependency rewrite occurred. No live metadata scan, message recovery/linking,
 acknowledgement/deletion, enrollment, resume or outbound mail occurred. Campaign 3 stays paused

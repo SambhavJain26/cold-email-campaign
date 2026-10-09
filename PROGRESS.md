@@ -618,5 +618,5 @@ Branch `b8.3-local-canary`. Runbook: **[docs/17-local-canary-runbook.md](docs/17
 
 **2026-10-10 Possible replies rollout:** [x] authorized push/deploy 48d931d, separate Campaign 3 pause.
 34 migrations, 222-enrollment zero drift/self-check, healthy routes/services and validated backups
-pass; 892 events/346 sends unchanged. Authenticated UI replay awaits sign-in. Historical scan/
+pass; 892 events/346 sends unchanged. Authenticated UI replay passes after operator sign-in. Historical scan/
 Bruce-Lori repair remains unperformed; campaigns stay paused. See docs/17.
