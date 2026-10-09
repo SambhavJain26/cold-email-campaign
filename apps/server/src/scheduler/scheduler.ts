@@ -261,7 +261,7 @@ export class Scheduler {
       });
     }
 
-    // C. due work, oldest-first — this ordering + budgets IS never-burst catch-up.
+    // C. follow-ups first, oldest effective due time within each class; budgets prevent bursts.
     const due = await listDue(db, now, this.deps.historicalQueuePolicy);
     const blockers: SendBlocker[] = [];
     const automaticDue = due.filter((e) => e.personalizationMode !== 'human_written');

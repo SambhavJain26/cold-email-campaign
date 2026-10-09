@@ -72,9 +72,10 @@ export interface DueEnrollment {
 }
 
 /**
- * Due work, oldest-first (docs/06 §1 C): ACTIVE enrollment in an ACTIVE
- * campaign, next_send_at <= now, not snoozed. Oldest-first ordering + budgets
- * IS the catch-up mechanism. Suppressed leads are excluded — send-time is one
+ * Due work: follow-ups first, then effective due time and enrollment ID.
+ * ACTIVE enrollment in an ACTIVE campaign, next_send_at <= now, not held or
+ * delayed/snoozed. Ordering + budgets drain catch-up without bursts.
+ * Suppressed leads are excluded — send-time is one
  * of suppression's four enforcement layers. The campaign-status join keeps
  * draft/paused campaigns silent — recycle (docs/09 §6) enrolls into a DRAFT
  * campaign that must not send until activated.
