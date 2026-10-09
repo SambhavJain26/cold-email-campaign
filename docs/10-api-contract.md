@@ -1,5 +1,17 @@
 # API Contract — v1 (frozen seam between backend and frontend)
 
+## Protected follow-up capacity (2026-10-09 local implementation)
+
+Capacity response fields are unchanged. Counts cover healthy mailboxes' local-day reservations
+from active campaigns. Steps 2+ reserve capacity even when due later today; assigned Email 1
+retries count as pending openers. Mailbox spare allowances are clamped separately, then combined
+and reduced by unassigned pending first emails once. Campaign/ramp/pool bounds still apply.
+Enrollment above the allowance returns 409 `capacity_exceeded` with `details.suggested` and
+"Only N additional leads fit today. Reduce the enrollment count to N." Nothing enrolls on failure.
+The optional explicit-ID `force` field remains readable, but true returns 422 `validation`:
+"Capacity overrides are unavailable. Enroll within the current allowance."
+Past events/enrollments are unaffected. Later contract excerpts permitting overrides are superseded.
+
 ## Incoming review additive contract (0028–0032; local release)
 
 The executable contracts are `packages/shared/src/api/incomingReview.ts` and `localTime.ts`.

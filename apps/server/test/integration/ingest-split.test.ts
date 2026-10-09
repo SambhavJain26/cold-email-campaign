@@ -138,7 +138,7 @@ describe('remaining docs/09 §7 edges (B5.9)', () => {
        ('c@x.dev', NULL, 'standard')`,
     );
 
-    const r = await enroll({ db, store, clock, sequences }, 1, 5, { force: true });
+    const r = await enroll({ db, store, clock, sequences }, 1, 5);
     expect(r.enrolled).toBe(1);
     expect(r.leadIds).toEqual([2]);
   });

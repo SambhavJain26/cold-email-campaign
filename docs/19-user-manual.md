@@ -1,5 +1,15 @@
 # Cold Email Campaign — Complete User Manual
 
+## Follow-up priority (2026-10-09 local candidate; not deployed)
+
+Emails 2–5 receive priority over first emails. Within follow-ups, the oldest effective due time
+wins, not the highest email number. Mailboxes reserve slots for follow-ups due later that day.
+With 80 slots, 60 follow-ups and 15 pending first emails, only five additional leads fit.
+Each follow-up stays on its original mailbox, so uneven mailbox backlogs can reduce the allowance.
+Enrollment above the displayed allowance is rejected; there is no capacity override. The allowance
+is planning capacity, not a guarantee: windows, delays, holds, suppression and pacing still apply.
+Unsent work carries forward; the next step's gap starts from actual acceptance, without bursts.
+
 ## Incoming review: operator workflow (2026-10-08)
 
 The core controls and personalized-restoration/plain-language UI follow-up are deployed and

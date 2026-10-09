@@ -73,10 +73,13 @@ import {
 } from '../db/repos/manualDraftsRepo';
 import type { RenderedMessage } from '../render/types';
 import { sendAuthorized, lockSendingCampaign } from '../db/repos/sendAuthorizationRepo';
+import { mailboxCapacity } from '../db/repos/sendingCapacityRepo';
 
 const SCHEDULER_LOCK = [2, 0] as const; // advisory keyspace: (2,0) = tick
 
 export interface SchedulerDeps {
+  /** Locked historical replay only; rejected outside tests. */
+  historicalQueuePolicy?: boolean;
   db: Db;
   pool: Pool;
   store: EventStore;
@@ -111,6 +114,7 @@ export type SendBlocker = {
 };
 
 interface MailboxBudget extends RotationCandidate {
+  openerSlots: number;
   window: SendWindow;
   timezone: string;
   fromAddress: string;
@@ -202,6 +206,8 @@ export class Scheduler {
     compliance: ComplianceRow,
   ): Promise<TickResult> {
     const { db, rng, alerts } = this.deps;
+    if (this.deps.historicalQueuePolicy && process.env.NODE_ENV !== 'test')
+      throw new Error('Historical queue policy is fixture-only');
 
     // A. housekeeping
     await this.refreshMailboxHealth(now, settings);
@@ -241,6 +247,9 @@ export class Scheduler {
             );
       const remaining = Math.max(0, capToday - sentToday);
       budgets.set(mb.id, {
+        openerSlots: this.deps.historicalQueuePolicy
+          ? remaining
+          : (await mailboxCapacity(db, mb, now)).openerSlots,
         id: mb.id,
         sentToday,
         capToday,
@@ -253,7 +262,7 @@ export class Scheduler {
     }
 
     // C. due work, oldest-first — this ordering + budgets IS never-burst catch-up.
-    const due = await listDue(db, now);
+    const due = await listDue(db, now, this.deps.historicalQueuePolicy);
     const blockers: SendBlocker[] = [];
     const automaticDue = due.filter((e) => e.personalizationMode !== 'human_written');
     const manualDue = due.filter((e) => e.personalizationMode === 'human_written');
@@ -323,8 +332,11 @@ export class Scheduler {
         // Follow-up: FIXED mailbox — never rerouted (threading, spec Part 9).
         mb = budgets.get(e.assignedMailboxId);
         if (!mb || mb.budget <= 0 || attempted.has(mb.id)) continue;
+        if ((e.sendingStepNo ?? e.currentStepNo) === 1 && mb.openerSlots <= 0) continue;
       } else {
-        const candidates = [...budgets.values()].filter((c) => !attempted.has(c.id));
+        const candidates = [...budgets.values()].filter(
+          (c) => !attempted.has(c.id) && c.openerSlots > 0,
+        );
         const picked = pickMailbox(candidates, rng);
         if (!picked) continue;
         mb = picked as MailboxBudget;
@@ -336,6 +348,7 @@ export class Scheduler {
           sent += 1;
           mb.budget -= 1;
           mb.sentToday += 1;
+          if ((e.sendingStepNo ?? e.currentStepNo) === 1) mb.openerSlots -= 1;
           attempted.add(mb.id); // paceReady = false for the rest of this tick
           break;
         case 'transient':
@@ -625,6 +638,7 @@ export class Scheduler {
     const result = await store.withEnrollmentLock(
       e.id,
       async (tx) => {
+        const now = this.deps.clock.now();
         const current = await getEnrollmentById(tx, e.id);
         if (
           !current ||
@@ -647,6 +661,12 @@ export class Scheduler {
         if (!mailbox || mailbox.status !== 'ok') return null;
         const countToday = await countSentSince(tx, mb.id, startOfLocalDay(now, mailbox.timezone));
         if (countToday >= (mailbox.resumeCap ?? mailbox.dailyCap)) return null;
+        if (
+          stepNo === 1 &&
+          !this.deps.historicalQueuePolicy &&
+          (await mailboxCapacity(tx, mailbox, now)).openerSlots <= 0
+        )
+          return null;
         if (
           settings.enforceSendWindow &&
           !insideWindow(mailbox.sendWindow, now, resolveTimezone(e.leadState, mailbox.timezone))

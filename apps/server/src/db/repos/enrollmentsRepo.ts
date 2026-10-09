@@ -3,6 +3,7 @@ import { isTerminal, type LeadTier, type PersonalizationMode } from '@coldemail/
 import type { DbLike } from '../client';
 import { campaigns, enrollments, leads } from '../schema';
 import type { EnrollmentSnapshot } from '../../domain/reducer';
+import { sendingStep } from './sendingCapacityRepo';
 
 export type EnrollmentRow = typeof enrollments.$inferSelect;
 
@@ -56,6 +57,7 @@ export interface DueEnrollment {
   leadId: number;
   campaignId: number;
   currentStepNo: number;
+  sendingStepNo?: number;
   assignedMailboxId: number | null;
   nextSendAt: Date;
   reviewRevision?: number;
@@ -77,13 +79,20 @@ export interface DueEnrollment {
  * draft/paused campaigns silent — recycle (docs/09 §6) enrolls into a DRAFT
  * campaign that must not send until activated.
  */
-export async function listDue(db: DbLike, now: Date): Promise<DueEnrollment[]> {
+export async function listDue(
+  db: DbLike,
+  now: Date,
+  historicalOrder = false,
+): Promise<DueEnrollment[]> {
+  if (historicalOrder && process.env.NODE_ENV !== 'test')
+    throw new Error('Historical order is fixture-only');
   const rows = await db
     .select({
       id: enrollments.id,
       leadId: enrollments.leadId,
       campaignId: enrollments.campaignId,
       currentStepNo: enrollments.currentStepNo,
+      sendingStepNo: sendingStep(enrollments.id, enrollments.currentStepNo),
       assignedMailboxId: enrollments.assignedMailboxId,
       nextSendAt: enrollments.nextSendAt,
       reviewRevision: enrollments.reviewRevision,
@@ -111,7 +120,15 @@ export async function listDue(db: DbLike, now: Date): Promise<DueEnrollment[]> {
         eq(leads.isErased, false),
       ),
     )
-    .orderBy(asc(enrollments.nextSendAt), asc(enrollments.id));
+    .orderBy(
+      historicalOrder
+        ? sql`(0+0)`
+        : sql`CASE WHEN ${sendingStep(enrollments.id, enrollments.currentStepNo)}>1 THEN 0 ELSE 1 END`,
+      historicalOrder
+        ? enrollments.nextSendAt
+        : sql`GREATEST(${enrollments.nextSendAt},${enrollments.delayedUntil},${enrollments.snoozedUntil})`,
+      asc(enrollments.id),
+    );
   return rows.map((r) => ({
     ...r,
     nextSendAt: r.nextSendAt!,

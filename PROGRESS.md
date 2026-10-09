@@ -4,6 +4,11 @@
 
 **Legend:** `[ ]` not started · `[~]` in progress · `[x]` done · `[!]` blocked (note why in the log)
 
+**2026-10-09 follow-up priority:** [~] local implementation complete; final verification in progress.
+Shared mailbox-local reservations, due follow-ups before first emails, real retry classification,
+capacity override rejection and clear enrollment guidance are implemented. See docs/25 for the
+checklist. No push, deployment or live operation is authorized.
+
 **2026-10-08 operator follow-up:** [x] personalized restoration now uses saved personalized
 evidence; restoration/correction has simple Confirm without a reason. Removed Reminders,
 Needs linking and reader reminder/link controls. Unmatched bodies/HTML/previews are no longer

@@ -1,5 +1,24 @@
 # Scheduler Spec — Tick, Pacing, Rotation, Capacity, Catch-up, Auto-pause
 
+## Follow-up priority and daily reservations (2026-10-09 local implementation)
+
+Production policy selects due steps 2+ before Email 1, then the oldest effective due time
+(maximum schedule/delay/snooze), then enrollment ID. An assigned Email 1 retry is still an opener.
+Reservations cover outstanding follow-ups in active campaigns before each mailbox's next local
+midnight, including overdue work. Holds, terminal/erased/suppressed leads and future delays are
+excluded; unavailable copy retains the reservation. Follow-ups stay on their assigned mailbox.
+First emails can use only slots left after those reservations, rechecked under the mailbox lock
+before SMTP. Other healthy mailboxes may use their own spare capacity. Backlogs retain schedules
+and progress; subsequent gaps start from actual accepted send time, without catch-up bursts.
+
+Enrollment allowance sums clamped mailbox spare capacity after sent mail, follow-up reservations
+and assigned opener retries, then subtracts unassigned pending first emails once. Unassigned work
+uses the latest healthy-mailbox midnight as a conservative shared horizon. Existing response
+fields remain; campaign/ramp/pool limits further bound the allowance. `force:true` is rejected.
+Fixture-only historical ordering/capacity seams cannot run outside NODE_ENV=test and are never
+configured by production. Older pseudocode below is superseded where it specifies ordering
+or the aggregate capacity formula. No migration or historical scheduling rewrite is required.
+
 ## Review/delay/send serialization (2026-10-08; local candidate)
 
 Held responses never expire. Continue releases only reviewed hold IDs and preserves sequence

@@ -27,6 +27,7 @@ describe('@golden L3 — full pipeline over ~47 virtual days', () => {
 
   beforeAll(async () => {
     s = await scenario({
+      historicalQueuePolicy: true,
       mailboxes: GOLDEN.mailboxes,
       dailyCap: 30,
       // Preserve the historical 30-enrollment/day cohort explicitly now that

@@ -6,12 +6,9 @@ import type { EventStore } from './eventStore';
 import type { SequenceProvider } from '../scheduler/types';
 import { getSettings } from '../db/repos/settingsRepo';
 import { listMailboxesByStatus } from '../db/repos/mailboxesRepo';
-import { countSentSince } from '../db/repos/eventsRepo';
 import {
   coldStorageRows,
   countEnrolledSince,
-  countFollowupsDue,
-  countPendingOpenersDue,
   enrolledLeadIdsIn,
   insertEnrollments,
 } from '../db/repos/enrollmentsRepo';
@@ -39,8 +36,12 @@ import { poolEligibility } from './campaignPools';
 import { acquireEnrollmentCapacityLock, lockLead } from '../db/repos/locksRepo';
 import { suppressedAmong } from '../db/repos/suppressionsRepo';
 import { campaignPersonalizedCopyReadiness } from '../db/repos/manualDraftsRepo';
+import { mailboxCapacity, reservedWork } from '../db/repos/sendingCapacityRepo';
+import { AppError } from '../api/errors';
 
 export interface EnrollmentDeps {
+  /** Fixture-only: never configured by the API or production workers. */
+  fixtureCapacityOverride?: boolean;
   db: Db;
   store: EventStore;
   clock: Clock;
@@ -71,22 +72,30 @@ export async function capacityToday(
   const now = clock.now();
   const settings = await getSettings(db);
   const midnight = startOfLocalDay(now, settings.defaultTimezone);
-  const endOfDay = startOfNextLocalDay(now, settings.defaultTimezone);
 
   const boxes = await listMailboxesByStatus(db, ['ok']);
   let total = 0;
   let sentSoFar = 0;
+  let followupsDue = 0;
+  let assignedOpeners = 0;
+  let spare = 0;
   for (const mb of boxes) {
-    total += mb.resumeCap ?? mb.dailyCap;
-    sentSoFar += await countSentSince(
-      db,
-      mb.id,
-      startOfLocalDay(now, mb.timezone || settings.defaultTimezone),
-    );
+    const cap = await mailboxCapacity(db, mb, now);
+    total += cap.total;
+    sentSoFar += cap.sent;
+    followupsDue += cap.followups;
+    assignedOpeners += cap.openers;
+    spare += cap.newSlots;
   }
-  const followupsDue = await countFollowupsDue(db, endOfDay);
-  const pendingOpeners = await countPendingOpenersDue(db, endOfDay);
-  const roomForNew = Math.max(0, total - sentSoFar - followupsDue - pendingOpeners);
+  // An unassigned opener is one shared commitment, even with mixed mailbox timezones.
+  const latestMidnight = boxes.reduce(
+    (latest, mb) =>
+      new Date(Math.max(latest.getTime(), startOfNextLocalDay(now, mb.timezone).getTime())),
+    now,
+  );
+  const unassigned = (await reservedWork(db, latestMidnight)).openers;
+  const pendingOpeners = assignedOpeners + unassigned;
+  const roomForNew = Math.max(0, spare - unassigned);
 
   const campaign = await getCampaign(db, campaignId);
   if (!campaign) throw new Error(`campaign ${campaignId} not found`);
@@ -133,14 +142,16 @@ export async function capacityToday(
   };
 }
 
-/** count > suggested without force (docs/10: 409 capacity_exceeded). */
+/** Requests above the current allowance reject atomically (409 capacity_exceeded). */
 export class CapacityExceededError extends Error {
   readonly code = 'capacity_exceeded';
   constructor(
     readonly requested: number,
     readonly suggested: number,
   ) {
-    super(`enroll count ${requested} exceeds the current enrollment allowance ${suggested}`);
+    super(
+      `Only ${suggested} additional leads fit today. Reduce the enrollment count to ${suggested}.`,
+    );
     this.name = 'CapacityExceededError';
   }
 }
@@ -162,8 +173,8 @@ export interface EnrollResult {
  * Count-based enrollment selects eligible leads (suppression, dedupe,
  * recycle guard, Nurture/Untiered exclusion, and personalized Step-1
  * readiness), Tier A→B oldest first. It appends `enrolled` with
- * next_send_at = now and the fixed tier mode. Rejects count > suggested unless
- * force.
+ * next_send_at = now and the fixed tier mode. Production rejects count > suggested;
+ * only the historical fixture harness can bypass daily space.
  */
 export async function enroll(
   deps: EnrollmentDeps,
@@ -175,6 +186,12 @@ export async function enroll(
     await acquireEnrollmentCapacityLock(tx);
     const now = deps.clock.now();
     const cap = await capacityToday({ db: tx, clock: deps.clock }, campaignId);
+    if (opts.force && !(deps.fixtureCapacityOverride && process.env.NODE_ENV === 'test'))
+      throw new AppError(
+        'validation',
+        422,
+        'Capacity overrides are unavailable. Enroll within the current allowance.',
+      );
     const allowed = opts.force ? cap.campaignCapRemaining : cap.suggested;
     if (count > allowed) throw new CapacityExceededError(count, allowed);
     const campaign = await getCampaign(tx, campaignId);
@@ -280,6 +297,12 @@ export async function enrollByIds(
     const now = deps.clock.now();
 
     const cap = await capacityToday({ db: tx, clock: deps.clock }, campaignId);
+    if (opts.force && !(deps.fixtureCapacityOverride && process.env.NODE_ENV === 'test'))
+      throw new AppError(
+        'validation',
+        422,
+        'Capacity overrides are unavailable. Enroll within the current allowance.',
+      );
     const allowed = opts.force ? cap.campaignCapRemaining : cap.suggested;
     if (leadIds.length > allowed) {
       throw new CapacityExceededError(leadIds.length, allowed);

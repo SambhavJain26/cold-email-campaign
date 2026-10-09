@@ -43,6 +43,7 @@ export interface ScenarioConfig {
   ramp?: { ramp_days: number; ramp_daily_enroll_cap: number };
   /** Test-only post-ramp safety cap; production campaigns default to 15. */
   steadyDailyEnrollCap?: number;
+  historicalQueuePolicy?: boolean;
   /** Legacy-read fixture override. New campaign behavior is fixed A=researched/B=auto. */
   tierEffortConfig?: {
     A: 'human_written' | 'template_researched' | 'template_auto';
@@ -139,6 +140,7 @@ export class Scenario {
       },
     };
     this.scheduler = new Scheduler({
+      historicalQueuePolicy: cfg.historicalQueuePolicy,
       db: this.db,
       pool: this.pool,
       store: this.store,
@@ -253,7 +255,13 @@ export class Scenario {
     force?: boolean;
   }): Promise<number[]> {
     const result = await enrollService(
-      { db: this.db, store: this.store, clock: this.clock, sequences: this.sequences },
+      {
+        db: this.db,
+        store: this.store,
+        clock: this.clock,
+        sequences: this.sequences,
+        fixtureCapacityOverride: true,
+      },
       this.campaignId,
       opts.count,
       { tier: opts.tier, force: opts.force ?? true }, // scenarios default past the capacity gate

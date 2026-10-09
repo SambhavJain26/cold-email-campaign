@@ -18,10 +18,10 @@ Authorized for local implementation on 2026-10-09. No push, deployment or live o
 
 ## Verification and checkpoints
 
-- [ ] Shared reservation queries and enrollment allowance
-- [ ] Scheduler ordering and final send protection
-- [ ] API/UI explanation and override removal
-- [ ] Meaningful ordering, reservations, retry, exclusion, concurrency and local-day tests
+- [x] Shared reservation queries and enrollment allowance
+- [x] Scheduler ordering and final send protection
+- [x] API/UI explanation and override removal
+- [x] Meaningful ordering, reservations, retry, exclusion, concurrency and local-day tests
 - [ ] Type/lint/format, relevant serial suites, build, locked 47 golden tests
 - [ ] Populated canonical zero drift and self-check
 - [ ] Verified runbook and release handoff
@@ -35,3 +35,13 @@ first-email backlogs remain queued. Follow-up demand may intentionally postpone 
 Operator chose to protect later-today follow-up slots and limit new enrollment to available
 space (e.g. reject 20 when only five fit). Paused campaigns do not reserve live sending slots.
 Future rollout requires separate authorization, fresh state checks and validated backups.
+
+## Implementation notes
+
+Retry classification derives the actual outgoing step from the last accepted send and subsequent
+soft-bounce facts, matching the sender rather than assuming current_step_no is the outgoing step.
+Reservations live in the SQL repository boundary and are shared by enrollment and the sender.
+The final send check refreshes the clock while holding the decision lock, then checks the current
+mailbox-local day. Locked golden replay explicitly uses fixture-only historical queue policy.
+Final focused backend 43 tests and populated nine-enrollment zero drift/self-check pass. Full
+verification remains in progress; record the completed outcome in docs/17 after all gates pass.

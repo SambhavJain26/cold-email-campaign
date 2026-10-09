@@ -62,7 +62,7 @@ export function EnrollPanel({
             setRampNote(
               suggested === undefined
                 ? error.message
-                : `Today's campaign and mailbox capacity allows ${suggested} more new enrollments.`,
+                : `Only ${suggested} additional leads fit today. Reduce the enrollment count to ${suggested}.`,
             );
             if (typeof suggested === 'number') setCount(suggested);
           }
@@ -73,6 +73,12 @@ export function EnrollPanel({
 
   return (
     <section className={className} data-testid="today-panel">
+      <p className="mb-2 text-xs text-muted-foreground">
+        Follow-ups get priority. Slots are reserved for follow-ups due later today.
+      </p>
+      <p className="mb-2 text-xs text-muted-foreground">
+        This allowance plans daily capacity; sending windows and safety checks still apply.
+      </p>
       <h2 className="mb-3 text-sm font-semibold">TODAY</h2>
       <CapacityMeter capacity={capacity} />
 

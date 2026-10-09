@@ -19,6 +19,12 @@ test('completion panel reconciles the terminal outcomes to the enrolled total', 
 }) => {
   await login(page);
   await page.goto('/campaigns/1');
+  await expect(page.getByTestId('today-panel')).toContainText(
+    'Follow-ups get priority. Slots are reserved for follow-ups due later today.',
+  );
+  await expect(page.getByTestId('today-panel')).toContainText(
+    'This allowance plans daily capacity',
+  );
 
   // Live state breakdown: the golden cohort's terminal split.
   const breakdown = page.getByTestId('state-breakdown');
@@ -66,7 +72,7 @@ test('create → activate → day-1 ramp enrolls 5 and blocks more', async ({ pa
   // Over-asking hits the ramp cap: 409 capacity_exceeded explains that nothing else fits today.
   await today.getByLabel('Enroll').fill('200');
   await page.getByRole('button', { name: 'Enroll next 200' }).click();
-  await expect(page.getByTestId('ramp-note')).toContainText('allows 0 more');
+  await expect(page.getByTestId('ramp-note')).toContainText('Only 0 additional leads fit today');
   await expect(today.getByLabel('Enroll')).toHaveValue('0');
 
   // The list reflects the enrollment.

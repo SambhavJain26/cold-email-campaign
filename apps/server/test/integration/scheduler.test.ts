@@ -625,12 +625,12 @@ describe('capacity + enroll (B3.9)', () => {
     await s.importLeads(5);
 
     await expect(enroll(deps(s), s.campaignId, 3)).rejects.toThrow(
-      /exceeds the current enrollment allowance/,
+      /Only 2 additional leads fit today/,
     );
     const ok = await enroll(deps(s), s.campaignId, 2);
     expect(ok.enrolled).toBe(2);
     await expect(enroll(deps(s), s.campaignId, 1, { force: true })).rejects.toThrow(
-      /current enrollment allowance 0/,
+      /Capacity overrides are unavailable/,
     );
   });
 
@@ -645,7 +645,7 @@ describe('capacity + enroll (B3.9)', () => {
       `UPDATE leads SET tier = NULL, outreach_status = 'nurture' WHERE id IN (9,10)`,
     );
 
-    const r = await enroll(deps(s), s.campaignId, 15, { force: true });
+    const r = await enroll(deps(s), s.campaignId, 15);
     expect(r.leadIds).toEqual([7, 8, 5, 6]);
 
     const modes = await s.pool.query(
@@ -687,7 +687,7 @@ describe('capacity + enroll (B3.9)', () => {
       }),
     ]);
 
-    const r = await enroll(deps(s), s.campaignId, 10, { force: true });
+    const r = await enroll(deps(s), s.campaignId, 10);
     expect(r.leadIds).toEqual([2, 3]); // L0001 blocked by the hash guard
   });
 
@@ -695,7 +695,7 @@ describe('capacity + enroll (B3.9)', () => {
     s = await scenario({ mailboxes: 1, sequence: fourStep });
     await s.importLeads(3);
     await s.pool.query(`UPDATE leads SET is_suppressed = true WHERE id = 2`);
-    const r = await enroll(deps(s), s.campaignId, 10, { force: true });
+    const r = await enroll(deps(s), s.campaignId, 10);
     expect(r.leadIds).toEqual([1, 3]);
   });
 });

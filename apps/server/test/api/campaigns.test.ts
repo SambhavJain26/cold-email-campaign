@@ -177,6 +177,18 @@ describe('B6.6 campaigns', () => {
     expect(res.json().error.details.suggested).toBe(0);
   });
 
+  it('rejects retired capacity overrides without changing enrollment history', async () => {
+    const wm = await eventWatermark(h.pool);
+    const res = await h.inject({
+      method: 'POST',
+      url: `/api/v1/campaigns/${campaignId}/enroll`,
+      payload: { lead_ids: [1], force: true },
+    });
+    expect(res.statusCode).toBe(422);
+    expect(res.json().error.message).toContain('Capacity overrides are unavailable');
+    expect(await eventWatermark(h.pool)).toBe(wm);
+  });
+
   it('enroll {lead_ids}: per-reason skipped buckets without bypassing permanent caps', async () => {
     // suppress one candidate
     await h.pool.query(
@@ -215,7 +227,7 @@ describe('B6.6 campaigns', () => {
           byEmail['lead12@pool.dev'], // suppressed
           999999, // not found
         ],
-        force: true,
+        force: false,
       },
     });
     expect(res.statusCode).toBe(200);
