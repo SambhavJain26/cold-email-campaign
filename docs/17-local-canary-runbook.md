@@ -1,5 +1,17 @@
 # Local canary runbook (B8.3-local) — two-week validation on throwaway Gmail
 
+## 2026-10-09 VPS build-cache cleanup — verified
+
+Operator explicitly authorized the recommended unused Docker build-cache cleanup. Ran only
+`docker builder prune --all --force`; no image/container/volume prune or journal/package cleanup.
+Docker reports 4.587 GB reclaimed; actual root-filesystem used bytes fell from 12,928,634,880 to
+8,676,777,984 (**4,251,856,896 bytes recovered**, about 4.25 GB / 3.96 GiB). Disk usage fell from
+52% to 35%, with 16,189,612,032 bytes available (about 15.08 GiB). Build cache is zero.
+Running image IDs, volume names, backup-file inventory and independent deletion-manifest hash
+match before/after. App/database remain healthy, gateway/backup running and public health returns
+`ok: true, db: true`. No service restart, campaign change, database/content deletion or send
+operation was performed. Future builds will recreate their cache.
+
 ## 2026-10-09 follow-up priority — verified production deployment
 
 Operator explicitly authorized push/deploy, then separately authorized pausing Campaign 3 and
