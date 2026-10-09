@@ -1,5 +1,45 @@
 # Local canary runbook (B8.3-local) — two-week validation on throwaway Gmail
 
+## 2026-10-09 follow-up priority — verified production deployment
+
+Operator explicitly authorized push/deploy, then separately authorized pausing Campaign 3 and
+leaving it paused. Fresh preflight found Campaign 3 active, automatic enrollment off, 810 events
+and 273 sends; earlier paused facts were historical. Pushed `canary` to `76292e9`, transferred
+the reviewed incremental bundle with matching SHA-256
+`8ffbff07ceee81d65b7a0a4c329aff438202762b711e9d172f20a9930ece1a9c`.
+Gracefully stopped the app, validated a pre-mutation backup, changed only Campaign 3's status
+from active to paused, captured the stable snapshot and fast-forwarded the clean production
+checkout from `a59d3ff`. Rebuilt app/gateway/backup coherently. No migration was added.
+
+Verified production gates:
+
+- App/database healthy, gateway/backup running; all **33 migrations** remain applied.
+- Canonical dry-run: **213 enrollments — zero differences**; self-check clean.
+- Stable snapshot matches before/after: **810 events / max 810 / 273 sends**, sent-history hash,
+  suppression hash, settings/signature and mailbox configuration unchanged. Full enrollment-row
+  hash also matches, including delays, review holds, progress and saved checkpoints.
+- Campaign 1 archived; Campaigns 2/3 paused; automatic enrollment disabled throughout.
+- Four healthy mailboxes remain 20/day, New York weekday 09:00–17:00; actual saved ranges are
+  5–15 minutes for mailboxes 1–3 and 5–12 for mailbox 4. No range or cap edits occurred.
+- Independent deletion manifest unchanged, SHA-256
+  `03c28dfa962555297dafaec6b7b217888364306ced8dc12eee68d39d0ae814d4`.
+- Pre-backup `coldemail-20261009-072738.dump`: **2,727,909 bytes**; post-backup
+  `coldemail-20261009-072920.dump`: **2,728,014 bytes**. Both custom-format catalogs validate
+  with **372 lines**; latest independent manifest backup exists. No production restore ran.
+- HTTPS health, campaign route, version, portfolio and outreach/www sites return 200;
+  unauthenticated Unibox rows API returns 401; both unsubscribe roots return 404.
+- Build ID `1987d28a-b3d9-46e6-b23a-c624551b5d7f`, asset `index-DBYs2BYE.js`.
+  Authenticated Campaign 3 shows **paused**, automatic enrollment off and the new priority/
+  reserved-capacity guidance. No enrollment or Resume control was used.
+- VPS disk 52% used, 12 GiB available. Existing six runtime dependency findings remain separate;
+  no dependency rewrite or cleanup occurred.
+
+The deployment script's final backup-validation call had a trailing carriage return; the backup
+had completed, and a separate corrected postcheck validated its catalog and the public routes.
+Campaign 3 pause is the only authorized campaign mutation. No enrollment, resume, restoration,
+delay change or outbound mail occurred. This supersedes the local-only release status below.
+
+
 ## 2026-10-09 follow-up priority and protected capacity — verified locally
 
 Implemented on `canary` in `f2e1ec5`, with scheduler documentation clarification `2269f00`.

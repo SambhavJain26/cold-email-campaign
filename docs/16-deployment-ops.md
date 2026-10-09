@@ -1,5 +1,14 @@
 # Deployment & Operations
 
+## Follow-up priority release — deployed 2026-10-09
+
+Operator-authorized `76292e9` is deployed on `canary`, with separately authorized Campaign 3
+pause. Healthy services/routes, authenticated priority guidance, 213-enrollment zero drift/
+self-check and validated pre/post backups pass; 33 migrations unchanged. Stable snapshot stays
+810 events / 273 sends, full enrollment state, suppression and deletion manifest unchanged.
+Campaigns 2/3 remain paused, automatic enrollment off. No enrollment/resume/send occurred.
+Evidence is in docs/17; further live operations require separate authorization.
+
 ## Incoming review release boundary and restore requirements (deployed)
 
 Application `3c90050` includes the separately authorized personalized-restoration and simplified

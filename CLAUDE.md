@@ -8,6 +8,14 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Current operating boundary
 
+**2026-10-09 follow-up priority deployed:** explicitly authorized push/deploy at `76292e9` on
+`canary`, with separately authorized Campaign 3 pause. Campaigns 2/3 remain paused, automatic
+enrollment off. Healthy services/routes, authenticated priority guidance, all 33 migrations,
+213-enrollment zero drift/self-check and validated pre/post backups pass. Stable snapshot stays
+810 events / 273 sends; full enrollment state, suppression, caps/windows/ranges and deletion
+manifest unchanged. No enrollment, resume or outbound mail occurred. See docs/17. Future live
+operations require their own authorization.
+
 **2026-10-09 follow-up priority — verified locally:** follow docs/25-followup-priority-plan.md.
 Due follow-ups precede openers by effective due time; shared mailbox-local reservations protect
 later-today follow-ups and limit enrollment. Capacity overrides are rejected. Source f2e1ec5 and

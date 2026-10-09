@@ -48,3 +48,11 @@ Typecheck, lint, formatting, unit 413, web 71, full integration 221, API 175, Gr
 campaign browser 4 and the real-API production web build pass. Locked golden exactly 47 passes
 without cohort or expected-result changes. Verified evidence and local release boundary are
 recorded in docs/17. Source commits are f2e1ec5 and 2269f00; nothing is pushed or deployed.
+
+## Deployment outcome — 2026-10-09
+
+Subsequent explicit push/deploy authorization and separate Campaign 3 pause authorization
+advanced production to `76292e9`. All production gates pass: 213-enrollment zero drift,
+self-check, healthy services/routes, authenticated priority guidance and validated backups.
+Campaigns 2/3 remain paused, automatic enrollment off. Stable 810-event / 273-send snapshot,
+full enrollment state and deletion manifest remain unchanged. See docs/17 for evidence.

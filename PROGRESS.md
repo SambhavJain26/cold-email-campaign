@@ -10,6 +10,11 @@ capacity override rejection and clear enrollment guidance are implemented. See d
 checklist and docs/17 for completed gates, including locked golden 47 and populated zero drift.
 No push, deployment or live operation is authorized or performed.
 
+Subsequently explicitly authorized, pushed and deployed at `76292e9`, with separately authorized
+Campaign 3 pause. Production 213-enrollment zero drift/self-check, authenticated guidance,
+unchanged stable snapshot and validated pre/post backups pass. Campaigns remain paused;
+no enrollment, resume or send occurred. Verified deployment evidence is in docs/17.
+
 **2026-10-08 operator follow-up:** [x] personalized restoration now uses saved personalized
 evidence; restoration/correction has simple Confirm without a reason. Removed Reminders,
 Needs linking and reader reminder/link controls. Unmatched bodies/HTML/previews are no longer
