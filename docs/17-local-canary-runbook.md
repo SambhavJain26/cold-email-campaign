@@ -1,5 +1,45 @@
 # Local canary runbook (B8.3-local) — two-week validation on throwaway Gmail
 
+## 2026-10-10 IST Bruce/Lori — explicitly authorized bounded repair completed
+
+The operator explicitly authorized bringing back and linking Bruce/Lori only. Fresh checks
+confirmed Campaigns 2/3 paused, auto-enrollment off, 892 events and 346 accepted sends.
+Pre-repair backup coldemail-20261009-201322.dump (3,290,866 bytes) validates with 379 catalog lines.
+
+Ran the existing metadata CLI first in preview and then --apply, restricted to
+--message=2140 --message=2135. It returned exactly Bruce enrollment 83 and Lori enrollment 217.
+No broader historical scan ran. In the authenticated Unibox, used Recover message and its
+confirmation separately for each record, then the reviewed Confirm this is Bruce/Lori dialogs.
+
+- Bruce 2140: sender bja6@aol.com, verified against the original Message-ID and receiving
+  mailbox 1; full text 130 characters and HTML 160 characters recovered. Linked to Bruce
+  bruce@brucejay.com, enrollment 83 in Campaign 3. New review-hold fact 893.
+- Lori 2135: sender pmaccounts@dennisrealty.com, verified against original Message-ID and
+  receiving mailbox 4; full text 491 characters recovered. Linked to Lori
+  lori@dennisrealty.com, enrollment 217 in Campaign 3. New review-hold fact 894.
+- Both remain auto_reply with confirmed authorship Unsure; no human-reply credit added.
+  Both are unacknowledged and appear in Needs review as Held for review. Content is captured.
+- Bruce retains next step 3, next due 2026-10-13T18:20:51.546Z; Lori retains next step 2,
+  next due 2026-10-12T17:16:22.352Z. Delays were unset and remain unset.
+- Enrollment hash equals the pre-repair baseline after masking only the two new hold IDs
+  and their review revisions. All other enrollment fields and all other enrollments match.
+- Original 892-event history hash matches exactly. Only events 893/894 were appended:
+  incoming_review_required. Total now 894 events, still 346 sends.
+- Sent/retry, seven suppressions, settings/compliance, campaign and mailbox configuration
+  hashes match. Campaigns 2/3 remain paused; auto-enrollment off.
+- Canonical dry-run: 222 enrollments, zero differences; self-check clean.
+- Post-repair backup coldemail-20261009-201533.dump (3,292,225 bytes), 379 catalog lines
+  validates. Deletion manifest hash remains
+  03c28dfa962555297dafaec6b7b217888364306ced8dc12eee68d39d0ae814d4.
+
+The UI shows 2 lead conversations / 0 possible replies in Needs review; both full bodies
+are readable. Lori's reader shows her original alternate sender and automatic detection,
+Held for review and Campaign paused. Continue/Delay require ticking Reviewed this message;
+no reviewed checkbox, acknowledgement, outreach decision, suppression, content deletion,
+campaign resume, enrollment or outbound mail was applied. Recovery uses the existing
+non-destructive identity-verified IMAP source fetch; no mailbox mutation or cursor replay.
+Screenshot: C:/Users/jains/AppData/Local/Temp/bruce-lori-repair-verified.jpg.
+
 ## 2026-10-10 IST Possible replies — authorized push/deploy and Campaign 3 pause
 
 The operator authorized push/deploy after the complete local gates, then explicitly chose

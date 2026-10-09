@@ -8,6 +8,14 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Current operating boundary
 
+**2026-10-10 Bruce/Lori repair completed:** explicitly authorized metadata scan restricted to
+messages 2140/2135, full-content recovery and confirmed links to enrollments 83/217.
+Both appear in Needs review as Held for review; automatic labels/authorship and all progress/
+schedules/retry history preserved. Only review facts 893/894 appended; 894 events / 346 sends.
+222-enrollment zero drift/self-check and validated pre/post backups pass. Campaigns 2/3 remain
+paused, automatic enrollment off. No acknowledgement, sending decision, resume, enrollment or
+outbound mail occurred. Other historical scans/recovery/linking require their own authorization.
+See docs/17.
 **2026-10-10 Possible replies deployed:** explicitly authorized push/deploy of release
 `48d931d` (feature source `5ba304d`), plus separately confirmed Campaign 3 pause.
 Campaigns 2/3 remain paused, automatic enrollment off. All 34 migrations, healthy services/

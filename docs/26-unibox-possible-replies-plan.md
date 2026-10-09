@@ -140,3 +140,10 @@ Production 34 migrations, 222-enrollment zero drift/self-check, stable state and
 backup validation pass. Campaigns 2/3 remain paused; no historical candidate scan or
 Bruce/Lori recovery/linking ran. Authenticated Unibox replay passes after operator sign-in.
 See docs/17 for evidence and continuing boundaries.
+
+## Bounded historical repair completed — 2026-10-10 IST
+
+Operator authorized Bruce/Lori only. Records 2140/2135 were surfaced, full content
+recovered, and confirmed to enrollments 83/217. Both now Held for review; progress/schedules
+preserved, campaigns paused, no sends. 222-enrollment zero drift/self-check passes.
+See docs/17 for backup and unchanged-history evidence. Broader historical work remains gated.
