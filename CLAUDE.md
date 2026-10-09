@@ -8,10 +8,12 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Current operating boundary
 
-**2026-10-10 possible replies — local implementation authorized:** follow docs/26.
-Surface subject/company candidates in existing Unibox views with explicit confirmation;
-suggestions never change outreach. No push/deploy, live metadata scan, Bruce/Lori recovery/
-linking, campaign mutation or send is authorized. Preserve historical records and suppression.
+**2026-10-10 possible replies — verified locally:** source `5ba304d` on `canary`; follow docs/26.
+Subject/company candidates appear in existing Unibox views; only explicit confirmation applies
+review holds. Selective capture, counts/freshness, dismissal/Undo and metadata tooling pass local
+gates, locked golden exactly 47 and nine-enrollment zero drift/self-check; see docs/17. No push/
+deploy, live metadata scan, Bruce/Lori recovery/linking, campaign mutation or send is authorized
+or performed. Preserve historical records, suppression and deletion-manifest safeguards.
 
 **2026-10-09 follow-up priority deployed:** explicitly authorized push/deploy at `76292e9` on
 `canary`, with separately authorized Campaign 3 pause. Campaigns 2/3 remain paused, automatic

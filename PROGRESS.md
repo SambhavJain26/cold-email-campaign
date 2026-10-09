@@ -4,6 +4,13 @@
 
 **Legend:** `[ ]` not started · `[~]` in progress · `[x]` done · `[!]` blocked (note why in the log)
 
+**2026-10-10 Possible replies:** [x] implemented and verified locally at `5ba304d`.
+Docs/26 is saved/indexed with completed stages. Subject/company suggestions integrate into
+existing Unibox views without sending effects until explicit confirmation. Selective capture,
+counts/freshness, dismissal/Undo and explicit historical metadata tooling are verified. Full
+gates include exactly 47 locked golden tests and nine-enrollment zero drift/self-check; docs/17
+records results. No push/deploy or live scan, recovery/linking, campaign change or send occurred.
+
 **2026-10-09 follow-up priority:** [x] implemented and verified locally.
 Shared mailbox-local reservations, due follow-ups before first emails, real retry classification,
 capacity override rejection and clear enrollment guidance are implemented. See docs/25 for the

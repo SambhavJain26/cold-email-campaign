@@ -1,5 +1,62 @@
 # Local canary runbook (B8.3-local) — two-week validation on throwaway Gmail
 
+## 2026-10-10 IST Possible replies — implemented and verified locally
+
+Source `5ba304d` on `canary` implements docs/26, saved before implementation at `3fa8ac4`.
+Unibox integrates one unresolved physical message beside confirmed lead/campaign rows in
+Needs review/All/Acknowledged. No general unmatched inbox or Reminders returned. Unibox
+counts include candidates without new bell, desktop or email notifications.
+
+Accepted preceding sends on the receiving mailbox within 30 days provide specific-subject
+or business-domain evidence. Shared providers cannot supply company evidence; generic
+subjects cannot supply subject evidence. Evidence is separate from confirmed links; suggestions append
+no outreach events or human credit. New qualifying messages retain bounded removable content;
+other unrelated traffic stays metadata-only. Explicit confirmation rechecks evidence under
+existing locks and applies audited review holds without changing progress, delay or retry
+bodies. Different-address wording cannot automatically suppress the original lead.
+
+Dismissal/Undo uses exact message revisions and visibility facts only. Unresolved content is
+not automatically cleaned; dismissed content uses existing acknowledgement retention.
+Deleted content stays deleted through duplicate ingestion, metadata scans and recovery.
+Mailbox freshness warns on authentication failure or checks older than ten minutes.
+
+Verified gates (DB-backed suites run serially):
+
+| Gate | Result |
+| --- | --- |
+| Typecheck / lint / format check / production web build | Pass |
+| Unit + web components, one worker | 487/487 |
+| Full API after route-manifest correction | 182/182 |
+| Integration / scheduler / enrollment | 222/222 |
+| GreenMail | 31/31 |
+| Locked golden, unchanged cohort and expectations | Exactly 47/47 |
+| Full mock browser suite | 73/73 |
+| Final focused Unibox browser rerun | 13/13 |
+| Real-backend browser suite, mock transport | 4/4 |
+| Canonical dry-run, separate populated verification database | 9 enrollments, 0 differences |
+| Populated self-check | No invariant violations |
+| 0028–0033 preservation down/apply drill | Pass; existing state/snapshots/suppression/metrics retained |
+
+Migration 0033 applies additively. Its preservation behavior also passes with actual candidate
+evidence in the API fixture. The real browser extension proves an alternate-address reply
+leaves a delayed enrollment unchanged before confirmation and becomes held afterwards while
+retaining the exact delay timestamp. Desktop/mobile confirmation, dismissal/Undo, independent
+automation labels, safe HTML and existing review actions pass. Desktop screenshot was inspected.
+
+The first full API run exposed the expected addition of five routes missing from the contract
+manifest; documentation and manifest were updated, then the final full API run passed. An initial
+real-browser probe was interrupted after identifying stale pre-simplification authorship selectors.
+Its fixture now opens Email details and selects Who wrote this email? → A person. The full real
+suite then passed without changing outcome expectations. Existing pg query deprecation warnings,
+mock error-fixture proxy warnings and build bundle-size notices remain non-blocking.
+
+Historical scanner defaults to metadata preview and never fetches bodies or advances cursors.
+The bounded Bruce 2140 → enrollment 83 / Lori 2135 → enrollment 217 repair workflow is prepared
+in docs/26. No production connection, metadata scan, recovery, linking/holding, acknowledgement,
+deletion, pause/resume, enrollment, settings change, push, deployment or outbound mail occurred
+as part of this implementation. Local test mail uses MockTransport/GreenMail only. Production
+repair and rollout remain separately authorized; inspect actual campaign state before either.
+
 ## 2026-10-10 IST missing Bruce/Lori Unibox messages — read-only diagnosis
 
 At about 00:13 IST, all four mailboxes were healthy with successful polls about one minute ago;

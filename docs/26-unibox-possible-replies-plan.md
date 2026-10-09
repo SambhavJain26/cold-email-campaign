@@ -60,12 +60,12 @@ metadata/confirmation. Never recover deleted content. Other old candidates recov
 
 ## Stages and gates
 
-- [ ] Candidate matching/projection/contracts and additive migration
-- [ ] Selective capture, queue/summary, confirmation/dismissal services
-- [ ] Integrated accessible responsive UI/counts/freshness
-- [ ] Metadata scan and bounded repair tooling/documentation
-- [ ] Serial DB/API/UI/browser gates, type/lint/format/build, locked golden exactly 47
-- [ ] Populated canonical zero drift/self-check and verified runbook
+- [x] Candidate matching/projection/contracts and additive migration
+- [x] Selective capture, queue/summary, confirmation/dismissal services
+- [x] Integrated accessible responsive UI/counts/freshness
+- [x] Metadata scan and bounded repair tooling/documentation (workflow prepared; no live repair)
+- [x] Serial DB/API/UI/browser gates, type/lint/format/build, locked golden exactly 47
+- [x] Populated canonical zero drift/self-check and verified runbook
 
 Test Bruce/Lori, shared domains/generic subjects, collisions/multiple campaigns, no suggestion
 effects, held confirmation, automation analytics, duplicates/deletion/recovery, stale actions,
@@ -74,6 +74,14 @@ dismissal/Undo/retention, filters/counts/freshness and keyboard/mobile.
 ## Change log
 
 2026-10-10: specification saved before implementation; live operations remain separate.
+
+2026-10-10: implemented locally at `5ba304d`; all gates pass. API 182, integration 222,
+unit/component 487, GreenMail 31, locked golden exactly 47, mock browser 73 and real
+browser 4. Final targeted Unibox browser rerun passes 13. Typecheck/lint/format/build
+pass; nine-enrollment canonical dry-run has zero differences and self-check is clean.
+Migration preservation includes 0028–0033; populated candidate evidence survives its
+down/apply fixture check. See docs/17 for evidence and initial stale-selector correction.
+No push, deployment, production scan/recovery/linking or other live operation performed.
 
 ## Operator workflow prepared for a future authorized rollout
 
