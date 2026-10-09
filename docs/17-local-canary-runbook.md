@@ -1,5 +1,30 @@
 # Local canary runbook (B8.3-local) — two-week validation on throwaway Gmail
 
+## 2026-10-10 IST missing Bruce/Lori Unibox messages — read-only diagnosis
+
+At about 00:13 IST, all four mailboxes were healthy with successful polls about one minute ago;
+poll interval remains five minutes. Incoming record 2140 (Bruce, bja6@aol.com) was received
+2026-10-09 18:21:01 UTC and processed 18:22:18.609 UTC; record 2135 (Lori,
+pmaccounts@dennisrealty.com) was received 17:16:26 UTC and processed 17:17:18.540 UTC.
+Both are review_v1 auto_reply, unmatched/needs_linking, with no links or review-hold facts.
+Their stored In-Reply-To is absent and intake found no usable reference match. Neither sender
+address exists as a lead. Actual Campaign 3 leads are Bruce 83/bruce@brucejay.com/enrollment 83
+and Lori 217/lori@dennisrealty.com/enrollment 217. Their corresponding saved outbound subjects
+and receiving mailboxes match the response subjects, with receipt roughly ten/four seconds
+after the matching accepted outbound send. This is strong candidate evidence, not a confirmed
+association. Both enrollments remain ACTIVE without holds from these messages.
+
+The matched-row query requires incoming_message_links. The simplified Unibox removed unmatched
+visibility and intake intentionally stores no bodies/snippets for unmatched mail. Thus polling
+succeeded promptly, but alternate-address responses became invisible and lacked actions.
+Fix proposal: surface narrowly selected possible outreach responses in the existing review view,
+offer clear confirmation of the suggested lead, and retain bounded content for those candidates;
+preserve conservative matching and avoid domain/subject-only automatic global suppression.
+Confirmed linking must enforce review holds and preserve automatic-response analytics. Existing
+records need explicitly authorized content-only mailbox recovery and audited linking, not cursor
+rewind or historical replay. Poll health/freshness visibility should expose failures and latency.
+No mailbox fetch/replay, link, hold, campaign edit or other live-state mutation occurred.
+
 ## 2026-10-09 21:35 IST Campaign 3 timing/weekend assessment — read-only
 
 Fresh read-only production checks show Campaign 3 active after operator action, automatic
