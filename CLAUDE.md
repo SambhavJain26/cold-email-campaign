@@ -8,9 +8,12 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Current operating boundary
 
-**2026-10-09 follow-up priority — local implementation authorized:** follow docs/25-followup-priority-plan.md.
-Due follow-ups precede openers; reserve mailbox-local daily slots and remove capacity overrides.
-Preserve history and live state. No push, deployment, enrollment, resume or outbound send authorized.
+**2026-10-09 follow-up priority — verified locally:** follow docs/25-followup-priority-plan.md.
+Due follow-ups precede openers by effective due time; shared mailbox-local reservations protect
+later-today follow-ups and limit enrollment. Capacity overrides are rejected. Source f2e1ec5 and
+2269f00 pass local gates, locked golden exactly 47 and populated nine-enrollment zero drift/
+self-check; see docs/17. No migration or new event type. History and schedules are preserved.
+No push, deployment, live enrollment, resume or outbound send authorized or performed.
 
 **2026-10-08 personalized restoration follow-up deployed:** explicit operator approval pushed
 and deployed application `3c90050` on `canary`. Campaigns 2/3 remain paused, automatic enrollment

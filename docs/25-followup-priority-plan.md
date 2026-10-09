@@ -22,9 +22,9 @@ Authorized for local implementation on 2026-10-09. No push, deployment or live o
 - [x] Scheduler ordering and final send protection
 - [x] API/UI explanation and override removal
 - [x] Meaningful ordering, reservations, retry, exclusion, concurrency and local-day tests
-- [ ] Type/lint/format, relevant serial suites, build, locked 47 golden tests
-- [ ] Populated canonical zero drift and self-check
-- [ ] Verified runbook and release handoff
+- [x] Type/lint/format, relevant serial suites, build, locked 47 golden tests
+- [x] Populated canonical zero drift and self-check
+- [x] Verified runbook and release handoff
 
 Golden historical cohort/expected outcomes stay locked. If necessary isolate historical policy
 inside the fixture harness; production always enforces priority. No persisted queue. Existing
@@ -43,5 +43,8 @@ soft-bounce facts, matching the sender rather than assuming current_step_no is t
 Reservations live in the SQL repository boundary and are shared by enrollment and the sender.
 The final send check refreshes the clock while holding the decision lock, then checks the current
 mailbox-local day. Locked golden replay explicitly uses fixture-only historical queue policy.
-Final focused backend 43 tests and populated nine-enrollment zero drift/self-check pass. Full
-verification remains in progress; record the completed outcome in docs/17 after all gates pass.
+Final focused backend 43 tests and populated nine-enrollment zero drift/self-check pass.
+Typecheck, lint, formatting, unit 413, web 71, full integration 221, API 175, GreenMail 31,
+campaign browser 4 and the real-API production web build pass. Locked golden exactly 47 passes
+without cohort or expected-result changes. Verified evidence and local release boundary are
+recorded in docs/17. Source commits are f2e1ec5 and 2269f00; nothing is pushed or deployed.

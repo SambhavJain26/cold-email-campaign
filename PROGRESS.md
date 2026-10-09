@@ -4,10 +4,11 @@
 
 **Legend:** `[ ]` not started · `[~]` in progress · `[x]` done · `[!]` blocked (note why in the log)
 
-**2026-10-09 follow-up priority:** [~] local implementation complete; final verification in progress.
+**2026-10-09 follow-up priority:** [x] implemented and verified locally.
 Shared mailbox-local reservations, due follow-ups before first emails, real retry classification,
 capacity override rejection and clear enrollment guidance are implemented. See docs/25 for the
-checklist. No push, deployment or live operation is authorized.
+checklist and docs/17 for completed gates, including locked golden 47 and populated zero drift.
+No push, deployment or live operation is authorized or performed.
 
 **2026-10-08 operator follow-up:** [x] personalized restoration now uses saved personalized
 evidence; restoration/correction has simple Confirm without a reason. Removed Reminders,

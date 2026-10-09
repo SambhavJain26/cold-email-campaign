@@ -1,5 +1,46 @@
 # Local canary runbook (B8.3-local) — two-week validation on throwaway Gmail
 
+## 2026-10-09 follow-up priority and protected capacity — verified locally
+
+Implemented on `canary` in `f2e1ec5`, with scheduler documentation clarification `2269f00`.
+Specification is saved in docs/25 and indexed. Due follow-ups precede first emails by effective
+due time, then enrollment ID. Actual outgoing step is derived from accepted-send/soft-bounce
+history so Email 1 retries remain first emails even after sequence progress advances.
+Shared mailbox-local reservation queries protect overdue and later-today follow-ups; each
+mailbox clamps its own spare slots. Assigned first-email retries consume that mailbox's room,
+and unassigned pending first emails consume the shared allowance once. Mixed-timezone shared
+commitments conservatively use the latest healthy mailbox midnight. Paused campaigns, holds,
+suppression and delays beyond the local day do not reserve slots; unavailable copy does.
+
+The scheduler rechecks opener reservations under its existing mailbox/send transaction before
+SMTP. Enrollment retains its shared capacity lock and campaign/ramp/pool guards; excess requests
+reject atomically with the exact allowance. Compatibility `force: true` is rejected. UI explains
+follow-up protection and that daily allowance is not a delivery guarantee. No migration, persisted
+queue or new domain-event type; existing schedules, retry bodies and history remain intact.
+
+Verified gates (DB suites serial):
+
+- Typecheck, lint, formatting and whitespace checks pass.
+- Unit **413**, web **71**, full integration **221**, and final focused scheduler/review/priority
+  integration **43** pass. The final focused suite includes all **14** new priority tests.
+- API **175**, GreenMail **31**, campaign browser **4** pass; real-API production web build passes.
+- Locked golden **exactly 47** passes, without changing its cohort or expected results. Historical
+  queue compatibility is fixture-only and rejected outside tests; production uses the new policy.
+- Canonical `rebuildCli.ts --dry-run` on the separate populated local verification database checks
+  **nine enrollments — zero differences**; self-check is clean.
+
+Coverage includes ordering, later-day reservations, per-mailbox overload isolation, actual Email 1
+retries, hold/delay races, excessive and concurrent enrollments, unavailable copy, midnight and DST.
+Existing scheduler/golden coverage retains carry-forward, accepted-send gaps and normal safety checks.
+Browser tests pass with the previously known mock copy-coverage endpoint diagnostics; the production
+build reports its existing chunk-size warning. Neither blocks these verified gates.
+
+No production connection, push, deployment, live-state change, enrollment, resume or real outbound
+mail occurred. Test sends use controlled local transports/GreenMail. This candidate is local only.
+A separately authorized rollout must inspect actual campaign status, validate backups and deploy
+coherently; do not implicitly pause/resume campaigns or enroll/send. Existing Email 1 backlogs stay
+queued and may intentionally wait under sustained follow-up demand.
+
 ## 2026-10-08 IST operator Delay verification — read-only
 
 At 11:49 UTC (17:19 IST), a read-only production transaction verified the operator's Campaign 3
