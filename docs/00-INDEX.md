@@ -15,6 +15,8 @@ direct alias hosting is prepared in `deploy/spaceship/host-Caddyfile.fragment` a
 
 ## Document map
 
+Authorized local specification: [Follow-up priority and protected capacity](25-followup-priority-plan.md).
+
 Implemented specification: [Incoming review and Unibox redesign](24-incoming-review-unibox-redesign-plan.md).
 Its prospective review policy supersedes older company/human stopping excerpts. Application
 `3c90050` (including the personalized-restoration/UI follow-up) is deployed under explicit authorization; verified evidence and continuing operational

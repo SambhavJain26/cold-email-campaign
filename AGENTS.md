@@ -19,6 +19,10 @@ call planned work implemented.
 
 ## Current operating boundary
 
+**2026-10-09 follow-up priority — local implementation authorized:** follow docs/25-followup-priority-plan.md.
+Due follow-ups precede openers; reserve mailbox-local daily slots and remove capacity overrides.
+Preserve history and live state. No push, deployment, enrollment, resume or outbound send authorized.
+
 **2026-10-08 personalized restoration follow-up deployed:** explicit operator approval pushed
 and deployed application `3c90050` on `canary`. Campaigns 2/3 remain paused, automatic enrollment
 off. All 33 migrations, healthy services/routes, authenticated simplified Unibox and Debra's
