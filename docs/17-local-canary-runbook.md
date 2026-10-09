@@ -1,5 +1,20 @@
 # Local canary runbook (B8.3-local) — two-week validation on throwaway Gmail
 
+## 2026-10-09 21:35 IST Campaign 3 timing/weekend assessment — read-only
+
+Fresh read-only production checks show Campaign 3 active after operator action, automatic
+enrollment off. Sequence gaps after each preceding accepted send are 3/4/4/5 elapsed days for
+steps 2/3/4/5. At 16:05 UTC, nine eligible pending first emails and 66 eligible pending step-2
+messages are scheduled through the New York day; five step-2 messages already sent today.
+No step-3 follow-ups are due today. Pending step-2 counts by mailbox are 16/18/16/16; sends today
+are 1/1/1/2. Thus daily-cap arithmetic permits nine pending first emails after protecting the
+66 remaining follow-ups; actual delivery is still conditional on windows/pacing and other checks.
+All four mailboxes are healthy, 20/day, Monday–Friday 09:00–17:00 America/New_York, and enforced
+windows are enabled. All 201 active lead states are blank, so the current sender falls back to
+the mailbox's New York timezone. Saturday/Sunday there are excluded at selection and before
+SMTP. Friday's window ends at 02:30 IST Saturday; these settings do not impose an India-midnight
+weekend blackout. No campaign/settings/enrollment/sending mutation was performed.
+
 ## 2026-10-09 VPS build-cache cleanup — verified
 
 Operator explicitly authorized the recommended unused Docker build-cache cleanup. Ran only
