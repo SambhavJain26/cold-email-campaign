@@ -615,3 +615,8 @@ Branch `b8.3-local-canary`. Runbook: **[docs/17-local-canary-runbook.md](docs/17
 | 2026-07-22 | B0.2: ESLint 10 flat config with module-boundary rules (partitioned blocks — flat config is last-match-wins per rule; both partitions verified firing with temp violation files), Prettier, Vitest 4 + smoke test. format/lint/typecheck/test all green. |
 | 2026-07-22 | B0.1: npm-workspaces monorepo scaffolded (`apps/server`, `apps/web` placeholder, `packages/shared`); base tsconfig (strict, ESM, bundler resolution); dir tree per docs/02 §1; typecheck + tsx smoke-run green. Node updated: machine runs 24 (current LTS), decision B now `>=22`. |
 | 2026-07-22 | M0: full low-level documentation set written (docs/00–16 + this tracker). Decisions A–F confirmed (F kept automatic with escape hatch); new decisions G–Z locked — see [docs/01-decisions.md](docs/01-decisions.md). Notable resolutions: `sentiment_tagged` event added to preserve append-only (M); `delivered` via confirm-delivery job (N); `incoming_messages` ledger (O); content-hash recycle guard (Q); untiered-on-import (R). Next: B0.1. |
+
+**2026-10-10 Possible replies rollout:** [x] authorized push/deploy 48d931d, separate Campaign 3 pause.
+34 migrations, 222-enrollment zero drift/self-check, healthy routes/services and validated backups
+pass; 892 events/346 sends unchanged. Authenticated UI replay awaits sign-in. Historical scan/
+Bruce-Lori repair remains unperformed; campaigns stay paused. See docs/17.

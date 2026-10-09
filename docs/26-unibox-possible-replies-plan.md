@@ -132,3 +132,11 @@ Existing rows, linking, recovery, acknowledgement and content deletion APIs rema
 compatible. The queue omits bodies; the selected reader loads content. The Unibox
 navigation count refreshes in the foreground without emitting notifications. Undo uses
 the revision produced by its dismissal and refuses to override a later decision.
+
+## Deployment checkpoint — 2026-10-10 IST
+
+Explicitly authorized release 48d931d is deployed, with separately authorized Campaign 3 pause.
+Production 34 migrations, 222-enrollment zero drift/self-check, stable state and pre/post
+backup validation pass. Campaigns 2/3 remain paused; no historical candidate scan or
+Bruce/Lori recovery/linking ran. Authenticated browser replay awaits operator sign-in.
+See docs/17 for evidence and continuing boundaries.

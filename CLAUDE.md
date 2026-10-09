@@ -8,6 +8,15 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Current operating boundary
 
+**2026-10-10 Possible replies deployed:** explicitly authorized push/deploy of release
+`48d931d` (feature source `5ba304d`), plus separately confirmed Campaign 3 pause.
+Campaigns 2/3 remain paused, automatic enrollment off. All 34 migrations, healthy services/
+public routes, production queue/summary contracts, 222-enrollment zero drift/self-check and
+validated pre/post backups pass. Stable post-pause snapshot remains 892 events / 346 sends;
+enrollment, sent/retry history, suppression, settings and deletion manifest match. No historical
+scan, Bruce/Lori recovery/linking, enrollment, resume or outbound mail occurred. Authenticated
+browser replay awaits operator sign-in. See docs/17. Future live operations remain separately gated.
+
 **2026-10-10 possible replies — verified locally:** source `5ba304d` on `canary`; follow docs/26.
 Subject/company candidates appear in existing Unibox views; only explicit confirmation applies
 review holds. Selective capture, counts/freshness, dismissal/Undo and metadata tooling pass local

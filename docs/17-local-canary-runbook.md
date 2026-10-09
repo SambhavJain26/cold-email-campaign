@@ -1,5 +1,52 @@
 # Local canary runbook (B8.3-local) — two-week validation on throwaway Gmail
 
+## 2026-10-10 IST Possible replies — authorized push/deploy and Campaign 3 pause
+
+The operator authorized push/deploy after the complete local gates, then explicitly chose
+"Pause Campaign 3 and leave it paused." Fresh prechecks found Campaign 3 active, automatic
+enrollment off, and New York's Friday window still open; no implicit pause/resume was inferred.
+The separate pause authorization resolves the rollout's paused-state prerequisite.
+
+Pushed `canary` to `48d931d` (feature source `5ba304d`). The clean VPS checkout advanced
+from `827ae6089` using a verified incremental bundle with SHA-256
+`aef8b0ffb608bf7ba782c1ac8c31cae4aedd524ed774aceb98cc2734880bcbe9`.
+Gracefully stopped the app, validated the pre-mutation backup, explicitly paused Campaign 3,
+captured a stable snapshot, built app/gateway/backup and restarted coherently. Host Caddy,
+DNS and mailbox settings were unchanged.
+
+Verified outcomes:
+
+- All **34 migrations**, through `0033_incoming_reply_candidates`; app/database healthy,
+  gateway/backup running. Candidate evidence is empty: no historical scan ran automatically.
+- Canonical dry-run: **222 enrollments — 0 differences**; self-check clean.
+- Stable before/after/final snapshot matches: **892 events / max ID 892 / 346 sends**,
+  complete enrollment and sent/retry hashes, seven suppressions, settings/compliance,
+  campaign records after the authorized pause, and mailbox caps/windows/ranges/deadlines.
+- Campaign 1 archived; Campaigns 2/3 paused; automatic enrollment off everywhere.
+- Live deletion manifest and latest backup manifest both retain SHA-256
+  `03c28dfa962555297dafaec6b7b217888364306ced8dc12eee68d39d0ae814d4`.
+- Pre-backup `coldemail-20261009-200313.dump`: **3,285,513 bytes**, 372 catalog lines.
+  Post-backup `coldemail-20261009-200616.dump`: **3,289,159 bytes**, 379 catalog lines.
+  Both custom-format catalogs validate; independent manifest backup matches.
+- Public health, Unibox/Campaign routes, portfolio and four outreach website aliases return
+  200. Protected queue/summary routes return 401 without authentication.
+- Production queue/summary services pass shared response schemas against actual production
+  data. Needs-review is 0 lead conversations / 0 possible replies at verification; all four
+  mailbox checks are healthy/fresh. Older Bruce/Lori records have not been scanned or linked.
+- Served version is `687439d3-b5f1-4217-aeb3-1cbc43ed29a2`; gateway asset
+  `index-rX80CK-j.js` is built from the pinned release.
+
+Authenticated browser replay remains pending operator sign-in. The browser reached Login.
+A server-side login probe first omitted the required request header (403), then correctly
+received 401 with the stored initial password; no credential was exposed or reset, and no
+further password attempts were made. Public protection and production service-contract
+verification pass; do not claim authenticated UI coverage for this rollout yet.
+
+Existing dependency audit findings remain a separate backlog (build reports six runtime
+findings); no dependency rewrite occurred. No live metadata scan, message recovery/linking,
+acknowledgement/deletion, enrollment, resume or outbound mail occurred. Campaign 3 stays paused
+for the operator; the separately bounded Bruce/Lori repair remains unperformed.
+
 ## 2026-10-10 IST Possible replies — implemented and verified locally
 
 Source `5ba304d` on `canary` implements docs/26, saved before implementation at `3fa8ac4`.
