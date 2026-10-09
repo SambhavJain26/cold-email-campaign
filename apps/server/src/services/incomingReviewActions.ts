@@ -38,6 +38,8 @@ import {
   lockMessage,
 } from '../db/repos/incomingReviewRepo';
 import { explicitOptOut, extractNewText } from '../poller/reviewText';
+import { findReplyCandidates } from '../db/repos/replyCandidatesRepo';
+import { incomingMessageIdentity } from '../db/repos/incomingReviewRepo';
 
 export class IncomingReviewError extends Error {
   constructor(
@@ -330,6 +332,7 @@ export async function linkIncoming(
   id: number,
   body: z.infer<typeof incomingLinkSchema>,
   now: Date,
+  candidateOnly = false,
 ): Promise<void> {
   await db.transaction(async (tx) => {
     await acquireRebuildLockShared(tx);
@@ -342,6 +345,22 @@ export async function linkIncoming(
       await lockLead(tx, leadId);
     if (await operationExists(tx, body.operation_id)) return;
     const message = await lockedMessage(tx, id, body.expected_revision);
+    if (candidateOnly) {
+      if (message.links.length)
+        conflict('This message is already linked. Refresh the conversation.');
+      const identity = await incomingMessageIdentity(tx, id);
+      if (!identity?.from || !identity.receivedAt) validation('Message identity is unavailable.');
+      const possibilities = await findReplyCandidates(tx, {
+        mailboxId: identity.mailboxId,
+        from: identity.from,
+        subject: identity.subject ?? '',
+        receivedAt: identity.receivedAt,
+      });
+      if (
+        !possibilities.some((c) => c.lead_id === body.lead_id && c.campaign_id === body.campaign_id)
+      )
+        conflict('The suggested lead is no longer eligible. Refresh the message.');
+    }
     const { lead } = await leadProtected(tx, body.lead_id);
     const candidates = await linkCandidates(tx, body.campaign_id, lead.email);
     if (!candidates.some((c) => c.lead_id === lead.id))

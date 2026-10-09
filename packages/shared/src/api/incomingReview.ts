@@ -40,6 +40,23 @@ export const incomingRowSchema = z
   })
   .strict();
 export type IncomingReviewRow = z.infer<typeof incomingRowSchema>;
+export const replyCandidateSchema = z.object({
+  lead_id: z.number(),
+  enrollment_id: z.number(),
+  campaign_id: z.number(),
+  name: z.string(),
+  email: z.string(),
+  company: z.string().nullable(),
+  campaign_name: z.string(),
+  sending_state: sendingStateSchema,
+  campaign_status: z.string(),
+  delayed_until: isoDateTime.nullable(),
+  sent_message_id: z.string(),
+  sent_at: isoDateTime,
+  subject_match: z.boolean(),
+  company_match: z.boolean(),
+});
+export type ReplyCandidate = z.infer<typeof replyCandidateSchema>;
 export const incomingRowsQuerySchema = pageQuerySchema.extend({
   campaign_id: z.coerce.number().int().positive().optional(),
   search: z.string().max(200).optional(),
@@ -88,6 +105,34 @@ export const incomingMessageSchema = z
   })
   .strict();
 export type IncomingReviewMessage = z.infer<typeof incomingMessageSchema>;
+export const possibleReplySchema = z.object({
+  message: incomingMessageSchema,
+  candidates: z.array(replyCandidateSchema),
+});
+export const reviewQueueItemSchema = z.discriminatedUnion('kind', [
+  z.object({ kind: z.literal('lead'), row: incomingRowSchema }),
+  z.object({ kind: z.literal('possible'), item: possibleReplySchema }),
+]);
+export type ReviewQueueItem = z.infer<typeof reviewQueueItemSchema>;
+export const reviewQueueSchema = z.object({
+  items: z.array(reviewQueueItemSchema),
+  total: z.number(),
+  lead_count: z.number(),
+  possible_count: z.number(),
+});
+export const reviewSummarySchema = z.object({
+  lead_count: z.number(),
+  possible_count: z.number(),
+  mailboxes: z.array(
+    z.object({
+      id: z.number(),
+      name: z.string(),
+      status: z.string(),
+      last_checked_at: isoDateTime.nullable(),
+      stale: z.boolean(),
+    }),
+  ),
+});
 export const incomingMessageListSchema = listOf(incomingMessageSchema);
 export const incomingContextSchema = z.object({
   row: incomingRowSchema.nullable(),

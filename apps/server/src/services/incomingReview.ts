@@ -29,6 +29,7 @@ import {
   MAX_INCOMING_CONTENT_BYTES,
 } from '../poller/reviewText';
 import { classify } from '../poller/classifier';
+import { findReplyCandidates, saveReplyCandidates } from '../db/repos/replyCandidatesRepo';
 
 /** Production intake. Meaning beyond explicit opt-out belongs to the operator. */
 export async function ingestIncoming(
@@ -87,6 +88,7 @@ export async function ingestIncoming(
       match = await matchIncoming(tx, m);
     }
     const id = await nextIncomingMessageId(tx);
+    const candidates = !bounce && !match.leadId ? await findReplyCandidates(tx, m) : [];
     const extracted = extractNewText(m.bodyText);
     // HTML quote structures that the plain-text converter cannot preserve are uncertain.
     const unsafeQuotes =
@@ -133,17 +135,18 @@ export async function ingestIncoming(
       snippet: null,
       bodyText: null,
     });
-    // Keep only identity metadata for unrelated mailbox traffic; the operator's
-    // Unibox is limited to confidently matched lead conversations.
+    // Save bodies only for confirmed conversations and qualifying suggestions;
+    // other mailbox traffic retains identity metadata.
     await saveContent(
       tx,
       id,
-      !bounce && !match.leadId
+      !bounce && !match.leadId && !candidates.length
         ? { ...m, bodyText: '', bodyHtml: undefined, contentStatus: 'unavailable' }
         : m,
-      !bounce && !match.leadId ? '' : extracted.newText,
-      !bounce && !match.leadId ? '' : extracted.quotedText,
+      !bounce && !match.leadId && !candidates.length ? '' : extracted.newText,
+      !bounce && !match.leadId && !candidates.length ? '' : extracted.quotedText,
     );
+    await saveReplyCandidates(tx, id, candidates);
     await recordLocation(tx, m, id);
     const events: DomainEvent[] = legacyBounce?.events ?? [];
     if (!bounce && match.leadId) {

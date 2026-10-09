@@ -12,7 +12,13 @@ import {
 } from '@/components/ui/dialog';
 import { useIncomingMutation } from '@/api/mutations/incoming-review';
 
-export function RecoverContent({ message }: { message: IncomingReviewMessage }) {
+export function RecoverContent({
+  message,
+  label = 'Recover full content',
+}: {
+  message: IncomingReviewMessage;
+  label?: string;
+}) {
   const [snapshot, setSnapshot] = useState<IncomingReviewMessage | null>(null);
   const mutation = useIncomingMutation();
   if (message.capture_status === 'captured' || message.capture_status === 'deleted') return null;
@@ -26,7 +32,7 @@ export function RecoverContent({ message }: { message: IncomingReviewMessage }) 
           setSnapshot(message);
         }}
       >
-        Recover full content
+        {label}
       </Button>
       <Dialog
         open={snapshot !== null}

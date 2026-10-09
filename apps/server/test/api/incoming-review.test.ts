@@ -9,6 +9,7 @@ import { seedMailboxes } from '../helpers/db';
 import { buildEvent } from '../../src/domain/events';
 import { ingestIncoming } from '../../src/services/incomingReview';
 import { readMessage } from '../../src/db/repos/incomingReviewRepo';
+import { scanPossibleReplies } from '../../src/services/possibleReplies';
 import {
   cleanAcknowledgedContent,
   reapplyDeletionManifest,
@@ -120,6 +121,292 @@ it('company suggestions recognize subdomains without affecting sending state', a
   expect((await h.pool.query('SELECT review_hold_ids FROM enrollments ORDER BY id')).rows).toEqual(
     before,
   );
+});
+const possibleIncoming = async () => {
+  await h.pool.query("UPDATE leads SET email='bruce@brucejay.com',first_name='Bruce' WHERE id=1");
+  await h.pool.query("UPDATE sent_messages SET rendered_subject='bruce: repairs into accounting'");
+  await ingestIncoming(
+    h.services.db,
+    h.services.store,
+    incoming({
+      uid: 2,
+      messageId: '<possible@aol.com>',
+      from: 'bja6@aol.com',
+      subject: 'Auto Response: Re: bruce: repairs into accounting',
+      headers: { 'auto-submitted': 'auto-replied' },
+    }),
+    h.clock.now(),
+  );
+  return (
+    await h.pool.query("SELECT id FROM incoming_messages WHERE message_id='<possible@aol.com>'")
+  ).rows[0].id as number;
+};
+it('surfaces Bruce through subject evidence without changing history or holds, and confirms atomically', async () => {
+  const before = (await h.pool.query('SELECT count(*) FROM events')).rows[0].count;
+  const id = await possibleIncoming();
+  expect((await h.pool.query('SELECT count(*) FROM events')).rows[0].count).toBe(before);
+  const q = await h.inject({
+    method: 'GET',
+    url: '/api/v1/unibox/review-queue/v1?view=needs_review&search=Bruce',
+  });
+  expect(q.statusCode).toBe(200);
+  expect(q.json().possible_count).toBe(1);
+  const item = q.json().items.find((i: { kind: string }) => i.kind === 'possible').item;
+  expect(item.candidates).toHaveLength(1);
+  expect(item.candidates[0]).toMatchObject({
+    enrollment_id: 1,
+    subject_match: true,
+    company_match: false,
+  });
+  expect(item.message.body_text).toBeNull();
+  expect(
+    (await h.inject({ method: 'GET', url: `/api/v1/unibox/messages/${id}/possible-detail` })).json()
+      .message.body_text,
+  ).toContain('Away for three days');
+  const op = randomUUID();
+  const payload = { operation_id: op, expected_revision: 0, lead_id: 1, campaign_id: 1 };
+  expect(
+    (
+      await h.inject({
+        method: 'POST',
+        url: `/api/v1/unibox/messages/${id}/confirm-candidate`,
+        payload,
+      })
+    ).statusCode,
+  ).toBe(200);
+  const after = (await h.pool.query('SELECT count(*) FROM events')).rows[0].count;
+  expect(Number(after)).toBe(Number(before) + 2);
+  expect(
+    (
+      await h.inject({
+        method: 'POST',
+        url: `/api/v1/unibox/messages/${id}/confirm-candidate`,
+        payload,
+      })
+    ).statusCode,
+  ).toBe(200);
+  expect((await h.pool.query('SELECT count(*) FROM events')).rows[0].count).toBe(after);
+  expect((await readMessage(h.services.db, id))?.automation).toBe('automatic');
+  expect((await readMessage(h.services.db, id))?.authorship).toBe('unsure');
+  expect(
+    (await h.inject({ method: 'GET', url: '/api/v1/unibox/review-queue/v1?view=all' })).json()
+      .possible_count,
+  ).toBe(0);
+  expect(
+    (await h.pool.query("SELECT count(*) FROM events WHERE type='incoming_authorship_confirmed'"))
+      .rows[0].count,
+  ).toBe(0);
+});
+it('dismissal and exact-revision Undo change visibility only and reject stale decisions', async () => {
+  const id = await possibleIncoming();
+  const before = (await h.pool.query('SELECT count(*) FROM events')).rows[0].count;
+  const visibility = async (action: string, revision: number) =>
+    h.inject({
+      method: 'POST',
+      url: `/api/v1/unibox/messages/${id}/candidate-visibility`,
+      payload: { action, expected_revision: revision, operation_id: randomUUID() },
+    });
+  expect((await visibility('dismiss', 0)).statusCode).toBe(200);
+  expect(
+    (
+      await h.inject({ method: 'GET', url: '/api/v1/unibox/review-queue/v1?view=acknowledged' })
+    ).json().possible_count,
+  ).toBe(1);
+  expect((await visibility('return', 0)).statusCode).toBe(409);
+  expect((await visibility('return', 1)).statusCode).toBe(200);
+  expect(
+    (
+      await h.inject({
+        method: 'GET',
+        url: '/api/v1/unibox/review-queue/v1?view=needs_review&sending_state=suppressed',
+      })
+    ).json().possible_count,
+  ).toBe(1);
+  expect((await h.pool.query('SELECT count(*) FROM events')).rows[0].count).toBe(before);
+});
+it('metadata scan is explicit, content-free and preserves deleted content through duplicates', async () => {
+  const id = await possibleIncoming();
+  await h.pool.query('DELETE FROM incoming_reply_candidates');
+  const before = (await h.pool.query('SELECT count(*) FROM events')).rows[0].count;
+  expect(await scanPossibleReplies(h.services.db, h.clock.now())).toEqual([
+    { message_id: id, enrollment_ids: [1] },
+  ]);
+  expect((await h.pool.query('SELECT count(*) FROM incoming_reply_candidates')).rows[0].count).toBe(
+    0,
+  );
+  await scanPossibleReplies(h.services.db, h.clock.now(), true, [id]);
+  const savedEvidence = (await h.pool.query('SELECT * FROM incoming_reply_candidates')).rows;
+  await h.pool.query(
+    await readFile(path.join(MIGRATIONS_DIR, '0033_incoming_reply_candidates.down.sql'), 'utf8'),
+  );
+  await h.pool.query(
+    await readFile(path.join(MIGRATIONS_DIR, '0033_incoming_reply_candidates.up.sql'), 'utf8'),
+  );
+  expect((await h.pool.query('SELECT * FROM incoming_reply_candidates')).rows).toEqual(
+    savedEvidence,
+  );
+  await deleteStoredContent(
+    h.services.db,
+    id,
+    { operation_id: randomUUID(), expected_revision: 0 },
+    h.clock.now(),
+    manifest,
+  );
+  await ingestIncoming(
+    h.services.db,
+    h.services.store,
+    incoming({
+      uid: 3,
+      folder: 'Archive',
+      messageId: '<possible@aol.com>',
+      from: 'bja6@aol.com',
+      subject: 'Auto Response: Re: bruce: repairs into accounting',
+    }),
+    h.clock.now(),
+  );
+  expect((await readMessage(h.services.db, id))?.capture_status).toBe('deleted');
+  expect((await h.pool.query('SELECT count(*) FROM incoming_reply_candidates')).rows[0].count).toBe(
+    1,
+  );
+  expect((await h.pool.query('SELECT count(*) FROM events')).rows[0].count).toBe(before);
+});
+it('reports mailbox check age and authentication failure', async () => {
+  await h.pool.query("UPDATE mailboxes SET status='auth_failed',last_successful_poll_at=$1", [
+    new Date(h.clock.now().getTime() - 601000),
+  ]);
+  const r = await h.inject({ method: 'GET', url: '/api/v1/unibox/review-summary/v1' });
+  expect(r.statusCode).toBe(200);
+  expect(r.json().mailboxes[0]).toMatchObject({ status: 'auth_failed', stale: true });
+});
+it('serializes confirmation against dismissal and rejects stale candidate selections', async () => {
+  const id = await possibleIncoming();
+  const before = (await h.pool.query('SELECT count(*) FROM sent_messages')).rows[0].count;
+  expect(
+    (
+      await h.inject({
+        method: 'POST',
+        url: `/api/v1/unibox/messages/${id}/confirm-candidate`,
+        payload: { operation_id: randomUUID(), expected_revision: 0, lead_id: 1, campaign_id: 2 },
+      })
+    ).statusCode,
+  ).toBe(409);
+  const responses = await Promise.all([
+    h.inject({
+      method: 'POST',
+      url: `/api/v1/unibox/messages/${id}/confirm-candidate`,
+      payload: { operation_id: randomUUID(), expected_revision: 0, lead_id: 1, campaign_id: 1 },
+    }),
+    h.inject({
+      method: 'POST',
+      url: `/api/v1/unibox/messages/${id}/candidate-visibility`,
+      payload: { operation_id: randomUUID(), expected_revision: 0, action: 'dismiss' },
+    }),
+  ]);
+  expect(responses.map((r) => r.statusCode).sort()).toEqual([200, 409]);
+  expect((await h.pool.query('SELECT count(*) FROM sent_messages')).rows[0].count).toBe(before);
+});
+it('ranks Lori company-and-subject evidence, keeps multiple people unresolved and honors send boundaries', async () => {
+  await h.pool.query("UPDATE leads SET email='lori@dennisrealty.com',first_name='Lori' WHERE id=1");
+  await h.pool.query(
+    "UPDATE sent_messages SET rendered_subject='lori / owner onboarding handoffs'",
+  );
+  await h.pool.query(
+    "INSERT INTO leads(email,tier) VALUES('other@dennisrealty.com','B'),('uncontacted@dennisrealty.com','B')",
+  );
+  await h.pool.query(
+    "INSERT INTO enrollments(lead_id,campaign_id,personalization_mode,enrolled_at) VALUES(2,1,'template_auto',now()),(3,1,'template_auto',now())",
+  );
+  await h.pool.query(
+    "INSERT INTO sent_messages(message_id,enrollment_id,lead_id,mailbox_id,step_no,content_hash,rendered_subject,rendered_body_text,email_format,sent_at) VALUES('<other@app.example>',3,2,1,1,'h1','A different specific subject','Saved body','plain_text',$1)",
+    [new Date(h.clock.now().getTime() - 1000)],
+  );
+  const before = (await h.pool.query('SELECT count(*) FROM events')).rows[0].count;
+  await ingestIncoming(
+    h.services.db,
+    h.services.store,
+    incoming({
+      uid: 2,
+      messageId: '<lori@dennisrealty.com>',
+      from: 'pmaccounts@dennisrealty.com',
+      subject: 'Out of Office Re: lori / owner onboarding handoffs',
+    }),
+    h.clock.now(),
+  );
+  const q = (
+    await h.inject({
+      method: 'GET',
+      url: '/api/v1/unibox/review-queue/v1?view=all&campaign_id=1&search=pmaccounts',
+    })
+  ).json();
+  expect(q.possible_count).toBe(1);
+  expect(q.items[0].item.candidates.map((c: { lead_id: number }) => c.lead_id)).toEqual([1, 2]);
+  expect(q.items[0].item.candidates[0]).toMatchObject({ subject_match: true, company_match: true });
+  expect((await h.pool.query('SELECT count(*) FROM events')).rows[0].count).toBe(before);
+  // A received message cannot be suggested from future, older-than-30-day or other-mailbox sends.
+  const { findReplyCandidates } = await import('../../src/db/repos/replyCandidatesRepo');
+  expect(
+    await findReplyCandidates(h.services.db, {
+      mailboxId: 2,
+      from: 'pmaccounts@dennisrealty.com',
+      subject: 'lori / owner onboarding handoffs',
+      receivedAt: h.clock.now(),
+    }),
+  ).toEqual([]);
+  expect(
+    await findReplyCandidates(h.services.db, {
+      mailboxId: 1,
+      from: 'pmaccounts@dennisrealty.com',
+      subject: 'lori / owner onboarding handoffs',
+      receivedAt: new Date(h.clock.now().getTime() - 2 * 86400000),
+    }),
+  ).toEqual([]);
+  expect(
+    await findReplyCandidates(h.services.db, {
+      mailboxId: 1,
+      from: 'pmaccounts@dennisrealty.com',
+      subject: 'lori / owner onboarding handoffs',
+      receivedAt: new Date(h.clock.now().getTime() + 31 * 86400000),
+    }),
+  ).toEqual([]);
+});
+it('retains unresolved candidate content, cleans dismissed content and never auto-suppresses a different-address opt-out', async () => {
+  const id = await possibleIncoming();
+  const later = new Date(h.clock.now().getTime() + 31 * 86400000);
+  await cleanAcknowledgedContent(h.services.db, later, manifest);
+  expect((await readMessage(h.services.db, id))?.capture_status).toBe('captured');
+  await h.inject({
+    method: 'POST',
+    url: `/api/v1/unibox/messages/${id}/candidate-visibility`,
+    payload: { action: 'dismiss', operation_id: randomUUID(), expected_revision: 0 },
+  });
+  await cleanAcknowledgedContent(h.services.db, later, manifest);
+  expect((await readMessage(h.services.db, id))?.capture_status).toBe('deleted');
+  await ingestIncoming(
+    h.services.db,
+    h.services.store,
+    incoming({
+      uid: 4,
+      messageId: '<optout@aol.com>',
+      from: 'bja6@aol.com',
+      subject: 'Re: bruce: repairs into accounting',
+      bodyText: 'unsubscribe',
+      bodyHtml: undefined,
+    }),
+    h.clock.now(),
+  );
+  const optoutId = (
+    await h.pool.query("SELECT id FROM incoming_messages WHERE message_id='<optout@aol.com>'")
+  ).rows[0].id;
+  expect(
+    (
+      await h.inject({
+        method: 'POST',
+        url: `/api/v1/unibox/messages/${optoutId}/confirm-candidate`,
+        payload: { operation_id: randomUUID(), expected_revision: 0, lead_id: 1, campaign_id: 1 },
+      })
+    ).statusCode,
+  ).toBe(200);
+  expect((await h.pool.query('SELECT count(*) FROM suppressions')).rows[0].count).toBe(0);
 });
 it('groups rows and returns complete reader content and immutable sent context', async () => {
   expect((await rows()).map((r) => r.sending_state)).toEqual(['held', 'held']);

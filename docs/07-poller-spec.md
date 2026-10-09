@@ -1,5 +1,25 @@
 # Poller Spec — IMAP Fetch, Classification, Threading, STOP Detection, Idempotency
 
+## Possible replies policy (0033)
+
+After confident matching fails, compare accepted sends on the receiving mailbox before receipt,
+within 30 days, against non-erased leads. A specific normalized subject or registrable business
+domain creates evidence only. Shared-provider domains cannot create company evidence. Rank both
+evidence types, then subject, then company; latest preceding send and enrollment ID break ties.
+Deduplicate each lead/campaign. Preserve paused/terminal candidates without reactivating them.
+See docs/26 for exact subject normalization and minimum specificity.
+
+Capture removable content for qualifying candidates as well as confident conversations. Other
+unmatched traffic remains metadata-only. Suggestions append no holds/stops/suppression or human
+metrics; the operator confirms the lead before existing audited linking applies review holds.
+Different-address opt-out wording cannot automatically suppress the original lead.
+Duplicates preserve canonical identity and deletion tombstones. Startup/migration do not scan
+historical messages or fetch bodies. The CLI scan is explicit, metadata-only and bounded to 30 days.
+
+Five-minute polling remains unchanged. Foreground Unibox checks every 30 seconds and displays
+mailbox freshness; more than ten minutes without a successful check is warned, not guaranteed
+delivery latency. Candidate items use Unibox counts only, without new alert notifications.
+
 ## Prospective human-review intake (2026-10-08; local candidate)
 
 Production intake uses review policy; the historical terminal/company policy is selectable only

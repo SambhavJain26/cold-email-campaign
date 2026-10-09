@@ -26,6 +26,7 @@ import { TransportChip } from './transport-chip';
 import { AlertsBell } from './alerts-bell';
 import { UpdateAvailableBanner } from './update-available-banner';
 import { Button } from '@/components/ui/button';
+import { useReviewSummary } from '@/api/queries/incoming-review';
 import {
   DropdownMenu,
   DropdownMenuTrigger,
@@ -46,6 +47,19 @@ const NAV: Array<{ to: string; icon: LucideIcon; label: string }> = [
   { to: '/settings', icon: Settings, label: 'Settings' },
   { to: '/system', icon: MonitorCog, label: 'System' },
 ];
+function UniboxCount() {
+  const summary = useReviewSummary({ view: 'needs_review', page: 1, per_page: 25 });
+  const count = summary.data ? summary.data.lead_count + summary.data.possible_count : 0;
+  return count ? (
+    <span
+      aria-hidden="true"
+      title={`${count} Unibox items need review`}
+      className="ml-1 rounded-full bg-muted px-1.5 text-xs tabular-nums"
+    >
+      {count}
+    </span>
+  ) : null;
+}
 
 function PrimaryNavigation({ onNavigate }: { onNavigate?: () => void }) {
   return (
@@ -67,6 +81,7 @@ function PrimaryNavigation({ onNavigate }: { onNavigate?: () => void }) {
               >
                 <Icon aria-hidden className="size-4 shrink-0" />
                 {entry.label}
+                {entry.to === '/unibox' && <UniboxCount />}
               </NavLink>
             </li>
           );
@@ -101,6 +116,7 @@ function DesktopNavigation() {
             }
           >
             {entry.label}
+            {entry.to === '/unibox' && <UniboxCount />}
           </NavLink>
         );
       })}

@@ -74,3 +74,53 @@ dismissal/Undo/retention, filters/counts/freshness and keyboard/mobile.
 ## Change log
 
 2026-10-10: specification saved before implementation; live operations remain separate.
+
+## Operator workflow prepared for a future authorized rollout
+
+The metadata scanner is `apps/server/src/services/possibleRepliesCli.ts`. It defaults
+to preview and reads only database metadata. With an explicitly selected database,
+run `npx tsx apps/server/src/services/possibleRepliesCli.ts` to preview the last 30 days.
+`--apply` persists candidate evidence; repeated invocations do not duplicate candidates.
+Optional `--message=2140 --message=2135` restricts it to the two reported messages.
+Never infer production authorization from these instructions. Migration and worker
+startup do not invoke the scanner.
+
+After separately authorized deployment and metadata application, Bruce and Lori can
+be repaired independently in Unibox:
+
+1. Verify message 2140 is from `bja6@aol.com` and proposes Bruce, enrollment 83.
+   Verify message 2135 is from `pmaccounts@dennisrealty.com` and proposes Lori,
+   enrollment 217. Confirm receipt times, receiving mailbox and preceding-send evidence.
+2. Use **Recover message** for each selected message. Recovery reads without changing
+   mailbox flags and checks identity; failure leaves the metadata item visible. Deleted
+   content remains unavailable.
+3. Confirm the person in the dialog only after checking both sender and lead addresses.
+   This applies normal review holds, preserves any delay and does not resume campaigns.
+   Linking is possible even if recovery failed.
+4. Verify both messages now appear in their lead conversations, with their previous
+   automation labels and unchanged authorship. Check actual states of all affected
+   unfinished enrollments and unchanged accepted-send count.
+
+No bulk confirmation, sender-alias learning, body recovery, historical-event replay,
+campaign change or outbound test is part of this workflow. Other older candidates
+remain metadata-only until individually recovered by the operator.
+
+## API and storage implementation notes
+
+Migration `0033` adds candidate evidence keyed by canonical message/enrollment, referring
+to its accepted sent-message evidence. Its down operation preserves data for rollback.
+No existing outreach event or projection vocabulary is changed.
+
+- `GET /api/v1/unibox/review-queue/v1`: explicit `lead` and `possible` variants,
+  campaign/mailbox/search/view filters, mixed pagination and separate counts.
+- `GET /api/v1/unibox/review-summary/v1`: filtered counts and mailbox freshness.
+- `GET /api/v1/unibox/messages/:id/possible-detail`: full removable content and candidates.
+- `POST /api/v1/unibox/messages/:id/confirm-candidate`: existing audited linking with
+  a fresh mailbox/time/evidence check under the lead/message locks.
+- `POST /api/v1/unibox/messages/:id/candidate-visibility`: dismiss/return, exact message
+  revision and operation ID; append-only activity facts, no outreach events.
+
+Existing rows, linking, recovery, acknowledgement and content deletion APIs remain
+compatible. The queue omits bodies; the selected reader loads content. The Unibox
+navigation count refreshes in the foreground without emitting notifications. Undo uses
+the revision produced by its dismissal and refuses to override a later decision.

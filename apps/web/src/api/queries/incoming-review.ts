@@ -6,10 +6,35 @@ import {
   incomingMessageListSchema,
   incomingMessageSchema,
   incomingRetentionSchema,
+  reviewQueueSchema,
+  reviewSummarySchema,
+  possibleReplySchema,
   type IncomingReviewRow,
 } from '@coldemail/shared';
 import { apiFetch } from '../client';
 import { POLL } from '../queryClient';
+
+export function useReviewQueue(query: Record<string, string | number | undefined>) {
+  return useQuery({
+    queryKey: ['incoming-review', 'queue', query],
+    queryFn: () => apiFetch('/unibox/review-queue/v1', reviewQueueSchema, { query }),
+    refetchInterval: POLL.operational,
+  });
+}
+export function useReviewSummary(query: Record<string, string | number | undefined>) {
+  return useQuery({
+    queryKey: ['incoming-review', 'summary', query],
+    queryFn: () => apiFetch('/unibox/review-summary/v1', reviewSummarySchema, { query }),
+    refetchInterval: POLL.operational,
+  });
+}
+export function usePossibleDetail(id: number) {
+  return useQuery({
+    queryKey: ['incoming-review', 'possible', id],
+    queryFn: () => apiFetch(`/unibox/messages/${id}/possible-detail`, possibleReplySchema),
+    refetchInterval: POLL.operational,
+  });
+}
 
 export function useIncomingRows(query: Record<string, string | number | undefined>) {
   return useQuery({

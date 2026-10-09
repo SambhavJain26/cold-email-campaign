@@ -15,6 +15,9 @@ import {
   okResponseSchema,
   idParamSchema,
   pageQuerySchema,
+  reviewQueueSchema,
+  reviewSummarySchema,
+  possibleReplySchema,
 } from '@coldemail/shared';
 import type { AppServices } from '../composition';
 import type { ZodTypeProvider } from './plugins/zodCompilers';
@@ -42,6 +45,12 @@ import {
   markUnrelated,
   suppressLinkedAddress,
 } from '../services/incomingReviewActions';
+import {
+  reviewQueue,
+  reviewSummary,
+  possibleDetail,
+  candidateVisibility,
+} from '../services/possibleReplies';
 
 export async function incomingReviewRoutes(
   app: FastifyInstance,
@@ -49,6 +58,49 @@ export async function incomingReviewRoutes(
 ): Promise<void> {
   const r = app.withTypeProvider<ZodTypeProvider>();
   const { db, store, clock } = services;
+  r.get(
+    '/unibox/review-queue/v1',
+    { schema: { querystring: incomingRowsQuerySchema, response: { 200: reviewQueueSchema } } },
+    async (req) => reviewQueue(db, { ...req.query, now: clock.now() }),
+  );
+  r.get(
+    '/unibox/review-summary/v1',
+    { schema: { querystring: incomingRowsQuerySchema, response: { 200: reviewSummarySchema } } },
+    async (req) => reviewSummary(db, { ...req.query, now: clock.now() }, clock.now()),
+  );
+  r.get(
+    '/unibox/messages/:id/possible-detail',
+    { schema: { params: idParamSchema, response: { 200: possibleReplySchema } } },
+    async (req) => possibleDetail(db, req.params.id),
+  );
+  r.post(
+    '/unibox/messages/:id/confirm-candidate',
+    {
+      schema: {
+        params: idParamSchema,
+        body: incomingLinkSchema,
+        response: { 200: okResponseSchema },
+      },
+    },
+    async (req) => {
+      await linkIncoming(db, store, req.params.id, req.body, clock.now(), true);
+      return { ok: true } as const;
+    },
+  );
+  r.post(
+    '/unibox/messages/:id/candidate-visibility',
+    {
+      schema: {
+        params: idParamSchema,
+        body: reviewMutationSchema.extend({ action: z.enum(['dismiss', 'return']) }).strict(),
+        response: { 200: okResponseSchema },
+      },
+    },
+    async (req) => {
+      await candidateVisibility(db, req.params.id, req.body, clock.now());
+      return { ok: true } as const;
+    },
+  );
   r.post(
     '/unibox/lead-action',
     {

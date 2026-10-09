@@ -14,7 +14,12 @@ import {
 import { CollectionPagination } from '@/components/shared/collection-pagination';
 import { useCampaigns } from '@/api/queries/campaigns';
 import { useMailboxes } from '@/api/queries/mailboxes';
-import { useIncomingRows, useIncomingRetention } from '@/api/queries/incoming-review';
+import {
+  useReviewQueue,
+  useReviewSummary,
+  useIncomingRetention,
+} from '@/api/queries/incoming-review';
+import { PossibleReader, candidateReason } from './possible-reader';
 import { useIncomingMutation } from '@/api/mutations/incoming-review';
 import { cn } from '@/lib/utils';
 import { formatDateTime } from '@/lib/format';
@@ -42,11 +47,12 @@ export default function UniboxPage() {
   const [state, setState] = useState('all');
   const [page, setPage] = useState(1);
   const [selected, setSelected] = useState<IncomingReviewRow | null>(null);
+  const [possibleId, setPossibleId] = useState<number | null>(null);
   const [retentionOpen, setRetentionOpen] = useState(false);
   const campaigns = useCampaigns();
   const mailboxes = useMailboxes();
   const acknowledgeRef = useRef<(() => void) | null>(null);
-  const rows = useIncomingRows({
+  const query = {
     view: view === 'acknowledged' ? 'acknowledged' : view === 'all' ? 'all' : 'needs_review',
     campaign_id: campaign === 'all' ? undefined : Number(campaign),
     search: search || undefined,
@@ -54,11 +60,14 @@ export default function UniboxPage() {
     sending_state: state === 'all' ? undefined : state,
     page,
     per_page: 25,
-  });
+  };
+  const rows = useReviewQueue(query);
+  const summary = useReviewSummary(query);
   const active = selected
-    ? (rows.data?.items.find(
-        (r) => r.lead_id === selected.lead_id && r.campaign_id === selected.campaign_id,
-      ) ?? selected)
+    ? (rows.data?.items
+        .flatMap((item) => (item.kind === 'lead' ? [item.row] : []))
+        .find((r) => r.lead_id === selected.lead_id && r.campaign_id === selected.campaign_id) ??
+      selected)
     : null;
   const selectedCampaign = active && campaigns.data?.items.find((c) => c.id === active.campaign_id);
   const currentRow =
@@ -67,10 +76,11 @@ export default function UniboxPage() {
     setView(next);
     setPage(1);
     setSelected(null);
+    setPossibleId(null);
   };
   const busy = rows.isPending;
   const error = rows.error;
-  const readerOpen = !!currentRow;
+  const readerOpen = !!currentRow || possibleId !== null;
   return (
     <div className="flex h-full min-h-0 flex-col gap-4 p-3 sm:p-5">
       <header className="flex flex-wrap items-center justify-between gap-3">
@@ -84,6 +94,34 @@ export default function UniboxPage() {
           Content retention
         </Button>
       </header>
+      <p className="text-sm" role="status">
+        {rows.data?.lead_count ?? 0} lead conversations · {rows.data?.possible_count ?? 0} possible
+        replies
+      </p>
+      <div
+        className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted-foreground"
+        aria-label="Mailbox check status"
+      >
+        {summary.data?.mailboxes.map((m) => (
+          <p
+            key={m.id}
+            className={m.stale || m.status === 'auth_failed' ? 'text-destructive' : undefined}
+          >
+            {m.name}:{' '}
+            {m.last_checked_at
+              ? `last checked ${formatDateTime(m.last_checked_at)}`
+              : 'not checked yet'}
+            {m.status === 'auth_failed'
+              ? ' · Authentication failed'
+              : m.stale
+                ? ' · Mailbox checks delayed'
+                : ''}
+          </p>
+        ))}
+        {summary.error && (
+          <p role="alert">Mailbox check status unavailable: {summary.error.message}</p>
+        )}
+      </div>
       <div className={cn('space-y-3', readerOpen && 'hidden lg:block')}>
         <div className="flex flex-wrap gap-2">
           <Select
@@ -92,6 +130,7 @@ export default function UniboxPage() {
               setCampaign(value);
               setPage(1);
               setSelected(null);
+              setPossibleId(null);
             }}
           >
             <SelectTrigger aria-label="Unibox campaign" className="w-full sm:w-60">
@@ -172,6 +211,12 @@ export default function UniboxPage() {
             </SelectContent>
           </Select>
         </div>
+        {state !== 'all' && (
+          <p className="text-xs text-muted-foreground">
+            The sending-state filter applies to confirmed lead conversations. Possible replies
+            remain visible until you confirm the lead.
+          </p>
+        )}
         <div
           className="flex max-w-full gap-1 overflow-x-auto pb-1"
           role="group"
@@ -224,57 +269,94 @@ export default function UniboxPage() {
               No leads in this view. Use All to find acknowledged or resolved items.
             </p>
           )}
-          {rows.data?.items.map((row) => (
-            <div
-              key={`${row.lead_id}:${row.campaign_id}`}
-              className={cn(
-                'flex items-start gap-1 border-b border-border p-3 hover:bg-muted',
-                active?.lead_id === row.lead_id &&
-                  active.campaign_id === row.campaign_id &&
-                  'bg-muted',
-              )}
-            >
-              <button
-                type="button"
-                aria-label={`Open ${row.name || row.email} in ${row.campaign_name}`}
-                className="min-w-0 flex-1 space-y-1 rounded-md p-1 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                onClick={() => {
-                  setSelected(row);
-                }}
-              >
-                <p className="truncate text-sm font-semibold">{row.name || row.email}</p>
-                <p className="truncate text-xs text-muted-foreground">
-                  {row.email} · {row.company || 'No company'}
-                </p>
-                <p className="truncate text-xs text-muted-foreground">{row.campaign_name}</p>
-                <p className="break-words text-sm">{sendingLabel(row)}</p>
-                <p className="text-xs text-muted-foreground">
-                  {row.message_count} message(s) · {row.unacknowledged_count} unacknowledged
-                </p>
-                {row.latest_received_at && (
-                  <p className="text-xs text-muted-foreground">
-                    {formatDateTime(row.latest_received_at)}
+          {rows.data?.items.map((entry) => {
+            if (entry.kind === 'possible')
+              return (
+                <button
+                  key={`possible:${entry.item.message.id}`}
+                  className="block w-full space-y-1 border-b border-border p-4 text-left hover:bg-muted focus-visible:ring-2 focus-visible:ring-ring"
+                  onClick={() => {
+                    setSelected(null);
+                    setPossibleId(entry.item.message.id);
+                  }}
+                >
+                  <p className="break-words text-sm font-semibold">
+                    Possible reply · {entry.item.message.from_address}
                   </p>
+                  <p className="truncate text-sm">{entry.item.message.subject}</p>
+                  {entry.item.candidates.length === 1 && (
+                    <p className="truncate text-xs">
+                      {entry.item.candidates[0]!.name || entry.item.candidates[0]!.email} ·{' '}
+                      {entry.item.candidates[0]!.campaign_name}
+                    </p>
+                  )}
+                  <p className="text-xs text-muted-foreground">
+                    {entry.item.candidates.length === 1
+                      ? candidateReason(entry.item.candidates[0]!)
+                      : `${entry.item.candidates.length} possible leads — choose the correct person`}
+                  </p>
+                  <p className="text-xs text-muted-foreground">
+                    {entry.item.message.received_at
+                      ? formatDateTime(entry.item.message.received_at)
+                      : 'Receipt time unavailable'}
+                  </p>
+                </button>
+              );
+            const row = entry.row;
+            return (
+              <div
+                key={`${row.lead_id}:${row.campaign_id}`}
+                className={cn(
+                  'flex items-start gap-1 border-b border-border p-3 hover:bg-muted',
+                  active?.lead_id === row.lead_id &&
+                    active.campaign_id === row.campaign_id &&
+                    'bg-muted',
                 )}
-              </button>
-              <Button
-                size="icon"
-                variant="ghost"
-                aria-label={`Acknowledge ${row.name || row.email} in ${row.campaign_name}`}
-                disabled={row.sending_state === 'held' || row.unacknowledged_count === 0}
-                onClick={() => {
-                  if (active?.lead_id === row.lead_id && active.campaign_id === row.campaign_id)
-                    acknowledgeRef.current?.();
-                  else {
-                    setSelected(row);
-                    toast.info('Review the messages in the reader before acknowledging them.');
-                  }
-                }}
               >
-                ✓
-              </Button>
-            </div>
-          ))}
+                <button
+                  type="button"
+                  aria-label={`Open ${row.name || row.email} in ${row.campaign_name}`}
+                  className="min-w-0 flex-1 space-y-1 rounded-md p-1 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                  onClick={() => {
+                    setSelected(row);
+                    setPossibleId(null);
+                  }}
+                >
+                  <p className="truncate text-sm font-semibold">{row.name || row.email}</p>
+                  <p className="truncate text-xs text-muted-foreground">
+                    {row.email} · {row.company || 'No company'}
+                  </p>
+                  <p className="truncate text-xs text-muted-foreground">{row.campaign_name}</p>
+                  <p className="break-words text-sm">{sendingLabel(row)}</p>
+                  <p className="text-xs text-muted-foreground">
+                    {row.message_count} message(s) · {row.unacknowledged_count} unacknowledged
+                  </p>
+                  {row.latest_received_at && (
+                    <p className="text-xs text-muted-foreground">
+                      {formatDateTime(row.latest_received_at)}
+                    </p>
+                  )}
+                </button>
+                <Button
+                  size="icon"
+                  variant="ghost"
+                  aria-label={`Acknowledge ${row.name || row.email} in ${row.campaign_name}`}
+                  disabled={row.sending_state === 'held' || row.unacknowledged_count === 0}
+                  onClick={() => {
+                    if (active?.lead_id === row.lead_id && active.campaign_id === row.campaign_id)
+                      acknowledgeRef.current?.();
+                    else {
+                      setSelected(row);
+                      setPossibleId(null);
+                      toast.info('Review the messages in the reader before acknowledging them.');
+                    }
+                  }}
+                >
+                  ✓
+                </Button>
+              </div>
+            );
+          })}
           <div className="p-3">
             <CollectionPagination
               page={page}
@@ -284,7 +366,17 @@ export default function UniboxPage() {
             />
           </div>
         </section>
-        {currentRow ? (
+        {possibleId !== null ? (
+          <PossibleReader
+            key={possibleId}
+            id={possibleId}
+            onBack={() => setPossibleId(null)}
+            onConfirmed={() => {
+              setPossibleId(null);
+              setSelected(null);
+            }}
+          />
+        ) : currentRow ? (
           <ReviewReader
             key={`${currentRow.lead_id}:${currentRow.campaign_id}`}
             row={currentRow}

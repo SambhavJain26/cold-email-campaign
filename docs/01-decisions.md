@@ -1,5 +1,20 @@
 # Decision Register
 
+## Possible replies (2026-10-10; approved local implementation)
+
+Docs/26 expands the simplified Unibox prospectively: bounded subject/company evidence can
+surface alternate-address messages as Possible reply items inside Needs review/All/Acknowledged.
+It does not restore a general unmatched mailbox inbox or Reminders. Keep candidate evidence
+separate from confirmed links; suggestions never hold or suppress leads. Only explicit operator
+confirmation invokes audited linking and normal review holds. Different-address wording cannot
+automatically opt out the original lead. No alias learning or inferred human-reply credit.
+
+Accepted defaults: preceding 30 days on the receiving mailbox, specific subject or business
+domain evidence with shared-provider exclusions, one physical item regardless of candidate count,
+Unibox counts only, selective bounded content capture and explicit metadata-only historical scan.
+Dismissal/Undo changes visibility only; unresolved content remains protected from retention.
+Bruce/Lori recovery/linking remains separately authorized, as do deployment and live operations.
+
 ## Incoming human-review redesign (2026-10-08; authorized local implementation)
 
 The approved specification in docs/24 supersedes pre-real-domain AA–AC, operator-workflow BB,

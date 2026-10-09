@@ -240,6 +240,7 @@ async function migrationGate(): Promise<void> {
     'incoming_message_links',
     'incoming_message_activity',
     'incoming_message_locations',
+    'incoming_reply_candidates',
   ];
   const snapshot = async () =>
     Promise.all(
@@ -258,7 +259,7 @@ async function migrationGate(): Promise<void> {
   for (const m of migrations) await pool.query(m.upSql);
   assert.deepEqual(await snapshot(), before);
   await verify();
-  console.log('0028–0032 preservation down/apply drill passed on populated state.');
+  console.log('0028–0033 preservation down/apply drill passed on populated state.');
 }
 try {
   if (mode === 'seed') await seed();

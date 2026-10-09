@@ -42,6 +42,43 @@ test('grouped lead list, complete reader, independent labels and sent conversati
   });
   await page.screenshot({ path: test.info().outputPath('unibox-desktop.png'), fullPage: true });
 });
+test('possible reply confirms the selected person, preserving automation and review actions', async ({
+  page,
+}) => {
+  await login(page);
+  await navigate(page, 'Unibox');
+  await expect(page.getByText('1 lead conversations · 1 possible replies')).toBeVisible();
+  await page.getByRole('button', { name: /Possible reply · other@apex.example/ }).click();
+  await expect(page.getByRole('region', { name: 'Possible reply reader' })).toContainText(
+    'has not been held because of this message',
+  );
+  await page.getByRole('button', { name: 'Confirm this is Alex Rivera' }).click();
+  await expect(page.getByRole('dialog')).toContainText('other@apex.example');
+  await expect(page.getByRole('dialog')).toContainText('alex@apex.example');
+  await page.getByRole('button', { name: 'Confirm', exact: true }).click();
+  await expect(page.getByText('1 lead conversations · 0 possible replies')).toBeVisible();
+  await page.getByRole('button', { name: 'Open Alex Rivera in Golden Pass 1' }).click();
+  await expect(page.getByRole('region', { name: 'Message reader' })).toContainText(
+    'Held for review',
+  );
+  await expect(page.getByLabel('All incoming messages (3)')).toBeVisible();
+});
+test('possible reply dismissal and Undo only change its review visibility on mobile', async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await login(page);
+  await navigate(page, 'Unibox');
+  await page.getByRole('button', { name: /Possible reply · other@apex.example/ }).click();
+  await page.getByRole('button', { name: 'Not a campaign reply', exact: true }).click();
+  await expect(page.getByText('Removed from Needs review. Sending state unchanged.')).toBeVisible();
+  await page.getByRole('button', { name: 'Undo', exact: true }).click();
+  await expect(page.getByText('Returned to Needs review')).toBeVisible();
+  await page.getByRole('button', { name: 'Back to list', exact: true }).click();
+  await expect(
+    page.getByRole('button', { name: /Possible reply · other@apex.example/ }),
+  ).toBeVisible();
+});
 test('automatic separate response keeps a review hold and does not gain human credit', async ({
   page,
 }) => {

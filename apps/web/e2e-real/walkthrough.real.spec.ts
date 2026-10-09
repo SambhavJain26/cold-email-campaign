@@ -151,8 +151,9 @@ test('real backend: import → enroll → advance → reply/STOP → tag → met
   await navigate(page, 'Unibox');
   await page.getByRole('button', { name: /Open Alice in/ }).click();
   await expect(page.getByRole('region', { name: 'Message reader' })).toContainText('set up a call');
-  await page.getByLabel('Confirm authorship for analytics').click();
-  await page.getByRole('option', { name: 'Human', exact: true }).click();
+  await page.getByText('Email details', { exact: true }).click();
+  await page.getByLabel('Who wrote this email?').click();
+  await page.getByRole('option', { name: 'A person', exact: true }).click();
   await page.getByLabel('Confirmed reply sentiment').click();
   await page.getByRole('option', { name: 'Positive', exact: true }).click();
   await expect(page.getByLabel('Confirmed reply sentiment')).toContainText('Positive');

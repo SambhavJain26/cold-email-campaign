@@ -1,5 +1,22 @@
 # API Contract — v1 (frozen seam between backend and frontend)
 
+## Possible replies additive contract (0033)
+
+Existing `/unibox/rows` remains compatible. New authenticated routes:
+
+| Route | Contract |
+| --- | --- |
+| `GET /unibox/review-queue/v1` | Existing row filters; paginated `lead`/`possible` variants, total, lead_count and possible_count. Each unresolved canonical message counts once. State filters affect only confirmed rows. |
+| `GET /unibox/review-summary/v1` | Filtered counts and mailbox last_checked_at/status/stale (>10 minutes or no successful check). |
+| `GET /unibox/messages/:id/possible-detail` | Existing message plus ranked candidate evidence and current sending states; full content loaded only in the reader. |
+| `POST /unibox/messages/:id/confirm-candidate` | Existing incomingLinkSchema, revalidated evidence under locks; audited linking/holds, no sends or inferred human credit. |
+| `POST /unibox/messages/:id/candidate-visibility` | operation_id, expected_revision, action `dismiss`/`return`; append-only visibility facts without outreach effects. |
+
+Recovery/deletion use existing message routes and tombstones. Candidate evidence is distinct
+from confirmed links. Neither suggestion creation nor dismissal appends domain reply/control
+events. Expected revisions reject later message decisions; duplicate operation IDs are idempotent.
+See docs/26 for the bounded historical metadata scan and separately authorized repair workflow.
+
 ## Protected follow-up capacity (2026-10-09 local implementation)
 
 Capacity response fields are unchanged. Counts cover healthy mailboxes' local-day reservations

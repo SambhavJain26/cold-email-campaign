@@ -17,7 +17,7 @@ test('real review policy: away hold, confirmed Continue, acknowledgement, fresh 
         variants: [
           {
             label: 'A',
-            subject_template: 'A question',
+            subject_template: 'Owner onboarding handoffs',
             body_template: 'Hello {{first_name}}',
             active: true,
           },
@@ -133,4 +133,36 @@ test('real review policy: away hold, confirmed Continue, acknowledgement, fresh 
     delayed_until: '2099-01-12T10:00:00.000Z',
   });
   await api(page, 'patch', `/api/v1/campaigns/${campaign.id}`, { status: 'paused' });
+  await api(page, 'post', '/api/v1/system/script-inbound', {
+    mailbox_id: 1,
+    kind: 'spam',
+    from: 'alternate@different.com',
+    subject: 'Re: Owner onboarding handoffs',
+    body_text: 'Please check back next week.',
+  });
+  await advanceClock(page, { minutes: 10 });
+  await page.reload();
+  await page.getByRole('button', { name: /Possible reply · alternate@different.com/ }).click();
+  await expect(page.getByRole('region', { name: 'Possible reply reader' })).toContainText(
+    'has not been held because of this message',
+  );
+  const possibleRows = await (
+    await page.request.get(`/api/v1/unibox/rows?campaign_id=${campaign.id}&view=all`)
+  ).json();
+  expect(possibleRows.items[0].sending_state).toBe('delayed');
+  await page.getByRole('button', { name: 'Confirm this is Casey' }).click();
+  await page.getByRole('button', { name: 'Confirm', exact: true }).click();
+  await expect(page.getByRole('dialog')).toBeHidden();
+  await expect
+    .poll(async () => {
+      const q = await (
+        await page.request.get(`/api/v1/unibox/rows?campaign_id=${campaign.id}&view=all`)
+      ).json();
+      return q.items[0].sending_state;
+    })
+    .toBe('held');
+  const heldRows = await (
+    await page.request.get(`/api/v1/unibox/rows?campaign_id=${campaign.id}&view=all`)
+  ).json();
+  expect(heldRows.items[0].delayed_until).toBe('2099-01-12T10:00:00.000Z');
 });

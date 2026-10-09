@@ -1,5 +1,27 @@
 # Cold Email Campaign — Complete User Manual
 
+## Possible replies in Unibox
+
+An alternate sender address may appear as **Possible reply** in Needs review, All or
+Acknowledged. The application shows a suggestion when its subject matches specific outreach
+or its business domain matches a contacted lead on the receiving mailbox within 30 days.
+It has not linked that message or held a sequence because of the suggestion.
+
+Read the message and check the suggested person, both addresses and campaign. Choose a person
+when several are suggested, then use **Confirm this is [name]**. Confirmation links the message
+and holds unfinished sequences for that lead; it does not send an email. Use the normal lead
+conversation actions afterwards. Automatic messages do not gain human-reply credit from linking.
+
+Use **Not a campaign reply** to dismiss unrelated suggestions, with immediate Undo. All and
+Acknowledged retain access; **Return to review** changes visibility only. Missing older text has
+a **Recover message** button. Recovery needs the original mailbox copy and cannot restore content
+intentionally deleted from the application. Delete stored content leaves evidence and sending state.
+
+The Unibox count includes conversations and possible replies, without extra notifications.
+Mailbox last-check times show whether polling is fresh; more than ten minutes old or an
+authentication failure needs attention. Five-minute polling plus foreground refresh usually
+surfaces replies promptly, but mailbox/provider failures can delay them.
+
 ## Follow-up priority (2026-10-09 local candidate; not deployed)
 
 Emails 2–5 receive priority over first emails. Within follow-ups, the oldest effective due time

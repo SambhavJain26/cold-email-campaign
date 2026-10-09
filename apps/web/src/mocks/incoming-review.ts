@@ -111,7 +111,118 @@ const page = (items: unknown[], url: URL) => {
     per_page: size,
   };
 };
+const possible = (message: IncomingReviewMessage) => ({
+  message,
+  candidates: [
+    {
+      enrollment_id: row.enrollment_id,
+      lead_id: row.lead_id,
+      campaign_id: row.campaign_id,
+      name: row.name,
+      email: row.email,
+      company: row.company,
+      campaign_name: row.campaign_name,
+      campaign_status: row.campaign_status,
+      sending_state: row.sending_state,
+      delayed_until: row.delayed_until,
+      sent_message_id: '<mock-out@example>',
+      sent_at: NOW,
+      subject_match: false,
+      company_match: true,
+    },
+  ],
+});
+const queue = (url: URL) => {
+  updateCounts();
+  const view = url.searchParams.get('view') ?? 'needs_review';
+  const campaign = url.searchParams.get('campaign_id');
+  const search = (url.searchParams.get('search') ?? '').toLowerCase();
+  const visible = (acknowledged: boolean) =>
+    view === 'all' || (view === 'acknowledged' ? acknowledged : !acknowledged);
+  const campaignFits = !campaign || Number(campaign) === row.campaign_id;
+  const leadItems =
+    campaignFits &&
+    visible(row.unacknowledged_count === 0) &&
+    `${row.name} ${row.email} ${row.company}`.toLowerCase().includes(search) &&
+    (!url.searchParams.get('sending_state') ||
+      row.sending_state === url.searchParams.get('sending_state'))
+      ? [{ kind: 'lead', row }]
+      : [];
+  const possibleItems = campaignFits
+    ? messages
+        .filter(
+          (m) =>
+            !m.links.length &&
+            visible(m.acknowledged) &&
+            `${m.from_address} ${m.subject} ${row.name} ${row.email} ${row.company}`
+              .toLowerCase()
+              .includes(search),
+        )
+        .map((m) => ({ kind: 'possible', item: possible(m) }))
+    : [];
+  return {
+    ...page([...leadItems, ...possibleItems], url),
+    lead_count: leadItems.length,
+    possible_count: possibleItems.length,
+  };
+};
 export const incomingReviewHandlers: RequestHandler[] = [
+  http.get(`${base}/review-queue/v1`, ({ request }) => reply(queue(new URL(request.url)))),
+  http.get(`${base}/review-summary/v1`, ({ request }) => {
+    const q = queue(new URL(request.url));
+    return reply({
+      lead_count: q.lead_count,
+      possible_count: q.possible_count,
+      mailboxes: [{ id: 1, name: 'Mailbox 1', status: 'ok', last_checked_at: NOW, stale: false }],
+    });
+  }),
+  http.get(`${base}/messages/:id/possible-detail`, ({ params }) =>
+    reply(possible(messages.find((m) => m.id === Number(params.id))!)),
+  ),
+  http.post(`${base}/messages/:id/candidate-visibility`, async ({ request, params }) => {
+    if (!allowed()) return failure('authentication required', 401);
+    const body = (await request.json()) as {
+      expected_revision: number;
+      action: 'dismiss' | 'return';
+    };
+    const m = messages.find((m) => m.id === Number(params.id))!;
+    if (m.revision !== body.expected_revision || m.links.length)
+      return failure('The message changed. Refresh before deciding.');
+    m.acknowledged = body.action === 'dismiss';
+    m.linking_status = m.acknowledged ? 'unrelated' : 'needs_linking';
+    m.revision++;
+    return reply({ ok: true });
+  }),
+  http.post(`${base}/messages/:id/confirm-candidate`, async ({ request, params }) => {
+    if (!allowed()) return failure('authentication required', 401);
+    const body = incomingLinkSchema.parse(await request.json());
+    const m = messages.find((m) => m.id === Number(params.id))!;
+    if (
+      m.revision !== body.expected_revision ||
+      m.links.length ||
+      body.lead_id !== row.lead_id ||
+      body.campaign_id !== row.campaign_id
+    )
+      return failure('The message changed. Refresh before deciding.');
+    m.links = [
+      {
+        lead_id: row.lead_id,
+        campaign_id: row.campaign_id,
+        enrollment_id: row.enrollment_id,
+        matching_method: 'manual',
+      },
+    ];
+    m.linking_status = 'linked';
+    m.primary_enrollment_id = row.enrollment_id;
+    m.relationship = 'separate';
+    m.acknowledged = false;
+    m.revision++;
+    row.sending_state = 'held';
+    row.hold_ids = [9001];
+    row.revision++;
+    updateCounts();
+    return reply({ ok: true });
+  }),
   http.post('/api/v1/unibox/:id/reminders', async ({ request, params }) => {
     if (!allowed()) return failure('authentication required', 401);
     const body = (await request.json()) as { due_date: string; note?: string };
