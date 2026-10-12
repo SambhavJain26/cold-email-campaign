@@ -1,5 +1,15 @@
 # Frontend Screens — Low-Level Spec
 
+## Sequence business-day timing (2026-10-12)
+
+The builder exposes elapsed/business-day selection, a five-email 0/3/14/4/4 preset,
+and explicit pending-date preview/apply. Existing five-step copy/IDs remain intact.
+Preview shows shared campaign states and each enrollment's old/new/effective dates in
+the resolved send timezone, held state, exclusions and blockers. Apply is disabled until
+the server accepts paused-state/evidence guards; errors require a fresh preview where
+state changed. Copy/name/structure edits must be saved before timing-only preview.
+Save sequence never silently recalculates pending dates. See docs/27 and the API contract.
+
 ## Current Unibox candidate (2026-10-08; local only)
 
 The earlier Human/Auto card and disposition workflow below is legacy. The current candidate uses

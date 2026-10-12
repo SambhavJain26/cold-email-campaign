@@ -1,5 +1,86 @@
 # Local canary runbook (B8.3-local) — two-week validation on throwaway Gmail
 
+## 2026-10-12 IST business-day scheduling — implemented and verified locally
+
+Implemented the approved docs/27 plan on local `canary`. Opt-in `business_days` mode
+counts Monday–Friday after the preceding actual accepted-send date, with recipient-state
+timezone mapping and mailbox/global fallbacks. Positive waits become eligible at exact
+local midnight, including DST and millisecond source timestamps; zero waits and legacy
+elapsed-day arithmetic are unchanged. The editable preset is 0/3/14/4/4, new/continue/
+new/continue/continue. First-email enrollment and retry backoff remain unchanged; accepted
+retries anchor subsequent scheduling. Restoration retains explicit checkpoints and uses
+the same helper only for its missing-checkpoint fallback. Legacy elapsed definitions omit
+the new runtime mode property so historical manual-Stop fingerprints remain compatible.
+
+Authenticated schedule preview lists shared campaign states and named prospects' old/new/
+effective due dates, timezones, holds and exclusions. Apply rechecks fingerprints under
+sequence/campaign/identity/mailbox locks, requires paused affected campaigns, verifies exact
+accepted-message snapshots, and atomically applies timing and dates through EventStore.
+Held/delayed/snoozed follow-ups retain their barriers and progress. Openers, terminal/full
+sequences, suppressed/erased leads and pending retries are excluded. Missing evidence and
+stale decisions reject all writes. Overdue dates remain overdue. Ordinary saves do not
+silently recalculate pending dates; omitted mode preserves the saved mode.
+
+Each changed date appends identity-reducer `schedule_recalculated` facts. Immutable apply
+receipts also cover zero-enrollment changes and repeated/concurrent requests. Sequences with
+receipts cannot be deleted. Migration 0034 defaults all existing sequences to elapsed mode,
+rewrites no waits/dates, and preserves policy/facts/receipts on down/apply. Local `app_rw`
+receipt privileges verify SELECT/INSERT true and UPDATE/DELETE false.
+
+Verified gates (DB-backed Vitest invocations run serially):
+
+| Gate | Result |
+| --- | --- |
+| Typecheck / lint / format check / production web build | Pass |
+| Full unit + web, one worker | 497/497 |
+| Final focused weekday + sequence components | 23/23 |
+| Full API | 191/191 |
+| Final schedule + existing sequence API, including zero-row receipts/deletion guard | 19/19 |
+| Relevant scheduler/priority/range/review/provider/rebuild integration suites | 63/63 |
+| GreenMail | 31/31 |
+| Locked golden cohort and expectations, unchanged | Exactly 47/47 |
+| Existing Sequence mock browser suite | 5/5 |
+| New real-backend browser preview/apply, mock transport, final mobile replay | 1/1 |
+| 0034 preservation down/apply with applied policy and receipts | Pass |
+| Populated canonical dry-run and self-check | Nine enrollments, zero differences; clean |
+| Separate scheduling/history/retry/hold/delay assertions before and after scratch restore | Pass |
+
+The real sender test proves a Tuesday afternoon acceptance produces Friday-midnight
+eligibility and permits Friday-morning sending, preserving windows, caps, review holds,
+5–10 minute pacing and Thread 2 separation. Weekday tests include the corrected Tuesday
+example, Friday/weekend sources, holiday counting, month/year boundaries, timezone fallback,
+spring/autumn DST, zero waits and fractional accepted timestamps. API coverage includes
+stale proposals, active shared campaigns, missing snapshots, duplicate steps, concurrent
+idempotency, accepted retries, terminal exclusions, authentication, legacy fallback and
+exact manual restoration checkpoints.
+
+The disposable `coldemail_schedule_verification` drill has nine enrollments and nine saved
+synthetic accepted messages. Exactly five dates change; only five scheduling facts are
+appended. Existing enrollment fields (masking only changed next_send_at), all preceding
+events and every immutable sent/retry snapshot match. Canonical CLI reports
+`checked 9 enrollments — 0 diff(s)`; self-check CLI reports no violations. The existing
+projection audit excludes next_send_at, so independent date assertions are also required
+and pass for both source and `coldemail_schedule_restore` databases.
+
+Backup `backups/business-days/verified.dump`: 150,801 bytes, 380 validated catalog lines,
+SHA-256 `bbc16d88cda7055cbd815a1fb6e5fe5bd0de726ecb07702cffabc0e10840a80d`.
+The latest independent local deletion manifest is empty because this fresh drill has no
+content-deletion history. Restore reconciliation explicitly reapplies zero intents before
+the final canonical dry-run; scratch scheduling assertions and self-check pass. No API or
+workers serve the scratch restore. Final mobile preview screenshot inspected:
+`backups/business-days-preview-mobile.png`; prospect name/address, timezone, dates and
+actions are readable. Existing pg query deprecation, mock error-proxy and bundle-size
+warnings are non-blocking. One initial API attempt under concurrent compiler/UI load hit
+the existing 30-second setup budget and was interrupted; the complete serial rerun with
+an explicit 120-second hook budget and unchanged expectations passed all 191 tests.
+
+Local test transport is MockTransport/GreenMail only. No production connection, push,
+deployment, live preset/recalculation, campaign/settings mutation, enrollment, resume,
+historical recovery/linking or external outbound mail occurred. Deployment and live
+schedule application require their own fresh paused-state/shared-reference checks,
+validated backups, reviewed preview and explicit authorization. Leave campaigns paused
+after those separately authorized steps; old ignoring-mode/audit rollback code is unsafe.
+
 ## 2026-10-10 IST Bruce/Lori — explicitly authorized bounded repair completed
 
 The operator explicitly authorized bringing back and linking Bruce/Lori only. Fresh checks

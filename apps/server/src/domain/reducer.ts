@@ -76,6 +76,8 @@ export function applyEvent(
   ctx: SequenceShape,
 ): EnrollmentSnapshot {
   switch (e.type) {
+    case 'schedule_recalculated':
+      return s; // scheduling-only audit; no lifecycle, review or engagement change
     case 'incoming_review_required':
       return isTerminal(s.state)
         ? s

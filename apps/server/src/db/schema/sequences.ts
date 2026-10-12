@@ -16,6 +16,10 @@ const tz = (name: string) => timestamp(name, { withTimezone: true, mode: 'date' 
 export const sequences = pgTable('sequences', {
   id: bigint('id', { mode: 'number' }).generatedAlwaysAsIdentity().primaryKey(),
   name: text('name').notNull(),
+  waitDayMode: text('wait_day_mode')
+    .$type<'elapsed_days' | 'business_days'>()
+    .notNull()
+    .default('elapsed_days'),
   stopOnReply: boolean('stop_on_reply').notNull().default(true),
   stopOnHardBounce: boolean('stop_on_hard_bounce').notNull().default(true),
   stopOnUnsubscribe: boolean('stop_on_unsubscribe').notNull().default(true),

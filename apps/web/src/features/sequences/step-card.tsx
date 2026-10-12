@@ -35,6 +35,7 @@ import { TemplateField } from './template-field';
 export function StepCard({
   step,
   stepNo,
+  waitDayMode = 'elapsed_days',
   canRemove,
   saveErrors,
   onChange,
@@ -43,6 +44,7 @@ export function StepCard({
 }: {
   step: DraftStep;
   stepNo: number;
+  waitDayMode?: 'elapsed_days' | 'business_days';
   canRemove: boolean;
   saveErrors: Map<string, string>;
   onChange: (next: DraftStep) => void;
@@ -123,7 +125,9 @@ export function StepCard({
             }
           />
           <span className="text-xs text-muted-foreground">
-            {stepNo === 1 ? 'days after enrollment' : 'days after the previous step'}
+            {stepNo === 1
+              ? 'days after enrollment'
+              : `${waitDayMode === 'business_days' ? 'business days' : 'elapsed days'} after the previous email`}
           </span>
         </div>
         <Button

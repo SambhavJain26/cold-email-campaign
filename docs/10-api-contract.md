@@ -263,3 +263,24 @@ never activates, enrolls, or sends. Request and response schemas are unchanged.
 | commit import / bulk-tier / settings / mailboxes / sequences | none (not lead-history facts) |
 
 Scheduler and poller event emissions: docs/06 §5, docs/07 §2.
+
+## Business-day schedule contract addition (2026-10-12)
+
+Sequence reads include `wait_day_mode: elapsed_days|business_days`. Creates default to
+elapsed days; PATCH omission preserves the stored mode. Existing `wait_days` values stay
+editable. Normal saves do not recalculate pending dates.
+
+Authenticated POST `/sequences/:id/schedule/preview`: body `{wait_day_mode, steps}`;
+steps are `{step_no, wait_days (0..90), in_thread}` with the exact saved step set and
+zero first-step wait. Response `{fingerprint,campaigns,rows,can_apply,blockers}`.
+Rows contain `enrollment_id,lead_id,lead_name,lead_email,campaign_id,step_no,old_due_at,new_due_at,effective_due_at,
+timezone,source_send_id,held,exclusion,error`; timestamps/evidence/text can be null.
+Campaigns contain `id,name,status`. Effective timestamp incorporates delay/snooze;
+held rows remain held, and campaign pause still prevents sending.
+
+Authenticated POST `/sequences/:id/schedule/apply`: same body plus 64-character SHA-256
+`fingerprint` and UUID `operation_id`; response `{sequence,changed}`. Apply rechecks the
+preview and paused campaign guards under locks, writes the policy and date changes
+atomically, and persists an immutable idempotency receipt. Conflict 409 means preview
+again or resolve campaign/evidence blockers; no partial writes or sends occur.
+Wrong sequence 404; malformed input 400. See docs/27 for exclusions and compatibility.

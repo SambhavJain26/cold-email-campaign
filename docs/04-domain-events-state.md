@@ -174,3 +174,11 @@ CLI: `npm run rebuild-projections [-- --campaign <id>] [--dry-run]`
 ```
 
 The weekly `rebuild-compare` job (B7) runs `--dry-run` and emits a `selfcheck_drift` alert on any diff. **Rebuild equivalence is also a Stage-B1 test:** run a scenario live, snapshot projections, wipe them, rebuild, assert identical.
+
+## Scheduling audit addition (2026-10-12)
+
+`schedule_recalculated` is enrollment/campaign-scoped and records old/new due timestamps,
+source accepted-send event ID, timezone, wait_day_mode, wait_days and UUID operation_id.
+It is append-only and has identity reducer semantics: no progress, hold/revision, sentiment,
+milestone or lifecycle change. EventStore applies its next_send_at patch in the same transaction.
+The historical replay audit still excludes scheduling timestamps; check these independently.

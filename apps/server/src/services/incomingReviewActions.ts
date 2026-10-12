@@ -19,6 +19,10 @@ import { listByEnrollments } from '../db/repos/eventsRepo';
 import { getCampaign } from '../db/repos/campaignsRepo';
 import { loadSequenceDef } from '../db/repos/sequencesRepo';
 import { stepOf } from '../domain/sequence';
+import { followupDueAt } from '../scheduler/followupDue';
+import { resolveTimezone } from '../scheduler/tzmap';
+import { getMailbox } from '../db/repos/mailboxesRepo';
+import { getSettings } from '../db/repos/settingsRepo';
 import { findSentByMessageIds } from '../db/repos/sentMessagesRepo';
 import { getManualDraft } from '../db/repos/manualDraftsRepo';
 import { buildEvent, type DomainEvent } from '../domain/events';
@@ -203,8 +207,17 @@ export async function applyReviewAction(
         const lastSent = history.filter((h) => h.type === 'sent').at(-1);
         const lastBounce = history.filter((h) => h.type === 'soft_bounce').at(-1);
         let due = e.resumeDueAt;
-        if (!due && lastSent)
-          due = new Date(lastSent.occurredAt.getTime() + step.waitDays * 86400000);
+        if (!due && lastSent) {
+          const mailbox =
+            lastSent.type === 'sent' ? await getMailbox(tx, lastSent.mailboxId) : undefined;
+          const settings = await getSettings(tx);
+          due = followupDueAt(
+            lastSent.occurredAt,
+            step.waitDays,
+            seq!.waitDayMode ?? 'elapsed_days',
+            resolveTimezone(lead.state, mailbox?.timezone || settings.defaultTimezone),
+          );
+        }
         if (lastBounce && lastSent && lastBounce.occurredAt > lastSent.occurredAt) {
           // Retry restoration must have the immutable body originally accepted.
           const { sentMessageForStep } = await import('../db/repos/sentMessagesRepo');

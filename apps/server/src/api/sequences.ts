@@ -15,6 +15,10 @@ import {
   validateTemplateResponseSchema,
   type SequenceDto,
   type SequenceWriteBody,
+  scheduleProposalSchema,
+  schedulePreviewSchema,
+  scheduleApplyBodySchema,
+  scheduleApplyResponseSchema,
 } from '@coldemail/shared';
 import type { AppServices } from '../composition';
 import {
@@ -46,12 +50,14 @@ import { spintaxRng } from '../render/seed';
 import type { RenderContext } from '../render/types';
 import { conversationRootStepNo } from '../domain/sequence';
 import { AppError } from './errors';
+import { previewScheduleChange, applyScheduleChange } from '../services/sequenceSchedule';
 import type { ZodTypeProvider } from './plugins/zodCompilers';
 
 function toSequenceDto(n: NestedSequence): SequenceDto {
   return {
     id: n.sequence.id,
     name: n.sequence.name,
+    wait_day_mode: n.sequence.waitDayMode,
     stop_on_reply: n.sequence.stopOnReply,
     stop_on_hard_bounce: true,
     stop_on_unsubscribe: true,
@@ -128,6 +134,41 @@ export async function sequencesRoutes(app: FastifyInstance, services: AppService
   const r = app.withTypeProvider<ZodTypeProvider>();
   const { db, renderer } = services;
 
+  r.post(
+    '/sequences/:id/schedule/preview',
+    {
+      schema: {
+        params: idParamSchema,
+        body: scheduleProposalSchema,
+        response: { 200: schedulePreviewSchema },
+      },
+    },
+    async (req) => previewScheduleChange(db, req.params.id, req.body),
+  );
+  r.post(
+    '/sequences/:id/schedule/apply',
+    {
+      schema: {
+        params: idParamSchema,
+        body: scheduleApplyBodySchema,
+        response: { 200: scheduleApplyResponseSchema },
+      },
+    },
+    async (req) => {
+      const result = await applyScheduleChange(
+        db,
+        services.store,
+        req.params.id,
+        req.body,
+        services.clock.now(),
+      );
+      return {
+        sequence: toSequenceDto((await getSequenceNested(db, req.params.id))!),
+        changed: result.changed,
+      };
+    },
+  );
+
   r.get('/sequences', { schema: { response: { 200: sequencesListResponseSchema } } }, async () => ({
     items: (await listSequencesNested(db)).map(toSequenceDto),
   }));
@@ -139,6 +180,7 @@ export async function sequencesRoutes(app: FastifyInstance, services: AppService
       assertTemplatesParse(req.body);
       const id = await createSequence(db, {
         name: req.body.name,
+        waitDayMode: req.body.wait_day_mode,
         variableDefaults: req.body.variable_defaults,
         stopOnReply: req.body.stop_on_reply,
         steps: toSaveSteps(req.body).map(({ id: _new, ...s }) => s),
@@ -166,6 +208,7 @@ export async function sequencesRoutes(app: FastifyInstance, services: AppService
         req.params.id,
         {
           name: req.body.name,
+          waitDayMode: req.body.wait_day_mode,
           variableDefaults: req.body.variable_defaults,
           stopOnReply: req.body.stop_on_reply,
           steps: toSaveSteps(req.body),

@@ -192,7 +192,22 @@ const addressSuppressed_ = base.extend({
   }),
 });
 
+const scheduleRecalculated_ = base.extend({
+  type: z.literal('schedule_recalculated'),
+  enrollmentId: id,
+  campaignId: id,
+  attributes: z.object({
+    old_due_at: z.string().datetime(),
+    new_due_at: z.string().datetime(),
+    source_send_id: id,
+    timezone: z.string().min(1),
+    wait_day_mode: z.enum(['elapsed_days', 'business_days']),
+    wait_days: z.number().int().min(0),
+    operation_id: z.string().uuid(),
+  }),
+});
 export const domainEventSchema = z.discriminatedUnion('type', [
+  scheduleRecalculated_,
   reviewRequired_,
   reviewDecided_,
   sequenceStopped_,
@@ -226,6 +241,8 @@ type Input<S extends z.ZodType> = z.input<S>;
 
 /** The constructors. Usage: buildEvent.sent({...}) — throws on malformed input. */
 export const buildEvent = {
+  scheduleRecalculated: (a: Omit<Input<typeof scheduleRecalculated_>, 'type'>) =>
+    scheduleRecalculated_.parse({ ...a, type: 'schedule_recalculated' }),
   reviewRequired: (a: Omit<Input<typeof reviewRequired_>, 'type'>) =>
     reviewRequired_.parse({ ...a, type: 'incoming_review_required' }),
   reviewDecided: (a: Omit<Input<typeof reviewDecided_>, 'type'>) =>

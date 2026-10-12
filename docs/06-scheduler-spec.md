@@ -254,3 +254,13 @@ failure status.
 ## 8. Tests (B3 — via scenario runner, docs/13)
 
 Golden cohort full-pipeline (flagship); never-burst after a 14 h VirtualClock gap; midnight cap reset; window enforcement; soft-retry ≤2 then BOUNCED; Part-11 auto-pause; failed-mailbox rotation for unassigned work with started threads pinned; pace-gap statistics; rotation balance.
+
+## Opt-in business-day timing (2026-10-12)
+
+Sequence elapsed-day mode retains exact `acceptedAt + waitDays * 86400000` behavior.
+Business-day mode excludes the actual accepted-send date, counts Monday–Friday in the
+existing recipient-or-mailbox send timezone, and returns target local midnight for positive
+waits. Holidays count; zero wait is immediate. The preset is 0/3/14/4/4 with Thread 2 starting
+at Email 3. Pacing, due follow-up priority, capacities, windows and review barriers still
+control actual sends. Retries retain their existing backoff; next-step timing anchors to the
+accepted retry. Existing pending dates change only through explicit preview/apply. See docs/27.

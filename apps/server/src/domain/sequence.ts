@@ -24,6 +24,7 @@ export interface SequenceStepDef {
 
 export interface SequenceDef {
   id: number;
+  waitDayMode?: 'elapsed_days' | 'business_days';
   /** Omitted only by legacy/static providers; those retain the safe default. */
   stopOnReply?: boolean;
   steps: SequenceStepDef[]; // ordered by stepNo

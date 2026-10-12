@@ -24,6 +24,10 @@ import {
 import { PreviewPanel, type PreviewTarget } from './preview-panel';
 import { StepCard } from './step-card';
 import { useUnsavedChanges } from '@/lib/unsaved-changes';
+import { Field, FieldLabel, FieldDescription } from '@/components/ui/field';
+import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
+import { ScheduleChange } from './schedule-change';
+import { businessDayPreset } from './draft';
 
 /** F4.2/F4.3/F4.4 — the sequence builder (docs/12 §5). Mounted with `key={sequence.id}`
  *  so a different sequence remounts with fresh state initializers (no setState-in-effect). */
@@ -43,6 +47,26 @@ export function SequenceBuilder({ sequence }: { sequence?: SequenceDto }) {
   const saving = create.isPending || update.isPending;
   const blockers = draftBlockers(draft);
   const dirty = !draftsEqual(draft, savedDraft);
+  const proposal = {
+    wait_day_mode: draft.wait_day_mode,
+    steps: draft.steps.map((s, i) => ({
+      step_no: i + 1,
+      wait_days: s.wait_days,
+      in_thread: s.in_thread,
+    })),
+  };
+  const timingOnly = draftsEqual(
+    {
+      ...draft,
+      wait_day_mode: savedDraft.wait_day_mode,
+      steps: draft.steps.map((s, i) => ({
+        ...s,
+        wait_days: savedDraft.steps[i]?.wait_days ?? s.wait_days,
+        in_thread: savedDraft.steps[i]?.in_thread ?? s.in_thread,
+      })),
+    },
+    savedDraft,
+  );
   useUnsavedChanges(dirty);
 
   const edit = (next: SequenceDraft) => setDraft(next);
@@ -156,6 +180,60 @@ export function SequenceBuilder({ sequence }: { sequence?: SequenceDto }) {
 
       <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_360px]">
         <div className="space-y-4">
+          <section className="flex flex-col gap-3 rounded-lg border border-border p-4">
+            <Field>
+              <FieldLabel>Follow-up timing</FieldLabel>
+              <RadioGroup
+                value={draft.wait_day_mode}
+                onValueChange={(value) =>
+                  edit({ ...draft, wait_day_mode: value as SequenceDraft['wait_day_mode'] })
+                }
+              >
+                <div className="flex items-center gap-2">
+                  <RadioGroupItem id="elapsed-days" value="elapsed_days" />
+                  <Label htmlFor="elapsed-days">Elapsed days (24-hour periods)</Label>
+                </div>
+                <div className="flex items-center gap-2">
+                  <RadioGroupItem id="business-days" value="business_days" />
+                  <Label htmlFor="business-days">Business days (Monday–Friday)</Label>
+                </div>
+              </RadioGroup>
+              <FieldDescription>
+                Business-day follow-ups are eligible from the start of the target weekday. Mailbox
+                pacing, caps and queue priority control the send time. Holidays count as weekdays.
+              </FieldDescription>
+            </Field>
+            <Button
+              variant="outline"
+              disabled={sequence ? draft.steps.length !== 5 : draft.steps.length > 5}
+              onClick={() => edit(businessDayPreset(draft, !sequence))}
+            >
+              Use five-email business-day preset
+            </Button>
+            <p className="text-xs text-muted-foreground">
+              Preset: 0 / 3 / 14 / 4 / 4 business days. Emails 1 and 3 start new conversations. Save
+              sequence affects future scheduling; existing pending dates stay unchanged.
+            </p>
+            {sequence && (
+              <ScheduleChange
+                key={JSON.stringify(proposal)}
+                id={sequence.id}
+                proposal={proposal}
+                disabled={!timingOnly || saving}
+                onApplied={(saved) => {
+                  const next = draftFromSequence(saved);
+                  setDraft(next);
+                  setSavedDraft(next);
+                  toast.success('Timing and pending dates updated');
+                }}
+              />
+            )}
+            {sequence && !timingOnly && (
+              <p className="text-xs text-muted-foreground">
+                Save changes to copy, name or step structure before previewing pending dates.
+              </p>
+            )}
+          </section>
           <section className="space-y-3 rounded-lg border border-border p-4">
             <div>
               <h2 className="text-sm font-semibold">Sequence variables</h2>
@@ -207,6 +285,7 @@ export function SequenceBuilder({ sequence }: { sequence?: SequenceDto }) {
               key={step.uid}
               step={step}
               stepNo={index + 1}
+              waitDayMode={draft.wait_day_mode}
               canRemove={draft.steps.length > 1}
               saveErrors={saveErrors}
               onChange={(next) => patchStep(step.uid, next)}

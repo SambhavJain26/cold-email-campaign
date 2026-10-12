@@ -1,5 +1,7 @@
 # Documentation Index — Cold Email Campaign Tool
 
+- [Business-day follow-up scheduling — approved local implementation](27-business-day-scheduling-plan.md)
+
 - [Unibox possible replies — implemented locally, verified plan and repair workflow](26-unibox-possible-replies-plan.md)
 
 **This folder is the complete low-level build documentation.** The three root-level documents ([build_plan.md](../build_plan.md), [event_model_spec.md](../event_model_spec.md), [campaign_walkthrough_v2.md](../campaign_walkthrough_v2.md)) define _what_ the system is and the high-level build order. The files here go one level deeper: every table column, every algorithm, every endpoint, every screen, every task — detailed enough that development can start at task B0.1 and proceed without further design work.

@@ -57,6 +57,7 @@ import {
 } from '../domain/sequence';
 import { evaluateAutoPause } from '../services/autoPause';
 import { resolveTimezone } from './tzmap';
+import { followupDueAt } from './followupDue';
 import { insideWindow, startOfLocalDay } from './window';
 import { jitterFactor, minGapMs, nextAllowedSendAt, paceReady } from './pacing';
 import { pickMailbox, type RotationCandidate } from './rotation';
@@ -688,7 +689,12 @@ export class Scheduler {
 
         const nextStep = stepOf(seq, stepNo + 1);
         const nextSendAt = nextStep
-          ? new Date(acceptedAt.getTime() + nextStep.waitDays * 86_400_000)
+          ? followupDueAt(
+              acceptedAt,
+              nextStep.waitDays,
+              seq.waitDayMode ?? 'elapsed_days',
+              resolveTimezone(e.leadState, mailbox.timezone || settings.defaultTimezone),
+            )
           : null;
         await store.appendUnderEnrollmentLock(
           tx,

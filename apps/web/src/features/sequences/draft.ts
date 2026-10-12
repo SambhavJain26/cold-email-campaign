@@ -30,6 +30,7 @@ export interface DraftStep {
 
 export interface SequenceDraft {
   name: string;
+  wait_day_mode: 'elapsed_days' | 'business_days';
   stop_on_reply: true;
   variable_defaults: Record<string, string>;
   steps: DraftStep[];
@@ -44,6 +45,7 @@ export function draftUid(prefix = 'd'): string {
 export function draftFromSequence(sequence: SequenceDto): SequenceDraft {
   return {
     name: sequence.name,
+    wait_day_mode: sequence.wait_day_mode,
     stop_on_reply: true,
     variable_defaults: sequence.variable_defaults,
     steps: [...sequence.steps]
@@ -83,6 +85,7 @@ export function blankStep(inThread: boolean, waitDays: number): DraftStep {
 export function blankDraft(): SequenceDraft {
   return {
     name: '',
+    wait_day_mode: 'elapsed_days',
     stop_on_reply: true,
     variable_defaults: {},
     steps: [blankStep(false, 0)],
@@ -99,10 +102,26 @@ export function nextVariantLabel(variants: DraftVariant[]): string {
   return `V${variants.length + 1}`;
 }
 
+/** Preserve existing copy and identities. New builders may expand to five steps. */
+export function businessDayPreset(draft: SequenceDraft, isNew: boolean): SequenceDraft {
+  if (!isNew && draft.steps.length !== 5) return draft;
+  const waits = [0, 3, 14, 4, 4];
+  return {
+    ...draft,
+    wait_day_mode: 'business_days',
+    steps: waits.map((wait, i) => ({
+      ...(draft.steps[i] ?? blankStep(i !== 0 && i !== 2, wait)),
+      wait_days: wait,
+      in_thread: i !== 0 && i !== 2,
+    })),
+  };
+}
+
 /** Draft → the contract's write body. step_no comes from position (docs/10 §Sequences). */
 export function toWriteBody(draft: SequenceDraft): SequenceWriteBody {
   return {
     name: draft.name.trim(),
+    wait_day_mode: draft.wait_day_mode,
     stop_on_reply: true,
     variable_defaults: draft.variable_defaults,
     steps: draft.steps.map((step, index) => ({

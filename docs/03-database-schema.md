@@ -515,3 +515,12 @@ GRANT  INSERT, SELECT ON events TO app_rw;
   `0018_campaign_pools_auto_enrollment`. Later stages add columns only via new migrations — never
   edit an applied migration.
 - Rollback: every migration ships a `down`; tested in CI (apply → down → apply).
+
+## Business-day schedule storage addition (migration 0034)
+
+`sequences.wait_day_mode` is non-null text, default `elapsed_days`, constrained to
+`elapsed_days|business_days`. Migration does not rewrite any sequence waits or due dates.
+The `event_type` enum gains `schedule_recalculated`. Immutable
+`sequence_schedule_operations(operation_id text PK, sequence_id FK, fingerprint text,
+result jsonb, occurred_at timestamptz)` stores apply receipts; `app_rw` has only SELECT/INSERT.
+Preservation rollback retains policy, enum and receipts. See docs/27.

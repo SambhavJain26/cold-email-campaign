@@ -50,6 +50,7 @@ import {
 } from '@coldemail/shared';
 import { buildTimeline, db, persistSession, NOW } from './db';
 import { incomingReviewHandlers } from './incoming-review';
+import { sequenceScheduleHandlers, mockSequenceHasScheduleHistory } from './sequence-schedule';
 
 const importCopySummaries = new Map<number, { genericValid: number; stepSpecificValid: number }>();
 
@@ -278,6 +279,7 @@ function mockRenderChecks(
 }
 
 export const handlers: RequestHandler[] = [
+  ...sequenceScheduleHandlers,
   ...incomingReviewHandlers,
   // ── auth ──────────────────────────────────────────────────────────────────
   http.post(`${BASE}/auth/login`, async ({ request }) => {
@@ -973,6 +975,7 @@ export const handlers: RequestHandler[] = [
       const sequence: SequenceDto = {
         id: db.nextId++,
         name: body.name,
+        wait_day_mode: body.wait_day_mode ?? 'elapsed_days',
         stop_on_reply: body.stop_on_reply,
         stop_on_hard_bounce: true,
         stop_on_unsubscribe: true,
@@ -1012,6 +1015,7 @@ export const handlers: RequestHandler[] = [
       const sequence: SequenceDto = {
         id: existing.id,
         name: body.name,
+        wait_day_mode: body.wait_day_mode ?? existing.wait_day_mode,
         stop_on_reply: body.stop_on_reply,
         stop_on_hard_bounce: true,
         stop_on_unsubscribe: true,
@@ -1093,8 +1097,11 @@ export const handlers: RequestHandler[] = [
       const sequence = db.sequences[index]!;
       if (body.confirm !== sequence.name)
         return err('validation', 'confirm must equal the sequence name', 400);
-      if (db.campaigns.some((campaign) => campaign.sequence_id === sequence.id))
-        return err('conflict', 'sequence has campaign references', 409);
+      if (
+        db.campaigns.some((campaign) => campaign.sequence_id === sequence.id) ||
+        mockSequenceHasScheduleHistory(sequence.id)
+      )
+        return err('conflict', 'sequence has campaign or schedule-change history', 409);
       db.sequences.splice(index, 1);
       return HttpResponse.json({ ok: true });
     }),

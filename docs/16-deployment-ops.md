@@ -1,5 +1,22 @@
 # Deployment & Operations
 
+## Business-day schedule rollout requirements
+
+The docs/27 candidate adds migration 0034 with compatibility defaults only. A separately
+authorized rollout must verify paused campaign state, shared sequence references, event/sent
+watermarks, a validated backup and the latest independent deletion manifest. Deploy API,
+worker and UI coherently; do not run old workers with business-day policies or scheduling
+audit facts. Deployment does not apply the preset or recalculate pending dates automatically.
+
+Live schedule application needs its own reviewed preview and authorization. Verify all shared
+active campaigns paused and every campaign with nonterminal enrollments paused; recheck the
+fingerprint immediately before apply. Afterwards compare all date changes to the preview,
+validate unchanged progress/holds/delays/retry/sent/suppression state and prior events, run
+canonical populated zero-drift plus self-check, and validate a post-apply backup. Leave
+campaigns paused. Canonical projection replay does not inspect next_send_at, so independent
+scheduling assertions are mandatory. Restore retains mode, receipts and audit vocabulary,
+reconciles the latest deletion manifest, then checks both projections and scheduled dates.
+
 ## Follow-up priority release — deployed 2026-10-09
 
 Operator-authorized `76292e9` is deployed on `canary`, with separately authorized Campaign 3

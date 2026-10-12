@@ -137,3 +137,11 @@ Escape hatches built in: `settings.optout_detection = 'auto' | 'tag_only'` (the 
 | Shift effort toward Mode 1 / shrink Tier-C automation | Same config + analytics-by-tier already surface the evidence | Same |
 | Bounce auto-pause thresholds (25 / 4% / 50 / 3-in-10 / 50%) | `settings` row, editable in the Settings screen | Only if real providers behave differently |
 | Send window defaults, tick/poll intervals, stale-poll hours | `settings` row | Live tuning in B8 |
+
+## 2026-10-12 operator decision: opt-in business-day sequence timing
+
+Add business-day timing without reinterpreting historical elapsed-day sequences. The chosen
+five-email preset is 0/3/14/4/4, with Email 3 starting Thread 2. Business-day due timestamps
+use local midnight and the existing send-window timezone; send time remains queue/pacing-led.
+Pending-date recalculation is explicit, previewed and audited; live rollout remains gated.
+This supersedes elapsed-day timing only for explicitly opted-in sequences. See docs/27.

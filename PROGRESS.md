@@ -4,6 +4,14 @@
 
 **Legend:** `[ ]` not started · `[~]` in progress · `[x]` done · `[!]` blocked (note why in the log)
 
+**2026-10-12 business-day scheduling:** [x] implemented and verified locally on `canary`.
+Docs/27 covers opt-in weekday timing, editable five-email preset, compatibility migration 0034,
+atomic paused-state/fingerprint preview/apply, idempotent audit receipts and preserved review/
+retry/sent state. Builder and mobile real-backend browser flow pass. Full unit/web 497, API 191
+plus final focused 19, relevant integration 63, mail 31 and unchanged locked golden exactly 47
+pass. Nine-enrollment schedule assertions, canonical zero drift/self-check and manifest-aware
+scratch restore pass; evidence in docs/17. No push, deployment or live schedule/send operation.
+
 **2026-10-10 Possible replies:** [x] implemented and verified locally at `5ba304d`.
 Docs/26 is saved/indexed with completed stages. Subject/company suggestions integrate into
 existing Unibox views without sending effects until explicit confirmation. Selective capture,

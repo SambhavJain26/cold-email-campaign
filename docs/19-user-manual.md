@@ -1,5 +1,22 @@
 # Cold Email Campaign — Complete User Manual
 
+## Business-day follow-up timing
+
+In Sequences, choose Business days to count Monday–Friday, skipping weekends. Holidays
+still count. Follow-ups can send throughout the calculated day's mailbox window; mailbox
+spacing, caps and queue priority select the actual time. Review holds and manual delays
+still apply.
+
+For five-email sequences, Use five-email business-day preset sets gaps 0/3/14/4/4 and
+starts a new conversation at Emails 1 and 3. It preserves your copy and step identities.
+The values remain editable. Existing sequences start in elapsed-day mode for compatibility.
+
+Save sequence changes future date calculations but leaves already-saved pending dates
+alone. To update those, pause every affected/shared campaign, make your timing edits,
+choose Preview pending dates, review all changes and exclusions, then Apply timing and
+pending dates. Save non-timing copy/name changes before previewing. Applying the schedule
+does not resume campaigns or send email. A stale preview must be refreshed before applying.
+
 ## Possible replies in Unibox
 
 An alternate sender address may appear as **Possible reply** in Needs review, All or

@@ -7,6 +7,8 @@ export const sequenceVariableKeySchema = z
   .string()
   .regex(/^[a-z][a-z0-9_]*$/, 'use lowercase letters, numbers, and underscores');
 export const sequenceVariablesSchema = z.record(sequenceVariableKeySchema, z.string());
+export const waitDayModeSchema = z.enum(['elapsed_days', 'business_days']);
+export type WaitDayMode = z.infer<typeof waitDayModeSchema>;
 
 export const variantSchema = z
   .object({
@@ -35,6 +37,7 @@ export const sequenceSchema = z
   .object({
     id: z.number().int(),
     name: z.string(),
+    wait_day_mode: waitDayModeSchema.default('elapsed_days'),
     stop_on_reply: z.boolean(),
     /** Legacy read-only compatibility; bounces and STOP always terminate. */
     stop_on_hard_bounce: z.boolean(),
@@ -88,11 +91,67 @@ export const stepWriteSchema = z
 
 export const sequenceWriteBodySchema = z.object({
   name: z.string().min(1),
+  wait_day_mode: waitDayModeSchema.optional(),
   stop_on_reply: z.literal(true).default(true),
   variable_defaults: sequenceVariablesSchema.default({}),
   steps: z.array(stepWriteSchema).min(1),
 });
 export type SequenceWriteBody = z.infer<typeof sequenceWriteBodySchema>;
+
+export const scheduleProposalSchema = z
+  .object({
+    wait_day_mode: waitDayModeSchema,
+    steps: z
+      .array(
+        z
+          .object({
+            step_no: z.number().int().positive(),
+            wait_days: z.number().int().min(0).max(90),
+            in_thread: z.boolean(),
+          })
+          .strict(),
+      )
+      .min(1),
+  })
+  .strict();
+export type ScheduleProposal = z.infer<typeof scheduleProposalSchema>;
+export const schedulePreviewSchema = z
+  .object({
+    fingerprint: z.string(),
+    campaigns: z.array(z.object({ id: z.number(), name: z.string(), status: z.string() }).strict()),
+    rows: z.array(
+      z
+        .object({
+          enrollment_id: z.number(),
+          lead_id: z.number(),
+          lead_name: z.string(),
+          lead_email: z.string(),
+          campaign_id: z.number(),
+          step_no: z.number(),
+          old_due_at: z.string().nullable(),
+          new_due_at: z.string().nullable(),
+          effective_due_at: z.string().nullable(),
+          timezone: z.string().nullable(),
+          source_send_id: z.number().nullable(),
+          held: z.boolean(),
+          exclusion: z.string().nullable(),
+          error: z.string().nullable(),
+        })
+        .strict(),
+    ),
+    can_apply: z.boolean(),
+    blockers: z.array(z.string()),
+  })
+  .strict();
+export type SchedulePreview = z.infer<typeof schedulePreviewSchema>;
+export const scheduleApplyBodySchema = scheduleProposalSchema.extend({
+  fingerprint: z.string().regex(/^[a-f0-9]{64}$/),
+  operation_id: z.string().uuid(),
+});
+export type ScheduleApplyBody = z.infer<typeof scheduleApplyBodySchema>;
+export const scheduleApplyResponseSchema = z
+  .object({ sequence: sequenceSchema, changed: z.number().int().min(0) })
+  .strict();
 
 /** Typed confirmation for deleting a sequence that has no historical use. */
 export const deleteSequenceBodySchema = z.object({ confirm: z.string().min(1) }).strict();

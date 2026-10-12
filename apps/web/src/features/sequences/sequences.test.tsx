@@ -12,11 +12,13 @@ import {
   nextVariantLabel,
   parseSaveErrors,
   toWriteBody,
+  businessDayPreset,
 } from './draft';
 import { previewRequirement } from './preview-panel';
 import { StepCard } from './step-card';
 
 const sequence: SequenceDto = {
+  wait_day_mode: 'elapsed_days',
   id: 7,
   name: 'Real Estate Outreach v2',
   stop_on_reply: true,
@@ -55,6 +57,25 @@ const sequence: SequenceDto = {
 };
 
 describe('draftFromSequence / toWriteBody', () => {
+  it('applies the five-email preset while preserving saved copy, IDs and sources', () => {
+    const draft = businessDayPreset(blankDraft(), true);
+    draft.steps.forEach((step, i) => {
+      step.id = i + 10;
+      step.variants[0]!.body_template = `Saved ${i}`;
+    });
+    draft.steps[2]!.content_source = 'personalized';
+    draft.steps[2]!.variants = [];
+    const next = businessDayPreset({ ...draft, wait_day_mode: 'elapsed_days' }, false);
+    expect(next.steps.map((s) => s.wait_days)).toEqual([0, 3, 14, 4, 4]);
+    expect(next.steps.map((s) => s.in_thread)).toEqual([false, true, false, true, true]);
+    expect(next.steps.map((s) => s.id)).toEqual([10, 11, 12, 13, 14]);
+    expect(next.steps[2]!.content_source).toBe('personalized');
+    expect(next.steps[0]!.variants[0]!.body_template).toBe('Saved 0');
+    expect(toWriteBody(next).wait_day_mode).toBe('business_days');
+    expect(draftFromSequence({ ...sequence, wait_day_mode: 'business_days' }).wait_day_mode).toBe(
+      'business_days',
+    );
+  });
   it('orders steps by step_no and round-trips ids', () => {
     const draft = draftFromSequence(sequence);
     expect(draft.steps.map((s) => s.id)).toEqual([10, 20]);

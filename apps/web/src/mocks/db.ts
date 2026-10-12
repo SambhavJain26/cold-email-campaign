@@ -169,6 +169,7 @@ function buildMailboxes(): MailboxDto[] {
 
 function buildSequence(): SequenceDto {
   return {
+    wait_day_mode: 'elapsed_days',
     id: 1,
     name: 'Real Estate Outreach v2',
     stop_on_reply: true,
@@ -262,6 +263,7 @@ function buildImportMappingSequence(): SequenceDto {
   return {
     id: 2,
     name: 'Import Mapping Sequence',
+    wait_day_mode: 'elapsed_days',
     stop_on_reply: true,
     stop_on_hard_bounce: true,
     stop_on_unsubscribe: true,

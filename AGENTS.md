@@ -19,6 +19,15 @@ call planned work implemented.
 
 ## Current operating boundary
 
+**2026-10-12 business-day scheduling — verified locally:** docs/27 implemented on `canary`.
+Opt-in weekday timing and editable 0/3/14/4/4 preset; guarded preview/apply recalculates
+pending follow-ups with immutable facts/receipts, preserving holds/delays/retries/history.
+Migration 0034 defaults to elapsed days and preserves policy/audit records on rollback.
+Local gates, locked golden exactly 47 and populated nine-enrollment zero drift/self-check/
+manifest-aware backup restore pass; see docs/17. No push/deploy, production schedule/campaign/
+enrollment mutation, resume or external outbound mail occurred. Further live operations
+remain separately gated. Preserve absent elapsed-mode runtime vocabulary for legacy Stop fingerprints.
+
 **2026-10-10 Bruce/Lori repair completed:** explicitly authorized metadata scan restricted to
 messages 2140/2135, full-content recovery and confirmed links to enrollments 83/217.
 Both appear in Needs review as Held for review; automatic labels/authorship and all progress/

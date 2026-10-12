@@ -93,7 +93,7 @@ test('list shows the fixture sequence with its steps, waits and stop conditions'
 
   const row = page.getByTestId('sequence-row-1');
   await expect(row).toContainText('Real Estate Outreach v2');
-  await expect(row).toContainText('0 / 3 / 4 / 5 days');
+  await expect(row).toContainText('0 / 3 / 4 / 5 elapsed days');
   await expect(row).toContainText('review hold');
   await expect(row).toContainText('hard bounce');
   await expect(row).toContainText('STOP');

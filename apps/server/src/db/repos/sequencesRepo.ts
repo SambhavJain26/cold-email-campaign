@@ -27,7 +27,11 @@ export async function sequenceIdForCampaign(
  */
 export async function loadSequenceDef(db: DbLike, sequenceId: number): Promise<SequenceDef | null> {
   const seqRows = await db
-    .select({ id: sequences.id, stopOnReply: sequences.stopOnReply })
+    .select({
+      id: sequences.id,
+      stopOnReply: sequences.stopOnReply,
+      waitDayMode: sequences.waitDayMode,
+    })
     .from(sequences)
     .where(eq(sequences.id, sequenceId));
   if (seqRows.length === 0) return null;
@@ -55,6 +59,8 @@ export async function loadSequenceDef(db: DbLike, sequenceId: number): Promise<S
   return {
     id: sequenceId,
     stopOnReply: seqRows[0]!.stopOnReply,
+    // Preserve legacy Stop fingerprints: elapsed mode was absent from this shape.
+    ...(seqRows[0]!.waitDayMode === 'business_days' && { waitDayMode: 'business_days' as const }),
     steps: steps.map((s) => ({
       id: s.id,
       stepNo: s.stepNo,
@@ -111,6 +117,7 @@ export async function getVariantById(
 
 export interface CreateSequenceInput {
   name: string;
+  waitDayMode?: 'elapsed_days' | 'business_days';
   variableDefaults?: Record<string, string>;
   stopOnReply?: boolean;
   stopOnHardBounce?: boolean;
@@ -137,6 +144,7 @@ export async function createSequence(db: DbLike, input: CreateSequenceInput): Pr
     .insert(sequences)
     .values({
       name: input.name,
+      waitDayMode: input.waitDayMode ?? 'elapsed_days',
       variableDefaults: input.variableDefaults ?? {},
       ...(input.stopOnReply !== undefined && { stopOnReply: input.stopOnReply }),
       // These columns remain for backwards-compatible storage only. Runtime
@@ -253,10 +261,14 @@ export async function deleteSequenceIfUnreferenced(
       (SELECT count(*)::int FROM sent_messages sm
         JOIN enrollments e ON e.id = sm.enrollment_id
         JOIN campaigns c ON c.id = e.campaign_id
-        WHERE c.sequence_id = ${sequenceId}) AS sends`);
-  const row = refs.rows[0] as { campaigns: number; sends: number };
-  if (row.campaigns > 0 || row.sends > 0) {
-    return { deleted: false, reason: 'sequence has campaign or sent-message references' };
+        WHERE c.sequence_id = ${sequenceId}) AS sends,
+      (SELECT count(*)::int FROM sequence_schedule_operations WHERE sequence_id=${sequenceId}) AS operations`);
+  const row = refs.rows[0] as { campaigns: number; sends: number; operations: number };
+  if (row.campaigns > 0 || row.sends > 0 || row.operations > 0) {
+    return {
+      deleted: false,
+      reason: 'sequence has campaign, sent-message or schedule-change history',
+    };
   }
   const removed = await db
     .delete(sequences)
@@ -275,6 +287,7 @@ export class SequenceEditConflictError extends Error {
 
 export interface SequenceSaveInput {
   name: string;
+  waitDayMode?: 'elapsed_days' | 'business_days';
   variableDefaults: Record<string, string>;
   stopOnReply: boolean;
   steps: Array<{
@@ -315,6 +328,7 @@ export async function updateSequenceReplaceSet(
       .update(sequences)
       .set({
         name: input.name,
+        ...(input.waitDayMode !== undefined && { waitDayMode: input.waitDayMode }),
         variableDefaults: input.variableDefaults,
         stopOnReply: input.stopOnReply,
         stopOnHardBounce: true,

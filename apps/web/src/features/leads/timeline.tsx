@@ -3,6 +3,7 @@ import { formatDateTime } from '@/lib/format';
 
 /** Event-type glyphs for the detail timeline (docs/12 §2 — newest first). */
 const ICON: Record<EventViewDto['type'], string> = {
+  schedule_recalculated: '📅',
   incoming_review_required: '⏸️',
   outreach_review_decided: '📋',
   sequence_stopped: '⏹️',

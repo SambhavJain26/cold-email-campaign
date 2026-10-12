@@ -79,6 +79,8 @@ const CONTRACT_ROUTES = [
   'PATCH /api/v1/sequences/:id',
   'DELETE /api/v1/sequences/:id',
   'POST /api/v1/sequences/:id/preview',
+  'POST /api/v1/sequences/:id/schedule/preview',
+  'POST /api/v1/sequences/:id/schedule/apply',
   'POST /api/v1/sequences/validate-template',
   'GET /api/v1/campaigns',
   'POST /api/v1/campaigns',

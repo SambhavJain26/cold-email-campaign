@@ -2,6 +2,7 @@
 // Must stay in lockstep with the Postgres enums in 0001_core / docs/03 §1.
 
 export const EVENT_TYPES = [
+  'schedule_recalculated',
   'enrolled',
   'sent',
   'delivered',

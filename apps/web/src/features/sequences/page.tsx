@@ -18,7 +18,7 @@ function waitPattern(sequence: SequenceDto): string {
   return `${[...sequence.steps]
     .sort((a, b) => a.step_no - b.step_no)
     .map((s) => s.wait_days)
-    .join(' / ')} days`;
+    .join(' / ')} ${sequence.wait_day_mode === 'business_days' ? 'business days' : 'elapsed days'}`;
 }
 
 function activeVariantCount(sequence: SequenceDto): number {

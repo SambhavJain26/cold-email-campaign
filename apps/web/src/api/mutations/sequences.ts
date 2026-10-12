@@ -4,6 +4,10 @@ import {
   previewResponseSchema,
   sequenceSchema,
   type SequenceWriteBody,
+  schedulePreviewSchema,
+  scheduleApplyResponseSchema,
+  type ScheduleProposal,
+  type ScheduleApplyBody,
 } from '@coldemail/shared';
 import { apiFetch } from '../client';
 
@@ -31,6 +35,29 @@ export function useDeleteSequence() {
     mutationFn: ({ id, confirm }: { id: number; confirm: string }) =>
       apiFetch(`/sequences/${id}`, okResponseSchema, { method: 'DELETE', body: { confirm } }),
     onSuccess: () => void qc.invalidateQueries({ queryKey: ['sequences'] }),
+  });
+}
+
+export function usePreviewSchedule(id: number) {
+  return useMutation({
+    mutationFn: (body: ScheduleProposal) =>
+      apiFetch(`/sequences/${id}/schedule/preview`, schedulePreviewSchema, {
+        method: 'POST',
+        body,
+      }),
+  });
+}
+export function useApplySchedule(id: number) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (body: ScheduleApplyBody) =>
+      apiFetch(`/sequences/${id}/schedule/apply`, scheduleApplyResponseSchema, {
+        method: 'POST',
+        body,
+      }),
+    onSuccess: () => {
+      void qc.invalidateQueries();
+    },
   });
 }
 
