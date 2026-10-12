@@ -78,3 +78,12 @@ the gate actually passes.
 - [x] Local gates, unchanged golden exactly 47, populated scheduling/replay/self-check and restore.
 
 Docs/17 records exact outcomes. Production rollout/application remain separately authorized.
+
+## Separately authorized rollout — 2026-10-12
+
+Application `bc0f1e0` is pushed/deployed with separately authorized Campaign 3 pause.
+All 35 migrations, service/public protection, production contracts, 222-enrollment zero drift/
+self-check, unchanged 969-event/346-send snapshot and validated backups pass. Authenticated
+browser replay remains unverified after computer-use URL-policy stop; see docs/17.
+Saved elapsed-day timing and pending dates remain unchanged. Live preset/recalculation,
+campaign resume, enrollment and outbound sending still require their own authorization.

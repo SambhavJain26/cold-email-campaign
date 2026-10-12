@@ -4,6 +4,14 @@
 
 **Legend:** `[ ]` not started · `[~]` in progress · `[x]` done · `[!]` blocked (note why in the log)
 
+**2026-10-12 business-day rollout:** [x] explicitly authorized, pushed and deployed `bc0f1e0`.
+Campaign 3 pause separately authorized; Campaigns 2/3 paused and auto-enrollment off.
+35 migrations, healthy services/routes, production contracts, 222-enrollment zero drift/
+self-check, unchanged 969-event/346-send snapshot and validated pre/post backups pass.
+Saved elapsed-day mode/waits and all pending dates are preserved. Authenticated browser
+replay is unverified due to computer-use URL-policy stop. Live preset/recalculation,
+resume/enrollment/send remain separate. Evidence in docs/17.
+
 **2026-10-12 business-day scheduling:** [x] implemented and verified locally on `canary`.
 Docs/27 covers opt-in weekday timing, editable five-email preset, compatibility migration 0034,
 atomic paused-state/fingerprint preview/apply, idempotent audit receipts and preserved review/

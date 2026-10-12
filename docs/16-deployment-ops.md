@@ -1,5 +1,16 @@
 # Deployment & Operations
 
+## Business-day application release — deployed 2026-10-12
+
+Operator-authorized `bc0f1e0` is pushed/deployed with separately authorized Campaign 3 pause.
+All 35 migrations, services/routes, production sequence/preview contracts, 222-enrollment
+zero drift/self-check and validated pre/post backups pass. Paused snapshot stays 969 events /
+346 sends, with full enrollment/scheduling/retry/suppression/settings/copy hashes unchanged.
+Campaigns 2/3 paused; auto-enrollment off. Migration defaults remain elapsed days and original
+waits; deployment does not apply the preset or recalculate any pending dates. Authenticated
+browser verification was stopped by computer-use URL validation and remains unverified.
+See docs/17. Live schedule application, resume/enrollment/send require separate authorization.
+
 ## Business-day schedule rollout requirements
 
 The docs/27 candidate adds migration 0034 with compatibility defaults only. A separately

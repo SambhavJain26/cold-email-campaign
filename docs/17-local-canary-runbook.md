@@ -1,5 +1,72 @@
 # Local canary runbook (B8.3-local) — two-week validation on throwaway Gmail
 
+## 2026-10-12 IST business-day scheduling — authorized push/deploy completed
+
+The operator authorized push/deploy after the completed local gates, then separately chose
+"Pause Campaign 3 and leave it paused." Fresh preflight found Campaign 3 active, automatic
+enrollment off, 969 events / 346 sends and 222 enrollments. Historical paused facts were not
+assumed current. Campaign 2 was already paused; Campaign 1 archived.
+
+Pushed `canary` to `bc0f1e0`. The clean VPS checkout advanced from `4141a3305` using an
+incremental bundle validated locally/remotely with SHA-256
+`aeeb78b522ac93c45d4938845517523b554f584fe36e56f2e8530781e8b00468`.
+Pre-deploy canonical dry-run and self-check passed. Gracefully stopped the app, took and
+validated the pre-mutation backup, explicitly paused Campaign 3, captured the stable
+baseline, fast-forwarded the checkout and rebuilt app/gateway/backup coherently.
+Host Caddy, DNS, mailbox settings and copy were unchanged.
+
+Verified outcomes:
+
+- All **35 migrations**, through `0034_business_day_schedule`, applied. App/database healthy;
+  gateway/backup running. Public health, Sequence/Unibox and portfolio/outreach/www aliases
+  return 200. Protected sequence/queue GETs and both schedule POST routes return 401 without
+  authentication (the POST probes include the required request header).
+- Canonical dry-run: **222 enrollments — zero differences**; self-check clean before/after.
+- Stable before/after/final snapshots match: **969 events / max ID 969 / 346 sent messages**,
+  complete enrollment state (including pending dates, holds, delays, snoozes and checkpoints),
+  sent/retry snapshots, seven suppressions, campaign records after the authorized pause,
+  settings/compliance, sequence metadata/waits/threading/variants and mailbox configuration.
+  Only mailbox poll freshness is excluded from its configuration hash.
+- Enrollment hash `29c997d583ee1b6550b68ea7236dea87`; complete event-history hash
+  `ba7043089a6665dcbd016c39669921fc`; sent/retry hash `6cc79b1b5b31fce2ccdb647efae7cdf1`.
+- Campaign 1 archived; Campaigns 2/3 paused; automatic enrollment off everywhere.
+- Both sequences remain `elapsed_days`. Sequence 2, **US Personalized — Five Emails**, remains
+  **0/3/4/4/5** with existing conversation choices. No preset was applied, no pending dates
+  recalculated. Scheduling facts and apply receipts are both **zero**.
+- Production sequence DTO and read-only saved-policy preview pass their shared schemas against
+  real data. Sequence 2 references paused Campaigns 2/3; preview covers 221 enrollments, with
+  zero evidence errors, 23 exclusions and no apply blockers. This read-only probe uses the
+  saved elapsed policy and does not apply or propose a new business schedule to the operator.
+  Final snapshot still matches after contract verification; no transport or workers are
+  started by the verification script.
+- Served build contains both preset and pending-date controls. Version is
+  `6f0ad85b-09c8-4e53-b05b-ca22d342045b`, asset `index-BhJvtK2k.js`.
+- Independent live and latest backup deletion manifests retain SHA-256
+  `03c28dfa962555297dafaec6b7b217888364306ced8dc12eee68d39d0ae814d4`.
+- Pre-backup `coldemail-20261012-093746.dump`: **3,773,576 bytes**, 379 validated catalog lines.
+  Post-backup `coldemail-20261012-093922.dump`: **3,776,063 bytes**, 384 validated catalog lines.
+  The manifest copies match the retained live manifest.
+- Disk is 41% used with about 14 GiB available. No infrastructure/cache cleanup performed.
+  Existing six runtime audit findings (three moderate/three high) remain separate; no dependency
+  rewrite was performed.
+
+Authenticated live browser replay is **unverified**. The computer-use runtime stopped native
+browser control because it could not identify Chrome's current URL confidently enough to
+enforce policy. No browser input, login attempt, password reset or policy bypass followed.
+Server-side contracts, public protection, served controls and local authenticated browser
+tests are verified; do not call this an authenticated production UI pass.
+
+Initial remote stdin inspection hit a Windows CRLF artifact while checking the manifest,
+without changing it; uploaded shell scripts were normalized before execution. An initial
+read-only verification helper used top-level await from the root CJS package and failed
+before querying the database; an async wrapper corrected it and the final probe passed.
+
+No live timing/preset/recalculation, historical scan/recovery/linking, acknowledgement,
+content deletion, cap/window/range edit, enrollment, resume or outbound mail occurred.
+The only campaign mutation was the separately authorized Campaign 3 pause. Applying the
+business-day schedule remains a separately reviewed action, with fresh preview/backups;
+leave campaigns paused for the operator. Deployment documentation follow-up is docs-only.
+
 ## 2026-10-12 IST business-day scheduling — implemented and verified locally
 
 Implemented the approved docs/27 plan on local `canary`. Opt-in `business_days` mode

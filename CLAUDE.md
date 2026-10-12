@@ -8,6 +8,17 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Current operating boundary
 
+**2026-10-12 business-day scheduling deployed:** explicitly authorized push/deploy at `bc0f1e0`,
+with separately authorized Campaign 3 pause. All 35 migrations, healthy services/routes,
+production sequence/preview contracts, 222-enrollment zero drift/self-check and validated
+pre/post backups pass. Stable paused snapshot remains 969 events / 346 sends; enrollment,
+pending dates, holds/delays, retries, suppression, copy/settings and deletion manifest match.
+Campaigns 2/3 remain paused; automatic enrollment off. Sequences remain elapsed_days with
+their existing waits; no live preset/recalculation, resume, enrollment or outbound mail occurred.
+Authenticated browser replay is unverified: computer-use policy stopped browser control because
+the current URL could not be identified confidently. See docs/17. Live schedule application
+and further operations remain separately gated.
+
 **2026-10-12 business-day scheduling — verified locally:** docs/27 implemented on `canary`.
 Opt-in weekday timing and editable 0/3/14/4/4 preset; guarded preview/apply recalculates
 pending follow-ups with immutable facts/receipts, preserving holds/delays/retries/history.
