@@ -117,6 +117,40 @@ flowchart LR
 
 ---
 
+## Visual Interface & Operational Telemetry
+
+### Executive Overview Console
+The central operator dashboard displaying real-time delivery capacity pacing, active campaign throughput, deliverability health gauges, and live Unibox reply streams.
+
+![Executive Overview Console](docs/screenshots/02-overview-dashboard.png)
+
+### Multi-Step Sequence Composer & Deliverability Guard
+Multi-step template editor featuring dynamic spintax variations, merge-tag syntax checking, fallback observation slots, and real-time deliverability score rubrics.
+
+![Sequence Composer](docs/screenshots/04-sequence-builder.png)
+
+### Unified Unibox & Inbound Triage Feed
+Multi-mailbox communication feed grouping threaded conversations, automated STOP/unsubscribe tagging, and sub-3-second AI sentiment classification.
+
+![Unibox Triage](docs/screenshots/05-unibox-triage.png)
+
+### Campaign Lifecycle Management
+Campaign control panel displaying live enrollment status, effort-tier distributions, and step-by-step cohort throughput.
+
+![Campaign Management](docs/screenshots/03-campaign-management.png)
+
+### Mailbox Fleet Pacing & Rotation Health
+Fleet monitoring console tracking daily sending limits, warm-up ramping curves, and IMAP listener health across all connected inboxes.
+
+![Mailbox Fleet Health](docs/screenshots/07-mailbox-health.png)
+
+### Reconciled Analytics & Golden Cohort Audit
+Multi-tab analytics suite verifying step transitions, tier performance, variant conversion, and automated reconciliation footers.
+
+![Analytics Reconciliation](docs/screenshots/06-analytics-reconciliation.png)
+
+---
+
 ## Step-by-Step Workflow Walkthrough
 
 ### Phase 1: Intake & Hygiene Validation
@@ -140,22 +174,6 @@ flowchart LR
 - **Strict Precedence Enforcement**: Out-of-order events resolve deterministically:
   $$\text{UNSUBSCRIBED} > \text{BOUNCED} > \text{REPLIED} > \text{COMPLETED}$$
 - **Automated Opt-Out**: Human replies containing keyword variants (`STOP`, `unsubscribe`, `remove me`) immediately trigger unsubscribe state changes without awaiting manual review.
-
----
-
-## Visual Interface & Architecture Embeds
-
-<!-- Visual Embed 01: System Architecture Diagram -->
-> **Figure 1: High-Level Architecture Flow**
-> *Reference architectural blueprint showing separation between Fastify API, pg-boss worker, event ledger, and React dashboard.*
-
-<!-- Visual Embed 02: Overview Dashboard & Capacity Meter -->
-> **Figure 2: Executive Overview Dashboard**
-> *Live dashboard showcasing pacing capacity, active campaign volume, deliverability health, and the Unibox triage feed.*
-
-<!-- Visual Embed 03: Sequence Builder & Spintax Syntax -->
-> **Figure 3: Sequence Composer & Deliverability Checks**
-> *Multi-step sequence editor featuring dynamic spintax variations, merge-tag validation, and real-time deliverability score calculations.*
 
 ---
 

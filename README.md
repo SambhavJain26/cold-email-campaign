@@ -15,7 +15,41 @@
 
 ---
 
-## 1. Problem Solved & Operational Context
+## 1. Executive Dashboard & Visual Tour
+
+### Executive Overview Console
+Real-time capacity pacing, active campaign monitoring, deliverability health gauges, and live Unibox reply feed.
+
+![Executive Overview Console](docs/screenshots/02-overview-dashboard.png)
+
+### Multi-Step Sequence Composer & Deliverability Guard
+Multi-step sequence editor featuring dynamic spintax variations, merge-tag validation, custom observations, and deterministic delivery score rubrics.
+
+![Sequence Builder](docs/screenshots/04-sequence-builder.png)
+
+### Unified Unibox & Inbound Classification Feed
+Unified communication stream grouping threads, automated stop/unsubscribe detection, and AI-suggested sentiment tagging.
+
+![Unibox Triage](docs/screenshots/05-unibox-triage.png)
+
+### Campaign Lifecycle & Step Telemetry
+Comprehensive campaign enrollment tracking, status toggles, effort-tier distribution, and cohort progress.
+
+![Campaign Management](docs/screenshots/03-campaign-management.png)
+
+### Mailbox Fleet & Pacing Capacity
+Multi-mailbox rotation with health scoring, send caps, warm-up status, and IMAP connection telemetry.
+
+![Mailbox Fleet Health](docs/screenshots/07-mailbox-health.png)
+
+### Analytics & Golden Cohort Reconciliation
+Four-tab analytics suite (Overview, Tiers, Steps, Variants) with automated self-checking reconciliation footers.
+
+![Analytics Reconciliation](docs/screenshots/06-analytics-reconciliation.png)
+
+---
+
+## 2. Problem Solved & Operational Context
 
 Commercial cold outbound platforms (e.g., Smartlead, Instantly, Apollo) present critical engineering and operational liabilities for high-touch, reputation-sensitive outreach:
 
@@ -28,7 +62,7 @@ This platform solves these bottlenecks by implementing an **authoritative, singl
 
 ---
 
-## 2. System Architecture
+## 3. System Architecture
 
 The monorepo (`@coldemail/server`, `@coldemail/web`, and `@coldemail/shared`) maintains a strict dependency hierarchy. Domain logic is 100% pure (no I/O, no wall-clock dependencies), write operations flow through a single transactional chokepoint (`eventStore.append`), and all DTO schemas are statically and runtime validated via Zod.
 
@@ -93,7 +127,7 @@ flowchart TD
 
 ---
 
-## 3. Core Architectural Mechanisms
+## 4. Core Architectural Mechanisms
 
 ### A. The Append-Only Event Ledger & Reducer Folding
 - **Immutable Table**: The `events` table enforces an append-only rule through a database-level trigger that raises an exception on any `UPDATE` or `DELETE` attempt. The application database role lacks mutation privileges on historical events.
@@ -125,7 +159,7 @@ The platform includes an authoritative, mathematically reconciled 885-lead bench
 
 ---
 
-## 4. Repository Layout & Workspaces
+## 5. Repository Layout & Workspaces
 
 The monorepo uses npm workspaces with strict TypeScript project boundaries:
 
@@ -156,13 +190,14 @@ cold-email-campaign/
 │   └── shared/                 # Zero runtime dependencies except Zod
 │       └── src/                # API DTO schemas, domain enums, pagination envelopes
 ├── docs/                       # Complete specification suite (00-INDEX through 16-deployment-ops)
+│   └── screenshots/            # High-resolution production UI captures
 ├── docker-compose.yml          # PostgreSQL 16 (dev port 5433) + GreenMail test mail server
 └── docker-compose.prod.yml     # Self-contained production container topology
 ```
 
 ---
 
-## 5. Local Setup & Quickstart
+## 6. Local Setup & Quickstart
 
 ### Prerequisites
 - Node.js >= 22 (tested on v24.18.0)
@@ -210,7 +245,7 @@ Access the web dashboard at `http://localhost:5173` and authenticate using the s
 
 ---
 
-## 6. Verification & Test Suites
+## 7. Verification & Test Suites
 
 The repository enforces strict verification across unit, integration, and golden regression tiers:
 
@@ -237,7 +272,7 @@ bash scripts/restore-drill.sh
 
 ---
 
-## 7. Technical Decisions & Trade-Offs
+## 8. Technical Decisions & Trade-Offs
 
 | Decision Area | Chosen Approach | Alternative Considered | Trade-Off Rationale |
 |---|---|---|---|
@@ -249,7 +284,7 @@ bash scripts/restore-drill.sh
 
 ---
 
-## 8. License & Authorship
+## 9. License & Authorship
 
 - **Architect & Author**: Sambhav Jain
 - **License**: MIT License: see the [LICENSE](LICENSE) file for complete details.
