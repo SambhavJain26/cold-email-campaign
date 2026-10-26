@@ -50,7 +50,7 @@ export function BulkTierBar({
           <SelectItem value="B">🟡 Tier B</SelectItem>
           <SelectItem value="C">⚪ Tier C</SelectItem>
           <SelectItem value="nurture">🔵 Nurture</SelectItem>
-          <SelectItem value="clear">- clear tier</SelectItem>
+          <SelectItem value="clear"> -  clear tier</SelectItem>
         </SelectContent>
       </Select>
       <Button

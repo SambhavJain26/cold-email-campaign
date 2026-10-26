@@ -1,7 +1,7 @@
 // B8.1: the real parser (mailparser) over the real-world header corpus
 // (docs/13 §2). The offline suites feed the classifier through the hand-rolled
 // `loadHeaderFixture` loader; B8 replaces that loader with mailparser in
-// production, so the two MUST agree on every field the classifier reads -
+// production, so the two MUST agree on every field the classifier reads - 
 // otherwise the whole offline classifier suite is testing a fiction.
 import { readFileSync } from 'node:fs';
 import path from 'node:path';

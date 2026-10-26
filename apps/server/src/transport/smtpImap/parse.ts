@@ -4,8 +4,8 @@
 // corpus (test/fixtures/headers/) is the same corpus this parser must satisfy.
 //
 // Two shapes matter (docs/07 §2):
-//   - threading headers - in-reply-to / references drive the enrollment walk;
-//   - DSNs - a multipart/report whose `message/delivery-status` part carries
+//  - threading headers - in-reply-to / references drive the enrollment walk;
+//  - DSNs - a multipart/report whose `message/delivery-status` part carries
 //     Status + Final-Recipient. mailparser hands that part back as an
 //     "attachment", NOT as `text`, so bodyText is rebuilt to include it (the
 //     classifier greps Diagnostic-Code out of bodyText).

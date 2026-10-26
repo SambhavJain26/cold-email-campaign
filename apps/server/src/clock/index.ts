@@ -27,7 +27,7 @@ export function durationMs(d: Duration): number {
 
 /**
  * A clock that can be driven forward (VirtualClock implements this). The
- * SimulationDriver (B6.12) depends on THIS interface, not the concrete -
+ * SimulationDriver (B6.12) depends on THIS interface, not the concrete - 
  * keeping the concrete-clock ESLint ban intact.
  */
 export interface SteppableClock extends Clock {

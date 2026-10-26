@@ -1,5 +1,5 @@
 // Manual compose (docs/08 §3, Mode 1): the operator submits a final bespoke
-// subject+body for one due enrollment. Same pipeline as every other send -
+// subject+body for one due enrollment. Same pipeline as every other send - 
 // stored as a one-off step_variants row ({bespoke:true}, active=false, real
 // content hash so the recycle guard applies), rendered LITERAL (footer +
 // checks still run), delivered through Scheduler.sendOne so the sent event,

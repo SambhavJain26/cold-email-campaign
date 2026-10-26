@@ -1,5 +1,5 @@
 // B6.12 SIMULATED_CLOCK mode (docs/13 §5, mock builds only): drives the real
-// scheduler + poller + confirm-delivery jobs across a virtual-time jump -
+// scheduler + poller + confirm-delivery jobs across a virtual-time jump - 
 // the API-server twin of the scenario runner's advanceMs loop. Composition
 // builds this ONLY when config.SIMULATED_CLOCK is set; the advance-clock
 // route registers only when it exists.

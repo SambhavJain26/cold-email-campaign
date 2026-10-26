@@ -1,8 +1,8 @@
 // Decision E: the Anthropic sentiment-suggestion adapter. Pure unit - the SDK
 // client is injected, so no network and no API key. What must hold:
-//   - a well-formed answer maps to our Sentiment union;
-//   - EVERY failure path (timeout, HTTP error, refusal, garbage) yields null;
-//   - the call is bounded (3s, no retries) so a poll cycle can't hang on it.
+//  - a well-formed answer maps to our Sentiment union;
+//  - EVERY failure path (timeout, HTTP error, refusal, garbage) yields null;
+//  - the call is bounded (3s, no retries) so a poll cycle can't hang on it.
 import { describe, expect, it, vi } from 'vitest';
 import { AnthropicSentimentSuggester } from '../../src/sentiment/anthropic';
 

@@ -89,7 +89,7 @@ export function ComplianceTab({
             className="rounded-md border border-dashed border-border bg-muted/30 p-3 font-mono text-xs whitespace-pre-wrap text-muted-foreground"
             data-testid="footer-preview"
           >
-            {`-\n${address || '⟨no address - sends blocked⟩'}\n${optout}`}
+            {` - \n${address || '⟨no address - sends blocked⟩'}\n${optout}`}
           </div>
         </CardContent>
       </Card>

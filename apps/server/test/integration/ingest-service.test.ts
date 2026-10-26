@@ -1,4 +1,4 @@
-// B5.3-B5.5: preview persistence, commit modes, suppression-at-ingest -
+// B5.3-B5.5: preview persistence, commit modes, suppression-at-ingest - 
 // against the real test DB.
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import type { Pool } from 'pg';

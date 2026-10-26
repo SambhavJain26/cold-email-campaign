@@ -292,7 +292,7 @@ Offer validated. Arjun builds the reusable sequence in **✍️ Sequences**.
 ```
 Subject: {{RANDOM|quick question|quick idea}} about {{company|your team}}'s inbound leads
 
-{{RANDOM|Hi|Hey|Hello}} {{first_name|there}} -
+{{RANDOM|Hi|Hey|Hello}} {{first_name|there}} - 
 {{RANDOM|noticed|saw}} {{custom_observation|your listings move fast in your market}}.
 
 Most {{market|US}} brokers I talk to lose leads because inbound
@@ -301,7 +301,7 @@ that respond to every lead in under a minute, 24/7.
 
 {{RANDOM|Worth me sending|Happy to send}} a 2-min video of how it'd
 work for {{company|your team}}?
-- Arjun
+ -  Arjun
 
 ---
 {{sender_physical_address}}

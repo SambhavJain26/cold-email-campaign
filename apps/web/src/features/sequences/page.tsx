@@ -131,7 +131,7 @@ export default function SequencesPage() {
                     </TableCell>
                     <TableCell className="py-1.5">
                       {users.length === 0 ? (
-                        <span className="text-xs text-muted-foreground">-</span>
+                        <span className="text-xs text-muted-foreground"> - </span>
                       ) : (
                         <div className="flex flex-wrap gap-1">
                           {users.map((c) => (

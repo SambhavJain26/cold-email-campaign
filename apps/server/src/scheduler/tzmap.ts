@@ -1,6 +1,6 @@
 // Timezone resolution (decision X, docs/06 §4): static US state → IANA map.
 // Split states are mapped to their MAJORITY zone (noted inline). Unknown or
-// missing state → the caller falls back to settings.default_timezone -
+// missing state → the caller falls back to settings.default_timezone - 
 // unknown NEVER means send-now (spec Part 7).
 
 export const STATE_TZ: Record<string, string> = {

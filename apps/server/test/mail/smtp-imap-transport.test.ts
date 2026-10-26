@@ -68,7 +68,7 @@ describe('SmtpImapTransport over a real server (B8.1)', () => {
       mailboxId: CANARY_ID,
       to: LEAD.address,
       subject: 'quick question about Acme',
-      bodyText: 'Hi Sarah,\n\nNoticed you handle listings in Austin.\n\n- Arjun',
+      bodyText: 'Hi Sarah,\n\nNoticed you handle listings in Austin.\n\n -  Arjun',
       headers: { messageId },
     });
     expect(result).toEqual({ messageId, accepted: true });

@@ -108,20 +108,20 @@ export default function LeadsPage() {
     {
       key: 'name',
       header: 'Name',
-      cell: (l) => [l.first_name, l.last_name].filter(Boolean).join(' ') || '-',
+      cell: (l) => [l.first_name, l.last_name].filter(Boolean).join(' ') || ' - ',
     },
-    { key: 'company', header: 'Company', cell: (l) => l.company ?? '-' },
+    { key: 'company', header: 'Company', cell: (l) => l.company ?? ' - ' },
     {
       key: 'location',
       header: 'Location',
-      cell: (l) => [l.city, l.state].filter(Boolean).join(', ') || '-',
+      cell: (l) => [l.city, l.state].filter(Boolean).join(', ') || ' - ',
     },
     { key: 'tier', header: 'Tier', cell: (l) => <TierBadge tier={l.tier} /> },
     {
       key: 'state',
       header: 'State',
       cell: (l) =>
-        l.latest_enrollment ? <StateBadge state={l.latest_enrollment.current_state} /> : '-',
+        l.latest_enrollment ? <StateBadge state={l.latest_enrollment.current_state} /> : ' - ',
     },
     {
       key: 'suppressed',

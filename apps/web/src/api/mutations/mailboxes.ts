@@ -9,7 +9,7 @@ import {
 import { apiFetch } from '../client';
 
 // Fire-and-forget: returning the invalidation promise from a mutation-level
-// onSuccess makes React Query AWAIT the refetch before per-call callbacks -
+// onSuccess makes React Query AWAIT the refetch before per-call callbacks - 
 // if the refetch unmounts the calling component (e.g. a failure panel that
 // disappears on success), its mutate() callbacks are silently skipped.
 function useInvalidateMailboxes() {

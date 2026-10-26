@@ -129,7 +129,7 @@ export class SmtpImapTransport implements MailTransport {
           { uid: true, source: true, internalDate: true },
           { uid: true },
         )) {
-          // The `n:*` range returns the LAST message when n > highest UID -
+          // The `n:*` range returns the LAST message when n > highest UID - 
           // this filter is what makes fetchNew idempotent.
           if (m.uid <= highWater || !m.source) continue;
           messages.push(

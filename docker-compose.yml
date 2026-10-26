@@ -9,10 +9,10 @@ services:
       POSTGRES_PASSWORD: coldemail_dev
       POSTGRES_DB: coldemail
     ports:
-      - '5433:5432'
+     - '5433:5432'
     volumes:
-      - coldemail_pgdata:/var/lib/postgresql/data
-      - ./docker/initdb:/docker-entrypoint-initdb.d:ro
+     - coldemail_pgdata:/var/lib/postgresql/data
+     - ./docker/initdb:/docker-entrypoint-initdb.d:ro
     healthcheck:
       test: ['CMD-SHELL', 'pg_isready -U coldemail -d coldemail']
       interval: 5s
@@ -36,9 +36,9 @@ services:
         -Dgreenmail.users=canary@coldemail.test:canarypw,second@coldemail.test:secondpw,seed@lead.test:seedpw,mailer-daemon@mx.coldemail.test:daemonpw
         -Dgreenmail.verbose
     ports:
-      - '3025:3025' # SMTP
-      - '3143:3143' # IMAP
-      - '18080:8080' # management API (purge between test runs)
+     - '3025:3025' # SMTP
+     - '3143:3143' # IMAP
+     - '18080:8080' # management API (purge between test runs)
     healthcheck:
       # The image has no curl/wget/nc - bash's /dev/tcp is the only probe available.
       test:

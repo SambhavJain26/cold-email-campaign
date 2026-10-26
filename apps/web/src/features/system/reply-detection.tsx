@@ -97,9 +97,9 @@ export function ReplyDetectionTable() {
                       {formatDateTime(row.processed_at)}
                     </TableCell>
                     <TableCell className="py-1.5 text-xs tabular-nums">{row.mailbox_id}</TableCell>
-                    <TableCell className="py-1.5 text-xs">{row.from_address ?? '-'}</TableCell>
+                    <TableCell className="py-1.5 text-xs">{row.from_address ?? ' - '}</TableCell>
                     <TableCell className="max-w-64 truncate py-1.5 text-xs">
-                      {row.subject ?? '-'}
+                      {row.subject ?? ' - '}
                     </TableCell>
                     <TableCell className="py-1.5">
                       <Badge variant="outline" className={`border-transparent ${chip.className}`}>
@@ -107,7 +107,7 @@ export function ReplyDetectionTable() {
                       </Badge>
                     </TableCell>
                     <TableCell className="py-1.5 text-xs tabular-nums">
-                      {row.dsn_status ?? '-'}
+                      {row.dsn_status ?? ' - '}
                     </TableCell>
                     <TableCell className="py-1.5 text-xs">
                       {row.matched_enrollment_id === null ? (
@@ -123,7 +123,7 @@ export function ReplyDetectionTable() {
                     </TableCell>
                     <TableCell className="py-1.5 text-right text-xs tabular-nums">
                       {row.resulting_event_ids.length === 0
-                        ? '-'
+                        ? ' - '
                         : row.resulting_event_ids.join(', ')}
                     </TableCell>
                   </TableRow>

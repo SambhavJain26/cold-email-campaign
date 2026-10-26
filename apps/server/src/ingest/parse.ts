@@ -34,7 +34,7 @@ export type CanonicalField =
   | 'phone'
   | 'notes';
 
-// Keys are the POST-toSnakeCase form of the accepted headers (docs/09 §1) -
+// Keys are the POST-toSnakeCase form of the accepted headers (docs/09 §1) - 
 // e.g. the "e-mail" alias arrives here as "e_mail".
 const ALIASES: Record<string, CanonicalField> = {
   email: 'email',

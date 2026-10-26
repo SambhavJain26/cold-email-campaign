@@ -98,7 +98,7 @@ This was the ambiguity that broke the numbers. Here is the resolution the spec a
 - **Unsubscribe rate** counts them.
 - **Terminal state**: they're `UNSUBSCRIBED` (precedence over `REPLIED`), so the outcome breakdown counts them once.
 
-This is why rates can overlap while outcomes don't. **If you'd prefer unsubscribes excluded from reply rate entirely** (i.e., "remove me" is not a reply at all), that's a one-line change to the reply-rate denominator - tell me and I'll flip it. The spec's default is "it counts as a reply because a human typed it," which matches how most tools report it.
+This is why rates can overlap while outcomes don't. While unsubscribes could be excluded from reply rate entirely (i.e., treating "remove me" as an opt-out rather than a reply), the specification standard counts it as a reply because a human respondent actively authored the message.
 
 > **[FINALIZED]** Unsubscribe counts as both a reply AND an unsubscribe event, with UNSUBSCRIBED taking precedence as the terminal state. Default confirmed.
 
@@ -200,9 +200,9 @@ One campaign, **885 enrolled leads**, run to completion. Every number below deri
 - `soft_bounce`: 9 (all recovered on retry → those leads continued; not terminal)
 - `contacted` (≥1 delivered): 885 − 18 = **867**
 - `human_reply` (distinct leads): 72
-  - sentiment positive: 28
-  - sentiment neutral: 19
-  - sentiment negative: 25 (all of these also fired `unsubscribe`)
+ - sentiment positive: 28
+ - sentiment neutral: 19
+ - sentiment negative: 25 (all of these also fired `unsubscribe`)
 - `unsubscribe` (distinct leads): 40 (25 via reply + 15 via link)
 - `meeting_booked`: 17 (a subset of the 28 positive repliers)
 

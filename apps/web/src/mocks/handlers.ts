@@ -1,7 +1,7 @@
 // F0.4 - MSW handlers for EVERY endpoint in the docs/10 manifest, served from
 // the in-memory golden-fixture state (db.ts). Mutations mutate that state so
 // flows work end-to-end offline: enroll decrements capacity, tagging moves the
-// positive rate, etc. Request bodies are parsed with the SHARED zod schemas -
+// positive rate, etc. Request bodies are parsed with the SHARED zod schemas - 
 // same validation the real server runs (decision H).
 import { http, HttpResponse, type RequestHandler } from 'msw';
 import {
@@ -570,7 +570,7 @@ export const handlers: RequestHandler[] = [
           .replace(/\{\{[^}]*\}\}/g, lead.city ?? 'your market');
       const subject = expand(variant.subject_template);
       const bodyPreFooter = expand(variant.body_template);
-      // The real engine appends the footer after all expansion (docs/08 §4) -
+      // The real engine appends the footer after all expansion (docs/08 §4) - 
       // separator included so the panel can split it back out.
       const footer = `\n\n---\n${db.compliance.physical_address}\n${db.compliance.optout_text}`;
       return HttpResponse.json({

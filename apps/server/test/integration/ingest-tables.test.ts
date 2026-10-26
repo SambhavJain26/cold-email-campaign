@@ -79,7 +79,7 @@ describe('0005_ingest tables (B5.1)', () => {
     await insertImportRows(db, [
       { importId: id, rowNo: 1, raw: {}, emailNormalized: 'kept@y.dev', flag: 'ok' },
     ]);
-    // leads.import_id blocks deleting a committed import (RESTRICT default) -
+    // leads.import_id blocks deleting a committed import (RESTRICT default) - 
     // clear it first; import_rows then cascade.
     await pool.query(`UPDATE leads SET import_id = NULL`);
     await pool.query(`DELETE FROM imports WHERE id = $1`, [id]);

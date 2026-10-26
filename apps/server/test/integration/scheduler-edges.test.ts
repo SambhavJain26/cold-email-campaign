@@ -74,7 +74,7 @@ describe('scheduler edges (B3.18)', () => {
     await s.importLeads(6);
     await s.enroll({ count: 6 });
 
-    // Pace gap = 959/3 ≈ 320 min → sends ~13:30Z, ~19:00Z, ~00:30Z(Tue UTC) -
+    // Pace gap = 959/3 ≈ 320 min → sends ~13:30Z, ~19:00Z, ~00:30Z(Tue UTC) - 
     // the third lands PAST UTC midnight but still on Monday in ET.
     await s.advanceHours(15); // → Tue 04:00Z = Mon 23:00 ET
     const monday = s.mock.sentLog.filter((e) => e.result.accepted);

@@ -3,7 +3,7 @@ import { Inbox } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 
-/** Inline empty/error block (docs/11 §3): errors render this with a retry action -
+/** Inline empty/error block (docs/11 §3): errors render this with a retry action - 
  *  never a full-page spinner. */
 export function EmptyState({
   title,

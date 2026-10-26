@@ -1,5 +1,5 @@
 // Slot resolution (docs/08 §3): where {{custom_observation}} comes from,
-// per enrollments.personalization_mode. Runs BEFORE merge-tag expansion -
+// per enrollments.personalization_mode. Runs BEFORE merge-tag expansion - 
 // it computes the VALUE; merge.ts substitutes it like any other field.
 import type { CheckItem, LeadLite, RenderContext } from './types';
 

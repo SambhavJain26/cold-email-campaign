@@ -18,7 +18,7 @@ import { Label } from '@/components/ui/label';
 import { useCreateMailbox, usePatchMailbox, useTestConnection } from '@/api/mutations/mailboxes';
 
 /** The shared create schema, narrowed to the form's shape: ports/cap always
- *  present here (prefilled defaults), password validated per-mode at submit -
+ *  present here (prefilled defaults), password validated per-mode at submit - 
  *  blank in edit mode means "keep the sealed one" (never re-displayed, B6.2). */
 const formSchema = createMailboxBodySchema.omit({ auth_type: true, send_window: true }).extend({
   smtp_port: z.number().int().min(1).max(65535),
@@ -55,7 +55,7 @@ export function MailboxDialog({
     resolver: zodResolver(formSchema),
   });
 
-  // Stale test results are cleared in handleOpenChange (an event handler) -
+  // Stale test results are cleared in handleOpenChange (an event handler) - 
   // setState inside this effect trips the react-hooks compiler rule.
   useEffect(() => {
     if (!open) return;

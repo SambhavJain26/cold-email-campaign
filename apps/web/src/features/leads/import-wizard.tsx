@@ -171,7 +171,7 @@ export function ImportWizard({
                       <ul className="mt-1 space-y-0.5 font-mono text-xs text-muted-foreground">
                         {samples.map((s) => (
                           <li key={s.row_no}>
-                            row {s.row_no}: {s.email ?? '-'}
+                            row {s.row_no}: {s.email ?? ' - '}
                           </li>
                         ))}
                       </ul>

@@ -114,7 +114,7 @@ export function TiersTab({
         <p className="font-medium">💡 Insights</p>
         {best && (
           <p>
-            • Tier {best.tier ?? 'untiered'} produced {best.meetings} of {totalMeetings} meetings -
+            • Tier {best.tier ?? 'untiered'} produced {best.meetings} of {totalMeetings} meetings - 
             tiering by likelihood-to-close is doing the work.
           </p>
         )}

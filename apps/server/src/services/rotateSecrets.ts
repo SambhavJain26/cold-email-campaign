@@ -15,7 +15,7 @@ export interface RotateSecretsResult {
 /**
  * Re-seal all mailbox secrets from `oldKey` to `newKey` in a single tx.
  * Throws before touching a row if the keys are malformed or identical, or if
- * any secret fails to unseal with `oldKey` (wrong old key / tampered blob) -
+ * any secret fails to unseal with `oldKey` (wrong old key / tampered blob) - 
  * a partial rotation is never committed.
  */
 export async function rotateSecrets(

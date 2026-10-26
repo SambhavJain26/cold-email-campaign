@@ -54,7 +54,7 @@ export function ReplyCard({
         <div className="flex flex-wrap items-baseline gap-2">
           <span className="text-sm font-medium">{item.lead.name}</span>
           {item.lead.company && (
-            <span className="text-xs text-muted-foreground">- {item.lead.company}</span>
+            <span className="text-xs text-muted-foreground"> -  {item.lead.company}</span>
           )}
           <span className="text-xs text-muted-foreground">
             {item.received_at ? formatRelativeTime(item.received_at) : 'unknown time'}

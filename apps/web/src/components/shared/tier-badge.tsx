@@ -13,7 +13,7 @@ export function TierBadge({ tier, className }: { tier: LeadTier | null; classNam
   if (tier === null) {
     return (
       <span className={cn('text-xs text-muted-foreground', className)} data-tier="untiered">
-        - untiered
+       - untiered
       </span>
     );
   }

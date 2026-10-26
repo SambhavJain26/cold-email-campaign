@@ -117,7 +117,7 @@ export class Jobs implements JobPort {
 
   /**
    * Register (once) the poll cron for a mailbox. Called at boot for existing
-   * mailboxes AND by the B6.2 routes when a mailbox is created or reconnected -
+   * mailboxes AND by the B6.2 routes when a mailbox is created or reconnected - 
    * without that, a mailbox added through the UI is never polled until the
    * process restarts (its replies, bounces and STOPs stay invisible).
    *

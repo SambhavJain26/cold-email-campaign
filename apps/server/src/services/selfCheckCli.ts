@@ -24,7 +24,7 @@ async function main(): Promise<void> {
       return;
     }
     console.error(`self-check FAILED - ${violations.length} invariant violation(s):`);
-    for (const v of violations) console.error(`  - ${v.rule}: ${v.count}`);
+    for (const v of violations) console.error(` - ${v.rule}: ${v.count}`);
     process.exit(1);
   } finally {
     await pool.end();

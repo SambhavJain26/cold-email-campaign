@@ -82,8 +82,8 @@ Among mailboxes with `status='ok'` and `budget > 0`: pick lowest `sentToday / ca
 4b. transientError (4xx, connection): do NOT append anything; leave next_send_at unchanged;
     pg-boss send-attempt retries with backoff; after 5 failures → pause mailbox (status_reason='smtp_failing'), alert.
 4c. permanentError:
-    - recipient-level 5xx (mailbox doesn't exist at RCPT time): append hard_bounce directly (reducer → BOUNCED, suppression)
-    - auth/connection-level permanent: mailbox.status = 'auth_failed', alert, §6 redistribution
+   - recipient-level 5xx (mailbox doesn't exist at RCPT time): append hard_bounce directly (reducer → BOUNCED, suppression)
+   - auth/connection-level permanent: mailbox.status = 'auth_failed', alert, §6 redistribution
 ```
 
 `confirm-delivery(enrollmentId, stepNo)` job: if no `hard_bounce`/`soft_bounce` event exists for that (enrollment, step) → append `delivered`.

@@ -1,5 +1,5 @@
 // Operator account lifecycle (decision I): single row, argon2id hashes.
-// ensureOperator runs at boot (main.ts) and in the API test harness -
+// ensureOperator runs at boot (main.ts) and in the API test harness - 
 // compose() stays side-effect-free.
 import { hash, verify } from '@node-rs/argon2';
 import type { DbLike } from '../db/client';
@@ -30,7 +30,7 @@ export async function verifyPassword(hashed: string, password: string): Promise<
 
 /**
  * First-boot seeding: create the operator row from OPERATOR_EMAIL +
- * argon2id(OPERATOR_INITIAL_PASSWORD) if it doesn't exist yet. Idempotent -
+ * argon2id(OPERATOR_INITIAL_PASSWORD) if it doesn't exist yet. Idempotent - 
  * an existing row (including a changed password) is never touched.
  */
 export async function ensureOperator(

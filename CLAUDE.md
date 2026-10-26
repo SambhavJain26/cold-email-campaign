@@ -1,6 +1,8 @@
-# CLAUDE.md
+# Repository Technical Guidelines & Architectural Constraints
+**Architect & System Designer: Sambhav Jain**
 
-This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+This file provides architectural guidance and operational constraints for engineering agents working with code in this repository.
+
 
 ## Working rules
 

@@ -1,5 +1,5 @@
 // B4.1's SequenceProvider: serves SequenceDefs from the 0003_sequences tables
-// via campaigns.sequence_id. Same interface as StaticSequenceProvider (B3) -
+// via campaigns.sequence_id. Same interface as StaticSequenceProvider (B3) - 
 // the scheduler never knows the difference.
 import type { DbLike } from '../db/client';
 import { loadSequenceDef, sequenceIdForCampaign } from '../db/repos/sequencesRepo';

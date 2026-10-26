@@ -1,9 +1,9 @@
 # syntax=docker/dockerfile:1
 # Production image (B7.5, docs/16 §2). Multi-stage:
-#   base      - full workspace install (server runs via tsx; shared is raw TS)
+#   base     - full workspace install (server runs via tsx; shared is raw TS)
 #   web-build - the static SPA, built in real-API mode
-#   app       - API + workers (target: app)
-#   caddy     - TLS terminator that serves the SPA and proxies /api (target: caddy)
+#   app      - API + workers (target: app)
+#   caddy    - TLS terminator that serves the SPA and proxies /api (target: caddy)
 
 FROM node:22-slim AS base
 WORKDIR /app

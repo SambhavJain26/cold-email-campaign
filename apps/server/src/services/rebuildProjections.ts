@@ -1,5 +1,5 @@
 // rebuild-projections (docs/04 §5): replay the event log to reconstruct every
-// enrollment projection. Disaster recovery and correctness audit in one -
+// enrollment projection. Disaster recovery and correctness audit in one - 
 // --dry-run diffs derived state against stored state without writing.
 import type { Db } from '../db/client';
 import { listByEnrollments } from '../db/repos/eventsRepo';

@@ -118,7 +118,7 @@ export function foldEvents(
 /**
  * Derived COMPLETED transition (docs/04 §2.1): all steps sent (currentStepNo
  * past the last step), still ACTIVE, and the final step's delivery-confirm
- * window has passed. Used by the scheduler tick and rebuild-projections -
+ * window has passed. Used by the scheduler tick and rebuild-projections - 
  * deliberately not part of applyEvent (no event exists for it).
  */
 export function shouldComplete(

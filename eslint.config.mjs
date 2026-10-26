@@ -4,7 +4,7 @@ import prettier from 'eslint-config-prettier';
 import reactHooks from 'eslint-plugin-react-hooks';
 
 // ── Module-boundary building blocks (docs/02 §1) ─────────────────────────────
-// NOTE: flat config does NOT merge a rule's options across matching blocks -
+// NOTE: flat config does NOT merge a rule's options across matching blocks - 
 // last match wins per rule. So the blocks below PARTITION apps/server/src:
 // every file matches exactly one no-restricted-imports block.
 

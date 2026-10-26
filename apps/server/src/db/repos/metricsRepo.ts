@@ -171,7 +171,7 @@ export interface VariantStatsRow {
 }
 
 /**
- * Per-variant (walkthrough 13a): the opener's variant defines the cohort -
+ * Per-variant (walkthrough 13a): the opener's variant defines the cohort - 
  * every enrollment is attributed to the variant of its FIRST step-1 send.
  */
 export async function variantStats(db: DbLike, scope: MetricScope): Promise<VariantStatsRow[]> {
@@ -285,7 +285,7 @@ export async function selfCheckViolations(
     [
       'enrollment count != enrolled events',
       sql`SELECT abs((SELECT count(*) FROM enrollments en WHERE true ${enrFilter})
-            - (SELECT count(*) FROM events e WHERE e.type = 'enrolled'
+           - (SELECT count(*) FROM events e WHERE e.type = 'enrolled'
                ${c != null ? sql`AND e.campaign_id = ${c}` : sql``}))::int n`,
     ],
     [

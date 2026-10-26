@@ -38,7 +38,7 @@ export const TRANSIENT_FAILURE_LIMIT = 5;
 
 /**
  * Which health state a run of consecutive transient failures resolves to.
- * `rateLimited` counts how many of those failures looked like a rate limit -
+ * `rateLimited` counts how many of those failures looked like a rate limit - 
  * a clean run of them means the provider is blocking us, not that SMTP is sick.
  */
 export function transientVerdict(

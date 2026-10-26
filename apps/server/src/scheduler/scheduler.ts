@@ -584,7 +584,7 @@ export class Scheduler {
   }
 
   /**
-   * Round-robin among active variants (docs/06 pickVariant, B4.8): stateless -
+   * Round-robin among active variants (docs/06 pickVariant, B4.8): stateless - 
    * the counter is the campaign-step's sent count, so it survives restarts and
    * rebuilds; the per-tick cache keeps it one query per (campaign, step) per tick.
    */

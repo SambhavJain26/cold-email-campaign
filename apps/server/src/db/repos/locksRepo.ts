@@ -1,6 +1,6 @@
 // Advisory-lock helpers (transaction-scoped). Keyspace:
-//   (0, 0)              - projection-wide: rebuild holds exclusively, appends share
-//   (1, enrollmentId)   - per-enrollment append serialization
+//   (0, 0)             - projection-wide: rebuild holds exclusively, appends share
+//   (1, enrollmentId)  - per-enrollment append serialization
 import { sql } from 'drizzle-orm';
 import type { DbLike } from '../client';
 

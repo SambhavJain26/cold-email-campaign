@@ -1,4 +1,4 @@
-// Spam-trigger lexicon (docs/08 §5 check #9, decision W: rubric is DATA -
+// Spam-trigger lexicon (docs/08 §5 check #9, decision W: rubric is DATA - 
 // edit this file, not checks.ts, to tune). Phrases match case-insensitively
 // against subject + body; each matched phrase = one hit. Two structural
 // rules live alongside: more than ALL_CAPS_MAX all-caps words, and more than

@@ -1,5 +1,5 @@
 // Sequence endpoints (docs/10 §Sequences). Nested Sequence→Step→Variant;
-// writes are replace-set per save (retire-don't-delete once sends exist -
+// writes are replace-set per save (retire-don't-delete once sends exist - 
 // see the docs/10 footnote, decision 2026-07-23).
 import { z } from 'zod';
 

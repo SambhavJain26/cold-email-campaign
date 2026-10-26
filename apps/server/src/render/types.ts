@@ -37,7 +37,7 @@ export interface RenderContext {
    */
   threadSubject?: string;
   /**
-   * Mode-1 manual compose (docs/08 §3): subject/body are already literal -
+   * Mode-1 manual compose (docs/08 §3): subject/body are already literal - 
    * pipeline stages 1-3 are skipped; footer + checks still apply.
    */
   literal?: boolean;

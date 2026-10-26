@@ -1,4 +1,4 @@
-// B4.12: threading e2e with REAL rendered templates through the mock -
+// B4.12: threading e2e with REAL rendered templates through the mock - 
 // round-robin variants, Re: subjects that exactly match the step-1 render,
 // header chains, byte-identical soft-retry resends, and a reply to step 2
 // matching back through the poller.

@@ -37,7 +37,7 @@ export const envSchema = z
     TEST_DATABASE_URL: z.url().optional(),
   })
   .superRefine((cfg, ctx) => {
-    // A simulated clock against real SMTP/IMAP would burst-send the backlog -
+    // A simulated clock against real SMTP/IMAP would burst-send the backlog - 
     // refuse loudly (docs/13 §5: mock builds only).
     if (cfg.SIMULATED_CLOCK && cfg.MAIL_TRANSPORT === 'smtp_imap') {
       ctx.addIssue({
@@ -96,7 +96,7 @@ export function loadConfig(): Config {
   const result = parseEnv(process.env);
   if (!result.success) {
     console.error('Invalid environment configuration:');
-    for (const issue of result.issues) console.error(`  - ${issue}`);
+    for (const issue of result.issues) console.error(` - ${issue}`);
     console.error('See .env.example and docs/16-deployment-ops.md §1.');
     process.exit(1);
   }

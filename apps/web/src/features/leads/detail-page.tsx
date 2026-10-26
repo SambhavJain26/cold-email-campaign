@@ -96,11 +96,11 @@ export default function LeadDetailPage() {
           </CardHeader>
           <CardContent className="space-y-1 text-sm">
             <p>
-              <span className="text-muted-foreground">Company:</span> {lead.company ?? '-'}
+              <span className="text-muted-foreground">Company:</span> {lead.company ?? ' - '}
             </p>
             <p>
               <span className="text-muted-foreground">Location:</span>{' '}
-              {[lead.city, lead.state].filter(Boolean).join(', ') || '-'}
+              {[lead.city, lead.state].filter(Boolean).join(', ') || ' - '}
             </p>
             {lead.latest_enrollment && (
               <p>
@@ -198,7 +198,7 @@ function EditCard({ lead }: { lead: LeadDto & { notes: string | null } }) {
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value={UNTIERED}>- untiered</SelectItem>
+              <SelectItem value={UNTIERED}> -  untiered</SelectItem>
               <SelectItem value="A">🟢 Tier A</SelectItem>
               <SelectItem value="B">🟡 Tier B</SelectItem>
               <SelectItem value="C">⚪ Tier C</SelectItem>

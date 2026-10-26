@@ -40,7 +40,7 @@ function ThreadBody({ incomingMessageId }: { incomingMessageId: number }) {
           {data.lead.name}
           {data.lead.company && (
             <span className="ml-2 text-sm font-normal text-muted-foreground">
-              - {data.lead.company}
+             - {data.lead.company}
             </span>
           )}
         </DialogTitle>

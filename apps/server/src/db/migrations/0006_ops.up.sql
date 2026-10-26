@@ -1,4 +1,4 @@
--- 0006_ops: alerts (docs/03 §3). Applied before 0005_ingest lands (B5.1) -
+-- 0006_ops: alerts (docs/03 §3). Applied before 0005_ingest lands (B5.1) - 
 -- the runner applies pending migrations in filename order; nothing here
 -- depends on ingest tables. (The operator table arrives in 0007 - it was
 -- deliberately NOT part of 0002; see that file's header.)

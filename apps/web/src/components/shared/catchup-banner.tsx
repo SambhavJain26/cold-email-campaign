@@ -25,7 +25,7 @@ export function CatchupBanner() {
         <p className="text-sm font-medium">Catching up after downtime</p>
         <p className="text-xs text-muted-foreground">
           {payload.missed_sends ?? '?'} sends came due during {payload.downtime_hours ?? '?'}h
-          offline. They are queued behind today&apos;s normal pacing and go out at the usual gaps -
+          offline. They are queued behind today&apos;s normal pacing and go out at the usual gaps - 
           the scheduler never bursts a backlog, so deliverability is unaffected.
         </p>
       </div>

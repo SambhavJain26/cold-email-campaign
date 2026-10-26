@@ -73,7 +73,7 @@ export class AnthropicSentimentSuggester implements SentimentSuggester {
         { timeout: this.timeoutMs, maxRetries: 0 },
       );
 
-      // A safety refusal returns 200 with an empty/partial content array -
+      // A safety refusal returns 200 with an empty/partial content array - 
       // never index content[0] before checking (docs: stop_reason first).
       if (response.stop_reason === 'refusal') return null;
       return parseSentiment(response.content);

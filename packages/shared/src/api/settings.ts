@@ -1,5 +1,5 @@
 // Settings + compliance endpoints (docs/10 §Settings). The settings DTO is
-// the full docs/03 settings row (snake_case); PUT validates ranges here -
+// the full docs/03 settings row (snake_case); PUT validates ranges here - 
 // e.g. pause_hard_pct 1-20 per the contract's example.
 import { z } from 'zod';
 import { isoDateTime } from './common';

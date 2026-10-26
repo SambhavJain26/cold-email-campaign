@@ -1,4 +1,4 @@
-// B1.8: the full transition matrix (docs/04 §2.2) - every cell enumerated -
+// B1.8: the full transition matrix (docs/04 §2.2) - every cell enumerated - 
 // plus precedence collisions, soft-retry exhaustion, sentiment resolution,
 // and the derived completion rule.
 import { describe, expect, it } from 'vitest';

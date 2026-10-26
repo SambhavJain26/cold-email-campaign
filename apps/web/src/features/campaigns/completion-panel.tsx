@@ -4,7 +4,7 @@ import type { OutcomesResponse, OverviewResponse } from '@coldemail/shared';
 import { Button } from '@/components/ui/button';
 import { MetricStat } from '@/components/shared/metric-stat';
 
-/** Terminal states are mutually exclusive and must sum to the enrolled total -
+/** Terminal states are mutually exclusive and must sum to the enrolled total - 
  *  the reconciliation is the point of the Stage-9 report, so it is shown, not assumed. */
 export function outcomeRows(outcomes: OutcomesResponse): Array<[string, number]> {
   return [

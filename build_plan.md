@@ -22,9 +22,9 @@ A guiding rule throughout: **correctness-critical logic is built and proven firs
 
 ---
 
-## 1. Assumptions & decisions you can override
+## 1. Architectural Decisions & Configurable Parameters
 
-You asked me to choose where the spec left things open. Here is every choice I made that could reasonably go another way. If any is wrong, tell me and I'll adjust the affected stages - none of these are baked so deep that changing them is expensive, and I note the swap cost for each.
+The system design deliberately isolates architectural choices that balance operational simplicity with future adaptability. Each decision documents its design rationale and substitution cost:
 
 | # | Decision | What I assumed | Override cost |
 |---|----------|----------------|---------------|
@@ -35,10 +35,10 @@ You asked me to choose where the spec left things open. Here is every choice I m
 | E | **Sentiment AI pre-suggestion** | Optional, behind an interface, defaulting to the Anthropic API (you already have access). Human always confirms, so the system is fully functional with the AI turned off. | Trivial. It's an optional adapter; off by default costs nothing. |
 | F | **"STOP" opt-out detection** | Automated: a human reply whose body matches opt-out keywords fires `unsubscribe` immediately (compliance: honour opt-outs promptly), *in addition to* `human_reply`, without waiting for you to tag it. You still tag sentiment. This reconciles the plain-text-STOP mechanism (spec Part 8) with human sentiment tagging (Part 6). | Low. If you'd rather opt-out only fire when you tag "Negative," it's a one-line switch in the poller. |
 
-**Two items you flagged as pending - how this plan handles them:**
+**Specification Implementation Notes:**
 
-1. **Spec sections not yet drawn as screens** (reply-detection view, missed-day/catch-up notice, CAN-SPAM footer editor, mailbox failure states). These are **built as real UI in Stage 7** - the plan treats them as first-class screens, not afterthoughts. I list exactly which screens in that stage. I am **not** editing the walkthrough or spec; I'm building the screens the spec implies.
-2. **The deferred judgment call** (whether strong Tier-A conversion should later shift effort toward human-written email and shrink automation). The plan makes the tiering **ratios and the tier→effort-mode mapping configuration, not hardcoded logic** (§7). When real data arrives, that decision becomes a settings change, not a code change. It stays undecided, exactly as you asked.
+1. **Operational States Rendered as Core Screens** (reply-detection view, missed-day/catch-up notice, CAN-SPAM footer editor, mailbox failure states). These are implemented as first-class UI views in Stage 7.
+2. **Dynamic Tier Effort Allocation**: The platform makes tiering ratios and tier-to-effort mappings fully configurable in settings rather than hardcoded in domain logic, allowing live campaign data to guide human versus automated outreach balance.
 
 ---
 
@@ -496,10 +496,10 @@ Nine stages. Each is independently buildable and testable, and builds on the las
 **What's built**
 - React + Vite dashboard implementing the nine screens (Overview, Leads, Mailboxes, Sequences, Campaigns, Unibox, Analytics, Cold Storage, Settings) against the Stage-6 API, with the walkthrough's exact numbers and interactions (capacity meter, one-click Unibox tagging with optional AI suggestion, mark-meeting, tier filters, sparkline health trends).
 - **The pending screens the spec implied but the walkthrough hadn't mocked**, now built for real:
-  - **Reply-detection view** - the 4-bucket classifier's output (bounce / auto-reply / human / unrelated), including the separate auto-reply/OOO tab.
-  - **Missed-day / catch-up notice** - the "Scheduler Resumed After Downtime" panel (never-burst explanation).
-  - **CAN-SPAM footer editor** - editing `compliance_settings` (physical address + opt-out text), with the guarantee it's always appended.
-  - **Mailbox failure states** - the `AUTH FAILED` reconnect panel, the `IMAP Poll Stale` panel, and the auto-pause panel, driven by real `status` values.
+ - **Reply-detection view** - the 4-bucket classifier's output (bounce / auto-reply / human / unrelated), including the separate auto-reply/OOO tab.
+ - **Missed-day / catch-up notice** - the "Scheduler Resumed After Downtime" panel (never-burst explanation).
+ - **CAN-SPAM footer editor** - editing `compliance_settings` (physical address + opt-out text), with the guarantee it's always appended.
+ - **Mailbox failure states** - the `AUTH FAILED` reconnect panel, the `IMAP Poll Stale` panel, and the auto-pause panel, driven by real `status` values.
 
 **How it's tested**
 - Component tests for the interactive pieces (Unibox tagging, capacity meter, filters).

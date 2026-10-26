@@ -1,5 +1,5 @@
 // Send-window math (docs/06 §4): windows are the MAILBOX's configured hours
-// evaluated in the RECIPIENT's zone. Daily caps reset at local midnight -
+// evaluated in the RECIPIENT's zone. Daily caps reset at local midnight - 
 // implemented as "count sent events since local midnight", so there is no
 // reset cron and no drift. All tz conversion via Intl (no deps).
 import type { SendWindow } from '../db/schema/transport';
