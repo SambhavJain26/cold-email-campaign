@@ -1,4 +1,4 @@
-# Cold Email Campaign Engine: Event-Sourced Outbound Platform
+# Event-Sourced Cold Email & Deliverability Engine
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 [![Node.js: >=22](https://img.shields.io/badge/Node.js-%3E%3D22-green.svg)](https://nodejs.org/)

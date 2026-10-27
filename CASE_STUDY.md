@@ -1,8 +1,8 @@
-# Case Study: Event-Sourced Cold Email Orchestration Engine
+# Case Study: Event-Sourced Cold Email & Deliverability Engine
 
 ## Project Hero
 
-- **Project Title**: Sovereign Cold Email Campaign & Delivery Orchestration Engine
+- **Project Title**: Event-Sourced Cold Email & Deliverability Engine
 - **Role**: Lead Systems Architect & Full-Stack Engineer
 - **Author**: Sambhav Jain
 - **Project Type**: Distributed Event-Driven Outbound Engine & Multi-Mailbox Automation
