@@ -1,5 +1,12 @@
 # PROGRESS — Cold Email Campaign Tool
 
+**2026-10-29 IST mailbox rollout:** [x] explicitly authorized, pushed and deployed `7c48d24`,
+including authorized Campaigns 3/4 pauses. Campaigns 2/3/4 remain paused; automatic enrollment
+off. All four mailboxes stay at 25/day. All 35 migrations, healthy services/routes, 551-enrollment
+zero drift/self-check, identical protected snapshots (2,786 events / 984 sends), validated
+backups/manifests pass. Authenticated browser verification stopped at URL identification and
+remains unverified. No resume/enrollment/rollout send. Evidence is in docs/17.
+
 **2026-10-29 IST mailbox repair:** [x] explicitly requested mailbox 2 effective cap restored
 from 12 to 25/day, with other row fields preserved. Validated pre/post backups, production
 551-enrollment zero drift and clean self-check pass. Campaigns 3/4 are operator-active;
@@ -9,7 +16,7 @@ no code deployment or campaign/enrollment mutation occurred. Evidence is in docs
 Pause/resume/reconnect parse the server's Mailbox response; matching mocks no longer hide
 contract drift. Auto-pause recovery uses saved percentages, with accurate returned-cap feedback.
 Type/lint/format/build, web 6/6, API 13/13, browser 8/8, locked golden exactly 47/47 pass.
-No migration or deployment. Explicit deployment and rollout-pause authorization remain pending.
+No migration. Subsequently deployed with explicit authorization as recorded above.
 
 **The single tracking file.** Tick tasks here as they complete; task definitions live in [docs/14-build-stages-backend.md](docs/14-build-stages-backend.md) and [docs/15-build-stages-frontend.md](docs/15-build-stages-frontend.md); all design docs indexed at [docs/00-INDEX.md](docs/00-INDEX.md).
 

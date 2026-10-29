@@ -1,5 +1,56 @@
 # Local canary runbook (B8.3-local) — two-week validation on throwaway Gmail
 
+## 2026-10-29 IST mailbox fixes — authorized deployment and campaign pauses verified
+
+After the local tests and live cap repair below, the operator explicitly approved pausing
+Campaigns 3/4, deploying `7c48d24`, and leaving them paused. Fresh preflight found both
+campaigns active, automatic enrollment off everywhere, all four mailboxes `ok` at 25/day,
+2,786 events / 984 sends and 551 enrollments. Production replay/self-check passed.
+
+Pushed `canary` to `7c48d24`; GitHub accepted the push via its repository relocation redirect.
+Transferred a verified incremental bundle from `3625ccc`, SHA-256
+`9b26137ed27a2520b5446562d456514dbc1660eeae2c9e3a1381708223bf532f`.
+Gracefully stopped the app, validated the pre-change backup, then guardedly paused exactly
+Campaigns 3/4. Captured the stable paused baseline, fast-forwarded the clean VPS checkout,
+rebuilt app/gateway/backup and restarted coherently. No migration was added.
+
+Verified outcomes:
+
+- App/database healthy; gateway/backup running. All 35 migrations retained.
+- Campaign 1 archived; Campaigns 2/3/4 paused, automatic enrollment off everywhere.
+- All four mailboxes remain `ok`, configured/effective cap 25/day. Mailbox 2's recovery cap
+  remains NULL. Saved global resume percentage remains 100.
+- Canonical production replay: 551 enrollments, zero differences; self-check clean.
+- Exact before/after hashes match for complete events, enrollment state (including pending
+  dates, progress, holds/delays/retries), sent messages, 21 suppressions, paused campaign
+  configuration, settings/compliance, mailbox settings/deadlines (excluding poll freshness),
+  sequences/steps/variants, campaign/global personalized copy and campaign lead pools.
+  Stable watermarks remain 2,786 events / max ID 2,786 / 984 sent messages.
+- Event hash `1ee5fc6e2e3e609e75f956202f4a3c8e`; enrollment hash
+  `6c8dabcc261e306e5d967947f9e140be`; sent hash `1df782a122d76378eaae23bb286233ef`.
+- Public health, Mailboxes, Campaigns, version and portfolio return 200. Unauthenticated
+  mailbox/settings GETs return 401. Served build version is
+  `64f9c8c7-1906-4b0d-9835-452415fc2c90`, asset `index-HXeraX89.js`.
+  Served mailbox-fix markers pass; public and gateway asset SHA-256 both equal
+  `010431b8457d313c572cf7fa23cb8cb9e33db2440b5b57b65b7bd02ffbfe9ad2`.
+- Pre-backup `mailbox-deploy-before-20261029.dump`: 5,158,737 bytes; post-backup
+  `mailbox-deploy-after-20261029.dump`: 5,158,848 bytes; both catalogs validate at 384 lines.
+  Live and both independent manifest copies retain SHA-256
+  `03c28dfa962555297dafaec6b7b217888364306ced8dc12eee68d39d0ae814d4`.
+- Disk is 52% used, about 12 GiB available. No infrastructure/cache cleanup performed.
+  Build-time runtime audit reports eight existing dependency findings (three moderate,
+  four high, one critical); dependency remediation was not part of this mailbox release.
+
+Authenticated browser verification remains unverified: the computer-use tool stopped
+before browser interaction because it could not confidently determine Chrome's current URL
+for policy enforcement. No browser input, login attempt, policy bypass or live mailbox action
+was performed to test the fix. Local mailbox browser 8/8 and action-contract regressions
+are verified below. Server/route/data verification completed independently.
+
+The only rollout data mutations were the explicitly approved Campaigns 3/4 status pauses.
+No resume, enrollment, acknowledgement, historical recovery/linking, settings change or
+outbound mail occurred during rollout. Leave Campaigns 2/3/4 paused for operator review.
+
 ## 2026-10-29 IST mailbox 2 — authorized cap restoration verified
 
 The operator requested restoring the mailbox limited by bounce recovery to 25/day and

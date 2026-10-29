@@ -8,6 +8,14 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Current operating boundary
 
+**2026-10-29 mailbox fixes deployed:** explicitly approved `7c48d24` is pushed/deployed,
+with explicitly approved Campaigns 3/4 pauses. Campaigns 2/3/4 remain paused, automatic
+enrollment off; four healthy mailboxes remain at 25/day and saved resume percentage 100.
+All 35 migrations, healthy services/routes, 551-enrollment zero drift/self-check, unchanged
+2,786 events / 984 sends and full protected snapshots, validated pre/post backups and
+deletion manifests pass. Browser verification stopped on computer-use URL identification;
+authenticated live UI remains unverified. See docs/17. No resume, enrollment or rollout send.
+
 **2026-10-29 mailbox cap repair verified:** explicitly requested mailbox 2 restoration
 changed only `resume_cap` 12→NULL; configured/effective capacity is 25/day and status remains
 `ok`. Global resume percentage was already 100. Fresh production state has Campaigns 3/4
@@ -16,7 +24,7 @@ zero drift and clean self-check pass; see docs/17. No code deployment or campaig
 enrollment/history change was performed. Do not infer paused state from older checkpoints.
 Mailbox action response-contract and saved recovery-percentage fixes are verified locally:
 type/lint/format/build, web 6, API 13, browser 8 and locked golden exactly 47 pass.
-No migration; code deployment and any campaign pause remain separately gated. See docs/17.
+No migration. The subsequently authorized deployment and Campaigns 3/4 pauses are verified above.
 
 **2026-10-12 business-day scheduling deployed:** explicitly authorized push/deploy at `bc0f1e0`,
 with separately authorized Campaign 3 pause. All 35 migrations, healthy services/routes,

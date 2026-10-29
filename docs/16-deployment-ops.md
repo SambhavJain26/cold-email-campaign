@@ -1,5 +1,15 @@
 # Deployment & Operations
 
+## Mailbox action/recovery fixes — deployed 2026-10-29
+
+Explicitly approved `7c48d24` is deployed, with authorized Campaigns 3/4 pauses; Campaigns
+2/3/4 remain paused and automatic enrollment is off. All four mailboxes are `ok` at 25/day,
+resume setting 100. No migration; all 35 retained. Services/routes, 551-enrollment zero
+drift/self-check, identical protected snapshots (2,786 events / 984 sends), validated pre/post
+backups and independent deletion manifests pass. Authenticated UI remains unverified because
+computer-use stopped on browser URL identification. No resume/enrollment/rollout send.
+See docs/17 for evidence and remaining boundaries; leave campaigns paused for operator review.
+
 ## Business-day application release — deployed 2026-10-12
 
 Operator-authorized `bc0f1e0` is pushed/deployed with separately authorized Campaign 3 pause.
