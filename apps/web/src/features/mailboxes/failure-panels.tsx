@@ -9,6 +9,7 @@ import { Input } from '@/components/ui/input';
 import { cn } from '@/lib/utils';
 import { formatRelativeTime } from '@/lib/format';
 import { useAlerts } from '@/api/queries/alerts';
+import { useSettings } from '@/api/queries/settings';
 import {
   useReconnectMailbox,
   useResumeMailbox,
@@ -158,6 +159,8 @@ function ImapStalePanel({ mailbox }: { mailbox: MailboxDto }) {
 
 function AutoPausedPanel({ mailbox }: { mailbox: MailboxDto }) {
   const resume = useResumeMailbox();
+  const { data: settings } = useSettings();
+  const capPct = settings?.resume_cap_pct;
   const { data: alerts } = useAlerts(true);
   const paired = alerts?.items.find(
     (a: AlertDto) =>
@@ -192,15 +195,18 @@ function AutoPausedPanel({ mailbox }: { mailbox: MailboxDto }) {
         </Button>
         <Button
           variant="outline"
-          disabled={resume.isPending}
+          disabled={resume.isPending || capPct === undefined}
           onClick={() =>
             resume.mutate(
-              { id: mailbox.id, cap_pct: 50 },
-              { onSuccess: () => toast.success(`${mailbox.from_address} resumed at 50% cap`) },
+              { id: mailbox.id, cap_pct: capPct },
+              {
+                onSuccess: (updated) =>
+                  toast.success(`${mailbox.from_address} resumed at ${updated.effective_cap}/day`),
+              },
             )
           }
         >
-          Resume at 50%
+          {capPct === undefined ? 'Loading resume setting…' : `Resume at ${capPct}%`}
         </Button>
       </div>
     </PanelCard>

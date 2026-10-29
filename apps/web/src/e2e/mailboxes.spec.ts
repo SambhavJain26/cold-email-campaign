@@ -94,5 +94,28 @@ test('auto_paused panel resumes at 50%', async ({ page }) => {
 
   await panel.getByRole('button', { name: 'Resume at 50%' }).click();
   await expect(panel).not.toBeVisible();
-  await expect(page.getByText('resumed at 50% cap')).toBeVisible();
+  await expect(page.getByText('resumed at 15/day')).toBeVisible();
 });
+
+for (const pct of [100, 75]) {
+  test(`auto-paused resume uses saved ${pct}% and displays the returned daily cap`, async ({
+    page,
+  }) => {
+    await enableFailureFixtures(page);
+    await login(page);
+    await page.evaluate(async (resume_cap_pct) => {
+      const settings = await fetch('/api/v1/settings').then((res) => res.json());
+      const saved = await fetch('/api/v1/settings', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json', 'X-Requested-With': 'fetch' },
+        body: JSON.stringify({ ...settings, resume_cap_pct }),
+      });
+      if (!saved.ok) throw new Error(`Settings save failed: ${saved.status}`);
+    }, pct);
+    await navigate(page, 'Mailboxes');
+    const panel = page.getByTestId('auto-paused-4');
+    await panel.getByRole('button', { name: `Resume at ${pct}%` }).click();
+    await expect(panel).not.toBeVisible();
+    await expect(page.getByText(`resumed at ${Math.floor((30 * pct) / 100)}/day`)).toBeVisible();
+  });
+}

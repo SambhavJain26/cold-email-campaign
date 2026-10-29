@@ -178,7 +178,7 @@ Among mailboxes with `status='ok'` and `budget > 0`: pick lowest `sentToday / ca
 ## 6. Mailbox health machine (spec Part 9 + Part 11)
 
 ```
-ok ──(hard-bounce rule fires)──────────▶ auto_paused   ──(operator "Resume at 50%")──▶ ok (resume_cap = 50% of daily_cap)
+ok ──(hard-bounce rule fires)──────────▶ auto_paused   ──(operator "Resume at configured %")──▶ ok (resume_cap = configured % of daily_cap)
 ok ──(SMTP auth permanent failure)─────▶ auth_failed   ──(operator reconnects, verify OK)──▶ ok
 ok ──(no successful poll > stale_poll_hours)─▶ imap_stale ──(poll succeeds)──▶ ok (automatic)
 ok ──(provider rate-limit persists)────▶ provider_blocked ──(operator resume)──▶ ok
@@ -200,7 +200,7 @@ on pause: status='auto_paused', alert with both window numbers (walkthrough Stag
 
 **Assignment rule (finding 25):** a mailbox is assigned atomically with the first successful `sent` event. Unstarted work is already unassigned and normal rotation selects another healthy mailbox. Started threads remain pinned and wait, preserving threading. The impossible `redistributeUnstarted` path was removed.
 
-**Resume:** operator action `POST /mailboxes/:id/resume { capPct }` sets `resume_cap = daily_cap × capPct / 100`, status `ok`. `resume_cap` clears back to null (full cap) automatically after 7 consecutive days with 0 hard bounces (checked in tick housekeeping).
+**Resume:** operator action `POST /mailboxes/:id/resume { cap_pct? }` accepts integer percentages 1–100. Omitted percentage uses saved `settings.resume_cap_pct` (default 50) for auto-paused mailboxes and 100 for operator-paused mailboxes. It sets `resume_cap = max(1, floor(daily_cap × cap_pct / 100))`, status `ok`. Changing the global setting alone does not rewrite existing reduced caps. `resume_cap` clears back to null (full cap) automatically after 7 consecutive days with 0 hard bounces (checked in tick housekeeping).
 
 ## 7. Capacity & enrollment (walkthrough Stages 5, 8)
 

@@ -442,7 +442,7 @@ export const handlers: RequestHandler[] = [
       if (!mailbox) return notFound('mailbox');
       mailbox.status = 'paused';
       mailbox.status_reason = 'paused by operator';
-      return HttpResponse.json({ ok: true });
+      return HttpResponse.json(mailbox);
     }),
   ),
   http.post(
@@ -453,11 +453,11 @@ export const handlers: RequestHandler[] = [
       const body = await parseBody(request, resumeMailboxBodySchema);
       if (body instanceof Response) return body;
       const wasAutoPaused = mailbox.status === 'auto_paused';
-      const capPct = body.cap_pct ?? (wasAutoPaused ? 50 : 100);
+      const capPct = body.cap_pct ?? (wasAutoPaused ? Number(db.settings.resume_cap_pct) : 100);
       mailbox.status = 'ok';
       mailbox.status_reason = null;
-      mailbox.effective_cap = Math.round((mailbox.daily_cap * capPct) / 100);
-      return HttpResponse.json({ ok: true });
+      mailbox.effective_cap = Math.max(1, Math.floor((mailbox.daily_cap * capPct) / 100));
+      return HttpResponse.json(mailbox);
     }),
   ),
   http.post(
@@ -470,7 +470,7 @@ export const handlers: RequestHandler[] = [
       mailbox.status = 'ok';
       mailbox.status_reason = null;
       mailbox.last_successful_poll_at = NOW;
-      return HttpResponse.json({ ok: true });
+      return HttpResponse.json(mailbox);
     }),
   ),
 

@@ -124,7 +124,11 @@ export function RulesTab({
           {num('pause_window_sends', '% window size (sends)', 'Last-N sends the % is taken over.')}
           {num('pause_absolute_bounces', 'Absolute bounces', 'Absolute rule numerator.')}
           {num('pause_absolute_span', 'Absolute span (sends)', 'Absolute rule window.')}
-          {num('resume_cap_pct', 'Resume cap %', 'Cap after auto-pause resume (default 50).')}
+          {num(
+            'resume_cap_pct',
+            'Resume cap %',
+            'Applied when resuming an auto-paused mailbox. Existing reduced caps stay unchanged.',
+          )}
         </CardContent>
       </Card>
 

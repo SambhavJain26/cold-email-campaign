@@ -19,6 +19,16 @@ call planned work implemented.
 
 ## Current operating boundary
 
+**2026-10-29 mailbox cap repair verified:** explicitly requested mailbox 2 restoration
+changed only `resume_cap` 12→NULL; configured/effective capacity is 25/day and status remains
+`ok`. Global resume percentage was already 100. Fresh production state has Campaigns 3/4
+active, Campaign 2 paused, Campaign 1 archived. Validated pre/post backups, 551-enrollment
+zero drift and clean self-check pass; see docs/17. No code deployment or campaign/status/
+enrollment/history change was performed. Do not infer paused state from older checkpoints.
+Mailbox action response-contract and saved recovery-percentage fixes are verified locally:
+type/lint/format/build, web 6, API 13, browser 8 and locked golden exactly 47 pass.
+No migration; code deployment and any campaign pause remain separately gated. See docs/17.
+
 **2026-10-12 business-day scheduling deployed:** explicitly authorized push/deploy at `bc0f1e0`,
 with separately authorized Campaign 3 pause. All 35 migrations, healthy services/routes,
 production sequence/preview contracts, 222-enrollment zero drift/self-check and validated

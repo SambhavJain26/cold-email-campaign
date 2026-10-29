@@ -1,7 +1,6 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import {
   mailboxSchema,
-  okResponseSchema,
   testConnectionResponseSchema,
   googleOauthDisconnectResponseSchema,
   googleOauthStartResponseSchema,
@@ -51,7 +50,7 @@ export function usePauseMailbox() {
   const invalidate = useInvalidateMailboxes();
   return useMutation({
     mutationFn: (id: number) =>
-      apiFetch(`/mailboxes/${id}/pause`, okResponseSchema, { method: 'POST' }),
+      apiFetch(`/mailboxes/${id}/pause`, mailboxSchema, { method: 'POST' }),
     onSuccess: invalidate,
   });
 }
@@ -59,8 +58,8 @@ export function usePauseMailbox() {
 export function useResumeMailbox() {
   const invalidate = useInvalidateMailboxes();
   return useMutation({
-    mutationFn: ({ id, cap_pct }: { id: number; cap_pct?: 50 | 100 }) =>
-      apiFetch(`/mailboxes/${id}/resume`, okResponseSchema, {
+    mutationFn: ({ id, cap_pct }: { id: number; cap_pct?: number }) =>
+      apiFetch(`/mailboxes/${id}/resume`, mailboxSchema, {
         method: 'POST',
         body: cap_pct === undefined ? {} : { cap_pct },
       }),
@@ -72,7 +71,7 @@ export function useReconnectMailbox() {
   const invalidate = useInvalidateMailboxes();
   return useMutation({
     mutationFn: ({ id, password }: { id: number; password: string }) =>
-      apiFetch(`/mailboxes/${id}/reconnect`, okResponseSchema, {
+      apiFetch(`/mailboxes/${id}/reconnect`, mailboxSchema, {
         method: 'POST',
         body: { password },
       }),

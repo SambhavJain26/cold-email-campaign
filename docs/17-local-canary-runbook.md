@@ -1,5 +1,54 @@
 # Local canary runbook (B8.3-local) — two-week validation on throwaway Gmail
 
+## 2026-10-29 IST mailbox 2 — authorized cap restoration verified
+
+The operator requested restoring the mailbox limited by bounce recovery to 25/day and
+fixing false errors from mailbox actions. Fresh production inspection found mailboxes 1–4
+all `ok`, each configured at 25/day; mailbox 2 (`s.jain@sambhavpmtech.com`) alone retained
+`resume_cap=12`, with `paused_at=NULL`. The saved global `resume_cap_pct` was already 100.
+Campaigns 3/4 were active, Campaign 2 paused and Campaign 1 archived; historical paused
+snapshots were not assumed current. Inspection watermarks were 2,774 events / 972 sends.
+
+After validating a pre-change backup, a guarded transaction changed only mailbox 2's
+`resume_cap` from 12 to NULL, requiring the exact identity, `ok` status and 25/day setting.
+Exactly one row changed. Effective cap is now 25/day; all other row fields matched the
+transaction's baseline. No mailbox status, campaign state, enrollment, bounce threshold,
+global setting, event or sent history was changed by this repair. Active workers were not
+stopped or driven; normal operator-enabled campaign activity can continue.
+
+Pre-backup `mailbox-cap-before-20261029.dump`: 5,151,056 bytes; post-backup
+`mailbox-cap-after-20261029.dump`: 5,151,184 bytes. Both custom-format catalogs validate
+with 384 lines, and each retains a separate copy of the live deletion manifest. Canonical
+production replay checks 551 enrollments with zero differences; self-check is clean.
+Production checkout remains `3625ccc`; no code deployment occurred.
+
+Root cause confirmed in code and production request logs: mailbox pause/resume/reconnect
+return `Mailbox`, while frontend hooks and MSW fixtures expected `{ok:true}`. A production
+pause request returned HTTP 200; the frontend rejected its response after the write.
+Recovery also hard-codes 50% in both the API default and UI, ignoring the saved percentage.
+Changing global settings does not rewrite an already persisted mailbox recovery cap.
+
+The local fix parses real `Mailbox` responses for pause/resume/reconnect and makes MSW
+return that same contract. Auto-paused resume defaults to the saved percentage, while
+operator-paused resume retains its full-cap default. Explicit resume accepts integer 1–100,
+matching settings. The panel displays the saved percentage, waits for settings, and reports
+the returned effective cap; the settings hint explains existing reduced caps are unchanged.
+Mock recovery uses the server's floor/minimum-one arithmetic. No migration or event type.
+
+Verified locally: typecheck, lint, format check and production web build pass; focused
+frontend regression/components 6/6, mailbox API 13/13, mailbox browser 8/8. API covers saved
+100/75/1 percentages, explicit override and invalid percentages without new events; browser
+coverage proves saved 50/100/75 settings and returned daily caps. Hook regressions parse
+the production response shape and verify operational invalidation for all three actions.
+The browser suite uses MSW and the API suite uses MockTransport; no external test mail.
+The existing Vite chunk-size and pg query deprecation warnings are non-blocking.
+
+Locked golden regression passes exactly 47/47 with unchanged fixtures/expectations (409s).
+All DB-backed runs were serial. Local implementation is complete and verified; deployment
+requires explicit per-deployment authorization. Fresh live recheck still shows all four
+mailboxes `ok`, configured/effective 25/day. Campaigns 3/4 remain active and were not paused
+for these local tests; any rollout pause and deployment must be explicitly authorized.
+
 ## 2026-10-12 IST business-day scheduling — authorized push/deploy completed
 
 The operator authorized push/deploy after the completed local gates, then separately chose

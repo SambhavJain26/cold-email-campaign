@@ -82,7 +82,7 @@ Three steps in a dialog: **Upload** (drag/drop CSV, client-side 10 MB check) →
 
 - `auth_failed` → red card: explanation, redistribution note, new-app-password input + **[Reconnect Mailbox]** → `POST reconnect`.
 - `imap_stale` → amber card: last-poll time, risk copy, **[Retry connection now]** → `POST test-connection` then refetch.
-- `auto_paused` → amber card: trigger detail from `status_reason` + the paired alert payload (both window numbers, likely cause), buttons **[Re-verify leads]** (links to Leads filtered to that mailbox's recent enrollments) and **[Resume at 50%]** → `POST resume {cap_pct:50}`.
+- `auto_paused` → amber card: trigger detail from `status_reason` + the paired alert payload (both window numbers, likely cause), buttons **[Re-verify leads]** (links to Leads filtered to that mailbox's recent enrollments) and **[Resume at configured %]** → `POST resume {cap_pct: settings.resume_cap_pct}`; disabled until settings load, success shows the returned effective daily cap.
 
 ## 5. ✍️ Sequences `/sequences`, builder `/sequences/:id` (§Stage 4)
 

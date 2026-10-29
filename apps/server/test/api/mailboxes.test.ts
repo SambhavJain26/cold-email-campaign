@@ -188,6 +188,49 @@ describe('B6.2 mailboxes', () => {
     expect(res.json().effective_cap).toBe(20); // 50% of 40
   });
 
+  it('auto-pause resume honors saved percentages and explicit overrides without changing history', async () => {
+    const wm = await eventWatermark(h.pool);
+    const original = await h.pool.query('SELECT resume_cap_pct FROM settings WHERE id=1');
+    try {
+      for (const pct of [100, 75, 1]) {
+        await h.pool.query('UPDATE settings SET resume_cap_pct=$1 WHERE id=1', [pct]);
+        await patchMailbox(h.services.db, 1, { status: 'auto_paused' });
+        const res = await h.inject({
+          method: 'POST',
+          url: '/api/v1/mailboxes/1/resume',
+          payload: {},
+        });
+        expect(res.statusCode).toBe(200);
+        expect(res.json()).toMatchObject({
+          status: 'ok',
+          daily_cap: 40,
+          effective_cap: Math.max(1, Math.floor((40 * pct) / 100)),
+        });
+      }
+      await patchMailbox(h.services.db, 1, { status: 'auto_paused' });
+      const explicit = await h.inject({
+        method: 'POST',
+        url: '/api/v1/mailboxes/1/resume',
+        payload: { cap_pct: 75 },
+      });
+      expect(explicit.statusCode).toBe(200);
+      expect(explicit.json().effective_cap).toBe(30);
+      for (const cap_pct of [0, 101, 50.5]) {
+        const invalid = await h.inject({
+          method: 'POST',
+          url: '/api/v1/mailboxes/1/resume',
+          payload: { cap_pct },
+        });
+        expect(invalid.statusCode).toBe(400);
+      }
+      await expectNoNewEvents(h.pool, wm);
+    } finally {
+      await h.pool.query('UPDATE settings SET resume_cap_pct=$1 WHERE id=1', [
+        original.rows[0].resume_cap_pct,
+      ]);
+    }
+  });
+
   it('reconnect re-seals and flips auth_failed → ok on verified creds', async () => {
     await patchMailbox(h.services.db, 1, { status: 'auth_failed', statusReason: 'IMAP auth' });
     transport.onVerify('sarah@agency.dev', { smtpOk: true, imapOk: true, roundTripMs: 10 });

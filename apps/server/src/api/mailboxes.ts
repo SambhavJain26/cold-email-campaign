@@ -493,9 +493,11 @@ export async function mailboxesRoutes(app: FastifyInstance, services: AppService
     },
     async (req) => {
       const row = await requireMailbox(req.params.id);
-      // Resume from auto_paused defaults to 50% cap (walkthrough Stage 7);
+      // Resume from auto_paused uses the operator's saved recovery percentage;
       // an operator-paused mailbox comes back at full cap.
-      const capPct = req.body.cap_pct ?? (row.status === 'auto_paused' ? 50 : 100);
+      const capPct =
+        req.body.cap_pct ??
+        (row.status === 'auto_paused' ? (await getSettings(db)).resumeCapPct : 100);
       await resumeMailbox({ db }, row.id, capPct, clock.now());
       return dtoOf(await requireMailbox(req.params.id));
     },

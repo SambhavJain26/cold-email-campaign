@@ -177,7 +177,7 @@ export const mailboxFoldersResponseSchema = z
 
 export const resumeMailboxBodySchema = z
   .object({
-    cap_pct: z.union([z.literal(50), z.literal(100)]).optional(),
+    cap_pct: z.number().int().min(1).max(100).optional(),
   })
   .strict();
 
